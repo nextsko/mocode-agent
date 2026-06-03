@@ -71,24 +71,8 @@ nfpms:
       - src: ./LICENSE.md
         dst: /usr/share/licenses/Mocode/LICENSE.md
 
-signs:
-  - cmd: cosign
-    signature: "${artifact}.sigstore.json"
-    args:
-      - sign-blob
-      - "--bundle=${signature}"
-      - "${artifact}"
-      - "--yes"
-    artifacts: checksum
-    output: true
-
 source:
   enabled: true
-
-sboms:
-  - artifacts: archive
-  - id: source
-    artifacts: source
 
 changelog:
   sort: asc

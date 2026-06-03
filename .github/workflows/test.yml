@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      GOEXPERIMENT: greenteagc
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test -race -failfast -timeout 10m ./...
+
+      - name: Vet
+        run: go vet ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      GOEXPERIMENT: null
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          config: .golangci.yml
+          args: --path-mode=abs --timeout=5m
