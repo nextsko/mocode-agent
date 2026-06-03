@@ -1,37 +1,20 @@
-name: Build-Mocode
+name: Release
 
 on:
   push:
     tags:
-      - v*.*.*
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  id-token: write
 
 jobs:
-  build:
-    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+  release:
+    name: Build and release with GoReleaser
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-            artifact: Mocode-linux-amd64.tar.gz
-            binary: Mocode-linux-amd64
-          - goos: darwin
-            goarch: amd64
-            artifact: Mocode-darwin-amd64.tar.gz
-            binary: Mocode-darwin-amd64
-          - goos: darwin
-            goarch: arm64
-            artifact: Mocode-darwin-arm64.tar.gz
-            binary: Mocode-darwin-arm64
-          - goos: windows
-            goarch: amd64
-            artifact: Mocode-windows-amd64.zip
-            binary: Mocode-windows-amd64.exe
-
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
@@ -42,51 +25,10 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - name: Set version
-        id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Build
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          REPO="${{ github.repository }}"
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o ${{ matrix.binary }} -trimpath \
-            -ldflags="-s -w -X github.com/package-register/mocode/internal/version.Version=${VERSION} -X github.com/package-register/mocode/internal/update.GitHubRepo=${REPO}" .
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            zip ${{ matrix.artifact }} ${{ matrix.binary }} README.md
-          else
-            tar -czf ${{ matrix.artifact }} ${{ matrix.binary }} README.md
-          fi
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v5
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
         with:
-          name: ${{ matrix.goos }}-${{ matrix.goarch }}
-          path: ${{ matrix.artifact }}
-
-  release:
-    name: Create Release
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v5
-        with:
-          path: release-artifacts
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            release-artifacts/linux-amd64/Mocode-linux-amd64.tar.gz
-            release-artifacts/darwin-amd64/Mocode-darwin-amd64.tar.gz
-            release-artifacts/darwin-arm64/Mocode-darwin-arm64.tar.gz
-            release-artifacts/windows-amd64/Mocode-windows-amd64.zip
-          generate_release_notes: true
-          draft: false
-          prerelease: false
+          version: latest
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
