@@ -4,18 +4,6 @@ version: 2
 
 project_name: Mocode
 
-before:
-  hooks:
-    - go mod tidy
-    - rm -rf completions
-    - mkdir completions
-    - rm -rf manpages
-    - mkdir manpages
-    - sh -c 'go run . completion bash >./completions/Mocode.bash'
-    - sh -c 'go run . completion zsh >./completions/Mocode.zsh'
-    - sh -c 'go run . completion fish >./completions/Mocode.fish'
-    - sh -c 'go run . man | gzip -c >./manpages/Mocode.1.gz'
-
 builds:
   - id: Mocode
     main: .
@@ -58,8 +46,6 @@ archives:
     files:
       - README*
       - LICENSE*
-      - manpages/*
-      - completions/*
     format_overrides:
       - goos: windows
         formats: [zip]
@@ -71,20 +57,19 @@ nfpms:
   - id: packages
     package_name: Mocode
     file_name_template: "{{ .ConventionalFileName }}"
+    maintainer: "Mocode Contributors <noreply@package-register.github.io>"
+    description: "A powerful terminal-based AI assistant for developers."
+    license: "FSL-1.1-MIT"
     formats:
       - apk
       - deb
       - rpm
       - archlinux
     contents:
-      - src: ./completions/Mocode.bash
-        dst: /etc/bash_completion.d/Mocode
-      - src: ./completions/Mocode.fish
-        dst: /usr/share/fish/vendor_completions.d/Mocode.fish
-      - src: ./completions/Mocode.zsh
-        dst: /usr/share/zsh/site-functions/_Mocode
-      - src: ./manpages/Mocode.1.gz
-        dst: /usr/share/man/man1/Mocode.1.gz
+      - src: ./README.md
+        dst: /usr/share/doc/Mocode/README.md
+      - src: ./LICENSE.md
+        dst: /usr/share/licenses/Mocode/LICENSE.md
 
 signs:
   - cmd: cosign
