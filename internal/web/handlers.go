@@ -14,6 +14,7 @@ import (
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
+	"github.com/package-register/mocode/internal/store"
 	"github.com/package-register/mocode/internal/workspace"
 )
 
@@ -271,7 +272,7 @@ func (s *Server) handlePutConfigToml(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if p := config.GlobalConfigData(); p != "" {
-		if err := os.WriteFile(p, []byte(req.Content), 0o644); err != nil {
+		if err := store.WriteJSON(p, req.Content); err != nil {
 			writeJSON(w, map[string]any{"success": false, "error": err.Error()})
 			return
 		}
@@ -476,8 +477,9 @@ func (s *Server) handleGetUpload(w http.ResponseWriter, r *http.Request) {
 
 	workDir := s.workspace.WorkingDir()
 	fullPath := filepath.Join(workDir, ".mocode", "uploads", sessionID, filePath)
-
-	if !strings.HasPrefix(filepath.Clean(fullPath), filepath.Clean(filepath.Join(workDir, ".mocode", "uploads"))) {
+	fullPath = filepath.Clean(fullPath)
+	uploadsDir := filepath.Clean(filepath.Join(workDir, ".mocode", "uploads", sessionID))
+	if !strings.HasPrefix(fullPath, uploadsDir) {
 		writeError(w, http.StatusForbidden, "path traversal")
 		return
 	}
@@ -692,6 +694,9 @@ func parseGitNameStatus(output string) map[string]string {
 		filename := strings.TrimSpace(parts[len(parts)-1])
 
 		switch {
+		case len(statusCode) == 0:
+			// Skip empty status lines (shouldn't happen after TrimSpace but defend)
+			continue
 		case statusCode[0] == 'A':
 			statusMap[filename] = "added"
 		case statusCode[0] == 'D':
@@ -930,16 +935,23 @@ func extractTitleFromFile(sessionID, workDir string) string {
 				} `json:"payload"`
 			} `json:"message"`
 		}
-		if err := json.Unmarshal([]byte(line), &record); err == nil {
-			if record.Message != nil && record.Message.Type == "TurnBegin" {
-				if text, ok := record.Message.Payload.UserInput.(string); ok {
-					if len(text) > 50 {
-						text = text[:50] + "..."
-					}
-					return text
-				}
-			}
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			continue
 		}
+		if record.Message == nil || record.Message.Type != "TurnBegin" {
+			continue
+		}
+		if record.Message.Payload == nil {
+			continue
+		}
+		text, ok := record.Message.Payload.UserInput.(string)
+		if !ok || text == "" {
+			continue
+		}
+		if len(text) > 50 {
+			text = text[:50] + "..."
+		}
+		return text
 	}
 	return ""
 }

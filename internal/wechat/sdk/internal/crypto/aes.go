@@ -103,6 +103,9 @@ func EncodeAESKeyBase64(key []byte) string {
 
 func pkcs7Pad(data []byte, blockSize int) []byte {
 	padding := blockSize - len(data)%blockSize
+	if padding == 0 {
+		padding = blockSize
+	}
 	pad := make([]byte, padding)
 	for i := range pad {
 		pad[i] = byte(padding)
