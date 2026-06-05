@@ -53,6 +53,7 @@ type CommandDescriptor struct {
 	Arguments   []commands.Argument
 	Risk        RiskLevel
 	Provider    ProviderInfo
+	ParentID    string // Non-empty means this command has a parent; used by palette for submenu grouping
 	Action      any
 }
 
@@ -110,4 +111,21 @@ func (r *CommandRegistry) Commands(ctx CommandContext) ([]CommandDescriptor, []D
 		out = append(out, items...)
 	}
 	return out, diagnostics
+}
+
+// GetCompletions returns a flat list of all commands, grouped by category.
+// Pass an empty filter string to get all commands.
+func (r *CommandRegistry) GetCompletions(ctx CommandContext) []CommandDescriptor {
+	all, _ := r.Commands(ctx)
+	return all
+}
+
+// GroupByCategory groups commands by category for UI rendering.
+func (r *CommandRegistry) GroupByCategory(ctx CommandContext) map[CommandCategory][]CommandDescriptor {
+	all, _ := r.Commands(ctx)
+	groups := make(map[CommandCategory][]CommandDescriptor)
+	for _, cmd := range all {
+		groups[cmd.Category] = append(groups[cmd.Category], cmd)
+	}
+	return groups
 }

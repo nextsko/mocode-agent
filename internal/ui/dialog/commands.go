@@ -751,14 +751,34 @@ func descriptorsFromCommandItems(items []*CommandItem, category capability.Comma
 		if item == nil {
 			continue
 		}
-		descriptors = append(descriptors, capability.CommandDescriptor{
+		desc := capability.CommandDescriptor{
 			ID:       item.id,
 			Title:    item.title,
 			Shortcut: item.shortcut,
 			Category: category,
 			Risk:     risk,
 			Action:   item.action,
-		})
+		}
+		// If it has children, record its ID so completions can render a sub-group hint.
+		if len(item.Children) > 0 {
+			desc.ParentID = item.id
+		}
+		descriptors = append(descriptors, desc)
+		// Flatten children into top-level list (no nesting in completions).
+		for _, child := range item.Children {
+			if child == nil {
+				continue
+			}
+			descriptors = append(descriptors, capability.CommandDescriptor{
+				ID:          child.id,
+				Title:       child.title,
+				Shortcut:    child.shortcut,
+				Category:    category,
+				Risk:        risk,
+				Action:      child.action,
+				ParentID:    item.id, // non-empty = child of this parent
+			})
+		}
 	}
 	return descriptors
 }
