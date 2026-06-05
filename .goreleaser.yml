@@ -1,105 +1,79 @@
-# yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json
-# vim: set ts=2 sw=2 tw=0 fo=jcroql
 version: 2
 
-project_name: Mocode
+project_name: mocode
+
+before:
+  hooks:
+    - go mod tidy
 
 builds:
-  - id: Mocode
-    main: .
-    binary: Mocode
+  - id: linux-amd64
+    goos: linux
+    goarch: amd64
     env:
       - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-      - windows
-      - freebsd
-      - openbsd
-      - netbsd
-    goarch:
-      - amd64
-      - arm64
-      - "386"
-      - arm
-    goarm:
-      - "7"
-    ignore:
-      - goos: windows
-        goarch: arm
     ldflags:
-      - -s -w -X github.com/package-register/mocode/internal/version.Version={{.Version}}
-    flags:
-      - -trimpath
+      - -s -w
+    binary: mocode_linux_amd64
+
+  - id: linux-arm64
+    goos: linux
+    goarch: arm64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+    binary: mocode_linux_arm64
+
+  - id: darwin-amd64
+    goos: darwin
+    goarch: amd64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+    binary: mocode_darwin_amd64
+
+  - id: darwin-arm64
+    goos: darwin
+    goarch: arm64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+    binary: mocode_darwin_arm64
+
+  - id: windows-amd64
+    goos: windows
+    goarch: amd64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+    binary: mocode_windows_amd64.exe
 
 archives:
-  - id: default
-    name_template: >-
-      {{ .ProjectName }}_
-      {{- .Version }}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
-      {{- with .Arm}}v{{ . }}{{ end }}
-    wrap_in_directory: true
-    files:
-      - README*
-      - LICENSE*
+  - format: zip
     format_overrides:
       - goos: windows
-        formats: [zip]
+        format: binary
 
 checksum:
-  name_template: "checksums.txt"
-
-nfpms:
-  - id: packages
-    package_name: Mocode
-    file_name_template: "{{ .ConventionalFileName }}"
-    maintainer: "Mocode Contributors <noreply@package-register.github.io>"
-    description: "A powerful terminal-based AI assistant for developers."
-    license: "FSL-1.1-MIT"
-    formats:
-      - apk
-      - deb
-      - rpm
-      - archlinux
-    contents:
-      - src: ./README.md
-        dst: /usr/share/doc/Mocode/README.md
-      - src: ./LICENSE.md
-        dst: /usr/share/licenses/Mocode/LICENSE.md
-
-source:
-  enabled: true
-
-changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^(build|ci): "
-      - "^chore: auto-update generated files$"
-      - "^chore\\(legal\\): "
-      - "^chore\\(deps\\): "
-      - "^docs: update$"
-      - "^test:"
-      - "^test\\("
-      - "^v\\d.*"
-      - "merge conflict"
-      - "Merge branch"
-      - "Merge pull request"
-      - "Merge remote-tracking branch"
-      - "go mod tidy"
-  groups:
-    - title: "New features"
-      regexp: "^.*feat[(\\w)]*:+.*$"
-      order: 100
-    - title: "Bug fixes"
-      regexp: "^.*fix[(\\w)]*:+.*$"
-      order: 200
-    - title: "Other"
-      order: 9999
+  name_template: 'mocode_checksums.txt'
+  algorithm: sha256
 
 release:
-  prerelease: auto
+  github:
+    owner: package-register
+    name: mocode
+  draft: false
+  prerelease: false
+  name_template: '{{.Tag}}'
+  body_template: |
+    ## What's Changed
+
+    {{range .Commits}}
+    - {{.Message}}
+    {{end}}
+
+    **Full Changelog**: https://github.com/package-register/mocode/compare/{{.PreviousTag}}...{{.Tag}}
