@@ -66,11 +66,11 @@ const (
 )
 
 const (
-	AgentCoder  string = "coder"
-	AgentTask   string = "task"
-	AgentGit    string = "git"
-	AgentRust   string = "rust"
-	AgentPlan   string = "plan"
+	AgentCoder   string = "coder"
+	AgentTask    string = "task"
+	AgentGit     string = "git"
+	AgentRust    string = "rust"
+	AgentPlan    string = "plan"
 	AgentDefault string = AgentPlan
 )
 
@@ -590,6 +590,35 @@ func resolveReadOnlyTools(tools []string) []string {
 	return filterSlice(tools, readOnlyTools, true)
 }
 
+func normalizeSubAgents(selfID string, subAgents []string, available map[string]Agent) []string {
+	if len(subAgents) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(subAgents))
+	normalized := make([]string, 0, len(subAgents))
+	for _, subAgentID := range subAgents {
+		subAgentID = strings.TrimSpace(subAgentID)
+		if subAgentID == "" {
+			continue
+		}
+		if subAgentID == selfID {
+			continue
+		}
+		if _, ok := available[subAgentID]; !ok {
+			continue
+		}
+		if _, dup := seen[subAgentID]; dup {
+			continue
+		}
+		seen[subAgentID] = struct{}{}
+		normalized = append(normalized, subAgentID)
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+	return normalized
+}
+
 func filterSlice(data []string, mask []string, include bool) []string {
 	var filtered []string
 	for _, s := range data {
@@ -632,6 +661,11 @@ func (c *Config) SetupAgents() {
 	if task, ok := agents[AgentTask]; ok {
 		task.AllowedTools = resolveReadOnlyTools(allToolNames())
 		agents[AgentTask] = task
+	}
+
+	for id, agent := range agents {
+		agent.SubAgents = normalizeSubAgents(id, agent.SubAgents, agents)
+		agents[id] = agent
 	}
 
 	c.Agents = agents

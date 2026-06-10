@@ -59,6 +59,7 @@ func init() {
 
 	rootCmd.AddCommand(
 		runCmd,
+		doctorCmd,
 		dirsCmd,
 		projectsCmd,
 		updateProvidersCmd,
@@ -132,7 +133,7 @@ mocode --continue
 
 		if finalModel, runErr := program.Run(); runErr != nil {
 			slog.Error("TUI run error", "error", runErr)
-			return errors.New("mocode crashed. If metrics are enabled, we were notified about it. If you'd like to report it, please copy the stacktrace above and open an issue at https://github.com/package-register/mocode/issues/new?template=bug.yml") //nolint:staticcheck
+			return errors.New("mocode crashed. If metrics are enabled, we were notified about it. If you'd like to report it, please copy the stacktrace above and open an issue at https://github.com/package-register/mocode/issues/new?template=bug.yml")
 		} else if m, ok := finalModel.(*ui.UI); ok {
 			if summary := m.QuitSummary(); summary != "" {
 				fmt.Println(summary)
@@ -169,6 +170,7 @@ COMMANDS
   auth       Authenticate wechat or minimax
   gateway    Run the WeChat bot gateway
   quota      Show MiniMax quota usage
+  doctor     Run local environment diagnostics
   session    List, show, rename, or delete sessions
   models     List configured models
   projects   List known project directories
@@ -426,7 +428,7 @@ func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error
 
 	gitIgnorePath := filepath.Join(cfg.Options.DataDirectory, ".gitignore")
 	if _, err := os.Stat(gitIgnorePath); os.IsNotExist(err) {
-		if err := os.WriteFile(gitIgnorePath, []byte("*\n"), 0o644); err != nil {
+		if err := os.WriteFile(gitIgnorePath, []byte("*\n"), 0o600); err != nil {
 			return nil, nil, fmt.Errorf("failed to create .gitignore file: %q %w", gitIgnorePath, err)
 		}
 	}
@@ -541,7 +543,7 @@ func ensureServer(cmd *cobra.Command, hostURL *url.URL) error {
 	switch hostURL.Scheme {
 	case "unix", "npipe":
 		needsStart := false
-		if _, err := os.Stat(hostURL.Host); err != nil && errors.Is(err, fs.ErrNotExist) {
+		if _, err := os.Stat(hostURL.Host); err != nil && errors.Is(err, fs.ErrNotExist) { //nolint:gosec // User-selected local socket path is intentional.
 			needsStart = true
 		} else if err == nil {
 			if err := restartIfStale(cmd, hostURL); err != nil {
@@ -558,7 +560,7 @@ func ensureServer(cmd *cobra.Command, hostURL *url.URL) error {
 
 		var err error
 		for range 10 {
-			_, err = os.Stat(hostURL.Host)
+			_, err = os.Stat(hostURL.Host) //nolint:gosec // User-selected local socket path is intentional.
 			if err == nil {
 				break
 			}
@@ -591,14 +593,15 @@ func restartIfStale(cmd *cobra.Command, hostURL *url.URL) error {
 	if vi.Version == version.Version {
 		return nil
 	}
-	slog.Info("Server version mismatch, restarting",
+	slog.Info(
+		"Server version mismatch, restarting",
 		"server", vi.Version,
 		"client", version.Version,
 	)
 	_ = c.ShutdownServer(cmd.Context())
 	// Give the old process a moment to release the socket.
 	for range 20 {
-		if _, err := os.Stat(hostURL.Host); errors.Is(err, fs.ErrNotExist) {
+		if _, err := os.Stat(hostURL.Host); errors.Is(err, fs.ErrNotExist) { //nolint:gosec // User-selected local socket path is intentional.
 			break
 		}
 		select {
@@ -608,7 +611,7 @@ func restartIfStale(cmd *cobra.Command, hostURL *url.URL) error {
 		}
 	}
 	// Force-remove if the socket is still lingering.
-	_ = os.Remove(hostURL.Host)
+	_ = os.Remove(hostURL.Host) //nolint:gosec // User-selected local socket path is intentional.
 	return nil
 }
 
@@ -738,7 +741,7 @@ func createDotmocodeDir(dir string) error {
 
 	// create or update if old version
 	if os.IsNotExist(err) || string(content) == oldGitIgnore {
-		if err := os.WriteFile(gitIgnorePath, []byte(defaultGitIgnore), 0o644); err != nil {
+		if err := os.WriteFile(gitIgnorePath, []byte(defaultGitIgnore), 0o600); err != nil {
 			return fmt.Errorf("failed to create .gitignore file: %q %w", gitIgnorePath, err)
 		}
 	}

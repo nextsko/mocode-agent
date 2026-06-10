@@ -145,14 +145,14 @@ func DefaultModeConfigs() map[string]Agent {
 		AgentCoder: {
 			ID:           AgentCoder,
 			Name:         "Coder",
-			Description:  "鎵ц缂栫爜浠诲姟",
+			Description:  "执行编码任务",
 			Model:        SelectedModelTypeLarge,
 			AllowedTools: nil, // all tools
 		},
 		AgentTask: {
 			ID:           AgentTask,
 			Name:         "Task",
-			Description:  "鎼滅储鍜屼笂涓嬫枃鍒嗘瀽",
+			Description:  "搜索与上下文分析",
 			Model:        SelectedModelTypeLarge,
 			AllowedTools: nil, // all tools
 		},

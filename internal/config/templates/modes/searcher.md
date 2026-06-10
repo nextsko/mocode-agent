@@ -51,8 +51,7 @@ sub_agents:
   - "task"
   - "coder"
   - "git"
-  - "skplan"
-  - "searcher"
+  - "plan"
 ---
 
 # 代码定位与 Bug 诊断专家

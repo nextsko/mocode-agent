@@ -520,6 +520,30 @@ func TestConfig_setupAgentsWithEveryReadOnlyToolDisabled(t *testing.T) {
 	assert.Equal(t, resolveReadOnlyTools(allToolNames()), taskAgent.AllowedTools)
 }
 
+func TestConfigSetupAgentsFiltersUnavailableSubAgents(t *testing.T) {
+	cfg := &Config{
+		Options: &Options{},
+	}
+
+	cfg.SetupAgents()
+
+	planAgent, ok := cfg.Agents[AgentPlan]
+	require.True(t, ok)
+	require.NotContains(t, planAgent.SubAgents, "skplan")
+	for _, subAgentID := range planAgent.SubAgents {
+		_, exists := cfg.Agents[subAgentID]
+		require.True(t, exists, "sub-agent %q should resolve to a configured agent", subAgentID)
+	}
+
+	gitAgent, ok := cfg.Agents[AgentGit]
+	require.True(t, ok)
+	require.NotContains(t, gitAgent.SubAgents, AgentGit)
+
+	searcherAgent, ok := cfg.Agents["searcher"]
+	require.True(t, ok)
+	require.NotContains(t, searcherAgent.SubAgents, "searcher")
+}
+
 func TestConfig_configureProvidersWithDisabledProvider(t *testing.T) {
 	knownProviders := []catwalk.Provider{
 		{

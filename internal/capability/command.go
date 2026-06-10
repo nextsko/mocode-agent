@@ -8,6 +8,7 @@ const (
 	CommandCategorySystem CommandCategory = "system"
 	CommandCategoryUser   CommandCategory = "user"
 	CommandCategoryMCP    CommandCategory = "mcp"
+	CommandCategoryAdmin  CommandCategory = "admin"
 )
 
 type RiskLevel string
@@ -17,6 +18,7 @@ const (
 	RiskLevelWrite       RiskLevel = "write"
 	RiskLevelNetwork     RiskLevel = "network"
 	RiskLevelDestructive RiskLevel = "destructive"
+	RiskLevelDangerous   RiskLevel = RiskLevelDestructive
 )
 
 type ProviderKind string

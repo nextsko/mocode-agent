@@ -51,7 +51,7 @@ sub_agents:
   - "task"
   - "coder"
   - "git"
-  - "skplan"
+  - "plan"
   - "searcher"
 ---
 

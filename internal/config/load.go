@@ -31,6 +31,16 @@ const defaultCatwalkURL = "https://catwalk.charm.land"
 // Load loads the configuration from the default paths and returns a
 // ConfigStore that owns both the pure-data Config and all runtime state.
 func Load(workingDir, dataDir string, debug bool) (*ConfigStore, error) {
+	return loadConfigStore(workingDir, dataDir, debug, true, true)
+}
+
+// LoadReadOnly loads configuration for inspection without mutating persisted
+// config state or syncing agent files to disk.
+func LoadReadOnly(workingDir, dataDir string, debug bool) (*ConfigStore, error) {
+	return loadConfigStore(workingDir, dataDir, debug, false, false)
+}
+
+func loadConfigStore(workingDir, dataDir string, debug bool, persistModels bool, syncAgents bool) (*ConfigStore, error) {
 	configPaths := lookupConfigs(workingDir)
 
 	cfg, loadedPaths, err := loadFromConfigPaths(configPaths)
@@ -112,10 +122,14 @@ func Load(workingDir, dataDir string, debug bool) (*ConfigStore, error) {
 		return store, nil
 	}
 
-	if err := configureSelectedModels(store, store.knownProviders, true); err != nil {
+	if err := configureSelectedModels(store, store.knownProviders, persistModels); err != nil {
 		return nil, fmt.Errorf("failed to configure selected models: %w", err)
 	}
-	store.SetupAgents()
+	if syncAgents {
+		store.SetupAgents()
+	} else {
+		cfg.SetupAgents()
+	}
 
 	// Capture initial staleness snapshot
 	store.captureStalenessSnapshot(loadedPaths)
@@ -150,12 +164,12 @@ func PushPopMocodeEnv() func() {
 	}
 
 	for _, ev := range found {
-		os.Setenv(ev, os.Getenv("MOCODE_"+ev))
+		_ = os.Setenv(ev, os.Getenv("MOCODE_"+ev))
 	}
 
 	restore := func() {
 		for k, v := range backups {
-			os.Setenv(k, v)
+			_ = os.Setenv(k, v)
 		}
 	}
 	return restore
@@ -249,7 +263,9 @@ func (c *Config) configureProviders(store *ConfigStore, env env.Env, resolver Va
 		case p.ID == catwalk.InferenceProviderAnthropic && config.OAuthToken != nil:
 			// Claude Code subscription is not supported anymore. Remove to show onboarding.
 			if !store.reloadInProgress {
-				store.RemoveConfigField(ScopeGlobal, "providers.anthropic")
+				if err := store.RemoveConfigField(ScopeGlobal, "providers.anthropic"); err != nil {
+					slog.Warn("Failed to remove unsupported Anthropic OAuth config", "error", err)
+				}
 			}
 			c.Providers.Del(string(p.ID))
 			continue
@@ -460,7 +476,10 @@ func (c *Config) setDefaults(workingDir, dataDir string) {
 func (c *Config) applyLSPDefaults() {
 	// Get powernap's default configuration
 	configManager := powernapConfig.NewManager()
-	configManager.LoadDefaults()
+	if err := configManager.LoadDefaults(); err != nil {
+		slog.Warn("Failed to load LSP defaults", "error", err)
+		return
+	}
 
 	// Apply defaults to each LSP configuration
 	for name, cfg := range c.LSP {
