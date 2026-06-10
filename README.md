@@ -186,11 +186,18 @@ Override with env vars:
 ## Build
 
 ```bash
-task build    # go build
+task build    # go build -buildvcs=false
 task test     # go test -race -failfast ./...
-task lint     # golangci-lint run
+task lint     # CI lint profile on changed files
+task lint:strict # full legacy golangci-lint suite
 task fmt      # gofumpt -w .
-task dev      # MOCODE_PROFILE=true go run .
+task dev      # MOCODE_PROFILE=true go run -buildvcs=false .
+```
+
+If you build from a source snapshot without usable Git metadata, use:
+
+```bash
+go build -buildvcs=false -o ./mocode .
 ```
 
 ## Skills Paths

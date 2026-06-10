@@ -103,7 +103,7 @@ internal/
 
 - **Version bump**: Use `task version:show` to inspect the current internal version and next semver tag, use `task version:bump` to automatically bump `internal/version/version.go`, use `task version:set VERSION=x.y.z` to set a specific version manually, and use `task release` to bump the version, create the release commit, tag it, and push it in one flow.
 
-- **Build**: `go build .` or `go run .`
+- **Build**: `go build -buildvcs=false .` or `go run -buildvcs=false .`
 - **Test**: `task test` or `go test ./...` (run single test:
   `go test ./internal/llm/prompt -run TestGetContextFromPaths`)
 - **Update Golden Files**: `go test ./... -update` (regenerates `.golden`
