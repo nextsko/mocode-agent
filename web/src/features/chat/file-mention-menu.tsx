@@ -143,8 +143,7 @@ export const FileMentionMenu = ({
 }: FileMentionMenuProps) => {
   const activeItemRef = useRef<HTMLButtonElement>(null);
 
-  // Scroll active item into view when activeIndex changes
-  // biome-ignore lint/correctness/useExhaustiveDependencies: keep activeIndex to scroll on selection
+  // Scroll active item into view when activeIndex changes.
   useEffect(() => {
     if (open && activeItemRef.current) {
       activeItemRef.current.scrollIntoView({

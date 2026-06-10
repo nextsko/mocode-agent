@@ -80,7 +80,7 @@ export function ChatWorkspaceContainer({
 
   const { config } = useGlobalConfig();
   const maxContextSize = useMemo(() => {
-    if (!config) return undefined;
+    if (!config) return;
     const model = config.models.find((m) => m.name === config.defaultModel);
     return model?.maxContextSize;
   }, [config]);
@@ -141,8 +141,7 @@ export function ChatWorkspaceContainer({
   }, [status, clearNewFiles]);
 
   // Clear queue when session changes (must run before auto-send to prevent
-  // sending stale queued messages to the wrong session)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: selectedSessionId triggers queue clear on session switch
+  // sending stale queued messages to the wrong session).
   useEffect(() => {
     clearQueue();
   }, [selectedSessionId, clearQueue]);

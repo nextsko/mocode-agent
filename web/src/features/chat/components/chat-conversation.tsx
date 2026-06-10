@@ -15,7 +15,6 @@ import {
   Loader2Icon,
   PlusIcon,
   SparklesIcon,
-  CheckSquareIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { hasPlatformModifier, isMacOS } from "@/hooks/utils";

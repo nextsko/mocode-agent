@@ -37,7 +37,7 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     }),
   dequeue: () => {
     const { queue } = get();
-    if (queue.length === 0) return undefined;
+    if (queue.length === 0) return;
     const [first, ...rest] = queue;
     set({ queue: rest });
     return first;

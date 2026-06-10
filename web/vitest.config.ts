@@ -6,8 +6,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
-      "@ai-elements": path.resolve(__dirname, "./src/components/ai-elements"),
+      "@": path.resolve(import.meta.dirname, "./src"),
+      "@ai-elements": path.resolve(import.meta.dirname, "./src/components/ai-elements"),
     },
   },
   test: {

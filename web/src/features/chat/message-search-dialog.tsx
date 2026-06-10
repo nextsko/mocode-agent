@@ -118,8 +118,7 @@ export function MessageSearchDialog({
     [messages, query],
   );
 
-  // Reset selection when matches change
-  // biome-ignore lint/correctness/useExhaustiveDependencies: We intentionally want to reset when length changes
+  // Reset selection when matches change.
   useEffect(() => {
     setSelectedIndex(0);
   }, [matches.length]);

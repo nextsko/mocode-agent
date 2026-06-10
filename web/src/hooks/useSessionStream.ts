@@ -155,6 +155,8 @@ const NEWLINE_REGEX = /\r?\n/;
 const MEDIA_TAG_PATH_REGEX = /<(?:image|video)\s+[^>]*path="([^"]*\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/uploads\/([^"]+))"/g;
 const BROWSER_URL_PROTOCOLS = new Set(["http:", "https:", "data:", "blob:"]);
 const WIRE_PROTOCOL_VERSION = "1.10";
+const BACKGROUND_RUNNING_STATUS = "running";
+const BACKGROUND_INTERRUPTED_STATUS = "interrupted";
 
 type StepRetryPayload = StepRetryEvent["payload"];
 
@@ -203,6 +205,15 @@ const discardSubagentRetryAttempt = (steps: SubagentStep[]): SubagentStep[] => {
     next.pop();
   }
   return next;
+};
+
+const getBackgroundJobStatus = (
+  extras: Record<string, unknown> | undefined,
+): string | null => {
+  if (extras?.background !== true) {
+    return null;
+  }
+  return typeof extras.job_status === "string" ? extras.job_status : null;
 };
 
 /** Extract the URL from a media output part (image_url or video_url) */
@@ -618,7 +629,7 @@ export function useSessionStream(
   const getSessionUploadUrl = useCallback(
     (filename?: string): string | undefined => {
       if (!(sessionId && filename)) {
-        return undefined;
+        return;
       }
       const basePath = baseUrl ?? getApiBaseUrl();
       const token = getAuthToken();
@@ -1502,6 +1513,22 @@ export function useSessionStream(
           }
 
           const messageStr = return_value.message;
+          const backgroundJobStatus = getBackgroundJobStatus(
+            return_value.extras,
+          );
+          const isBackgroundRunning =
+            backgroundJobStatus === BACKGROUND_RUNNING_STATUS;
+          const isBackgroundInterrupted =
+            backgroundJobStatus === BACKGROUND_INTERRUPTED_STATUS;
+          const nextToolState = isBackgroundRunning
+            ? ("input-available" as ToolUIPart["state"])
+            : isBackgroundInterrupted
+              ? "output-denied"
+              : return_value.is_error
+                ? ("output-error" as ToolUIPart["state"])
+                : ("output-available" as ToolUIPart["state"]);
+          const shouldHandleCompletedToolResult =
+            !(isBackgroundRunning || isBackgroundInterrupted);
 
           if (tc) {
             tc.argumentsComplete = true;
@@ -1523,9 +1550,7 @@ export function useSessionStream(
                 ...msg,
                 toolCall: {
                   ...msg.toolCall,
-                  state: return_value.is_error
-                    ? ("output-error" as ToolUIPart["state"])
-                    : ("output-available" as ToolUIPart["state"]),
+                  state: nextToolState,
                   // Aligned with backend ToolReturnValue
                   output: outputStr || undefined,
                   message: messageStr || undefined,
@@ -1541,7 +1566,7 @@ export function useSessionStream(
                     ? false
                     : msg.toolCall.subagentRunning,
                 },
-                isStreaming: false,
+                isStreaming: isBackgroundRunning,
               };
             }),
           );
@@ -1551,7 +1576,7 @@ export function useSessionStream(
           }
 
           // Handle tool-specific events (e.g., WriteFile → new files notification)
-          if (tc) {
+          if (tc && shouldHandleCompletedToolResult) {
             handleToolResult(
               tc.name,
               tc.arguments,
@@ -1561,7 +1586,11 @@ export function useSessionStream(
           }
 
           // Extract todo list from display blocks
-          if (!isReplay && Array.isArray(return_value.display)) {
+          if (
+            shouldHandleCompletedToolResult &&
+            !isReplay &&
+            Array.isArray(return_value.display)
+          ) {
             const todoBlock = return_value.display.find(
               (d: { type: string }) => d.type === "todo",
             );

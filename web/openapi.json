@@ -5,7 +5,7 @@
     "/api/config/": {
       "get": {
         "tags": ["config"],
-                "summary": "Get global (mocode) config snapshot",
+        "summary": "Get global (mocode) config snapshot",
         "description": "Get global (mocode) config snapshot.",
         "operationId": "get_global_config_api_config__get",
         "responses": {
@@ -21,7 +21,7 @@
       },
       "patch": {
         "tags": ["config"],
-                "summary": "Update global (mocode) default model/thinking",
+        "summary": "Update global (mocode) default model/thinking",
         "description": "Update global (mocode) default model/thinking.",
         "operationId": "update_global_config_api_config__patch",
         "requestBody": {
@@ -59,7 +59,7 @@
     "/api/config/toml": {
       "get": {
         "tags": ["config"],
-                "summary": "Get mocode config.toml",
+        "summary": "Get mocode config.toml",
         "description": "Get mocode config.toml.",
         "operationId": "get_config_toml_api_config_toml_get",
         "responses": {
@@ -75,7 +75,7 @@
       },
       "put": {
         "tags": ["config"],
-                "summary": "Update mocode config.toml",
+        "summary": "Update mocode config.toml",
         "description": "Update mocode config.toml.",
         "operationId": "update_config_toml_api_config_toml_put",
         "requestBody": {
@@ -549,7 +549,7 @@
           }
         }
       }
-        },
+    },
     "/api/sessions/{session_id}/fork": {
       "post": {
         "tags": ["sessions"],
@@ -1189,7 +1189,7 @@
         "type": "object",
         "title": "UpdateSessionRequest",
         "description": "Update session request."
-            },
+      },
       "ForkSessionRequest": {
         "properties": {
           "turn_index": {
