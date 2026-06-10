@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
+	"image/color"
 	"log/slog"
-	"math/rand"
+	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -32,8 +34,10 @@ import (
 	"github.com/charmbracelet/x/editor"
 	xstrings "github.com/charmbracelet/x/exp/strings"
 	"github.com/package-register/mocode/internal/admin"
+	agentcore "github.com/package-register/mocode/internal/agent"
 	"github.com/package-register/mocode/internal/agent/notify"
 	agenttools "github.com/package-register/mocode/internal/agent/tools"
+	execbuiltin "github.com/package-register/mocode/internal/agent/tools/builtin/exec"
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/app"
 	"github.com/package-register/mocode/internal/commands"
@@ -41,13 +45,13 @@ import (
 	"github.com/package-register/mocode/internal/fsext"
 	"github.com/package-register/mocode/internal/history"
 	"github.com/package-register/mocode/internal/infra/home"
-	"github.com/package-register/mocode/internal/knowledge/memory"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/pubsub"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
 	"github.com/package-register/mocode/internal/session/sessionexport"
 	"github.com/package-register/mocode/internal/skills"
+	"github.com/package-register/mocode/internal/tools/shell"
 	"github.com/package-register/mocode/internal/ui/anim"
 	"github.com/package-register/mocode/internal/ui/attachments"
 	"github.com/package-register/mocode/internal/ui/chat"
@@ -56,6 +60,7 @@ import (
 	"github.com/package-register/mocode/internal/ui/dialog"
 	fimage "github.com/package-register/mocode/internal/ui/image"
 	"github.com/package-register/mocode/internal/ui/notification"
+	"github.com/package-register/mocode/internal/ui/panel"
 	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/package-register/mocode/internal/ui/util"
 	"github.com/package-register/mocode/internal/version"
@@ -153,6 +158,13 @@ type (
 		sessionFiles []SessionFile
 	}
 	hudTickMsg struct{}
+
+	backgroundJobOutputMsg struct {
+		ShellID string
+		Output  string
+		Done    bool
+		Err     error
+	}
 )
 
 type todoAutoContinueState struct {
@@ -270,11 +282,15 @@ type UI struct {
 	pillsView          string
 
 	// Agent status tracking
-	agentStatus       string    // Current agent status text (e.g., "thinking", "executing tool")
-	agentStatusTime   time.Time // When the status was last updated
-	agentRuntimes     map[string]*sessionAgentRuntimeState
-	agentToolParents  map[string]string
-	todoContinuations map[string]*todoAutoContinueState
+	agentStatus        string    // Current agent status text (e.g., "thinking", "executing tool")
+	agentStatusTime    time.Time // When the status was last updated
+	agentRuntimes      map[string]*sessionAgentRuntimeState
+	agentToolParents   map[string]string
+	agentToolChildren  map[string]string
+	agentToolTaskIDs   map[string]string
+	agentToolSummaries map[string]map[string]string
+	todoContinuations  map[string]*todoAutoContinueState
+	backgroundJobs     map[string]string
 
 	// Todo spinner
 	todoSpinner    spinner.Model
@@ -387,7 +403,11 @@ func New(com *common.Common, initialSessionID string, continueLast bool) *UI {
 		lspStates:           make(map[string]app.LSPClientInfo),
 		mcpStates:           make(map[string]mcp.ClientInfo),
 		agentRuntimes:       make(map[string]*sessionAgentRuntimeState),
+		agentToolChildren:   make(map[string]string),
+		agentToolTaskIDs:    make(map[string]string),
+		agentToolSummaries:  make(map[string]map[string]string),
 		todoContinuations:   make(map[string]*todoAutoContinueState),
+		backgroundJobs:      make(map[string]string),
 		notifyBackend:       notification.NoopBackend{},
 		notifyWindowFocused: true,
 		initialSessionID:    initialSessionID,
@@ -395,6 +415,7 @@ func New(com *common.Common, initialSessionID string, continueLast bool) *UI {
 		startedAt:           time.Now(),
 		adminServer:         admin.New(com.Workspace),
 	}
+	chat.SetAgentPanelResolver(ui.agentTaskPanelsForRender)
 
 	status := NewStatus(com)
 
@@ -744,6 +765,10 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case hudTickMsg:
 		m.hudFrame++
 		cmds = append(cmds, m.hudTickCmd())
+	case backgroundJobOutputMsg:
+		if cmd := m.handleBackgroundJobOutput(msg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	case DelayedClickMsg:
 		// Handle delayed single-click action (e.g., expansion).
 		m.chat.HandleDelayedClick(msg)
@@ -1030,6 +1055,9 @@ func (m *UI) setSessionMessages(msgs []message.Message) tea.Cmd {
 		cmds = append(cmds, cmd)
 	}
 	m.chat.SelectLast()
+	if cmd := m.resumeBackgroundJobPolling(msgPtrs); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
 	return tea.Sequence(cmds...)
 }
 
@@ -1046,34 +1074,32 @@ func (m *UI) loadNestedToolCalls(items []chat.MessageItem) {
 		}
 
 		tc := toolItem.ToolCall()
-		messageID := toolItem.MessageID()
-		if m.hasSession() {
-			m.registerAgentToolParent(tc.ID, m.session.ID)
-		}
-
-		// Get the agent tool session ID.
-		agentSessionID := m.com.Workspace.CreateAgentToolSessionID(messageID, tc.ID)
-
-		// Fetch nested messages.
-		nestedMsgs, err := m.com.Workspace.ListMessages(context.Background(), agentSessionID)
-		if err != nil || len(nestedMsgs) == 0 {
-			continue
-		}
-
-		// Build tool result map for nested messages.
-		nestedMsgPtrs := make([]*message.Message, len(nestedMsgs))
-		for i := range nestedMsgs {
-			nestedMsgPtrs[i] = &nestedMsgs[i]
-		}
-		nestedToolResultMap := chat.BuildToolResultMap(nestedMsgPtrs)
-
-		// Extract nested tool items.
 		var nestedTools []chat.ToolMessageItem
-		for _, nestedMsg := range nestedMsgPtrs {
-			nestedItems := chat.ExtractMessageItems(m.com.Styles, nestedMsg, nestedToolResultMap)
-			for _, nestedItem := range nestedItems {
-				if nestedToolItem, ok := nestedItem.(chat.ToolMessageItem); ok {
-					// Mark nested tools as simple (compact) rendering.
+		for _, childToolCallID := range m.registerAgentToolTopology(toolItem.MessageID(), sessionIDOrEmpty(m.session), tc) {
+			agentSessionID := m.com.Workspace.CreateAgentToolSessionID(toolItem.MessageID(), childToolCallID)
+			taskID := childSessionTaskID(&tc, agentSessionID)
+			nestedMsgs, err := m.com.Workspace.ListMessages(context.Background(), agentSessionID)
+			if err != nil || len(nestedMsgs) == 0 {
+				continue
+			}
+
+			nestedMsgPtrs := make([]*message.Message, len(nestedMsgs))
+			for i := range nestedMsgs {
+				nestedMsgPtrs[i] = &nestedMsgs[i]
+				if m.hasSession() {
+					m.trackChildSessionRuntime(m.session.ID, agentSessionID, &tc, nestedMsgs[i])
+				}
+			}
+			nestedToolResultMap := chat.BuildToolResultMap(nestedMsgPtrs)
+
+			for _, nestedMsg := range nestedMsgPtrs {
+				nestedItems := chat.ExtractMessageItems(m.com.Styles, nestedMsg, nestedToolResultMap)
+				for _, nestedItem := range nestedItems {
+					nestedToolItem, ok := nestedItem.(chat.ToolMessageItem)
+					if !ok {
+						continue
+					}
+					m.registerAgentToolTaskID(nestedToolItem.ToolCall().ID, taskID)
 					if simplifiable, ok := nestedToolItem.(chat.Compactable); ok {
 						simplifiable.SetCompact(true)
 					}
@@ -1121,6 +1147,9 @@ func (m *UI) appendSessionMessage(msg message.Message) tea.Cmd {
 			cmds = append(cmds, cmd)
 		}
 	case message.Assistant:
+		for _, tc := range msg.ToolCalls() {
+			m.registerAgentToolTopology(msg.ID, msg.SessionID, tc)
+		}
 		items := chat.ExtractMessageItems(m.com.Styles, &msg, nil)
 		for _, item := range items {
 			if animatable, ok := item.(chat.Animatable); ok {
@@ -1158,10 +1187,184 @@ func (m *UI) appendSessionMessage(msg message.Message) tea.Cmd {
 						cmds = append(cmds, cmd)
 					}
 				}
+				if cmd := m.maybeStartBackgroundJobPoll(tr); cmd != nil {
+					cmds = append(cmds, cmd)
+				}
 			}
 		}
 	}
 	return tea.Sequence(cmds...)
+}
+
+func (m *UI) resumeBackgroundJobPolling(msgs []*message.Message) tea.Cmd {
+	var cmds []tea.Cmd
+	for _, msg := range msgs {
+		if msg == nil || msg.Role != message.Tool {
+			continue
+		}
+		for _, tr := range msg.ToolResults() {
+			if cmd := m.maybeStartBackgroundJobPoll(tr); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+	}
+	if len(cmds) == 0 {
+		return nil
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m *UI) maybeStartBackgroundJobPoll(tr message.ToolResult) tea.Cmd {
+	if tr.ToolCallID == "" || tr.Metadata == "" {
+		return nil
+	}
+
+	var meta execbuiltin.BashResponseMetadata
+	if err := json.Unmarshal([]byte(tr.Metadata), &meta); err != nil {
+		return nil
+	}
+	if !meta.Background || strings.TrimSpace(meta.ShellID) == "" {
+		return nil
+	}
+
+	bgShell, ok := shell.GetBackgroundShellManager().Get(meta.ShellID)
+	if !ok {
+		return nil
+	}
+	if m.backgroundJobs == nil {
+		m.backgroundJobs = make(map[string]string)
+	}
+	if existingToolCallID, ok := m.backgroundJobs[meta.ShellID]; ok && existingToolCallID == tr.ToolCallID && bgShell.IsDone() {
+		return nil
+	}
+	m.backgroundJobs[meta.ShellID] = tr.ToolCallID
+	return m.pollBackgroundJobCmd(meta.ShellID)
+}
+
+func (m *UI) pollBackgroundJobCmd(shellID string) tea.Cmd {
+	return tea.Tick(150*time.Millisecond, func(time.Time) tea.Msg {
+		bgShell, ok := shell.GetBackgroundShellManager().Get(shellID)
+		if !ok {
+			return backgroundJobOutputMsg{ShellID: shellID, Done: true}
+		}
+
+		stdout, stderr, done, err := bgShell.GetOutput()
+		output := formatBackgroundShellOutput(stdout, stderr, err)
+		if output == "" {
+			output = "no output"
+		}
+
+		status := "running"
+		if done {
+			status = "completed"
+			if err != nil && shell.IsInterrupt(err) {
+				status = "interrupted"
+			}
+		}
+
+		return backgroundJobOutputMsg{
+			ShellID: shellID,
+			Output:  fmt.Sprintf("Status: %s\n\n%s", status, output),
+			Done:    done,
+			Err:     err,
+		}
+	})
+}
+
+func (m *UI) handleBackgroundJobOutput(msg backgroundJobOutputMsg) tea.Cmd {
+	toolCallID, ok := m.backgroundJobs[msg.ShellID]
+	if !ok {
+		return nil
+	}
+	if msg.Done {
+		delete(m.backgroundJobs, msg.ShellID)
+	}
+
+	toolItem := m.findToolMessageItem(toolCallID)
+	if toolItem == nil {
+		return nil
+	}
+
+	current := toolItem.ToolCall()
+	current.Finished = msg.Done
+	toolItem.SetToolCall(current)
+
+	res := toolItemCurrentResult(toolItem)
+	if res == nil {
+		res = &message.ToolResult{
+			ToolCallID: toolCallID,
+			Name:       current.Name,
+		}
+	}
+	res.Content = msg.Output
+	toolItem.SetResult(res)
+
+	if msg.Done {
+		return nil
+	}
+	return m.pollBackgroundJobCmd(msg.ShellID)
+}
+
+func (m *UI) findToolMessageItem(toolCallID string) chat.ToolMessageItem {
+	if toolCallID == "" {
+		return nil
+	}
+	item := m.chat.MessageItem(toolCallID)
+	if toolItem, ok := item.(chat.ToolMessageItem); ok && toolItem.ToolCall().ID == toolCallID {
+		return toolItem
+	}
+	container, ok := item.(chat.NestedToolContainer)
+	if !ok {
+		return nil
+	}
+	for _, nested := range container.NestedTools() {
+		if nested.ToolCall().ID == toolCallID {
+			return nested
+		}
+	}
+	return nil
+}
+
+func toolItemCurrentResult(item chat.ToolMessageItem) *message.ToolResult {
+	if item == nil {
+		return nil
+	}
+	if item.Result() == nil {
+		return nil
+	}
+	result := *item.Result()
+	return &result
+}
+
+func formatBackgroundShellOutput(stdout, stderr string, execErr error) string {
+	stdout = truncateBackgroundShellOutput(stdout)
+	stderr = truncateBackgroundShellOutput(stderr)
+
+	output := stdout
+	if stderr != "" {
+		if output != "" {
+			output += "\n"
+		}
+		output += stderr
+	}
+	if execErr != nil && !shell.IsInterrupt(execErr) {
+		if output != "" {
+			output += "\n"
+		}
+		output += execErr.Error()
+	}
+	return output
+}
+
+func truncateBackgroundShellOutput(content string) string {
+	const maxOutputLength = 30000
+	if len(content) <= maxOutputLength {
+		return content
+	}
+	halfLength := maxOutputLength / 2
+	start := content[:halfLength]
+	end := content[len(content)-halfLength:]
+	return fmt.Sprintf("%s\n\n... output truncated ...\n\n%s", start, end)
 }
 
 func (m *UI) handleClickFocus(msg tea.MouseClickMsg) (cmd tea.Cmd) {
@@ -1220,6 +1423,7 @@ func (m *UI) updateSessionMessage(msg message.Message) tea.Cmd {
 
 	var items []chat.MessageItem
 	for _, tc := range msg.ToolCalls() {
+		m.registerAgentToolTopology(msg.ID, msg.SessionID, tc)
 		existingToolItem := m.chat.MessageItem(tc.ID)
 		if toolItem, ok := existingToolItem.(chat.ToolMessageItem); ok {
 			existingToolCall := toolItem.ToolCall()
@@ -1257,11 +1461,6 @@ func (m *UI) updateSessionMessage(msg message.Message) tea.Cmd {
 func (m *UI) handleChildSessionMessage(event pubsub.Event[message.Message]) tea.Cmd {
 	var cmds []tea.Cmd
 
-	// Only process messages with tool calls or results.
-	if len(event.Payload.ToolCalls()) == 0 && len(event.Payload.ToolResults()) == 0 {
-		return nil
-	}
-
 	// Check if this is an agent tool session and parse it.
 	childSessionID := event.Payload.SessionID
 	parentMessageID, toolCallID, ok := m.com.Workspace.ParseAgentToolSessionID(childSessionID)
@@ -1270,29 +1469,22 @@ func (m *UI) handleChildSessionMessage(event pubsub.Event[message.Message]) tea.
 	}
 
 	parentSessionID := m.parentSessionIDForChild(childSessionID, parentMessageID, toolCallID)
+	containerID := m.resolveAgentToolContainerID(toolCallID)
+	agentItem, parentToolItem := m.findAgentToolItem(containerID)
+	parentTaskID := ""
 	if parentSessionID != "" {
-		m.trackChildSessionRuntime(parentSessionID, childSessionID, event.Payload)
+		var parentTool *message.ToolCall
+		if parentToolItem != nil {
+			tc := parentToolItem.ToolCall()
+			parentTool = &tc
+			parentTaskID = childSessionTaskID(parentTool, childSessionID)
+		}
+		m.trackChildSessionRuntime(parentSessionID, childSessionID, parentTool, event.Payload)
 	}
 
-	// Find the parent agent tool item.
-	var agentItem chat.NestedToolContainer
-	for i := 0; i < m.chat.Len(); i++ {
-		item := m.chat.MessageItem(toolCallID)
-		if item == nil {
-			continue
-		}
-		if agent, ok := item.(chat.NestedToolContainer); ok {
-			if toolMessageItem, ok := item.(chat.ToolMessageItem); ok {
-				if toolMessageItem.ToolCall().ID == toolCallID {
-					// Verify this agent belongs to the correct parent message.
-					// We can't directly check parentMessageID on the item, so we trust the session parsing.
-					agentItem = agent
-					break
-				}
-			}
-		}
+	if len(event.Payload.ToolCalls()) == 0 && len(event.Payload.ToolResults()) == 0 {
+		return nil
 	}
-
 	if agentItem == nil {
 		return nil
 	}
@@ -1313,6 +1505,7 @@ func (m *UI) handleChildSessionMessage(event pubsub.Event[message.Message]) tea.
 		if !found {
 			// Create a new nested tool item.
 			nestedItem := chat.NewToolMessageItem(m.com.Styles, event.Payload.ID, tc, nil, false)
+			m.registerAgentToolTaskID(tc.ID, parentTaskID)
 			if simplifiable, ok := nestedItem.(chat.Compactable); ok {
 				simplifiable.SetCompact(true)
 			}
@@ -1339,7 +1532,7 @@ func (m *UI) handleChildSessionMessage(event pubsub.Event[message.Message]) tea.
 	agentItem.SetNestedTools(nestedTools)
 
 	// Update the chat so it updates the index map for animations to work as expected
-	m.chat.UpdateNestedToolIDs(toolCallID)
+	m.chat.UpdateNestedToolIDs(containerID)
 
 	if m.chat.Follow() {
 		if cmd := m.chat.ScrollToBottomAndAnimate(); cmd != nil {
@@ -1486,7 +1679,9 @@ func (m *UI) handleDialogAction(action tea.Msg) tea.Cmd {
 			if err := m.com.Workspace.UpdatePreferredModel(config.ScopeGlobal, agentCfg.Model, currentModel); err != nil {
 				return util.ReportError(err)()
 			}
-			m.com.Workspace.UpdateAgentModel(context.TODO())
+			if err := m.com.Workspace.UpdateAgentModel(context.TODO()); err != nil {
+				return util.ReportError(err)()
+			}
 			status := "disabled"
 			if currentModel.Think {
 				status = "enabled"
@@ -1683,7 +1878,9 @@ func (m *UI) handleDialogAction(action tea.Msg) tea.Cmd {
 		}
 
 		cmds = append(cmds, func() tea.Msg {
-			m.com.Workspace.UpdateAgentModel(context.TODO())
+			if err := m.com.Workspace.UpdateAgentModel(context.TODO()); err != nil {
+				return util.ReportError(err)()
+			}
 			return util.NewInfoMsg("Reasoning effort set to " + msg.Effort)
 		})
 		m.dialog.CloseDialog(dialog.ReasoningID)
@@ -1989,8 +2186,10 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 							if cmd := m.handleDialogAction(msg.Value.Msg); cmd != nil {
 								cmds = append(cmds, cmd)
 							}
-						} else if cmd := m.handleSlashCommand(msg.Value.Command); cmd != nil {
-							cmds = append(cmds, cmd)
+						} else if cmd, handled := m.handleSlashCommand(msg.Value.Command); handled {
+							if cmd != nil {
+								cmds = append(cmds, cmd)
+							}
 						}
 						return tea.Batch(cmds...)
 					case completions.ClosedMsg:
@@ -2061,8 +2260,11 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 				m.historyReset()
 
 				if strings.HasPrefix(value, "/") {
-					if cmd := m.handleSlashCommand(value); cmd != nil {
-						return cmd
+					if cmd, handled := m.handleSlashCommand(value); handled {
+						if cmd != nil {
+							cmds = append(cmds, cmd)
+						}
+						return tea.Batch(cmds...)
 					}
 				}
 
@@ -2445,7 +2647,8 @@ func (m *UI) statusLine(width int) string {
 	if m.promptQueue > 0 {
 		parts = append(parts, t.Header.Keystroke.Render("queue ")+t.Header.KeystrokeTip.Render(strconv.Itoa(m.promptQueue)))
 	}
-	parts = append(parts,
+	parts = append(
+		parts,
 		t.Header.Keystroke.Render("ctrl+p")+t.Header.KeystrokeTip.Render(" slash"),
 	)
 
@@ -2558,7 +2761,7 @@ func (m *UI) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 
 	// Debugging rendering (visually see when the tui rerenders)
 	if os.Getenv("MOCODE_UI_DEBUG") == "true" {
-		debugView := lipgloss.NewStyle().Background(lipgloss.ANSIColor(rand.Intn(256))).Width(4).Height(2)
+		debugView := lipgloss.NewStyle().Background(randomANSIColor()).Width(4).Height(2)
 		debug := uv.NewStyledString(debugView.String())
 		debug.Draw(scr, image.Rectangle{
 			Min: image.Pt(4, 1),
@@ -2639,7 +2842,7 @@ func (m *UI) View() tea.View {
 	if m.progressBarEnabled && m.sendProgressBar && m.isAgentBusy() {
 		// HACK: use a random percentage to prevent ghostty from hiding it
 		// after a timeout.
-		v.ProgressBar = tea.NewProgressBar(tea.ProgressBarIndeterminate, rand.Intn(100))
+		v.ProgressBar = tea.NewProgressBar(tea.ProgressBarIndeterminate, randomIntn(100))
 	}
 
 	return v
@@ -2676,7 +2879,8 @@ func (m *UI) ShortHelp() []key.Binding {
 			tab.SetHelp("tab", "focus editor")
 		}
 
-		binds = append(binds,
+		binds = append(
+			binds,
 			tab,
 			commands,
 			k.Models,
@@ -2684,11 +2888,13 @@ func (m *UI) ShortHelp() []key.Binding {
 
 		switch m.focus {
 		case uiFocusEditor:
-			binds = append(binds,
+			binds = append(
+				binds,
 				k.Editor.Newline,
 			)
 		case uiFocusMain:
-			binds = append(binds,
+			binds = append(
+				binds,
 				k.Chat.UpDown,
 				k.Chat.UpDownOneItem,
 				k.Chat.PageUp,
@@ -2703,14 +2909,16 @@ func (m *UI) ShortHelp() []key.Binding {
 		// TODO: other states
 		// if m.session == nil {
 		// no session selected
-		binds = append(binds,
+		binds = append(
+			binds,
 			commands,
 			k.Models,
 			k.Editor.Newline,
 		)
 	}
 
-	binds = append(binds,
+	binds = append(
+		binds,
 		k.Quit,
 	)
 
@@ -2754,7 +2962,8 @@ func (m *UI) FullHelp() [][]key.Binding {
 			tab.SetHelp("tab", "focus editor")
 		}
 
-		mainBinds = append(mainBinds,
+		mainBinds = append(
+			mainBinds,
 			tab,
 			commands,
 			k.Models,
@@ -2778,7 +2987,8 @@ func (m *UI) FullHelp() [][]key.Binding {
 			}
 			binds = append(binds, editorBinds)
 			if hasAttachments {
-				binds = append(binds,
+				binds = append(
+					binds,
 					[]key.Binding{
 						k.Editor.AttachmentDeleteMode,
 						k.Editor.DeleteAllAttachments,
@@ -2787,7 +2997,8 @@ func (m *UI) FullHelp() [][]key.Binding {
 				)
 			}
 		case uiFocusMain:
-			binds = append(binds,
+			binds = append(
+				binds,
 				[]key.Binding{
 					k.Chat.UpDown,
 					k.Chat.UpDownOneItem,
@@ -2812,7 +3023,8 @@ func (m *UI) FullHelp() [][]key.Binding {
 	default:
 		if m.session == nil {
 			// no session selected
-			binds = append(binds,
+			binds = append(
+				binds,
 				[]key.Binding{
 					commands,
 					k.Models,
@@ -2829,7 +3041,8 @@ func (m *UI) FullHelp() [][]key.Binding {
 			}
 			binds = append(binds, editorBinds)
 			if hasAttachments {
-				binds = append(binds,
+				binds = append(
+					binds,
 					[]key.Binding{
 						k.Editor.AttachmentDeleteMode,
 						k.Editor.DeleteAllAttachments,
@@ -2840,7 +3053,8 @@ func (m *UI) FullHelp() [][]key.Binding {
 		}
 	}
 
-	binds = append(binds,
+	binds = append(
+		binds,
 		[]key.Binding{
 			k.Quit,
 		},
@@ -3336,7 +3550,8 @@ func (m *UI) slashCompletionGroups() []completions.SlashGroup {
 		v("/init_kng", "Initialize kng knowledge templates", dialog.ActionInitKnowledge{}),
 	}
 	if hasSession {
-		sessionItems = append(sessionItems,
+		sessionItems = append(
+			sessionItems,
 			v("/context", "Browse current context messages",
 				dialog.ActionOpenDialog{DialogID: dialog.ContextID}),
 			v("/rollback", "Rollback files to a session node",
@@ -3668,8 +3883,8 @@ var workingPlaceholders = [...]string{
 // randomizePlaceholders selects random placeholder text for the textarea's
 // ready and working states.
 func (m *UI) randomizePlaceholders() {
-	m.workingPlaceholder = workingPlaceholders[rand.Intn(len(workingPlaceholders))]
-	m.readyPlaceholder = readyPlaceholders[rand.Intn(len(readyPlaceholders))]
+	m.workingPlaceholder = workingPlaceholders[randomIntn(len(workingPlaceholders))]
+	m.readyPlaceholder = readyPlaceholders[randomIntn(len(readyPlaceholders))]
 }
 
 // renderEditorView renders the editor view with attachments if any.
@@ -3844,6 +4059,10 @@ func (m *UI) openDialog(id string) tea.Cmd {
 		}
 	case dialog.WeChatSelectID:
 		m.dialog.OpenDialog(dialog.NewWeChatSelect(m.com))
+	case dialog.WeChatManagerID:
+		if cmd := m.openWeChatManagerDialog(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	case dialog.WeChatQRID:
 		if cmd := m.openWeChatQRDialog(); cmd != nil {
 			cmds = append(cmds, cmd)
@@ -3997,9 +4216,6 @@ func (m *UI) openWeChatQRDialog() tea.Cmd {
 		return nil
 	}
 
-	wc := wechat.Default()
-	wc.SetSessionStore(filepath.Join(m.com.Workspace.WorkingDir(), ".mocode", "wechat", "sessions.json"))
-
 	qrDialog, err := dialog.NewWeChatQR(m.com)
 	if err != nil {
 		return util.ReportError(err)
@@ -4007,54 +4223,16 @@ func (m *UI) openWeChatQRDialog() tea.Cmd {
 	qrDialog.SetHTTPClient(m.com.Config().HTTPClient(m.com.Workspace.Resolver(), 45*time.Second))
 	m.dialog.OpenDialog(qrDialog)
 
-	// Start the login flow (blocks until QR scanned + confirmed).
+	// Start the login flow via AccountManager (auto-registers account,
+	// persists credentials, enables management from the manager dialog).
 	qrDialog.StartLogin()
 
-	// Register agent handler BEFORE login completes.
-	wc.SetAgentHandler(func(ctx context.Context, userID, text string, _ *wechat.IncomingMessage) (string, error) {
-		ctx = memory.WithAppUserInContext(ctx, "mocode", "wx:"+userID)
-		sessKey := "wx:" + userID
-
-		// Show typing with keepalive.
-		stopTyping := wc.StartTyping(ctx, userID)
-		defer stopTyping()
-		if !m.com.Workspace.AgentIsReady() {
-			if err := m.com.Workspace.InitCoderAgent(ctx); err != nil {
-				return "", fmt.Errorf("agent init: %w", err)
-			}
-		}
-
-		// Get or create session.
-		var sessionID string
-		if v, ok := wc.GetSession(sessKey); ok {
-			sessionID = v
-		}
-		if sessionID == "" {
-			sess, err := m.com.Workspace.CreateSession(ctx, "WeChat: "+userID)
-			if err != nil {
-				return "", fmt.Errorf("create session: %w", err)
-			}
-			sessionID = sess.ID
-			wc.SetSession(sessKey, sessionID)
-		}
-
-		// Run agent (synchronous, blocks until done).
-		if err := m.com.Workspace.AgentRun(ctx, sessionID, text); err != nil {
-			return "", err
-		}
-
-		// Read last assistant response.
-		msgs, err := m.com.Workspace.ListMessages(ctx, sessionID)
-		if err != nil || len(msgs) == 0 {
-			return "处理完成。", nil
-		}
-		for i := len(msgs) - 1; i >= 0; i-- {
-			if msgs[i].Role == "assistant" {
-				return msgs[i].Content().Text, nil
-			}
-		}
-		return "处理完成。", nil
-	})
+	// Wire the agent handler on the active channel so incoming messages
+	// are processed once the poll loop starts.
+	mgr := wechat.GetManager()
+	if ch := mgr.GetActive(); ch != nil {
+		injectWeChatButler(ch, m.com.Workspace)
+	}
 
 	return qrDialog.PollLoginCmd()
 }
@@ -4215,7 +4393,7 @@ func findNodeIndex(m *UI, target message.Message) int {
 
 // shortNodeID returns a short representation of a message node for logging.
 func shortNodeID(target message.Message) string {
-	return fmt.Sprintf("%s", shortID(target.ID))
+	return shortID(target.ID)
 }
 
 func (m *UI) openTodoDialog(selected int) tea.Cmd {
@@ -4490,6 +4668,18 @@ func (m *UI) newSession() tea.Cmd {
 			}
 		}
 	}
+	if len(m.agentToolChildren) > 0 {
+		clear(m.agentToolChildren)
+	}
+	if len(m.agentToolTaskIDs) > 0 {
+		clear(m.agentToolTaskIDs)
+	}
+	if len(m.agentToolSummaries) > 0 {
+		clear(m.agentToolSummaries)
+	}
+	if len(m.backgroundJobs) > 0 {
+		clear(m.backgroundJobs)
+	}
 	agenttools.ResetCache()
 	return tea.Batch(
 		func() tea.Msg {
@@ -4528,6 +4718,80 @@ func (m *UI) registerAgentToolParent(toolCallID, sessionID string) {
 		m.agentToolParents = make(map[string]string)
 	}
 	m.agentToolParents[toolCallID] = sessionID
+}
+
+func (m *UI) registerAgentToolChild(parentToolCallID, childToolCallID string) {
+	parentToolCallID = strings.TrimSpace(parentToolCallID)
+	childToolCallID = strings.TrimSpace(childToolCallID)
+	if parentToolCallID == "" || childToolCallID == "" || parentToolCallID == childToolCallID {
+		return
+	}
+	if m.agentToolChildren == nil {
+		m.agentToolChildren = make(map[string]string)
+	}
+	m.agentToolChildren[childToolCallID] = parentToolCallID
+}
+
+func (m *UI) registerAgentToolTaskID(toolCallID, taskID string) {
+	toolCallID = strings.TrimSpace(toolCallID)
+	taskID = strings.TrimSpace(taskID)
+	if toolCallID == "" || taskID == "" {
+		return
+	}
+	if m.agentToolTaskIDs == nil {
+		m.agentToolTaskIDs = make(map[string]string)
+	}
+	m.agentToolTaskIDs[toolCallID] = taskID
+}
+
+func (m *UI) registerAgentToolTaskSummary(parentToolCallID, taskID, summary string) {
+	parentToolCallID = strings.TrimSpace(parentToolCallID)
+	taskID = strings.TrimSpace(taskID)
+	summary = strings.TrimSpace(summary)
+	if parentToolCallID == "" || taskID == "" || summary == "" {
+		return
+	}
+	if m.agentToolSummaries == nil {
+		m.agentToolSummaries = make(map[string]map[string]string)
+	}
+	taskSummaries := m.agentToolSummaries[parentToolCallID]
+	if taskSummaries == nil {
+		taskSummaries = make(map[string]string)
+		m.agentToolSummaries[parentToolCallID] = taskSummaries
+	}
+	taskSummaries[taskID] = summary
+}
+
+func (m *UI) registerAgentToolTopology(messageID, sessionID string, tc message.ToolCall) []string {
+	if messageID == "" {
+		return nil
+	}
+	childToolCallIDs := agentToolChildCallIDs(tc)
+	for _, childToolCallID := range childToolCallIDs {
+		if sessionID != "" {
+			m.registerAgentToolParent(childToolCallID, sessionID)
+		}
+		m.registerAgentToolChild(tc.ID, childToolCallID)
+	}
+	return childToolCallIDs
+}
+
+func (m *UI) agentTaskPanelsForRender(parentToolCallID string, params agentcore.AgentParams, nestedTools []chat.ToolMessageItem) []panel.AgentPanelData {
+	panels := chat.BuildAgentTaskPanels(parentToolCallID, params, nestedTools, func(toolCallID string) string {
+		if m.agentToolTaskIDs == nil {
+			return ""
+		}
+		return strings.TrimSpace(m.agentToolTaskIDs[toolCallID])
+	}, func(taskID string) string {
+		if m.agentToolSummaries == nil {
+			return ""
+		}
+		return strings.TrimSpace(m.agentToolSummaries[parentToolCallID][taskID])
+	})
+	if len(panels) == 0 {
+		return chat.BuildLegacyAgentPanels(parentToolCallID, params, nestedTools)
+	}
+	return panels
 }
 
 func (m *UI) updateAgentRuntime(sessionID, agentID, displayName string, status agentRuntimeStatus, toolName string, activity time.Time) *agentRuntimeEntry {
@@ -4593,14 +4857,50 @@ func (m *UI) parentSessionIDForChild(childSessionID, parentMessageID, toolCallID
 	return ""
 }
 
-func (m *UI) trackChildSessionRuntime(parentSessionID, childSessionID string, msg message.Message) {
+func (m *UI) trackChildSessionRuntime(parentSessionID, childSessionID string, parentTool *message.ToolCall, msg message.Message) {
 	if parentSessionID == "" || childSessionID == "" {
 		return
 	}
+	parentToolCallID := ""
+	if parentTool != nil {
+		parentToolCallID = strings.TrimSpace(parentTool.ID)
+	}
+	taskID := childSessionTaskID(parentTool, childSessionID)
 
 	now := time.Now()
+	if msg.UpdatedAt > 0 {
+		now = time.Unix(msg.UpdatedAt, 0)
+	} else if msg.CreatedAt > 0 {
+		now = time.Unix(msg.CreatedAt, 0)
+	}
+	if len(msg.ToolCalls()) == 0 && len(msg.ToolResults()) == 0 && msg.Role == message.Assistant {
+		displayName, fallbackSummary := childSessionDescriptor(parentTool, childSessionID)
+		summary := firstContentLine(msg.Content().Text)
+		if summary == "" {
+			summary = fallbackSummary
+		}
+		status := agentRuntimeExecuting
+		if msg.IsThinking() {
+			status = agentRuntimeThinking
+			if summary == "" {
+				summary = "thinking"
+			}
+		}
+		if msg.IsFinished() {
+			status = agentRuntimeStopped
+			if summary == "" {
+				summary = "completed"
+			}
+		}
+		entry := m.updateAgentRuntime(parentSessionID, childSessionID, displayName, status, "", now)
+		if entry != nil && summary != "" {
+			entry.Summary = summary
+		}
+		m.registerAgentToolTaskSummary(parentToolCallID, taskID, summary)
+	}
 	for _, tc := range msg.ToolCalls() {
 		m.registerAgentToolParent(tc.ID, parentSessionID)
+		m.registerAgentToolTaskID(tc.ID, taskID)
 		displayName, summary := childAgentIdentity(tc)
 		entry := m.updateAgentRuntime(parentSessionID, childSessionID, displayName, agentRuntimeExecuting, tc.Name, now)
 		if entry == nil {
@@ -4608,6 +4908,7 @@ func (m *UI) trackChildSessionRuntime(parentSessionID, childSessionID string, ms
 		}
 		if summary != "" {
 			entry.Summary = summary
+			m.registerAgentToolTaskSummary(parentToolCallID, taskID, summary)
 		}
 	}
 	for _, tr := range msg.ToolResults() {
@@ -4617,6 +4918,7 @@ func (m *UI) trackChildSessionRuntime(parentSessionID, childSessionID string, ms
 		}
 		if text := strings.TrimSpace(tr.Content); text != "" {
 			entry.Summary = text
+			m.registerAgentToolTaskSummary(parentToolCallID, taskID, text)
 		} else if entry.Summary == "" {
 			entry.Summary = "stopped"
 		}
@@ -4679,6 +4981,200 @@ func (m *UI) currentSessionAgentEntries() []*agentRuntimeEntry {
 		}
 	}
 	return entries
+}
+
+func (m *UI) resolveAgentToolContainerID(toolCallID string) string {
+	toolCallID = strings.TrimSpace(toolCallID)
+	if toolCallID == "" {
+		return ""
+	}
+	if item := m.chat.MessageItem(toolCallID); item != nil {
+		if _, ok := item.(chat.NestedToolContainer); ok {
+			return toolCallID
+		}
+	}
+	if m.agentToolChildren != nil {
+		if parentToolCallID := strings.TrimSpace(m.agentToolChildren[toolCallID]); parentToolCallID != "" {
+			return parentToolCallID
+		}
+	}
+	return ""
+}
+
+func (m *UI) findAgentToolItem(containerID string) (chat.NestedToolContainer, chat.ToolMessageItem) {
+	if containerID == "" {
+		return nil, nil
+	}
+	item := m.chat.MessageItem(containerID)
+	if item == nil {
+		return nil, nil
+	}
+	agentItem, ok := item.(chat.NestedToolContainer)
+	if !ok {
+		return nil, nil
+	}
+	toolItem, ok := item.(chat.ToolMessageItem)
+	if !ok {
+		return nil, nil
+	}
+	return agentItem, toolItem
+}
+
+func agentToolChildCallIDs(tc message.ToolCall) []string {
+	if tc.ID == "" {
+		return nil
+	}
+	if tc.Name != agentcore.AgentToolName {
+		return []string{tc.ID}
+	}
+
+	var params agentcore.AgentParams
+	if err := json.Unmarshal([]byte(tc.Input), &params); err != nil || len(params.Tasks) == 0 {
+		return []string{tc.ID}
+	}
+
+	hasDeps := false
+	for _, task := range params.Tasks {
+		if len(task.DependsOn) > 0 {
+			hasDeps = true
+			break
+		}
+	}
+	childIDs := make([]string, 0, len(params.Tasks))
+	if !hasDeps {
+		for i := range params.Tasks {
+			childIDs = append(childIDs, fmt.Sprintf("%s-%d", tc.ID, i+1))
+		}
+		return childIDs
+	}
+
+	for i, task := range params.Tasks {
+		taskID := strings.TrimSpace(task.ID)
+		if taskID == "" {
+			taskID = fmt.Sprintf("task-%d", i+1)
+		}
+		childIDs = append(childIDs, fmt.Sprintf("%s-%s", tc.ID, taskID))
+	}
+	return childIDs
+}
+
+func childSessionDescriptor(parentTool *message.ToolCall, childSessionID string) (displayName string, summary string) {
+	displayName = "Agent"
+	if parentTool == nil || parentTool.Name != agentcore.AgentToolName {
+		return displayName, summary
+	}
+
+	var params agentcore.AgentParams
+	if err := json.Unmarshal([]byte(parentTool.Input), &params); err != nil {
+		return displayName, summary
+	}
+	if len(params.Tasks) == 0 {
+		if prompt := strings.TrimSpace(params.Prompt); prompt != "" {
+			summary = prompt
+		}
+		return config.AgentTask, summary
+	}
+
+	_, childToolCallID, ok := parseChildSessionID(childSessionID)
+	if !ok {
+		childToolCallID = childSessionID
+	}
+	hasDeps := false
+	for _, task := range params.Tasks {
+		if len(task.DependsOn) > 0 {
+			hasDeps = true
+			break
+		}
+	}
+	for i, task := range params.Tasks {
+		var expectedID string
+		if hasDeps {
+			taskID := strings.TrimSpace(task.ID)
+			if taskID == "" {
+				taskID = fmt.Sprintf("task-%d", i+1)
+			}
+			expectedID = fmt.Sprintf("%s-%s", parentTool.ID, taskID)
+		} else {
+			expectedID = fmt.Sprintf("%s-%d", parentTool.ID, i+1)
+		}
+		if expectedID != childToolCallID {
+			continue
+		}
+		if agentName := strings.TrimSpace(task.AgentName); agentName != "" {
+			displayName = agentName
+		} else {
+			displayName = config.AgentTask
+		}
+		return displayName, strings.TrimSpace(task.Prompt)
+	}
+
+	return displayName, summary
+}
+
+func childSessionTaskID(parentTool *message.ToolCall, childSessionID string) string {
+	if parentTool == nil || parentTool.Name != agentcore.AgentToolName {
+		return ""
+	}
+
+	var params agentcore.AgentParams
+	if err := json.Unmarshal([]byte(parentTool.Input), &params); err != nil || len(params.Tasks) == 0 {
+		return ""
+	}
+
+	_, childToolCallID, ok := parseChildSessionID(childSessionID)
+	if !ok {
+		childToolCallID = childSessionID
+	}
+
+	hasDeps := false
+	for _, task := range params.Tasks {
+		if len(task.DependsOn) > 0 {
+			hasDeps = true
+			break
+		}
+	}
+
+	for i, task := range params.Tasks {
+		taskID := strings.TrimSpace(task.ID)
+		if taskID == "" {
+			taskID = fmt.Sprintf("task-%d", i+1)
+		}
+
+		expectedID := fmt.Sprintf("%s-%d", parentTool.ID, i+1)
+		if hasDeps {
+			expectedID = fmt.Sprintf("%s-%s", parentTool.ID, taskID)
+		}
+		if expectedID == childToolCallID {
+			return taskID
+		}
+	}
+
+	return ""
+}
+
+func parseChildSessionID(sessionID string) (messageID string, toolCallID string, ok bool) {
+	parts := strings.Split(sessionID, "$$")
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	return parts[0], parts[1], true
+}
+
+func firstContentLine(text string) string {
+	for _, line := range strings.Split(strings.TrimSpace(text), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			return line
+		}
+	}
+	return ""
+}
+
+func sessionIDOrEmpty(sess *session.Session) string {
+	if sess == nil {
+		return ""
+	}
+	return sess.ID
 }
 
 // handlePasteMsg handles a paste message.
@@ -4973,7 +5469,9 @@ func (m *UI) runMCPPrompt(clientID, promptID string, arguments map[string]string
 
 func (m *UI) handleStateChanged() tea.Cmd {
 	return func() tea.Msg {
-		m.com.Workspace.UpdateAgentModel(context.Background())
+		if err := m.com.Workspace.UpdateAgentModel(context.Background()); err != nil {
+			return util.ReportError(err)()
+		}
 		return mcpStateChangedMsg{
 			states: m.com.Workspace.MCPGetStates(),
 		}
@@ -5162,59 +5660,32 @@ func (w *tuiButlerWorkspace) UpdateModel(provider, model string) error {
 	})
 }
 
-// handleWeChatLogin starts the WeChat QR login flow.
+// handleWeChatLogin starts the WeChat QR login flow via AccountManager.
 func (m *UI) handleWeChatLogin() tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		wc := wechat.Default()
-		wc.SetSessionStore(filepath.Join(m.com.Workspace.WorkingDir(), ".mocode", "wechat", "sessions.json"))
+		mgr := wechat.GetManager()
 		qrCh := make(chan string, 1)
 
-		// Register handler that creates a WeChat session and prompts the agent.
-		wc.SetAgentHandler(func(ctx context.Context, userID, text string, _ *wechat.IncomingMessage) (string, error) {
-			ctx = memory.WithAppUserInContext(ctx, "mocode", "wx:"+userID)
-			// Create or get persistent session keyed by WeChat user.
-			sessKey := "wx:" + userID
-			var sessionID string
-			if v, ok := wc.GetSession(sessKey); ok {
-				sessionID = v
-			}
-
-			// Use existing session or create new one via the workspace.
-			if sessionID == "" {
-				slog.Debug("WeChat new session", "userID", userID)
-				sess, err := m.com.Workspace.CreateSession(ctx, "WeChat: "+userID)
-				if err != nil {
-					return "", fmt.Errorf("create session: %w", err)
-				}
-				sessionID = sess.ID
-				wc.SetSession(sessKey, sessionID)
-			}
-
-			// Prompt the agent synchronously.
-			if err := m.com.Workspace.AgentRun(ctx, sessionID, text); err != nil {
-				return "", err
-			}
-
-			wc.SetSession(sessKey, sessionID)
-			return fmt.Sprintf("处理完成，回复已通过 %s 生成。", config.GetAppName(m.com.Config())), nil
-		})
-
-		// Initialize butler routing + slash config on login.
-		injectWeChatButler(wc, m.com.Workspace)
-
 		go func() {
-			err := wc.Login(ctx, false, func(qrURL string) {
-				select {
-				case qrCh <- qrURL:
-				default:
-				}
-			})
+			info, err := mgr.Login(ctx, true, wechat.LoginCallbacks{
+				OnQRURL: func(qrURL string) {
+					select {
+					case qrCh <- qrURL:
+					default:
+					}
+				},
+			}, m.com.Config().HTTPClient(m.com.Workspace.Resolver(), 45*time.Second))
 			if err != nil {
 				slog.Error("WeChat login failed", "error", err)
 				return
 			}
-			wc.Run(ctx)
+			if info != nil {
+				slog.Info("WeChat account registered", "userID", info.UserID, "accountID", info.ID)
+				if ch := mgr.GetActive(); ch != nil {
+					injectWeChatButler(ch, m.com.Workspace)
+				}
+			}
 		}()
 
 		select {
@@ -5226,10 +5697,32 @@ func (m *UI) handleWeChatLogin() tea.Cmd {
 	}
 }
 
-// handleWeChatLogout stops the WeChat channel.
+// handleWeChatLogout stops all WeChat channels.
 func (m *UI) handleWeChatLogout() tea.Cmd {
 	return func() tea.Msg {
-		wechat.Default().Stop()
+		wechat.GetManager().StopAll()
 		return util.NewInfoMsg("WeChat disconnected")
 	}
+}
+
+func randomIntn(max int) int {
+	if max <= 1 {
+		return 0
+	}
+
+	n, err := cryptorand.Int(cryptorand.Reader, big.NewInt(int64(max)))
+	if err != nil {
+		return 0
+	}
+
+	return int(n.Int64())
+}
+
+func randomANSIColor() color.Color {
+	n, err := cryptorand.Int(cryptorand.Reader, big.NewInt(256))
+	if err != nil {
+		return lipgloss.Color("0")
+	}
+
+	return lipgloss.Color(strconv.FormatInt(n.Int64(), 10))
 }

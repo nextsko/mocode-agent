@@ -19,7 +19,6 @@ const (
 	WeChatQRID = "wechat_qr"
 )
 
-// WeChatQRState is the QR login flow state.
 type WeChatQRState int
 
 const (
@@ -30,7 +29,6 @@ const (
 	WeChatQRStateError
 )
 
-// WeChatQRMsg is sent when the QR login state changes.
 type WeChatQRMsg struct {
 	State   WeChatQRState
 	QRASCII string
@@ -40,16 +38,14 @@ type WeChatQRMsg struct {
 
 type WeChatQRPollMsg struct{}
 
-// WeChatQR represents a dialog for WeChat QR login.
+// WeChatQR represents a dialog for WeChat QR login via AccountManager.
 type WeChatQR struct {
-	com   *common.Common
-	help  help.Model
-	state WeChatQRState
-
-	qrASCII string
-	errMsg  string
-	userID  string
-
+	com       *common.Common
+	help      help.Model
+	state     WeChatQRState
+	qrASCII   string
+	errMsg    string
+	userID    string
 	loginDone chan WeChatQRMsg
 	cancelFn  context.CancelFunc
 	started   bool
@@ -63,7 +59,6 @@ type WeChatQR struct {
 
 var _ Dialog = (*WeChatQR)(nil)
 
-// NewWeChatQR creates a new WeChat QR login dialog.
 func NewWeChatQR(com *common.Common) (*WeChatQR, error) {
 	d := &WeChatQR{
 		com:       com,
@@ -84,7 +79,9 @@ func NewWeChatQR(com *common.Common) (*WeChatQR, error) {
 	return d, nil
 }
 
-// StartLogin begins the login flow. Called externally with agent handler already set.
+// StartLogin begins the login flow using AccountManager so the new account
+// is automatically registered, credentials persisted, and the poll loop can
+// be started from the manager dialog afterwards.
 func (d *WeChatQR) StartLogin() {
 	if d.started {
 		return
@@ -94,30 +91,31 @@ func (d *WeChatQR) StartLogin() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	d.cancelFn = cancel
-	wc := wechat.Default()
+	mgr := wechat.GetManager()
 
 	go func() {
 		defer cancel()
 
-		err := wc.LoginWithCallbacks(ctx, true, wechat.LoginCallbacks{
+		info, err := mgr.Login(ctx, true, wechat.LoginCallbacks{
 			OnQRURL: func(qrURL string) {
 				qr, genErr := wechat.GenerateQR(qrURL)
 				if genErr != nil {
-					d.sendLoginMsg(ctx, WeChatQRMsg{State: WeChatQRStateError, Error: genErr.Error()})
+					d.sendMsg(ctx, WeChatQRMsg{State: WeChatQRStateError, Error: genErr.Error()})
 					return
 				}
-				d.sendLoginMsg(ctx, WeChatQRMsg{State: WeChatQRStateDisplay, QRASCII: qr.ASCII})
+				d.sendMsg(ctx, WeChatQRMsg{State: WeChatQRStateDisplay, QRASCII: qr.ASCII})
 			},
 			OnScanned: func() {
-				d.sendLoginMsg(ctx, WeChatQRMsg{State: WeChatQRStateScanned})
+				d.sendMsg(ctx, WeChatQRMsg{State: WeChatQRStateScanned})
 			},
 			OnExpired: func() {
-				d.sendLoginMsg(ctx, WeChatQRMsg{State: WeChatQRStateGenerating})
+				d.sendMsg(ctx, WeChatQRMsg{State: WeChatQRStateGenerating})
 			},
 			OnLoggedIn: func(userID string) {
-				d.sendLoginMsg(ctx, WeChatQRMsg{State: WeChatQRStateLoggedIn, UserID: userID})
+				d.sendMsg(ctx, WeChatQRMsg{State: WeChatQRStateLoggedIn, UserID: userID})
 			},
 		}, d.client)
+
 		if err != nil {
 			select {
 			case d.loginDone <- WeChatQRMsg{State: WeChatQRStateError, Error: err.Error()}:
@@ -126,22 +124,19 @@ func (d *WeChatQR) StartLogin() {
 			return
 		}
 
-		// Start the message poll loop in background.
-		// Run blocks until Stop() or context cancel.
-		go func() {
-			_ = wc.Run(context.Background())
-		}()
+		if info != nil {
+			d.sendMsg(ctx, WeChatQRMsg{State: WeChatQRStateLoggedIn, UserID: info.UserID})
+		}
 	}()
 }
 
-func (d *WeChatQR) sendLoginMsg(ctx context.Context, msg WeChatQRMsg) {
+func (d *WeChatQR) sendMsg(ctx context.Context, msg WeChatQRMsg) {
 	select {
 	case d.loginDone <- msg:
 	case <-ctx.Done():
 	}
 }
 
-// PollLoginCmd returns a command that polls for login state changes.
 func (d *WeChatQR) PollLoginCmd() tea.Cmd {
 	return func() tea.Msg {
 		select {
@@ -160,12 +155,8 @@ func (d *WeChatQR) SetHTTPClient(client *http.Client) {
 	d.client = client
 }
 
-// ID returns the dialog ID.
-func (d *WeChatQR) ID() string {
-	return WeChatQRID
-}
+func (d *WeChatQR) ID() string { return WeChatQRID }
 
-// HandleMsg implements Dialog.
 func (d *WeChatQR) HandleMsg(msg tea.Msg) Action {
 	switch msg := msg.(type) {
 	case WeChatQRMsg:
@@ -184,7 +175,6 @@ func (d *WeChatQR) HandleMsg(msg tea.Msg) Action {
 		return ActionCmd{Cmd: d.PollLoginCmd()}
 
 	case tea.KeyPressMsg:
-		// In logged-in state, any key closes.
 		if d.state == WeChatQRStateLoggedIn {
 			if key.Matches(msg, d.keyMap.Close, d.keyMap.Refresh) {
 				return ActionClose{}
@@ -199,6 +189,7 @@ func (d *WeChatQR) HandleMsg(msg tea.Msg) Action {
 			if d.state == WeChatQRStateError {
 				d.started = false
 				d.StartLogin()
+				return ActionCmd{Cmd: d.PollLoginCmd()}
 			}
 		}
 	}
@@ -212,7 +203,6 @@ func (d *WeChatQR) cleanup() {
 	}
 }
 
-// Draw implements Dialog.
 func (d *WeChatQR) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	t := d.com.Styles
 
@@ -239,7 +229,7 @@ func (d *WeChatQR) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	case WeChatQRStateLoggedIn:
 		rc.Title = "WeChat Connected"
 		rc.AddPart(t.Dialog.PrimaryText.Render(
-			fmt.Sprintf("Logged in: %s\n\nPress Enter to close.\nSend messages from WeChat!", d.userID),
+			fmt.Sprintf("Logged in: %s\n\nAccount registered. Press Enter to close.\nOpen /wechat to manage accounts.", d.userID),
 		))
 
 	case WeChatQRStateError:
@@ -249,7 +239,7 @@ func (d *WeChatQR) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 
 	rc.Help = d.help.View(d)
 	view := rc.Render()
-	DrawCenterCursor(scr, area, view, nil)
+	DrawCenter(scr, area, view)
 	return nil
 }
 
@@ -261,7 +251,6 @@ func renderQRPanel(qrASCII string) string {
 		Render(qrASCII)
 }
 
-// ShortHelp implements help.KeyMap.
 func (d *WeChatQR) ShortHelp() []key.Binding {
 	switch d.state {
 	case WeChatQRStateLoggedIn:
@@ -273,7 +262,6 @@ func (d *WeChatQR) ShortHelp() []key.Binding {
 	}
 }
 
-// FullHelp implements help.KeyMap.
 func (d *WeChatQR) FullHelp() [][]key.Binding {
 	return [][]key.Binding{{d.keyMap.Close, d.keyMap.Refresh}}
 }

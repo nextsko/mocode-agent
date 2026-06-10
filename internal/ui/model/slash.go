@@ -12,17 +12,17 @@ import (
 
 const (
 	slashCmdWeChat   = "/wechat"
-	slashCmdContext   = "/context"
-	slashCmdRollback  = "/rollback"
+	slashCmdContext  = "/context"
+	slashCmdRollback = "/rollback"
 )
 
 // handleSlashCommand dispatches a slash command typed in the input box.
 // It uses slashCompletionGroups() as the single source of truth for command
 // lookup, with special handling only for commands that have sub-commands.
-func (m *UI) handleSlashCommand(value string) tea.Cmd {
+func (m *UI) handleSlashCommand(value string) (tea.Cmd, bool) {
 	trimmed := strings.TrimSpace(value)
 	if !strings.HasPrefix(trimmed, "/") {
-		return nil
+		return nil, false
 	}
 
 	// ── Special handling for commands with sub-commands ──
@@ -34,19 +34,19 @@ func (m *UI) handleSlashCommand(value string) tea.Cmd {
 		// the user can list accounts, switch active, reconnect, start/stop
 		// the poll loop, delete accounts, or open the QR login flow.
 		if args == "" {
-			return m.openWeChatManagerDialog()
+			return m.openWeChatManagerDialog(), true
 		}
 		// Sub-commands are still supported for power users / scripting.
-		return m.handleWeChatCommand(args)
+		return m.handleWeChatCommand(args), true
 
 	case slashCmdContext:
-		return m.openContextDialog()
+		return m.openContextDialog(), true
 
 	case slashCmdRollback:
 		if args == "" {
-			return m.openRollbackDialog()
+			return m.openRollbackDialog(), true
 		}
-		return m.rollbackSession(args)
+		return m.rollbackSession(args), true
 	}
 
 	// ── Unified lookup: search completion groups by label ──
@@ -55,7 +55,7 @@ func (m *UI) handleSlashCommand(value string) tea.Cmd {
 			if item.Command != trimmed || item.Msg == nil {
 				continue
 			}
-			return m.handleDialogAction(item.Msg)
+			return m.handleDialogAction(item.Msg), true
 		}
 	}
 
@@ -66,12 +66,12 @@ func (m *UI) handleSlashCommand(value string) tea.Cmd {
 				if item.Command != cmd || item.Msg == nil {
 					continue
 				}
-				return m.handleDialogAction(item.Msg)
+				return m.handleDialogAction(item.Msg), true
 			}
 		}
 	}
 
-	return nil
+	return nil, false
 }
 
 // splitSlashCommand splits "/cmd args" into ("/cmd", "args").

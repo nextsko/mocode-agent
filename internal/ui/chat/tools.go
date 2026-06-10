@@ -47,6 +47,7 @@ type ToolMessageItem interface {
 
 	ToolCall() message.ToolCall
 	SetToolCall(tc message.ToolCall)
+	Result() *message.ToolResult
 	SetResult(res *message.ToolResult)
 	MessageID() string
 	SetMessageID(id string)
@@ -57,9 +58,21 @@ type ToolMessageItem interface {
 // toolPanelView is set by the UI model for parallel agent panel display.
 var toolPanelView *panel.View
 
+// agentPanelResolver lets the UI layer provide task-aware panel grouping for
+// nested agent tool calls.
+var agentPanelResolver func(parentToolCallID string, params agent.AgentParams, nestedTools []ToolMessageItem) []panel.AgentPanelData
+
 // SetToolPanelView sets the panel view reference for agent tool rendering.
 func SetToolPanelView(pv *panel.View) {
 	toolPanelView = pv
+}
+
+// SetAgentPanelResolver sets the resolver used to build task-aware agent
+// panels for multi-agent tool calls.
+func SetAgentPanelResolver(
+	resolver func(parentToolCallID string, params agent.AgentParams, nestedTools []ToolMessageItem) []panel.AgentPanelData,
+) {
+	agentPanelResolver = resolver
 }
 
 // Compactable is an interface for tool items that can render in a compacted mode.
@@ -374,6 +387,11 @@ func (t *baseToolMessageItem) ToolCall() message.ToolCall {
 	return t.toolCall
 }
 
+// Result returns the tool result associated with this message item.
+func (t *baseToolMessageItem) Result() *message.ToolResult {
+	return t.result
+}
+
 // SetToolCall sets the tool call associated with this message item.
 func (t *baseToolMessageItem) SetToolCall(tc message.ToolCall) {
 	t.toolCall = tc
@@ -646,9 +664,10 @@ func toolOutputCodeContent(sty *styles.Styles, path, content string, offset, wid
 
 	// Add truncation message if needed.
 	if len(lines) > maxLines && !expanded {
-		out = append(out, sty.Tool.ContentCodeTruncation.
-			Width(width).
-			Render(fmt.Sprintf(assistantMessageTruncateFormat, len(lines)-maxLines)),
+		out = append(
+			out, sty.Tool.ContentCodeTruncation.
+				Width(width).
+				Render(fmt.Sprintf(assistantMessageTruncateFormat, len(lines)-maxLines)),
 		)
 	}
 
@@ -807,7 +826,8 @@ func renderHookLine(sty *styles.Styles, hi hooks.HookInfo, rawName, detail strin
 		arrowStyle = sty.Tool.HookDeniedLabel
 	}
 
-	return fmt.Sprintf("%s %s%s%s %s %s",
+	return fmt.Sprintf(
+		"%s %s%s%s %s %s",
 		labelStyle.Render("Hook"),
 		name,
 		namePad,
@@ -1019,9 +1039,10 @@ func toolOutputMarkdownContent(sty *styles.Styles, content string, width int, ex
 	}
 
 	if len(lines) > maxLines && !expanded {
-		out = append(out, sty.Tool.ContentTruncation.
-			Width(width).
-			Render(fmt.Sprintf(assistantMessageTruncateFormat, len(lines)-maxLines)),
+		out = append(
+			out, sty.Tool.ContentTruncation.
+				Width(width).
+				Render(fmt.Sprintf(assistantMessageTruncateFormat, len(lines)-maxLines)),
 		)
 	}
 
@@ -1272,7 +1293,9 @@ func (t *baseToolMessageItem) formatBashResultForCopy() string {
 
 	var meta tools.BashResponseMetadata
 	if t.result.Metadata != "" {
-		json.Unmarshal([]byte(t.result.Metadata), &meta)
+		if err := json.Unmarshal([]byte(t.result.Metadata), &meta); err != nil {
+			return fmt.Sprintf("```bash\n%s\n```", t.result.Content)
+		}
 	}
 
 	output := meta.Output
@@ -1295,7 +1318,9 @@ func (t *baseToolMessageItem) formatViewResultForCopy() string {
 
 	var meta tools.ViewResponseMetadata
 	if t.result.Metadata != "" {
-		json.Unmarshal([]byte(t.result.Metadata), &meta)
+		if err := json.Unmarshal([]byte(t.result.Metadata), &meta); err != nil {
+			return t.result.Content
+		}
 	}
 
 	if meta.Content == "" {
@@ -1366,7 +1391,9 @@ func (t *baseToolMessageItem) formatEditResultForCopy() string {
 	}
 
 	var params tools.EditParams
-	json.Unmarshal([]byte(t.toolCall.Input), &params)
+	if err := json.Unmarshal([]byte(t.toolCall.Input), &params); err != nil {
+		return t.result.Content
+	}
 
 	var result strings.Builder
 
@@ -1401,7 +1428,9 @@ func (t *baseToolMessageItem) formatMultiEditResultForCopy() string {
 	}
 
 	var params tools.MultiEditParams
-	json.Unmarshal([]byte(t.toolCall.Input), &params)
+	if err := json.Unmarshal([]byte(t.toolCall.Input), &params); err != nil {
+		return t.result.Content
+	}
 
 	var result strings.Builder
 	if meta.OldContent != "" || meta.NewContent != "" {

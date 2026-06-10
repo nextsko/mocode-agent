@@ -10,12 +10,15 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/lipgloss/v2"
+	agentcore "github.com/package-register/mocode/internal/agent"
 	"github.com/package-register/mocode/internal/agent/notify"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/csync"
+	"github.com/package-register/mocode/internal/pubsub"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
 	"github.com/package-register/mocode/internal/ui/attachments"
+	"github.com/package-register/mocode/internal/ui/chat"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/completions"
 	"github.com/package-register/mocode/internal/ui/dialog"
@@ -147,7 +150,8 @@ func TestHandleSlashCommandSelectMode(t *testing.T) {
 	ws := ui.com.Workspace.(*testWorkspace)
 	ws.currentAgentID = config.AgentCoder
 
-	cmd := ui.handleSlashCommand("/plan")
+	cmd, handled := ui.handleSlashCommand("/plan")
+	require.True(t, handled)
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -166,7 +170,8 @@ func TestHandleSlashCommandInitKnowledge(t *testing.T) {
 	})
 	ui.dialog = dialog.NewOverlay()
 
-	cmd := ui.handleSlashCommand("/init_kng")
+	cmd, handled := ui.handleSlashCommand("/init_kng")
+	require.True(t, handled)
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -192,6 +197,35 @@ func TestHandleKeyPressCtrlPOpensSlashCompletion(t *testing.T) {
 	require.True(t, ui.completionsOpen)
 	require.True(t, ui.completionsSlashMode)
 	require.False(t, ui.dialog.ContainsDialog(dialog.CommandsID))
+}
+
+func TestHandleSlashCommandWeChatOpensManagerDialog(t *testing.T) {
+	t.Parallel()
+
+	ui := newTestUIWithConfig(t, &config.Config{
+		Providers: csync.NewMap[string, config.ProviderConfig](),
+		Options:   &config.Options{},
+	})
+	ui.dialog = dialog.NewOverlay()
+
+	cmd, handled := ui.handleSlashCommand("/wechat")
+	require.True(t, handled)
+	require.True(t, ui.dialog.ContainsDialog(dialog.WeChatManagerID))
+	require.NotNil(t, cmd)
+}
+
+func TestHandleDialogActionOpenWeChatManagerDialog(t *testing.T) {
+	t.Parallel()
+
+	ui := newTestUIWithConfig(t, &config.Config{
+		Providers: csync.NewMap[string, config.ProviderConfig](),
+		Options:   &config.Options{},
+	})
+	ui.dialog = dialog.NewOverlay()
+
+	cmd := ui.handleDialogAction(dialog.ActionOpenDialog{DialogID: dialog.WeChatManagerID})
+	require.True(t, ui.dialog.ContainsDialog(dialog.WeChatManagerID))
+	require.NotNil(t, cmd)
 }
 
 func TestHandleAgentNotificationTracksSessionScopedRuntime(t *testing.T) {
@@ -257,6 +291,162 @@ func TestUpdateAgentRuntimeKeepsFirstSeenOrderStable(t *testing.T) {
 	require.Equal(t, 0, state.entries["alpha"].FirstSeenOrder)
 	require.Equal(t, 1, state.entries["beta"].FirstSeenOrder)
 	require.Equal(t, agentRuntimeStopped, state.entries["alpha"].Status)
+}
+
+func TestHandleChildSessionMessage_AssociatesBatchSubAgentSessionWithParentAgentTool(t *testing.T) {
+	t.Parallel()
+
+	ui := newTestUIWithConfig(t, &config.Config{
+		Providers: csync.NewMap[string, config.ProviderConfig](),
+		Options:   &config.Options{},
+	})
+	ui.session = &session.Session{ID: "session-parent", Title: "Parent"}
+
+	parentMsg := message.Message{
+		ID:        "msg-parent",
+		Role:      message.Assistant,
+		SessionID: "session-parent",
+		Parts: []message.ContentPart{
+			message.ToolCall{
+				ID:    "agent-call",
+				Name:  agentcore.AgentToolName,
+				Input: `{"tasks":[{"prompt":"Inspect UI"},{"prompt":"Patch UI"}]}`,
+			},
+		},
+	}
+
+	_ = ui.updateSessionMessage(parentMsg)
+
+	childSessionID := ui.com.Workspace.CreateAgentToolSessionID(parentMsg.ID, "agent-call-1")
+	childMsg := message.Message{
+		ID:        "child-msg-1",
+		Role:      message.Assistant,
+		SessionID: childSessionID,
+		Parts: []message.ContentPart{
+			message.ToolCall{
+				ID:    "bash-call-1",
+				Name:  "bash",
+				Input: `echo hi`,
+			},
+		},
+	}
+
+	_ = ui.handleChildSessionMessage(pubsub.Event[message.Message]{
+		Type:    pubsub.UpdatedEvent,
+		Payload: childMsg,
+	})
+
+	toolItem, ok := ui.chat.MessageItem("agent-call").(chat.NestedToolContainer)
+	require.True(t, ok)
+	require.Len(t, toolItem.NestedTools(), 1)
+	require.Equal(t, "bash-call-1", toolItem.NestedTools()[0].ToolCall().ID)
+}
+
+func TestHandleChildSessionMessage_TracksTextOnlySubAgentRuntime(t *testing.T) {
+	t.Parallel()
+
+	ui := newTestUIWithConfig(t, &config.Config{
+		Providers: csync.NewMap[string, config.ProviderConfig](),
+		Options:   &config.Options{},
+	})
+	ui.session = &session.Session{ID: "session-parent", Title: "Parent"}
+
+	parentMsg := message.Message{
+		ID:        "msg-parent",
+		Role:      message.Assistant,
+		SessionID: "session-parent",
+		Parts: []message.ContentPart{
+			message.ToolCall{
+				ID:    "agent-call",
+				Name:  agentcore.AgentToolName,
+				Input: `{"prompt":"Analyze the failing test"}`,
+			},
+		},
+	}
+
+	_ = ui.updateSessionMessage(parentMsg)
+
+	childSessionID := ui.com.Workspace.CreateAgentToolSessionID(parentMsg.ID, "agent-call")
+	_ = ui.handleChildSessionMessage(pubsub.Event[message.Message]{
+		Type: pubsub.UpdatedEvent,
+		Payload: message.Message{
+			ID:        "child-text-1",
+			Role:      message.Assistant,
+			SessionID: childSessionID,
+			Parts: []message.ContentPart{
+				message.TextContent{Text: "Analyzed the failure path."},
+			},
+		},
+	})
+
+	state := ui.agentRuntimes["session-parent"]
+	require.NotNil(t, state)
+	entry := state.entries[childSessionID]
+	require.NotNil(t, entry)
+	require.Equal(t, config.AgentTask, entry.DisplayName)
+	require.Equal(t, agentRuntimeExecuting, entry.Status)
+	require.Equal(t, "Analyzed the failure path.", entry.Summary)
+}
+
+func TestSetSessionMessages_LoadsNestedBatchSubAgentHistory(t *testing.T) {
+	t.Parallel()
+
+	ui := newTestUIWithConfig(t, &config.Config{
+		Providers: csync.NewMap[string, config.ProviderConfig](),
+		Options:   &config.Options{},
+	})
+	ui.session = &session.Session{ID: "session-parent", Title: "Parent"}
+
+	parentMsg := message.Message{
+		ID:        "msg-parent",
+		Role:      message.Assistant,
+		SessionID: "session-parent",
+		Parts: []message.ContentPart{
+			message.ToolCall{
+				ID:    "agent-call",
+				Name:  agentcore.AgentToolName,
+				Input: `{"tasks":[{"prompt":"Inspect UI"},{"prompt":"Patch UI"}]}`,
+			},
+		},
+	}
+
+	childSessionID := ui.com.Workspace.CreateAgentToolSessionID(parentMsg.ID, "agent-call-1")
+	ui.com.Workspace.(*testWorkspace).messagesBySession = map[string][]message.Message{
+		childSessionID: {
+			{
+				ID:        "child-msg-1",
+				Role:      message.Assistant,
+				SessionID: childSessionID,
+				Parts: []message.ContentPart{
+					message.ToolCall{
+						ID:       "bash-call-1",
+						Name:     "bash",
+						Input:    `echo hi`,
+						Finished: true,
+					},
+				},
+			},
+			{
+				ID:        "child-result-1",
+				Role:      message.Tool,
+				SessionID: childSessionID,
+				Parts: []message.ContentPart{
+					message.ToolResult{
+						ToolCallID: "bash-call-1",
+						Name:       "bash",
+						Content:    "ok",
+					},
+				},
+			},
+		},
+	}
+
+	_ = ui.setSessionMessages([]message.Message{parentMsg})
+
+	toolItem, ok := ui.chat.MessageItem("agent-call").(chat.NestedToolContainer)
+	require.True(t, ok)
+	require.Len(t, toolItem.NestedTools(), 1)
+	require.Equal(t, "bash-call-1", toolItem.NestedTools()[0].ToolCall().ID)
 }
 
 func TestPillClickTargetAt(t *testing.T) {
@@ -470,7 +660,7 @@ func newTestUIWithConfig(t *testing.T, cfg *config.Config) *UI {
 	ta.MaxHeight = TextareaMaxHeight
 	ta.Focus()
 
-	return &UI{
+	ui := &UI{
 		com:         com,
 		textarea:    ta,
 		chat:        NewChat(com),
@@ -488,13 +678,18 @@ func newTestUIWithConfig(t *testing.T, cfg *config.Config) *UI {
 				Escape:     DefaultKeyMap().Editor.Escape,
 			},
 		),
-		keyMap:            DefaultKeyMap(),
-		agentRuntimes:     make(map[string]*sessionAgentRuntimeState),
-		agentToolParents:  make(map[string]string),
-		todoContinuations: make(map[string]*todoAutoContinueState),
-		width:             120,
-		height:            40,
+		keyMap:             DefaultKeyMap(),
+		agentRuntimes:      make(map[string]*sessionAgentRuntimeState),
+		agentToolParents:   make(map[string]string),
+		agentToolChildren:  make(map[string]string),
+		agentToolTaskIDs:   make(map[string]string),
+		agentToolSummaries: make(map[string]map[string]string),
+		todoContinuations:  make(map[string]*todoAutoContinueState),
+		width:              120,
+		height:             40,
 	}
+	chat.SetAgentPanelResolver(ui.agentTaskPanelsForRender)
+	return ui
 }
 
 // testWorkspace is a minimal [workspace.Workspace] stub for unit tests.
@@ -509,6 +704,7 @@ type testWorkspace struct {
 	busySessions       map[string]bool
 	queuedPrompts      map[string]int
 	sessionByID        map[string]session.Session
+	messagesBySession  map[string][]message.Message
 	lastRunSessionID   string
 	lastRunPrompt      string
 	savedSession       session.Session
@@ -545,6 +741,15 @@ func (w *testWorkspace) GetSession(_ context.Context, sessionID string) (session
 	return session.Session{}, nil
 }
 
+func (w *testWorkspace) CreateAgentToolSessionID(messageID, toolCallID string) string {
+	return messageID + "$$" + toolCallID
+}
+
+func (w *testWorkspace) ParseAgentToolSessionID(sessionID string) (string, string, bool) {
+	messageID, toolCallID, ok := parseChildSessionID(sessionID)
+	return messageID, toolCallID, ok
+}
+
 func (w *testWorkspace) SaveSession(_ context.Context, sess session.Session) (session.Session, error) {
 	w.savedSession = sess
 	if w.sessionByID == nil {
@@ -552,6 +757,13 @@ func (w *testWorkspace) SaveSession(_ context.Context, sess session.Session) (se
 	}
 	w.sessionByID[sess.ID] = sess
 	return sess, nil
+}
+
+func (w *testWorkspace) ListMessages(_ context.Context, sessionID string) ([]message.Message, error) {
+	if w.messagesBySession == nil {
+		return nil, nil
+	}
+	return append([]message.Message(nil), w.messagesBySession[sessionID]...), nil
 }
 
 func (w *testWorkspace) AgentRun(_ context.Context, sessionID, prompt string, _ ...message.Attachment) error {

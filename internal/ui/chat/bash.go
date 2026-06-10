@@ -200,7 +200,16 @@ func (j *JobKillToolRenderContext) RenderTool(sty *styles.Styles, width int, opt
 // renderJobTool renders a job-related tool with the common pattern:
 // header → nested check → early state → body.
 func renderJobTool(sty *styles.Styles, opts *ToolRenderOpts, width int, action, shellID, description, content string) string {
-	header := jobHeader(sty, opts.Status, action, shellID, description, width)
+	status := opts.Status
+	trimmed := strings.TrimSpace(content)
+	switch {
+	case strings.HasPrefix(trimmed, "Status: running"):
+		status = ToolStatusRunning
+	case strings.HasPrefix(trimmed, "Status: interrupted"):
+		status = ToolStatusCanceled
+	}
+
+	header := jobHeader(sty, status, action, shellID, description, width)
 	if opts.Compact {
 		return header
 	}

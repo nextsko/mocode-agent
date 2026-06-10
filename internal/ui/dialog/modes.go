@@ -280,7 +280,7 @@ func (m *Modes) listArea(dialogArea image.Rectangle, leftWidth, listHeight int) 
 
 func (m *Modes) setModeItems() error {
 	cfg := m.com.Config()
-	activeMode := config.AgentCoder
+	activeMode := config.AgentDefault
 	if cfg.Options != nil && cfg.Options.ActiveMode != "" {
 		activeMode = cfg.Options.ActiveMode
 	}

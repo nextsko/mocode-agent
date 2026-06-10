@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	wechatbot "github.com/package-register/mocode/internal/wechat/sdk"
 )
 
 // AccountStatus represents the connection state of a WeChat account.
@@ -106,6 +108,11 @@ func (m *AccountManager) Login(ctx context.Context, force bool, callbacks LoginC
 
 	if err := m.saveRegistry(); err != nil {
 		slog.Warn("failed to save account registry", "error", err)
+	}
+
+	// Persist credentials to per-account file so loadRegistry can restore them.
+	if err := m.saveCredentials(id, creds); err != nil {
+		slog.Warn("failed to save account credentials", "account", id, "error", err)
 	}
 
 	return &AccountInfo{
@@ -338,25 +345,34 @@ func (m *AccountManager) loadRegistry() error {
 		ch := New()
 		ch.accountID = id
 		ch.storePath = filepath.Join(m.storeDir, id, "sessions.json")
-		// Try to load stored credentials from SDK cred path.
 		credPath := filepath.Join(m.storeDir, id, "credentials.json")
-		if credData, err := os.ReadFile(credPath); err == nil {
-			var stored struct {
-				UserID  string `json:"user_id"`
-				BaseURL string `json:"base_url"`
-				Token   string `json:"token"`
-			}
-			if err := json.Unmarshal(credData, &stored); err == nil {
-				ch.Credentials = &Credentials{
-					UserID:  stored.UserID,
-					BaseURL: stored.BaseURL,
-					Token:   stored.Token,
-				}
-				m.mu.Lock()
-				m.accounts[id] = ch
-				m.mu.Unlock()
-			}
+		credData, err := os.ReadFile(credPath)
+		if err != nil {
+			slog.Debug("no stored credentials for account", "account", id, "error", err)
+			continue
 		}
+		var stored Credentials
+		if err := json.Unmarshal(credData, &stored); err != nil {
+			slog.Warn("failed to parse credentials for account", "account", id, "error", err)
+			continue
+		}
+		ch.Credentials = &stored
+		// Re-initialize the bot with stored credentials so
+		// IsLoggedIn() returns true and the channel is usable.
+		bot := wechatbot.New(wechatbot.Options{})
+		if !bot.SetCredentials(&stored) {
+			slog.Warn("incomplete credentials for stored account", "account", id)
+			continue
+		}
+		ch.bot = bot
+
+		if err := ch.loadSessions(); err != nil {
+			slog.Warn("failed to load sessions for restored account", "account", id, "error", err)
+		}
+
+		m.mu.Lock()
+		m.accounts[id] = ch
+		m.mu.Unlock()
 	}
 
 	return nil
@@ -388,4 +404,17 @@ func accountID(baseURL, userID string) string {
 	key := baseURL + "|" + userID
 	h := sha256.Sum256([]byte(key))
 	return hex.EncodeToString(h[:])[:16]
+}
+
+// saveCredentials persists account credentials to a per-account JSON file.
+func (m *AccountManager) saveCredentials(id string, creds *Credentials) error {
+	dir := filepath.Join(m.storeDir, id)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(creds, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "credentials.json"), append(data, '\n'), 0o600)
 }

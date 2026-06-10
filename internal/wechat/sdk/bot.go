@@ -338,6 +338,26 @@ func (b *Bot) Run(ctx context.Context) error {
 	}
 }
 
+// SetCredentials restores previously saved credentials on the bot.
+// This allows the bot to operate (send messages, poll, etc.) without a fresh
+// QR login. Returns false if the credentials are incomplete.
+func (b *Bot) SetCredentials(creds *Credentials) bool {
+	if creds == nil || creds.Token == "" || creds.BaseURL == "" || creds.UserID == "" {
+		return false
+	}
+	b.mu.Lock()
+	b.creds = &auth.Credentials{
+		Token:     creds.Token,
+		BaseURL:   creds.BaseURL,
+		AccountID: creds.AccountID,
+		UserID:    creds.UserID,
+		SavedAt:   creds.SavedAt,
+	}
+	b.opts.BaseURL = creds.BaseURL
+	b.mu.Unlock()
+	return true
+}
+
 // Stop gracefully stops the poll loop.
 func (b *Bot) Stop() {
 	b.mu.Lock()
