@@ -30,11 +30,13 @@ import (
 	"charm.land/fantasy/providers/openai"
 	"charm.land/fantasy/providers/openrouter"
 	"charm.land/fantasy/providers/vercel"
+	"github.com/package-register/mocode/internal/agent/ctxcompress"
 	"github.com/package-register/mocode/internal/agent/notify"
 	"github.com/package-register/mocode/internal/agent/tools"
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/csync"
+	"github.com/package-register/mocode/internal/evolution"
 	"github.com/package-register/mocode/internal/knowledge/memory"
 	"github.com/package-register/mocode/internal/pubsub"
 	"github.com/package-register/mocode/internal/session"
@@ -121,6 +123,9 @@ type sessionAgent struct {
 	notify               pubsub.Publisher[notify.Notification]
 	callbacks            *AgentCallbacks
 
+	errorLearner   *evolution.ErrorLearner
+	compressor     *ctxcompress.Pipeline
+
 	messageQueue   *csync.Map[string, []SessionAgentCall]
 	activeRequests *csync.Map[string, context.CancelFunc]
 }
@@ -140,6 +145,7 @@ type SessionAgentOptions struct {
 	WorkingDir           string
 	Notify               pubsub.Publisher[notify.Notification]
 	Callbacks            *AgentCallbacks
+	ErrorLearner         *evolution.ErrorLearner
 }
 
 func NewSessionAgent(
@@ -160,6 +166,8 @@ func NewSessionAgent(
 		workingDir:           opts.WorkingDir,
 		notify:               opts.Notify,
 		callbacks:            opts.Callbacks,
+		errorLearner:         opts.ErrorLearner,
+		compressor:           ctxcompress.NewPipeline(ctxcompress.DefaultPolicy()),
 		messageQueue:         csync.NewMap[string, []SessionAgentCall](),
 		activeRequests:       csync.NewMap[string, context.CancelFunc](),
 	}
@@ -350,6 +358,13 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 				prepared.Messages = append([]fantasy.Message{fantasy.NewSystemMessage(promptPrefix)}, prepared.Messages...)
 			}
 
+			// Inject learned error corrections for the current provider/model.
+			if a.errorLearner != nil {
+				if corrections := a.errorLearner.CorrectionContext(largeModel.ModelCfg.Provider, largeModel.ModelCfg.Model); corrections != "" {
+					prepared.Messages = append([]fantasy.Message{fantasy.NewSystemMessage(corrections)}, prepared.Messages...)
+				}
+			}
+
 			var assistantMsg message.Message
 			assistantMsg, err = a.messages.Create(callContext, call.SessionID, message.CreateMessageParams{
 				Role:     message.Assistant,
@@ -444,6 +459,18 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 		},
 		OnToolResult: func(result fantasy.ToolResultContent) error {
 			toolResult := a.convertToToolResult(result)
+
+			// Record error patterns for evolution learning.
+			if toolResult.IsError && a.errorLearner != nil {
+				modelCfg := largeModel.ModelCfg
+				go a.errorLearner.Record(
+					modelCfg.Provider,
+					modelCfg.Model,
+					result.ToolName,
+					toolResult.Content,
+				)
+			}
+
 			// Use parent ctx instead of genCtx to ensure the message is created
 			// even if the request is canceled mid-stream
 			_, createMsgErr := a.messages.Create(ctx, currentAssistant.SessionID, message.CreateMessageParams{
@@ -875,7 +902,8 @@ If not, please feel free to ignore. Again do not mention this message to the use
 		}
 	}
 
-	for _, m := range msgs {
+	totalMsgs := len(msgs)
+	for i, m := range msgs {
 		if len(m.Parts) == 0 {
 			continue
 		}
@@ -883,8 +911,11 @@ If not, please feel free to ignore. Again do not mention this message to the use
 		if m.Role == message.Assistant && len(m.ToolCalls()) == 0 && m.Content().Text == "" && m.ReasoningContent().String() == "" {
 			continue
 		}
+		distanceFromEnd := totalMsgs - i - 1
 		if m.Role == message.Tool {
 			if msg, ok := filterOrphanedToolResults(m, knownToolCallIDs); ok {
+				// Apply multi-level compression to tool results.
+				msg = a.compressToolMessage(msg, distanceFromEnd)
 				history = append(history, msg)
 			}
 			continue
@@ -920,7 +951,65 @@ If not, please feel free to ignore. Again do not mention this message to the use
 	return history, files
 }
 
-// filterImagePartsFromMessages removes FilePart content from messages when the
+// compressToolMessage applies the multi-level compression pipeline to a tool
+// result message. Tool results are often the biggest consumers of context
+// window tokens, so compressing older ones yields significant savings.
+func (a *sessionAgent) compressToolMessage(msg fantasy.Message, distanceFromEnd int) fantasy.Message {
+	if a.compressor == nil {
+		return msg
+	}
+	level := a.compressor.Policy().LevelForIndex(distanceFromEnd)
+	if level == ctxcompress.LevelFull {
+		return msg
+	}
+
+	var compressedParts []fantasy.MessagePart
+	for _, part := range msg.Content {
+		tr, ok := fantasy.AsMessagePart[fantasy.ToolResultPart](part)
+		if !ok {
+			compressedParts = append(compressedParts, part)
+			continue
+		}
+
+		text := extractToolResultText(tr)
+		isErr := isToolResultError(tr)
+		cm := ctxcompress.CompressedMessage{
+			Role:    "tool",
+			Content: text,
+			IsError: isErr,
+		}
+		result := a.compressor.Compress(cm, level)
+		if result.Content != text {
+			setToolResultText(&tr, result.Content)
+		}
+		compressedParts = append(compressedParts, tr)
+	}
+
+	msg.Content = compressedParts
+	return msg
+}
+
+// extractToolResultText extracts the text content from a ToolResultPart.
+func extractToolResultText(tr fantasy.ToolResultPart) string {
+	if r, ok := fantasy.AsToolResultOutputType[fantasy.ToolResultOutputContentText](tr.Output); ok {
+		return r.Text
+	}
+	if r, ok := fantasy.AsToolResultOutputType[fantasy.ToolResultOutputContentError](tr.Output); ok {
+		return r.Error.Error()
+	}
+	return ""
+}
+
+// isToolResultError returns true if the tool result is an error.
+func isToolResultError(tr fantasy.ToolResultPart) bool {
+	_, ok := fantasy.AsToolResultOutputType[fantasy.ToolResultOutputContentError](tr.Output)
+	return ok
+}
+
+// setToolResultText replaces the text content in a ToolResultPart.
+func setToolResultText(tr *fantasy.ToolResultPart, text string) {
+	tr.Output = fantasy.ToolResultOutputContentText{Text: text}
+}
 // model does not support images. This prevents API errors when switching from
 // an image-capable model to one that doesn't support images.
 func filterImagePartsFromMessages(msgs []fantasy.Message) []fantasy.Message {
@@ -1423,28 +1512,36 @@ func (a *sessionAgent) workaroundProviderMediaLimitations(messages []fantasy.Mes
 }
 
 // buildSummaryPrompt constructs the prompt text for session summarization.
+// The output follows the Obsidian + YAML frontmatter format defined in
+// templates/summary.md for both human readability and machine parsing.
 func buildSummaryPrompt(todos []session.Todo) string {
 	var sb strings.Builder
 	sb.WriteString("请基于上面的完整会话生成一份中文标准会话摘要。")
 	sb.WriteString("\n\n要求：")
-	sb.WriteString("\n1. 使用中文撰写，术语、文件路径、命令、函数名、错误信息保持原文。")
-	sb.WriteString("\n2. 摘要用于下一次恢复上下文，必须足够具体，不能泛泛而谈。")
-	sb.WriteString("\n3. 必须覆盖：用户目标、已完成工作、当前状态、关键文件与改动、重要设计决策、验证命令、失败/风险、下一步操作。")
-	sb.WriteString("\n4. 使用 Markdown，固定输出以下标题：")
-	sb.WriteString("\n   ## 用户目标")
-	sb.WriteString("\n   ## 当前进展")
-	sb.WriteString("\n   ## 文件与代码变更")
-	sb.WriteString("\n   ## 技术决策与约束")
-	sb.WriteString("\n   ## 验证结果")
-	sb.WriteString("\n   ## 风险与待确认")
-	sb.WriteString("\n   ## 下一步")
-	sb.WriteString("\n5. 下一步必须是可执行清单，包含具体文件、函数或命令。")
+	sb.WriteString("\n1. 输出必须以 YAML frontmatter 开头（--- 包裹），包含 type, tags, status, files_modified, commands_run 等元数据。")
+	sb.WriteString("\n2. 使用中文撰写，术语、文件路径、命令、函数名、错误信息保持原文。")
+	sb.WriteString("\n3. 摘要用于下一次恢复上下文，必须足够具体，不能泛泛而谈。")
+	sb.WriteString("\n4. 必须覆盖以下 Markdown 章节：用户目标、当前进展、文件与代码变更、技术决策与约束、验证结果、风险与待确认、下一步。")
+	sb.WriteString("\n5. 文件引用格式：`path/to/file.go:行号` — 变更描述")
+	sb.WriteString("\n6. 命令结果格式：`command` → exit_code: N, 关键输出")
+	sb.WriteString("\n7. 下一步必须是可执行编号清单，包含具体文件、函数或命令。")
 	if len(todos) > 0 {
-		sb.WriteString("\n\n## Current Todo List\n\n")
+		pending := 0
+		inProgress := 0
+		for _, t := range todos {
+			switch t.Status {
+			case "pending":
+				pending++
+			case "in_progress":
+				inProgress++
+			}
+		}
+		sb.WriteString(fmt.Sprintf("\n\n## 当前 Todo 状态\n\n- pending: %d\n- in_progress: %d\n", pending, inProgress))
+		sb.WriteString("\n### 详情\n\n")
 		for _, t := range todos {
 			fmt.Fprintf(&sb, "- [%s] %s\n", t.Status, t.Content)
 		}
-		sb.WriteString("\n请把这些 todo 的状态整合进中文摘要，并提醒恢复会话时继续使用 `todos` 工具跟踪。")
+		sb.WriteString("\n请把这些 todo 的状态整合进 YAML frontmatter 的 todos_pending/todos_in_progress 字段，并在摘要正文的「下一步」章节中包含未完成项。")
 	}
 	return sb.String()
 }

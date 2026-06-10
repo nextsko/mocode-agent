@@ -100,6 +100,7 @@ type coordinator struct {
 	summaryQueue  *sessionSummaryQueue
 	swarmWF       *swarm.WorkflowRuntime // nil if swarm mode not active
 	sessionLogDir string                 // base dir for session logs
+	errorLearner  *evolution.ErrorLearner
 
 	// Skills discovery results (session-start snapshot).
 	allSkills    []*skills.Skill // Pre-filter: all discovered after dedup.
@@ -141,6 +142,11 @@ func NewCoordinator(
 		activeSkills:  activeSkills,
 		skillTracker:  skillTracker,
 		sessionLogDir: filepath.Join(cfg.WorkingDir(), ".mocode", "sessions"),
+	}
+
+	// Initialize error learner for provider-specific mistake tracking.
+	if learner, learnerErr := evolution.NewErrorLearner(filepath.Join(cfg.WorkingDir(), ".mocode", "evolution", "patterns")); learnerErr == nil {
+		c.errorLearner = learner
 	}
 
 	// Resolve the active agent from config (supports mode switching).
@@ -478,6 +484,7 @@ func (c *coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, age
 		Notify:               c.notify,
 		Memory:               c.memory,
 		WorkingDir:           c.cfg.WorkingDir(),
+		ErrorLearner:         c.errorLearner,
 	})
 
 	c.readyWg.Go(func() error {
