@@ -40,6 +40,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -47,8 +49,55 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
+      - name: Determine golangci-lint scope
+        id: golangci
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--config=.golangci.ci.yml --timeout=5m --whole-files)
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" && -n "${GITHUB_BASE_REF:-}" ]]; then
+            args+=(--new-from-merge-base="origin/${GITHUB_BASE_REF}")
+          elif git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+            args+=(--new-from-rev=HEAD~1)
+          else
+            args+=(--new)
+          fi
+          printf 'args=%s\n' "${args[*]} ./" >> "$GITHUB_OUTPUT"
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2
-          args: --timeout=5m ./
+          args: ${{ steps.golangci.outputs.args }}
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

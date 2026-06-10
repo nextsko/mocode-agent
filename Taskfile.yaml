@@ -7,6 +7,8 @@ vars:
     sh: git describe --long 2>/dev/null || echo ""
   RACE:
     sh: test -f race.log && echo "1" || echo ""
+  BUILDVCS_FLAG: -buildvcs=false
+  LINT_CONFIG: .golangci.ci.yml
 
 env:
   CGO_ENABLED: 0
@@ -21,7 +23,15 @@ tasks:
       GOTOOLCHAIN: go1.25.0
 
   lint:
-    desc: Run base linters
+    desc: Run CI linters on changed files
+    cmds:
+      - task: lint:log
+      - golangci-lint run --path-mode=abs --config="{{.LINT_CONFIG}}" --timeout=5m --new --whole-files
+    env:
+      GOEXPERIMENT: null
+
+  lint:strict:
+    desc: Run the full legacy lint suite across the repository
     cmds:
       - task: lint:log
       - golangci-lint run --path-mode=abs --config=".golangci.yml" --timeout=5m
@@ -34,9 +44,9 @@ tasks:
       - ./scripts/check_log_capitalization.sh
 
   lint:fix:
-    desc: Run base linters and fix issues
+    desc: Run CI linters on changed files and fix supported issues
     cmds:
-      - golangci-lint run --path-mode=abs --config=".golangci.yml" --timeout=5m --fix
+      - golangci-lint run --path-mode=abs --config="{{.LINT_CONFIG}}" --timeout=5m --new --whole-files --fix
     env:
       GOEXPERIMENT: null
 
@@ -45,7 +55,7 @@ tasks:
     vars:
       LDFLAGS: '{{if .VERSION}}-ldflags="-X github.com/package-register/mocode/internal/version.Version={{.VERSION}}"{{end}}'
     cmds:
-      - "go build -v {{if .RACE}}-race{{end}} {{.LDFLAGS}} ."
+      - "go build {{.BUILDVCS_FLAG}} -v {{if .RACE}}-race{{end}} {{.LDFLAGS}} ."
     sources:
       - ./**/*.go
       - go.mod
@@ -144,7 +154,7 @@ tasks:
     env:
       MOCODE_PROFILE: true
     cmds:
-      - go run .
+      - go run {{.BUILDVCS_FLAG}} .
 
   install:
     desc: Install the application
@@ -152,7 +162,7 @@ tasks:
       LDFLAGS: '{{if .VERSION}}-ldflags="-X github.com/package-register/mocode/internal/version.Version={{.VERSION}}"{{end}}'
     cmds:
       - task: fetch-tags
-      - go install {{.LDFLAGS}} -v .
+      - go install {{.BUILDVCS_FLAG}} {{.LDFLAGS}} -v .
     sources:
       - ./**/*.go
       - go.mod
@@ -177,7 +187,7 @@ tasks:
   schema:
     desc: Generate JSON schema for configuration
     cmds:
-      - go run main.go schema > schema.json
+      - go run {{.BUILDVCS_FLAG}} main.go schema > schema.json
       - echo "Generated schema.json"
     generates:
       - schema.json
