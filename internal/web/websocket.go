@@ -3,19 +3,24 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
+	agentexec "github.com/package-register/mocode/internal/agent/tools/builtin/exec"
 	"github.com/package-register/mocode/internal/app"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/pubsub"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
+	"github.com/package-register/mocode/internal/tools/shell"
 	"github.com/package-register/mocode/internal/workspace"
 )
 
@@ -28,13 +33,13 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		slog.Warn("web: ws upgrade failed", "error", err)
+		slog.Warn("Web: WS upgrade failed", "error", err)
 		return
 	}
 	defer conn.Close()
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	slog.Info("web: ws connected", "session", sessionID)
+	slog.Info("Web: WS connected", "session", sessionID)
 
 	appWS, ok := s.workspace.(*workspace.AppWorkspace)
 	if !ok {
@@ -42,9 +47,10 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	appInstance := appWS.App()
+	writer := newWSConnWriter(conn)
 
 	// Initial session status.
-	sendJSON(conn, map[string]any{
+	writer.Send(map[string]any{
 		"jsonrpc": "2.0",
 		"method":  "session_status",
 		"params": map[string]any{
@@ -56,10 +62,10 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Replay persisted history.
-	replayHistory(conn, sessionID)
+	replayHistory(writer, sessionID)
 
 	// Frontend expects top-level history_complete.
-	sendJSON(conn, map[string]any{
+	writer.Send(map[string]any{
 		"jsonrpc": "2.0",
 		"method":  "history_complete",
 		"id":      sessionID + "-history-complete",
@@ -71,12 +77,13 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 	msgCh := appInstance.Messages.Subscribe(ctx)
 	permReqCh := appInstance.Permissions.Subscribe(ctx)
 	permNotifCh := appInstance.Permissions.SubscribeNotifications(ctx)
+	bridgeState := newWSBridgeState(appInstance, sessionID)
+	resumeBackgroundToolStreams(ctx, writer, appInstance, sessionID)
 
 	// Event bridge goroutine.
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		seq := 1
 		for {
 			select {
 			case ev, ok := <-msgCh:
@@ -86,17 +93,17 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 				if ev.Payload.SessionID != sessionID {
 					continue
 				}
-				s.bridgeMessageEvent(conn, ev, &seq, appInstance)
+				s.bridgeMessageEvent(ctx, writer, ev, bridgeState, appInstance)
 			case ev, ok := <-permReqCh:
 				if !ok {
 					return
 				}
-				s.bridgePermissionRequest(conn, ev)
+				s.bridgePermissionRequest(writer, ev)
 			case ev, ok := <-permNotifCh:
 				if !ok {
 					return
 				}
-				s.bridgePermissionNotification(conn, ev)
+				s.bridgePermissionNotification(writer, ev)
 			case <-ctx.Done():
 				return
 			}
@@ -109,7 +116,7 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			cancel()
 			<-done
-			slog.Debug("web: ws closed", "session", sessionID, "error", err)
+			slog.Debug("Web: WS closed", "session", sessionID, "error", err)
 			break
 		}
 
@@ -136,9 +143,9 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 						case "reject":
 							s.workspace.PermissionDeny(perm)
 						default:
-							slog.Warn("web: unknown approval response", "response", resp, "request_id", reqID)
+							slog.Warn("Web: unknown approval response", "response", resp, "request_id", reqID)
 						}
-						sendJSON(conn, map[string]any{
+						writer.Send(map[string]any{
 							"jsonrpc": "2.0",
 							"id":      msg["id"],
 							"result":  map[string]any{"status": "ok"},
@@ -148,7 +155,7 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 					// Question response: {request_id, answers: {...}}
 					if _, ok := result["answers"]; ok {
 						// TODO: wire up question response mechanism when AskUserQuestion tool is implemented.
-						sendJSON(conn, map[string]any{
+						writer.Send(map[string]any{
 							"jsonrpc": "2.0",
 							"id":      msg["id"],
 							"result":  map[string]any{"status": "ok"},
@@ -161,7 +168,7 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 
 		switch method {
 		case "initialize":
-			sendJSON(conn, map[string]any{
+			writer.Send(map[string]any{
 				"jsonrpc": "2.0",
 				"id":      msg["id"],
 				"result": map[string]any{
@@ -172,13 +179,14 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 			continue
 		case "cancel":
 			s.workspace.AgentCancel(sessionID)
-			sendJSON(conn, map[string]any{
+			s.setRunning(sessionID, false)
+			writer.Send(map[string]any{
 				"jsonrpc": "2.0",
 				"id":      msg["id"],
 				"result":  map[string]any{},
 			})
 			// Notify frontend that the step was interrupted.
-			sendJSON(conn, map[string]any{
+			writer.Send(map[string]any{
 				"jsonrpc": "2.0",
 				"method":  "event",
 				"params": map[string]any{
@@ -186,6 +194,7 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 					"payload": map[string]any{},
 				},
 			})
+			sendSessionStatus(writer, sessionID, "idle", "prompt_cancelled", "", bridgeState.NextStatusSeq())
 			continue
 		case "set_plan_mode":
 			// Store plan mode state per session and broadcast via StatusUpdate.
@@ -197,7 +206,7 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 			s.setPlanMode(sessionID, enabled)
 
 			// Notify frontend of plan mode status.
-			sendJSON(conn, map[string]any{
+			writer.Send(map[string]any{
 				"jsonrpc": "2.0",
 				"method":  "event",
 				"params": map[string]any{
@@ -208,7 +217,7 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 				},
 			})
 
-			sendJSON(conn, map[string]any{
+			writer.Send(map[string]any{
 				"jsonrpc": "2.0",
 				"id":      msg["id"],
 				"result": map[string]any{
@@ -219,6 +228,16 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 			continue
 		case "prompt":
 			// Explicitly handle prompt method.
+		default:
+			writer.Send(map[string]any{
+				"jsonrpc": "2.0",
+				"id":      msg["id"],
+				"error": map[string]any{
+					"code":    -32601,
+					"message": "unknown method",
+				},
+			})
+			continue
 		}
 
 		params, _ := msg["params"].(map[string]any)
@@ -239,7 +258,7 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 			userInput = strings.Join(parts, "\n")
 		}
 		if userInput == "" {
-			sendJSON(conn, map[string]any{
+			writer.Send(map[string]any{
 				"jsonrpc": "2.0",
 				"id":      msg["id"],
 				"error": map[string]any{
@@ -249,49 +268,63 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 			})
 			continue
 		}
+		if s.isRunning(sessionID) {
+			writer.Send(map[string]any{
+				"jsonrpc": "2.0",
+				"id":      msg["id"],
+				"error": map[string]any{
+					"code":    -32001,
+					"message": "session is already running",
+				},
+			})
+			continue
+		}
 
 		s.setRunning(sessionID, true)
-		sendJSON(conn, map[string]any{
+		writer.Send(map[string]any{
 			"jsonrpc": "2.0",
 			"method":  "session_status",
 			"params": map[string]any{
 				"session_id": sessionID,
 				"state":      "busy",
-				"seq":        1,
+				"seq":        bridgeState.NextStatusSeq(),
 				"updated_at": time.Now().UTC().Format(time.RFC3339),
 			},
 		})
-
-		err = s.workspace.AgentRun(r.Context(), sessionID, userInput)
-		if err != nil {
-			slog.Warn("web: agent run failed", "session", sessionID, "error", err)
-			s.setRunning(sessionID, false)
-			sendJSON(conn, map[string]any{
-				"jsonrpc": "2.0",
-				"id":      msg["id"],
-				"error":   map[string]any{"code": -32000, "message": err.Error()},
-			})
-		} else {
-			sendJSON(conn, map[string]any{
-				"jsonrpc": "2.0",
-				"id":      msg["id"],
-				"result": map[string]any{
-					"status":         "ok",
-					"slash_commands": getSlashCommands(),
-				},
-			})
-		}
+		go func() {
+			err := s.workspace.AgentRun(ctx, sessionID, userInput)
+			if err != nil {
+				if errors.Is(err, context.Canceled) || !s.isRunning(sessionID) {
+					return
+				}
+				slog.Warn("Web: agent run failed", "session", sessionID, "error", err)
+				s.setRunning(sessionID, false)
+				sendSessionStatus(writer, sessionID, "error", "prompt_error", err.Error(), bridgeState.NextStatusSeq())
+				return
+			}
+			if s.isRunning(sessionID) {
+				s.setRunning(sessionID, false)
+				sendSessionStatus(writer, sessionID, "idle", "prompt_complete", "", bridgeState.NextStatusSeq())
+			}
+		}()
+		writer.Send(map[string]any{
+			"jsonrpc": "2.0",
+			"id":      msg["id"],
+			"result": map[string]any{
+				"status":         "ok",
+				"slash_commands": getSlashCommands(),
+			},
+		})
 	}
 }
 
-func (s *Server) bridgeMessageEvent(conn *websocket.Conn, ev pubsub.Event[message.Message], seq *int, appInstance *app.App) {
+func (s *Server) bridgeMessageEvent(ctx context.Context, writer *wsConnWriter, ev pubsub.Event[message.Message], state *wsBridgeState, appInstance *app.App) {
 	msg := ev.Payload
-	now := time.Now().UTC().Format(time.RFC3339)
 
 	switch ev.Type {
 	case pubsub.CreatedEvent:
 		if msg.Role == message.User {
-			sendJSON(conn, map[string]any{
+			writer.Send(map[string]any{
 				"jsonrpc": "2.0",
 				"method":  "event",
 				"params": map[string]any{
@@ -304,7 +337,7 @@ func (s *Server) bridgeMessageEvent(conn *websocket.Conn, ev pubsub.Event[messag
 			return
 		}
 		if msg.Role == message.Assistant {
-			sendJSON(conn, map[string]any{
+			writer.Send(map[string]any{
 				"jsonrpc": "2.0",
 				"method":  "event",
 				"params": map[string]any{
@@ -313,67 +346,17 @@ func (s *Server) bridgeMessageEvent(conn *websocket.Conn, ev pubsub.Event[messag
 				},
 			})
 		}
+	case pubsub.UpdatedEvent, pubsub.DeletedEvent:
+		// Delta streaming below handles the current persisted message state.
 	}
 
 	if msg.Role == message.Assistant {
-		thinking := msg.ReasoningContent().Thinking
-		if thinking != "" {
-			sendJSON(conn, map[string]any{
-				"jsonrpc": "2.0",
-				"method":  "event",
-				"params": map[string]any{
-					"type": "ContentPart",
-					"payload": map[string]any{
-						"type":  "think",
-						"think": thinking,
-					},
-				},
-			})
-		}
-		text := msg.Content().Text
-		if text != "" {
-			sendJSON(conn, map[string]any{
-				"jsonrpc": "2.0",
-				"method":  "event",
-				"params": map[string]any{
-					"type": "ContentPart",
-					"payload": map[string]any{
-						"type": "text",
-						"text": text,
-					},
-				},
-			})
-		}
-		for _, tc := range msg.ToolCalls() {
-			sendJSON(conn, map[string]any{
-				"jsonrpc": "2.0",
-				"method":  "event",
-				"params": map[string]any{
-					"type": "ToolCall",
-					"payload": map[string]any{
-						"type": "function",
-						"id":   tc.ID,
-						"function": map[string]any{
-							"name":      tc.Name,
-							"arguments": tc.Input,
-						},
-					},
-				},
-			})
+		for _, payload := range state.AssistantDeltaEvents(msg) {
+			writer.Send(payload)
 		}
 		if msg.FinishPart() != nil {
 			s.setRunning(msg.SessionID, false)
-			sendJSON(conn, map[string]any{
-				"jsonrpc": "2.0",
-				"method":  "session_status",
-				"params": map[string]any{
-					"session_id": msg.SessionID,
-					"state":      "idle",
-					"seq":        *seq,
-					"updated_at": now,
-				},
-			})
-			*seq++
+			sendSessionStatus(writer, msg.SessionID, "idle", "", "", state.NextStatusSeq())
 
 			// Send StatusUpdate with token usage from session.
 			if appInstance != nil {
@@ -397,7 +380,7 @@ func (s *Server) bridgeMessageEvent(conn *websocket.Conn, ev pubsub.Event[messag
 					} else {
 						contextUsage = nil
 					}
-					sendJSON(conn, map[string]any{
+					writer.Send(map[string]any{
 						"jsonrpc": "2.0",
 						"method":  "event",
 						"params": map[string]any{
@@ -416,30 +399,18 @@ func (s *Server) bridgeMessageEvent(conn *websocket.Conn, ev pubsub.Event[messag
 
 	if msg.Role == message.Tool {
 		for _, tr := range msg.ToolResults() {
-			payload := map[string]any{
-				"tool_call_id": tr.ToolCallID,
-				"return_value": map[string]any{
-					"is_error": tr.IsError,
-					"output":   tr.Content,
-					"message":  tr.Content,
-					"display":  []any{},
-				},
+			if !state.MarkToolResultSent(tr.ToolCallID) {
+				continue
 			}
-			sendJSON(conn, map[string]any{
-				"jsonrpc": "2.0",
-				"method":  "event",
-				"params": map[string]any{
-					"type":    "ToolResult",
-					"payload": payload,
-				},
-			})
+			writer.Send(toolResultEvent(buildToolResultPayload(tr)))
+			streamBackgroundToolResult(ctx, writer, tr)
 		}
 	}
 }
 
-func (s *Server) bridgePermissionRequest(conn *websocket.Conn, ev pubsub.Event[permission.PermissionRequest]) {
+func (s *Server) bridgePermissionRequest(writer *wsConnWriter, ev pubsub.Event[permission.PermissionRequest]) {
 	p := ev.Payload
-	sendJSON(conn, map[string]any{
+	writer.Send(map[string]any{
 		"jsonrpc": "2.0",
 		"method":  "event",
 		"params": map[string]any{
@@ -455,13 +426,13 @@ func (s *Server) bridgePermissionRequest(conn *websocket.Conn, ev pubsub.Event[p
 	})
 }
 
-func (s *Server) bridgePermissionNotification(conn *websocket.Conn, ev pubsub.Event[permission.PermissionNotification]) {
+func (s *Server) bridgePermissionNotification(writer *wsConnWriter, ev pubsub.Event[permission.PermissionNotification]) {
 	n := ev.Payload
 	response := any(false)
 	if n.Granted && !n.Denied {
 		response = true
 	}
-	sendJSON(conn, map[string]any{
+	writer.Send(map[string]any{
 		"jsonrpc": "2.0",
 		"method":  "event",
 		"params": map[string]any{
@@ -483,8 +454,8 @@ func (s *Server) bridgePermissionNotification(conn *websocket.Conn, ev pubsub.Ev
 // Frontend expects payload: {id, tool_call_id, questions: [{question, header, options, multi_select}]}
 //
 //lint:ignore U1000 — reserved for future use.
-func (s *Server) bridgeQuestionRequest(conn *websocket.Conn, reqID, toolCallID string, questions []any) {
-	sendJSON(conn, map[string]any{
+func (s *Server) bridgeQuestionRequest(writer *wsConnWriter, reqID, toolCallID string, questions []any) {
+	writer.Send(map[string]any{
 		"jsonrpc": "2.0",
 		"method":  "event",
 		"params": map[string]any{
@@ -507,8 +478,8 @@ func (s *Server) bridgeQuestionRequest(conn *websocket.Conn, reqID, toolCallID s
 // Frontend expects payload: {parent_tool_call_id, agent_id?, subagent_type?, event: {type, payload}}
 //
 //lint:ignore U1000 — reserved for future use.
-func (s *Server) bridgeSubagentEvent(conn *websocket.Conn, parentToolCallID, agentID, subagentType string, innerType string, innerPayload any) {
-	sendJSON(conn, map[string]any{
+func (s *Server) bridgeSubagentEvent(writer *wsConnWriter, parentToolCallID, agentID, subagentType string, innerType string, innerPayload any) {
+	writer.Send(map[string]any{
 		"jsonrpc": "2.0",
 		"method":  "event",
 		"params": map[string]any{
@@ -526,14 +497,18 @@ func (s *Server) bridgeSubagentEvent(conn *websocket.Conn, parentToolCallID, age
 	})
 }
 
-func replayHistory(conn *websocket.Conn, sessionID string) {
+func replayHistory(writer *wsConnWriter, sessionID string) {
+	if !isSafeSessionPathComponent(sessionID) {
+		return
+	}
+
 	workDir := getStartupDir()
 	candidates := []string{
 		filepath.Join(workDir, ".mocode", "sessions", sessionID, "wire.jsonl"),
 	}
 
 	for _, path := range candidates {
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // sessionID is validated by isSafeSessionPathComponent above.
 		if err != nil {
 			continue
 		}
@@ -555,13 +530,460 @@ func replayHistory(conn *websocket.Conn, sessionID string) {
 				continue
 			}
 
-			sendJSON(conn, map[string]any{
+			writer.Send(map[string]any{
 				"jsonrpc": "2.0",
 				"method":  "event",
-				"params":  json.RawMessage(record.Message),
+				"params":  record.Message,
 			})
 		}
 		break
+	}
+}
+
+func isSafeSessionPathComponent(value string) bool {
+	if value == "" || value == "." || value == ".." {
+		return false
+	}
+
+	if strings.Contains(value, "/") || strings.Contains(value, `\`) {
+		return false
+	}
+
+	return filepath.Base(value) == value && filepath.Clean(value) == value
+}
+
+func sendSessionStatus(writer *wsConnWriter, sessionID, state, reason, detail string, seq int) {
+	params := map[string]any{
+		"session_id": sessionID,
+		"state":      state,
+		"seq":        seq,
+		"updated_at": time.Now().UTC().Format(time.RFC3339),
+	}
+	if reason != "" {
+		params["reason"] = reason
+	}
+	if detail != "" {
+		params["detail"] = detail
+	}
+	writer.Send(map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "session_status",
+		"params":  params,
+	})
+}
+
+func toolResultEvent(payload map[string]any) map[string]any {
+	return map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "event",
+		"params": map[string]any{
+			"type":    "ToolResult",
+			"payload": payload,
+		},
+	}
+}
+
+func buildToolResultPayload(tr message.ToolResult) map[string]any {
+	return map[string]any{
+		"tool_call_id": tr.ToolCallID,
+		"return_value": buildToolReturnValue(tr),
+	}
+}
+
+func buildToolReturnValue(tr message.ToolResult) map[string]any {
+	returnValue := map[string]any{
+		"is_error": tr.IsError,
+		"output":   tr.Content,
+		"message":  tr.Content,
+		"display":  []any{},
+	}
+	if extras := bashToolResultExtras(tr); len(extras) > 0 {
+		returnValue["extras"] = extras
+	}
+	return returnValue
+}
+
+func bashToolResultExtras(tr message.ToolResult) map[string]any {
+	meta, ok := parseBashResponseMetadata(tr.Metadata)
+	if !ok {
+		return nil
+	}
+	status := "completed"
+	if meta.Background && meta.ShellID != "" {
+		status = "running"
+	}
+	return bashMetadataExtras(*meta, status)
+}
+
+func parseBashResponseMetadata(raw string) (*agentexec.BashResponseMetadata, bool) {
+	if raw == "" {
+		return nil, false
+	}
+	var meta agentexec.BashResponseMetadata
+	if err := json.Unmarshal([]byte(raw), &meta); err != nil {
+		return nil, false
+	}
+	if meta.Description == "" && meta.WorkingDirectory == "" && meta.ShellID == "" && !meta.Background && !meta.TTY {
+		return nil, false
+	}
+	return &meta, true
+}
+
+func resumeBackgroundToolStreams(ctx context.Context, writer *wsConnWriter, appInstance *app.App, sessionID string) {
+	if appInstance == nil {
+		return
+	}
+	msgs, err := appInstance.Messages.List(ctx, sessionID)
+	if err != nil {
+		return
+	}
+	for _, msg := range msgs {
+		if msg.Role != message.Tool {
+			continue
+		}
+		for _, tr := range msg.ToolResults() {
+			streamBackgroundToolResult(ctx, writer, tr)
+		}
+	}
+}
+
+func streamBackgroundToolResult(ctx context.Context, writer *wsConnWriter, tr message.ToolResult) {
+	meta, ok := parseBashResponseMetadata(tr.Metadata)
+	if !ok || !meta.Background || meta.ShellID == "" {
+		return
+	}
+	bgShell, ok := shell.GetBackgroundShellManager().Get(meta.ShellID)
+	if !ok {
+		return
+	}
+	go pollBackgroundToolResult(ctx, writer, tr.ToolCallID, *meta, bgShell)
+}
+
+func pollBackgroundToolResult(ctx context.Context, writer *wsConnWriter, toolCallID string, meta agentexec.BashResponseMetadata, bgShell *shell.BackgroundShell) {
+	ticker := time.NewTicker(150 * time.Millisecond)
+	defer ticker.Stop()
+
+	var lastSignature string
+	emit := func() bool {
+		payload, signature, done := buildBackgroundToolResultPayload(toolCallID, meta, bgShell)
+		if payload == nil {
+			return true
+		}
+		if signature != lastSignature {
+			lastSignature = signature
+			writer.Send(toolResultEvent(payload))
+		}
+		return done
+	}
+
+	if emit() {
+		return
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if emit() {
+				return
+			}
+		}
+	}
+}
+
+func buildBackgroundToolResultPayload(toolCallID string, meta agentexec.BashResponseMetadata, bgShell *shell.BackgroundShell) (map[string]any, string, bool) {
+	stdout, stderr, done, execErr := bgShell.GetOutput()
+	status := backgroundShellStatus(meta.Background, done, execErr)
+	output := formatBackgroundShellOutput(stdout, stderr, execErr)
+	message := backgroundShellSummary(bgShell.ID, status)
+	returnValue := map[string]any{
+		"is_error": status == "error",
+		"output":   output,
+		"message":  message,
+		"display":  []any{},
+		"extras":   bashMetadataExtras(meta, status),
+	}
+	signature := strings.Join(
+		[]string{
+			status,
+			output,
+			message,
+		},
+		"\x00",
+	)
+	return map[string]any{
+		"tool_call_id": toolCallID,
+		"return_value": returnValue,
+	}, signature, done
+}
+
+func bashMetadataExtras(meta agentexec.BashResponseMetadata, status string) map[string]any {
+	extras := map[string]any{
+		"background": meta.Background,
+		"job_status": status,
+	}
+	if meta.ShellID != "" {
+		extras["shell_id"] = meta.ShellID
+	}
+	if meta.Description != "" {
+		extras["description"] = meta.Description
+	}
+	if meta.WorkingDirectory != "" {
+		extras["working_directory"] = meta.WorkingDirectory
+	}
+	if meta.TTY {
+		extras["tty"] = true
+	}
+	return extras
+}
+
+func backgroundShellStatus(background bool, done bool, execErr error) string {
+	if !background {
+		return "completed"
+	}
+	if !done {
+		return "running"
+	}
+	if shell.IsInterrupt(execErr) {
+		return "interrupted"
+	}
+	if execErr != nil {
+		return "error"
+	}
+	return "completed"
+}
+
+func backgroundShellSummary(shellID, status string) string {
+	switch status {
+	case "running":
+		return "Background task is still running."
+	case "interrupted":
+		return "Background task was interrupted."
+	case "error":
+		return "Background task failed."
+	default:
+		return "Background task completed."
+	}
+}
+
+func formatBackgroundShellOutput(stdout, stderr string, execErr error) string {
+	output := stdout
+	if stderr != "" {
+		if output != "" {
+			output += "\n"
+		}
+		output += stderr
+	}
+	if execErr != nil && !shell.IsInterrupt(execErr) {
+		if output != "" {
+			output += "\n"
+		}
+		output += execErr.Error()
+	}
+	return truncateBackgroundShellOutput(output)
+}
+
+func truncateBackgroundShellOutput(content string) string {
+	const maxOutputLength = 30000
+	if len(content) <= maxOutputLength {
+		return content
+	}
+	halfLength := maxOutputLength / 2
+	start := content[:halfLength]
+	end := content[len(content)-halfLength:]
+	return start + "\n\n... output truncated ...\n\n" + end
+}
+
+type wsConnWriter struct {
+	conn *websocket.Conn
+	mu   sync.Mutex
+}
+
+func newWSConnWriter(conn *websocket.Conn) *wsConnWriter {
+	return &wsConnWriter{conn: conn}
+}
+
+func (w *wsConnWriter) Send(v any) {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	_ = w.conn.WriteMessage(websocket.TextMessage, data)
+}
+
+type wsBridgeState struct {
+	statusSeq atomic.Int64
+
+	messages        map[string]*wsBridgeMessageState
+	sentToolResults map[string]struct{}
+}
+
+type wsBridgeMessageState struct {
+	thinkingLen int
+	textLen     int
+	toolArgsLen map[string]int
+	sentTools   map[string]struct{}
+}
+
+func newWSBridgeState(appInstance *app.App, sessionID string) *wsBridgeState {
+	state := &wsBridgeState{
+		messages:        make(map[string]*wsBridgeMessageState),
+		sentToolResults: make(map[string]struct{}),
+	}
+	if appInstance == nil {
+		return state
+	}
+	msgs, err := appInstance.Messages.List(context.Background(), sessionID)
+	if err != nil {
+		return state
+	}
+	for _, msg := range msgs {
+		state.seedMessage(msg)
+	}
+	return state
+}
+
+func (s *wsBridgeState) NextStatusSeq() int {
+	return int(s.statusSeq.Add(1))
+}
+
+func (s *wsBridgeState) MarkToolResultSent(toolCallID string) bool {
+	if toolCallID == "" {
+		return false
+	}
+	if _, ok := s.sentToolResults[toolCallID]; ok {
+		return false
+	}
+	s.sentToolResults[toolCallID] = struct{}{}
+	return true
+}
+
+func (s *wsBridgeState) AssistantDeltaEvents(msg message.Message) []map[string]any {
+	msgState := s.messageState(msg.ID)
+	events := make([]map[string]any, 0)
+
+	thinking := msg.ReasoningContent().Thinking
+	if len(thinking) < msgState.thinkingLen {
+		msgState.thinkingLen = 0
+	}
+	if len(thinking) > msgState.thinkingLen {
+		delta := thinking[msgState.thinkingLen:]
+		msgState.thinkingLen = len(thinking)
+		events = append(events, contentPartEvent("think", "think", delta))
+	}
+
+	text := msg.Content().Text
+	if len(text) < msgState.textLen {
+		msgState.textLen = 0
+	}
+	if len(text) > msgState.textLen {
+		delta := text[msgState.textLen:]
+		msgState.textLen = len(text)
+		events = append(events, contentPartEvent("text", "text", delta))
+	}
+
+	for _, tc := range msg.ToolCalls() {
+		if _, ok := msgState.sentTools[tc.ID]; !ok {
+			msgState.sentTools[tc.ID] = struct{}{}
+			msgState.toolArgsLen[tc.ID] = len(tc.Input)
+			events = append(events, toolCallEvent(tc))
+			continue
+		}
+		prevLen := msgState.toolArgsLen[tc.ID]
+		if len(tc.Input) < prevLen {
+			msgState.toolArgsLen[tc.ID] = len(tc.Input)
+			continue
+		}
+		if len(tc.Input) > prevLen {
+			delta := tc.Input[prevLen:]
+			msgState.toolArgsLen[tc.ID] = len(tc.Input)
+			events = append(events, toolCallPartEvent(delta))
+		}
+	}
+
+	return events
+}
+
+func (s *wsBridgeState) seedMessage(msg message.Message) {
+	switch msg.Role {
+	case message.Assistant:
+		msgState := s.messageState(msg.ID)
+		msgState.thinkingLen = len(msg.ReasoningContent().Thinking)
+		msgState.textLen = len(msg.Content().Text)
+		for _, tc := range msg.ToolCalls() {
+			msgState.sentTools[tc.ID] = struct{}{}
+			msgState.toolArgsLen[tc.ID] = len(tc.Input)
+		}
+	case message.Tool:
+		for _, tr := range msg.ToolResults() {
+			if tr.ToolCallID == "" {
+				continue
+			}
+			s.sentToolResults[tr.ToolCallID] = struct{}{}
+		}
+	case message.User, message.System:
+		// Nothing to seed for websocket delta replay.
+	}
+}
+
+func (s *wsBridgeState) messageState(messageID string) *wsBridgeMessageState {
+	msgState, ok := s.messages[messageID]
+	if ok {
+		return msgState
+	}
+	msgState = &wsBridgeMessageState{
+		toolArgsLen: make(map[string]int),
+		sentTools:   make(map[string]struct{}),
+	}
+	s.messages[messageID] = msgState
+	return msgState
+}
+
+func contentPartEvent(partType, field, value string) map[string]any {
+	return map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "event",
+		"params": map[string]any{
+			"type": "ContentPart",
+			"payload": map[string]any{
+				"type": partType,
+				field:  value,
+			},
+		},
+	}
+}
+
+func toolCallEvent(tc message.ToolCall) map[string]any {
+	return map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "event",
+		"params": map[string]any{
+			"type": "ToolCall",
+			"payload": map[string]any{
+				"type": "function",
+				"id":   tc.ID,
+				"function": map[string]any{
+					"name":      tc.Name,
+					"arguments": tc.Input,
+				},
+			},
+		},
+	}
+}
+
+func toolCallPartEvent(delta string) map[string]any {
+	return map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "event",
+		"params": map[string]any{
+			"type": "ToolCallPart",
+			"payload": map[string]any{
+				"arguments_part": delta,
+			},
+		},
 	}
 }
 
@@ -585,12 +1007,4 @@ func getSlashCommands() []map[string]any {
 		{"name": "clear", "description": "Clear the conversation", "aliases": []string{"reset"}},
 		{"name": "compact", "description": "Compact/summarize the conversation", "aliases": []string{}},
 	}
-}
-
-func sendJSON(conn *websocket.Conn, v any) {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return
-	}
-	_ = conn.WriteMessage(websocket.TextMessage, data)
 }
