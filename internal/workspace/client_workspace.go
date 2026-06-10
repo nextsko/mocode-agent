@@ -15,6 +15,7 @@ import (
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/client"
 	"github.com/package-register/mocode/internal/capability"
+	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/history"
 	"github.com/package-register/mocode/internal/knowledge/kngs"
@@ -931,12 +932,14 @@ func sessionToProto(s session.Session) proto.Session {
 func (w *ClientWorkspace) BuildCommandRegistry() []capability.CommandDescriptor {
 	customDescs := make([]capability.CommandDescriptor, 0)
 	if cfg := w.Config(); cfg != nil {
-		for _, cmd := range cfg.CustomCommands {
-			customDescs = append(customDescs, capability.CommandDescriptor{
-				ID: "custom_" + cmd.ID, Title: cmd.Name,
-				Category: capability.CommandCategoryUser, Arguments: cmd.Arguments,
-				Risk: capability.RiskLevelRead,
-			})
+		if customCommands, err := commands.LoadCustomCommands(cfg); err == nil {
+			for _, cmd := range customCommands {
+				customDescs = append(customDescs, capability.CommandDescriptor{
+					ID: "custom_" + cmd.ID, Title: cmd.Name,
+					Category: capability.CommandCategoryUser, Arguments: cmd.Arguments,
+					Risk: capability.RiskLevelRead,
+				})
+			}
 		}
 	}
 	builtinDescs := []capability.CommandDescriptor{

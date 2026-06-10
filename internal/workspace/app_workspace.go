@@ -511,25 +511,30 @@ func (w *AppWorkspace) SwitchAgent(ctx context.Context, agentID string) error {
 func (w *AppWorkspace) BuildCommandRegistry() []capability.CommandDescriptor {
 	cfg := w.Config()
 
-	customDescs := make([]capability.CommandDescriptor, 0, len(cfg.CustomCommands))
-	for _, cmd := range cfg.CustomCommands {
-		customDescs = append(customDescs, capability.CommandDescriptor{
-			ID: "custom_" + cmd.ID, Title: cmd.Name,
-			Category: capability.CommandCategoryUser, Arguments: cmd.Arguments,
-			Risk: capability.RiskLevelRead,
-		})
+	var customDescs []capability.CommandDescriptor
+	if cfg != nil {
+		if customCommands, err := commands.LoadCustomCommands(cfg); err == nil {
+			customDescs = make([]capability.CommandDescriptor, 0, len(customCommands))
+			for _, cmd := range customCommands {
+				customDescs = append(customDescs, capability.CommandDescriptor{
+					ID: "custom_" + cmd.ID, Title: cmd.Name,
+					Category: capability.CommandCategoryUser, Arguments: cmd.Arguments,
+					Risk: capability.RiskLevelRead,
+				})
+			}
+		}
 	}
 
 	mcpDescs := make([]capability.CommandDescriptor, 0)
-	for _, srv := range w.app.MCPServers() {
-		for _, prompt := range srv.Prompts {
+	if mcpPrompts, err := commands.LoadMCPPrompts(); err == nil {
+		for _, prompt := range mcpPrompts {
 			mcpDescs = append(mcpDescs, capability.CommandDescriptor{
-				ID: "mcp_" + srv.Name + "_" + prompt.Name,
-				Title: prompt.Name, Description: prompt.Description,
+				ID: "mcp_" + prompt.ID,
+				Title: prompt.Title, Description: prompt.Description,
 				Category: capability.CommandCategoryMCP,
 				Arguments: prompt.Arguments,
 				Risk: capability.RiskLevelNetwork,
-				Provider: capability.ProviderInfo{ID: "mcp-" + srv.Name, Name: srv.Name, Kind: capability.ProviderKindMCP},
+				Provider: capability.ProviderInfo{ID: "mcp-" + prompt.ClientID, Name: prompt.ClientID, Kind: capability.ProviderKindMCP},
 			})
 		}
 	}
