@@ -50,6 +50,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/jordanella/go-ansi-paintbrush v0.0.0-20240728195301-b7ad996ecf3d
 	github.com/kbinani/screenshot v0.0.0-20250624051815-089614a94018
+	github.com/kevinburke/ssh_config v1.2.0
 	github.com/lucasb-eyer/go-colorful v1.4.0
 	github.com/mattn/go-isatty v0.0.22
 	github.com/modelcontextprotocol/go-sdk v1.6.0
@@ -68,6 +69,7 @@ require (
 	github.com/yeqown/go-qrcode v1.5.10
 	github.com/zeebo/xxh3 v1.1.0
 	go.uber.org/goleak v1.3.0
+	golang.org/x/crypto v0.50.0
 	golang.org/x/net v0.53.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.43.0
@@ -156,7 +158,6 @@ require (
 	github.com/kaptinlin/jsonpointer v0.4.19 // indirect
 	github.com/kaptinlin/jsonschema v0.7.11 // indirect
 	github.com/kaptinlin/messageformat-go v0.6.0 // indirect
-	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
@@ -203,7 +204,6 @@ require (
 	go.opentelemetry.io/otel/metric v1.43.0 // indirect
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.3 // indirect
-	golang.org/x/crypto v0.50.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/image v0.38.0 // indirect
 	golang.org/x/mod v0.35.0 // indirect

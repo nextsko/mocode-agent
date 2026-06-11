@@ -573,6 +573,10 @@ func allToolNames() []string {
 		"gitea_notifications",
 		"git_plan_commits",
 		"git_execute_commits",
+		"ssh_exec",
+		"ssh_upload",
+		"ssh_download",
+		"ssh_list_hosts",
 	}
 }
 

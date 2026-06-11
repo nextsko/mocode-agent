@@ -17,6 +17,7 @@ import (
 	"github.com/package-register/mocode/internal/agent/tools/plugins/network"
 	"github.com/package-register/mocode/internal/agent/tools/plugins/search"
 	sessiontool "github.com/package-register/mocode/internal/agent/tools/plugins/session"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh"
 	"github.com/package-register/mocode/internal/agent/tools/plugins/think"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/filetracker"
@@ -55,6 +56,7 @@ const (
 	CategoryReasoning ToolCategory = "reasoning"
 	CategoryGitea     ToolCategory = "gitea"
 	CategoryGitOps    ToolCategory = "gitops"
+	CategorySSH       ToolCategory = "ssh"
 )
 
 // ToolDescriptor holds static metadata for a single tool.
@@ -141,6 +143,7 @@ func standardPlugins() []ToolPlugin {
 		thinkPlugin{},
 		giteaPlugin{},
 		gitOpsPlugin{},
+		&sshPlugin{},
 	}
 }
 
@@ -401,6 +404,46 @@ func (gitOpsPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool 
 		gitops.NewPlanCommitsTool(wd),
 		gitops.NewExecuteCommitsTool(wd),
 	}
+}
+
+// ─── plugin/ssh ──────────────────────────────────────────────────────────────
+
+// sshPlugin is a thin wrapper around the ssh package.  It owns a single
+// *ssh.Service (which itself owns the connection pool) so the four SSH
+// tools share state.  The Startable hooks let the registry close the
+// pool on shutdown.
+type sshPlugin struct {
+	svc *ssh.Service
+}
+
+func (p *sshPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: ssh.SshExecToolName, Kind: ToolKindPlugin, Category: CategorySSH},
+		{Name: ssh.SshUploadToolName, Kind: ToolKindPlugin, Category: CategorySSH},
+		{Name: ssh.SshDownloadToolName, Kind: ToolKindPlugin, Category: CategorySSH},
+		{Name: ssh.SshListHostsToolName, Kind: ToolKindPlugin, Category: CategorySSH},
+	}
+}
+
+func (p *sshPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	if p.svc == nil {
+		p.svc = ssh.NewService()
+	}
+	return []fantasy.AgentTool{
+		ssh.NewSshExecTool(p.svc, deps.Permissions),
+		ssh.NewSshUploadTool(p.svc, deps.Permissions),
+		ssh.NewSshDownloadTool(p.svc, deps.Permissions),
+		ssh.NewSshListHostsTool(p.svc),
+	}
+}
+
+func (p *sshPlugin) Start(_ context.Context) error { return nil }
+
+func (p *sshPlugin) Stop(_ context.Context) error {
+	if p.svc == nil {
+		return nil
+	}
+	return p.svc.Close()
 }
 
 // coordinatorToolNames returns names of tools owned by coordinator (agent,

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/package-register/mocode/internal/agent/tools/plugins/gitops"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh"
 	"github.com/package-register/mocode/internal/knowledge/memory"
 	"github.com/stretchr/testify/assert"
 )
@@ -56,6 +57,10 @@ var knownAllToolNames = []string{
 	GiteaNotificationsToolName,
 	gitops.PlanCommitsToolName,
 	gitops.ExecuteCommitsToolName,
+	ssh.SshExecToolName,
+	ssh.SshUploadToolName,
+	ssh.SshDownloadToolName,
+	ssh.SshListHostsToolName,
 }
 
 // TestAllToolNames_MatchesConfigList asserts that the registry's standard tool

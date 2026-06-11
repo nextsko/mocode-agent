@@ -14,6 +14,7 @@ import (
 	"github.com/package-register/mocode/internal/agent/tools/plugins/network"
 	"github.com/package-register/mocode/internal/agent/tools/plugins/search"
 	sessiontool "github.com/package-register/mocode/internal/agent/tools/plugins/session"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh"
 	"github.com/package-register/mocode/internal/agent/tools/plugins/think"
 )
 
@@ -234,6 +235,38 @@ var (
 	NewGiteaIssuesTool        = gitea.NewIssuesTool
 	NewGiteaPullsTool         = gitea.NewPullsTool
 	NewGiteaNotificationsTool = gitea.NewNotificationsTool
+)
+
+// ─── plugins/ssh ────────────────────────────────────────────────────────────
+
+const (
+	SshExecToolName      = ssh.SshExecToolName
+	SshUploadToolName    = ssh.SshUploadToolName
+	SshDownloadToolName  = ssh.SshDownloadToolName
+	SshListHostsToolName = ssh.SshListHostsToolName
+)
+
+type (
+	SshExecParams                = ssh.SshExecParams
+	SshExecPermissionsParams     = ssh.SshExecPermissionsParams
+	SshExecResponseMetadata      = ssh.SshExecResponseMetadata
+	SshUploadParams              = ssh.SshUploadParams
+	SshUploadPermissionsParams   = ssh.SshUploadPermissionsParams
+	SshUploadResponseMetadata    = ssh.SshUploadResponseMetadata
+	SshDownloadParams            = ssh.SshDownloadParams
+	SshDownloadPermissionsParams = ssh.SshDownloadPermissionsParams
+	SshDownloadResponseMetadata  = ssh.SshDownloadResponseMetadata
+	SshListHostsParams           = ssh.SshListHostsParams
+	SshListHostsResponseMetadata = ssh.SshListHostsResponseMetadata
+	HostInfo                     = ssh.HostInfo
+)
+
+var (
+	NewSshExecTool      = ssh.NewSshExecTool
+	NewSshUploadTool    = ssh.NewSshUploadTool
+	NewSshDownloadTool  = ssh.NewSshDownloadTool
+	NewSshListHostsTool = ssh.NewSshListHostsTool
+	NewSSHService       = ssh.NewService
 )
 
 // ─── filter ───────────────────────────────────────────────────────────────────
