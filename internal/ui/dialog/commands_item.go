@@ -189,7 +189,7 @@ func (c *CommandItem) Render(width int) string {
 	}
 
 	lineWidth := max(0, width-style.GetHorizontalFrameSize())
-	labelWidth := min(20, max(12, lineWidth/4))
+	labelWidth := 16
 	label := ansi.Truncate(c.Label(), max(0, labelWidth), "…")
 	labelGap := strings.Repeat(" ", max(1, labelWidth-lipgloss.Width(label)+1))
 

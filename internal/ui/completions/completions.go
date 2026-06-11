@@ -24,6 +24,9 @@ const (
 	minWidth  = 10
 	maxWidth  = 100
 
+	slashMinWidth = 72
+	slashMaxWidth = 88
+
 	tierExactName = iota
 	tierPrefixName
 	tierPathSegment
@@ -247,7 +250,8 @@ func (c *Completions) SetSlashItems(items []SlashCompletionValue, t *styles.Styl
 	}
 	frameH := t.Dialog.View.GetHorizontalFrameSize()
 	itemPadH := t.Dialog.NormalItem.GetHorizontalFrameSize()
-	computedW := max(int(minWidth), maxTextW+frameH+itemPadH+2)
+	computedW := max(slashMinWidth, maxTextW+frameH+itemPadH+2)
+	computedW = min(slashMaxWidth, computedW)
 	outerWidth = min(outerWidth, computedW)
 	c.slashForceWidth = outerWidth
 
@@ -274,10 +278,6 @@ func (c *Completions) SetSlashGroups(groups []SlashGroup, t *styles.Styles, oute
 	c.popupTitle = "Commands"
 	c.list.SetReverse(false)
 
-	c.slashForceWidth = outerWidth
-	frameH := t.Dialog.View.GetHorizontalFrameSize()
-	innerW := max(int(minWidth), outerWidth-frameH)
-
 	var allItems []list.FilterableItem
 	for _, g := range groups {
 		if len(g.Items) == 0 {
@@ -288,6 +288,20 @@ func (c *Completions) SetSlashGroups(groups []SlashGroup, t *styles.Styles, oute
 			allItems = append(allItems, NewSlashCompletionItem(v, t))
 		}
 	}
+
+	maxTextW := 0
+	for _, item := range allItems {
+		if tx, ok := item.(interface{ Text() string }); ok {
+			maxTextW = max(maxTextW, ansi.StringWidth(tx.Text()))
+		}
+	}
+	frameH := t.Dialog.View.GetHorizontalFrameSize()
+	itemPadH := t.Dialog.NormalItem.GetHorizontalFrameSize()
+	computedW := max(slashMinWidth, maxTextW+frameH+itemPadH+2)
+	computedW = min(slashMaxWidth, computedW)
+	outerWidth = min(outerWidth, computedW)
+	c.slashForceWidth = outerWidth
+	innerW := max(int(minWidth), outerWidth-frameH)
 
 	c.open = true
 	c.query = ""
@@ -309,14 +323,24 @@ func (c *Completions) SetAtItems(items []AtCompletionValue, t *styles.Styles, ou
 	c.popupTitle = "@ Context"
 	c.list.SetReverse(false)
 
-	c.slashForceWidth = outerWidth
-	frameH := t.Dialog.View.GetHorizontalFrameSize()
-	innerW := max(int(minWidth), outerWidth-frameH)
-
 	allItems := make([]list.FilterableItem, 0, len(items))
 	for _, item := range items {
 		allItems = append(allItems, NewAtCompletionItem(item, t))
 	}
+
+	maxTextW := 0
+	for _, item := range allItems {
+		if tx, ok := item.(interface{ Text() string }); ok {
+			maxTextW = max(maxTextW, ansi.StringWidth(tx.Text()))
+		}
+	}
+	frameH := t.Dialog.View.GetHorizontalFrameSize()
+	itemPadH := t.Dialog.NormalItem.GetHorizontalFrameSize()
+	computedW := max(slashMinWidth, maxTextW+frameH+itemPadH+2)
+	computedW = min(slashMaxWidth, computedW)
+	outerWidth = min(outerWidth, computedW)
+	c.slashForceWidth = outerWidth
+	innerW := max(int(minWidth), outerWidth-frameH)
 
 	c.open = true
 	c.query = ""

@@ -31,7 +31,7 @@ func (c CommandType) String() string { return []string{"System", "User", "MCP"}[
 
 const (
 	sidebarCompactModeBreakpoint = 120
-	commandPaletteMaxWidth       = 94
+	commandPaletteMaxWidth       = 84
 	commandPaletteMaxHeight      = 24
 	commandPaletteMinWidth       = 56
 )
