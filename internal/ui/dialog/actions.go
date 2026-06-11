@@ -10,7 +10,6 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/oauth"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
@@ -119,28 +118,7 @@ type (
 	}
 )
 
-// Messages for OAuth2 device flow dialog.
-type (
-	// ActionInitiateOAuth is sent when the device auth is initiated
-	// successfully.
-	ActionInitiateOAuth struct {
-		DeviceCode      string
-		UserCode        string
-		ExpiresIn       int
-		VerificationURL string
-		Interval        int
-	}
 
-	// ActionCompleteOAuth is sent when the device flow completes successfully.
-	ActionCompleteOAuth struct {
-		Token *oauth.Token
-	}
-
-	// ActionOAuthErrored is sent when the device flow encounters an error.
-	ActionOAuthErrored struct {
-		Error error
-	}
-)
 
 // ActionCmd represents an action that carries a [tea.Cmd] to be passed to the
 // Bubble Tea program loop.

@@ -2014,7 +2014,6 @@ func (m *UI) handleSelectModel(msg dialog.ActionSelectModel) tea.Cmd {
 	})
 
 	m.dialog.CloseDialog(dialog.APIKeyInputID)
-	m.dialog.CloseDialog(dialog.OAuthID)
 	m.dialog.CloseDialog(dialog.ModelsID)
 
 	if isOnboarding {
