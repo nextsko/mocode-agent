@@ -1,9 +1,8 @@
-package env
+package config
 
-import (
-	"os"
-)
+import "os"
 
+// Env is an interface for reading environment variables.
 type Env interface {
 	Get(key string) string
 	Env() []string
@@ -20,7 +19,8 @@ func (o *osEnv) Env() []string {
 	return os.Environ()
 }
 
-func New() Env {
+// NewEnv returns a new Env backed by the OS environment.
+func NewEnv() Env {
 	return &osEnv{}
 }
 
@@ -38,14 +38,15 @@ func (m *mapEnv) Get(key string) string {
 
 // Env implements Env.
 func (m *mapEnv) Env() []string {
-	env := make([]string, 0, len(m.m))
+	envSlice := make([]string, 0, len(m.m))
 	for k, v := range m.m {
-		env = append(env, k+"="+v)
+		envSlice = append(envSlice, k+"="+v)
 	}
-	return env
+	return envSlice
 }
 
-func NewFromMap(m map[string]string) Env {
+// NewEnvFromMap returns a new Env backed by the given map.
+func NewEnvFromMap(m map[string]string) Env {
 	if m == nil {
 		m = make(map[string]string)
 	}

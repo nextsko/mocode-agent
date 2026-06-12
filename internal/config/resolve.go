@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/env"
 	"github.com/package-register/mocode/internal/tools/shell"
 )
 
@@ -34,10 +33,10 @@ type Shell interface {
 
 type shellVariableResolver struct {
 	shell Shell
-	env   env.Env
+	env   Env
 }
 
-func NewShellVariableResolver(env env.Env) VariableResolver {
+func NewShellVariableResolver(env Env) VariableResolver {
 	return &shellVariableResolver{
 		env: env,
 		shell: shell.NewShell(
@@ -166,10 +165,10 @@ func (r *shellVariableResolver) ResolveValue(value string) (string, error) {
 }
 
 type environmentVariableResolver struct {
-	env env.Env
+	env Env
 }
 
-func NewEnvironmentVariableResolver(env env.Env) VariableResolver {
+func NewEnvironmentVariableResolver(env Env) VariableResolver {
 	return &environmentVariableResolver{
 		env: env,
 	}

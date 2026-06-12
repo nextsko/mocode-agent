@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/package-register/mocode/internal/env"
 	"github.com/stretchr/testify/require"
 )
 
@@ -76,7 +75,7 @@ func TestShellVariableResolver_ResolveValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testEnv := env.NewFromMap(tt.envVars)
+			testEnv := NewEnvFromMap(tt.envVars)
 			resolver := &shellVariableResolver{
 				shell: &mockShell{execFunc: tt.shellFunc},
 				env:   testEnv,
@@ -241,7 +240,7 @@ func TestShellVariableResolver_EnhancedResolveValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testEnv := env.NewFromMap(tt.envVars)
+			testEnv := NewEnvFromMap(tt.envVars)
 			resolver := &shellVariableResolver{
 				shell: &mockShell{execFunc: tt.shellFunc},
 				env:   testEnv,
@@ -300,7 +299,7 @@ func TestEnvironmentVariableResolver_ResolveValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testEnv := env.NewFromMap(tt.envVars)
+			testEnv := NewEnvFromMap(tt.envVars)
 			resolver := NewEnvironmentVariableResolver(testEnv)
 
 			result, err := resolver.ResolveValue(tt.value)
@@ -316,7 +315,7 @@ func TestEnvironmentVariableResolver_ResolveValue(t *testing.T) {
 }
 
 func TestNewShellVariableResolver(t *testing.T) {
-	testEnv := env.NewFromMap(map[string]string{"TEST": "value"})
+	testEnv := NewEnvFromMap(map[string]string{"TEST": "value"})
 	resolver := NewShellVariableResolver(testEnv)
 
 	require.NotNil(t, resolver)
@@ -324,7 +323,7 @@ func TestNewShellVariableResolver(t *testing.T) {
 }
 
 func TestNewEnvironmentVariableResolver(t *testing.T) {
-	testEnv := env.NewFromMap(map[string]string{"TEST": "value"})
+	testEnv := NewEnvFromMap(map[string]string{"TEST": "value"})
 	resolver := NewEnvironmentVariableResolver(testEnv)
 
 	require.NotNil(t, resolver)

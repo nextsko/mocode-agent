@@ -26,7 +26,6 @@ import (
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/filetracker"
-	"github.com/package-register/mocode/internal/format"
 	"github.com/package-register/mocode/internal/history"
 	"github.com/package-register/mocode/internal/knowledge/memory"
 	"github.com/package-register/mocode/internal/log"
@@ -294,7 +293,7 @@ func (app *App) RunNonInteractive(ctx context.Context, output io.Writer, prompt,
 	}
 
 	var (
-		spinner   *format.Spinner
+		spinner   *anim.Spinner
 		stdoutTTY bool
 		stderrTTY bool
 		stdinTTY  bool
@@ -320,7 +319,7 @@ func (app *App) RunNonInteractive(ctx context.Context, output io.Writer, prompt,
 		}
 		defaultFG := lipgloss.LightDark(hasDarkBG)(charmtone.Pepper, t.WorkingLabelColor)
 
-		spinner = format.NewSpinner(ctx, cancel, anim.Settings{
+		spinner = anim.NewSpinner(ctx, cancel, anim.Settings{
 			Size:        10,
 			Label:       "Generating",
 			LabelColor:  defaultFG,

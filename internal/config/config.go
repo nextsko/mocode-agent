@@ -17,7 +17,6 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"github.com/invopop/jsonschema"
 	"github.com/package-register/mocode/internal/csync"
-	"github.com/package-register/mocode/internal/env"
 	"github.com/package-register/mocode/internal/oauth"
 )
 
@@ -340,7 +339,7 @@ func (m MCPConfig) ResolvedEnv() []string {
 }
 
 func (m MCPConfig) ResolvedHeaders() map[string]string {
-	resolver := NewShellVariableResolver(env.New())
+	resolver := NewShellVariableResolver(NewEnv())
 	for e, v := range m.Headers {
 		var err error
 		m.Headers[e], err = resolver.ResolveValue(v)
@@ -776,7 +775,7 @@ func (c *ProviderConfig) TestConnection(resolver VariableResolver, clients ...*h
 }
 
 func resolveEnvs(envs map[string]string) []string {
-	resolver := NewShellVariableResolver(env.New())
+	resolver := NewShellVariableResolver(NewEnv())
 	for e, v := range envs {
 		var err error
 		envs[e], err = resolver.ResolveValue(v)

@@ -1,4 +1,4 @@
-package ansiext
+package diffview
 
 import (
 	"strings"
@@ -6,9 +6,9 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Escape replaces control characters with their Unicode Control Picture
+// escapeControlChars replaces control characters with their Unicode Control Picture
 // representations to ensure they are displayed correctly in the UI.
-func Escape(content string) string {
+func escapeControlChars(content string) string {
 	var sb strings.Builder
 	sb.Grow(len(content))
 	for _, r := range content {

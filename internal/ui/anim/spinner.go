@@ -1,4 +1,4 @@
-package format
+package anim
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/package-register/mocode/internal/ui/anim"
 )
 
 // Spinner wraps the bubbles spinner for non-interactive mode
@@ -17,16 +16,16 @@ type Spinner struct {
 	prog *tea.Program
 }
 
-type model struct {
+type spinnerModel struct {
 	cancel context.CancelFunc
-	anim   *anim.Anim
+	anim   *Anim
 }
 
-func (m model) Init() tea.Cmd  { return m.anim.Start() }
-func (m model) View() tea.View { return tea.NewView(m.anim.Render()) }
+func (m spinnerModel) Init() tea.Cmd  { return m.anim.Start() }
+func (m spinnerModel) View() tea.View { return tea.NewView(m.anim.Render()) }
 
 // Update implements tea.Model.
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m spinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch msg.String() {
@@ -34,7 +33,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cancel()
 			return m, tea.Quit
 		}
-	case anim.StepMsg:
+	case StepMsg:
 		cmd := m.anim.Animate(msg)
 		return m, cmd
 	}
@@ -42,9 +41,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // NewSpinner creates a new spinner with the given message
-func NewSpinner(ctx context.Context, cancel context.CancelFunc, animSettings anim.Settings) *Spinner {
-	m := model{
-		anim:   anim.New(animSettings),
+func NewSpinner(ctx context.Context, cancel context.CancelFunc, animSettings Settings) *Spinner {
+	m := spinnerModel{
+		anim:   New(animSettings),
 		cancel: cancel,
 	}
 

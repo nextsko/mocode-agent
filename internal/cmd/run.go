@@ -16,7 +16,6 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/package-register/mocode/internal/client"
 	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/format"
 	"github.com/package-register/mocode/internal/proto"
 	"github.com/package-register/mocode/internal/pubsub"
 	"github.com/package-register/mocode/internal/session"
@@ -167,7 +166,7 @@ func runNonInteractive(
 	}
 
 	var (
-		spinner   *format.Spinner
+		spinner   *anim.Spinner
 		stdoutTTY bool
 		stderrTTY bool
 		stdinTTY  bool
@@ -188,7 +187,7 @@ func runNonInteractive(
 		}
 		defaultFG := lipgloss.LightDark(hasDarkBG)(charmtone.Pepper, t.WorkingLabelColor)
 
-		spinner = format.NewSpinner(ctx, cancel, anim.Settings{
+		spinner = anim.NewSpinner(ctx, cancel, anim.Settings{
 			Size:        10,
 			Label:       "Generating",
 			LabelColor:  defaultFG,

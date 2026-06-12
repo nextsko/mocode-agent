@@ -20,7 +20,6 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	powernapConfig "github.com/charmbracelet/x/powernap/pkg/config"
 	"github.com/package-register/mocode/internal/csync"
-	"github.com/package-register/mocode/internal/env"
 	"github.com/package-register/mocode/internal/fsext"
 	"github.com/package-register/mocode/internal/infra/home"
 	"github.com/qjebbs/go-jsons"
@@ -103,7 +102,7 @@ func loadConfigStore(workingDir, dataDir string, debug bool, persistModels bool,
 	}
 	store.knownProviders = providers
 
-	env := env.New()
+	env := NewEnv()
 	// Configure providers
 	valueResolver := NewShellVariableResolver(env)
 	store.resolver = valueResolver
@@ -175,7 +174,7 @@ func PushPopMocodeEnv() func() {
 	return restore
 }
 
-func (c *Config) configureProviders(store *ConfigStore, env env.Env, resolver VariableResolver, knownProviders []catwalk.Provider) error {
+func (c *Config) configureProviders(store *ConfigStore, env Env, resolver VariableResolver, knownProviders []catwalk.Provider) error {
 	knownProviderNames := make(map[string]bool)
 	restore := PushPopMocodeEnv()
 	defer restore()
@@ -748,7 +747,7 @@ func loadFromBytes(configs [][]byte) (*Config, error) {
 	return &config, nil
 }
 
-func hasAWSCredentials(env env.Env) bool {
+func hasAWSCredentials(env Env) bool {
 	if env.Get("AWS_BEARER_TOKEN_BEDROCK") != "" {
 		return true
 	}

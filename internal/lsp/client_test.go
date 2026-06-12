@@ -9,7 +9,6 @@ import (
 	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/csync"
-	"github.com/package-register/mocode/internal/env"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +25,7 @@ func TestClient(t *testing.T) {
 
 	// Test creating a powernap client - this will likely fail with echo
 	// but we can still test the basic structure
-	client, err := New(ctx, "test", cfg, config.NewEnvironmentVariableResolver(env.NewFromMap(map[string]string{
+	client, err := New(ctx, "test", cfg, config.NewEnvironmentVariableResolver(config.NewEnvFromMap(map[string]string{
 		"THE_CMD": "echo",
 	})), ".", false)
 	if err != nil {

@@ -10,7 +10,6 @@ import (
 	"slices"
 
 	"charm.land/catwalk/pkg/catwalk"
-	"github.com/package-register/mocode/internal/env"
 	"github.com/package-register/mocode/internal/oauth"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -568,7 +567,7 @@ func (s *ConfigStore) ReloadFromDisk(ctx context.Context) error {
 	overrides := s.overrides
 
 	// Reconfigure providers
-	env := env.New()
+	env := NewEnv()
 	resolver := NewShellVariableResolver(env)
 	providers, err := Providers(cfg)
 	if err != nil {

@@ -11,7 +11,6 @@ import (
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/aymanbagabas/go-udiff"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/package-register/mocode/internal/ansiext"
 	"github.com/package-register/mocode/internal/ui/xchroma"
 	"github.com/zeebo/xxh3"
 )
@@ -818,6 +817,6 @@ func (dv *DiffView) getChromaFormatter(bgColor color.Color) chroma.Formatter {
 
 func processChromaValue(value string) string {
 	value = strings.TrimRight(value, "\n")
-	value = ansiext.Escape(value)
+	value = escapeControlChars(value)
 	return value
 }

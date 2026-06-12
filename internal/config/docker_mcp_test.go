@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/package-register/mocode/internal/env"
 	"github.com/stretchr/testify/require"
 )
 
@@ -69,7 +68,7 @@ func TestEnableDockerMCP(t *testing.T) {
 		store := &ConfigStore{
 			config:         cfg,
 			globalDataPath: configPath,
-			resolver:       NewShellVariableResolver(env.New()),
+			resolver:       NewShellVariableResolver(NewEnv()),
 		}
 
 		err := store.EnableDockerMCP()
@@ -104,7 +103,7 @@ func TestEnableDockerMCP(t *testing.T) {
 		store := &ConfigStore{
 			config:         cfg,
 			globalDataPath: configPath,
-			resolver:       NewShellVariableResolver(env.New()),
+			resolver:       NewShellVariableResolver(NewEnv()),
 		}
 
 		err := store.EnableDockerMCP()
@@ -136,7 +135,7 @@ func TestDisableDockerMCP(t *testing.T) {
 		store := &ConfigStore{
 			config:         cfg,
 			globalDataPath: configPath,
-			resolver:       NewShellVariableResolver(env.New()),
+			resolver:       NewShellVariableResolver(NewEnv()),
 		}
 
 		// Verify it's enabled first.
@@ -160,7 +159,7 @@ func TestDisableDockerMCP(t *testing.T) {
 		store := &ConfigStore{
 			config:         cfg,
 			globalDataPath: filepath.Join(t.TempDir(), "mocode.json"),
-			resolver:       NewShellVariableResolver(env.New()),
+			resolver:       NewShellVariableResolver(NewEnv()),
 		}
 
 		err := store.DisableDockerMCP()
@@ -184,7 +183,7 @@ func TestEnableDockerMCPWithRealDockerWhenAvailable(t *testing.T) {
 	store := &ConfigStore{
 		config:         cfg,
 		globalDataPath: configPath,
-		resolver:       NewShellVariableResolver(env.New()),
+		resolver:       NewShellVariableResolver(NewEnv()),
 	}
 
 	err := store.EnableDockerMCP()
