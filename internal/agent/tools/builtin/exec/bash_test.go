@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/package-register/mocode/internal/agent/tools/internal/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil/shared"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/config"

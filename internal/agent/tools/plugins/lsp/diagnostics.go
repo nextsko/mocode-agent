@@ -5,8 +5,8 @@ import (
 	_ "embed"
 
 	"charm.land/fantasy"
-	lsputil "github.com/package-register/mocode/internal/agent/tools/internal/lsputil"
-	"github.com/package-register/mocode/internal/agent/tools/internal/shared"
+	lsputil "github.com/package-register/mocode/internal/agent/toolutil/lsputil"
+	"github.com/package-register/mocode/internal/agent/toolutil/shared"
 	"github.com/package-register/mocode/internal/lsp"
 )
 

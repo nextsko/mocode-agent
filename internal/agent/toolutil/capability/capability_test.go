@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/tools/internal/callback"
-	"github.com/package-register/mocode/internal/agent/tools/internal/capability"
-	"github.com/package-register/mocode/internal/agent/tools/internal/retry"
+	"github.com/package-register/mocode/internal/agent/toolutil/callback"
+	"github.com/package-register/mocode/internal/agent/toolutil/capability"
+	"github.com/package-register/mocode/internal/agent/toolutil/retry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

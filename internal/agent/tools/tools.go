@@ -7,7 +7,7 @@ import (
 	"context"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/tools/internal/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil/shared"
 )
 
 // Context key type aliases – re-exported so callers outside the tools tree

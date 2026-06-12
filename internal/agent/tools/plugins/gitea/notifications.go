@@ -7,7 +7,7 @@ import (
 	"os/exec"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/tools/internal/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil/shared"
 )
 
 // NotificationsToolName is the registered name of the gitea_notifications tool.

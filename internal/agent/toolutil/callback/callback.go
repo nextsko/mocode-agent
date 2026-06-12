@@ -27,7 +27,7 @@ import (
 	"fmt"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/tools/internal/toolctx"
+	"github.com/package-register/mocode/internal/agent/toolutil/toolctx"
 )
 
 // BeforeArgs holds the information available to a BeforeFunc before the inner

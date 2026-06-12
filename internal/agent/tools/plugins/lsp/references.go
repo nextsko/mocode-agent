@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/package-register/mocode/internal/agent/tools/internal/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil/shared"
 	"github.com/package-register/mocode/internal/agent/tools/plugins/search"
 
 	"charm.land/fantasy"

@@ -6,7 +6,7 @@ import (
 	_ "embed"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/tools/internal/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil/shared"
 )
 
 //go:embed think.md

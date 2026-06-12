@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/tools/internal/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil/shared"
 )
 
 //go:embed ssh_list_hosts.md
