@@ -7,18 +7,29 @@
 // types are 100% identical to their internal counterparts at compile time.
 // No conversion is needed when crossing the public/private boundary.
 //
-// Layering model in the mocode project:
+// # When to Use This Package
 //
-//	internal/session/message.ToolResult  — implements ContentPart (for messages)
-//	internal/proto.ToolResult            — implements ContentPart (for wire format)
-//	internal/types.ToolResult            — pure DTO (for cross-module exchange)
-//	pkg/types.ToolResult                 — public re-export of internal/types.ToolResult
+// Use pkg/types (this package) for:
 //
-// Use this package when you need a stable, public type for SDK or plugin
-// development. Use internal/* packages when working within the mocode codebase
-// and need the full ContentPart integration.
+//   - SDK development
+//   - Plugin development
+//   - External tools that need to interact with mocode
+//   - HTTP/WebSocket client code
 //
-// Example (external consumer):
+// Use internal/* packages (within the mocode codebase) for:
+//
+//   - Direct integration with the message system
+//   - Code that needs ContentPart or other sealed interfaces
+//   - Any code that already imports internal/ packages
+//
+// # Currently Exports
+//
+//   - ToolResult — unified tool execution result DTO
+//
+// See internal/types/doc.go for the full decision tree on when to add
+// new types to this layer.
+//
+// # Example (external consumer)
 //
 //	import "github.com/package-register/mocode/pkg/types"
 //
