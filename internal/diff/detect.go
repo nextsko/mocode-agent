@@ -1,4 +1,4 @@
-package diffdetect
+package diff
 
 import "strings"
 

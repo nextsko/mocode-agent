@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/package-register/mocode/internal/diffdetect"
+	"github.com/package-register/mocode/internal/diff"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/styles"
 )
@@ -16,7 +16,7 @@ type parsedDiffFile struct {
 }
 
 func looksLikeDiff(content string) bool {
-	return diffdetect.IsUnifiedDiff(content)
+	return diff.IsUnifiedDiff(content)
 }
 
 func parseUnifiedDiff(content string) []parsedDiffFile {
