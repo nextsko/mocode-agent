@@ -10,7 +10,6 @@ import (
 	"slices"
 
 	"charm.land/catwalk/pkg/catwalk"
-	"github.com/package-register/mocode/internal/oauth"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -272,7 +271,7 @@ func (s *ConfigStore) SetProviderAPIKey(scope Scope, providerID string, apiKey a
 			return fmt.Errorf("failed to save api key to config file: %w", err)
 		}
 		setKeyOrToken = func() { providerConfig.APIKey = v }
-	case *oauth.Token:
+	case *Token:
 		if err := cmp.Or(
 			s.SetConfigField(scope, fmt.Sprintf("providers.%s.api_key", providerID), v.AccessToken),
 			s.SetConfigField(scope, fmt.Sprintf("providers.%s.oauth", providerID), v),

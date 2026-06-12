@@ -1,8 +1,6 @@
-package oauth
+package config
 
-import (
-	"time"
-)
+import "time"
 
 // Token represents an OAuth2 token.
 type Token struct {

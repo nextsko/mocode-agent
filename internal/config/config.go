@@ -17,7 +17,6 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"github.com/invopop/jsonschema"
 	"github.com/package-register/mocode/internal/csync"
-	"github.com/package-register/mocode/internal/oauth"
 )
 
 const (
@@ -113,7 +112,7 @@ type ProviderConfig struct {
 	// The original API key template before resolution (for re-resolution on auth errors).
 	APIKeyTemplate string `json:"-"`
 	// OAuthToken for providers that use OAuth2 authentication.
-	OAuthToken *oauth.Token `json:"oauth,omitempty" jsonschema:"description=OAuth2 token for authentication with the provider"`
+	OAuthToken *Token `json:"oauth,omitempty" jsonschema:"description=OAuth2 token for authentication with the provider"`
 	// Marks the provider as disabled.
 	Disable bool `json:"disable,omitempty" jsonschema:"description=Whether this provider is disabled,default=false"`
 
