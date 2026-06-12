@@ -27,8 +27,6 @@ import (
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/ultraviolet/screen"
-	"github.com/charmbracelet/x/ansi"
-	"github.com/charmbracelet/x/editor"
 	xstrings "github.com/charmbracelet/x/exp/strings"
 	"github.com/package-register/mocode/internal/admin"
 	agentcore "github.com/package-register/mocode/internal/agent"
@@ -54,12 +52,10 @@ import (
 	"github.com/package-register/mocode/internal/ui/dialog"
 	"github.com/package-register/mocode/internal/ui/notification"
 	"github.com/package-register/mocode/internal/ui/panel"
-	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/package-register/mocode/internal/ui/util"
 	"github.com/package-register/mocode/internal/version"
 	wechat "github.com/package-register/mocode/internal/wechat"
 	"github.com/package-register/mocode/internal/workspace"
-	"github.com/pkg/browser"
 )
 
 // MouseScrollThreshold defines how many lines to scroll the chat when a mouse
@@ -1357,157 +1353,6 @@ func (m *UI) handleChildSessionMessage(event pubsub.Event[message.Message]) tea.
 // pre-checks have completed.
 
 // drawHeader draws the header section of the UI.
-func (m *UI) drawHeader(scr uv.Screen, area uv.Rectangle) {
-	m.header.drawHeader(
-		scr,
-		area,
-		m.session,
-		m.isCompact,
-		m.detailsOpen,
-		area.Dx(),
-		nil,
-		m.headerStats(),
-	)
-}
-
-func (m *UI) hudTickCmd() tea.Cmd {
-	return tea.Tick(500*time.Millisecond, func(time.Time) tea.Msg {
-		return hudTickMsg{}
-	})
-}
-
-func (m *UI) startAdminServer(open bool) tea.Cmd {
-	return func() tea.Msg {
-		url, err := m.adminServer.Start(context.Background(), 0)
-		if err != nil {
-			return util.NewErrorMsg(err)
-		}
-		if open {
-			if err := browser.OpenURL(url); err != nil {
-				return util.NewErrorMsg(err)
-			}
-			return util.NewInfoMsg("Admin panel opened: " + url)
-		}
-		return util.NewInfoMsg("Admin server started: " + url)
-	}
-}
-
-func (m *UI) stopAdminServer() tea.Cmd {
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		if err := m.adminServer.Stop(ctx); err != nil {
-			return util.NewErrorMsg(err)
-		}
-		return util.NewInfoMsg("Admin server stopped")
-	}
-}
-
-func (m *UI) showMiniMaxQuota() tea.Cmd {
-	return m.openMiniMaxQuotaDialog()
-}
-
-func (m *UI) setProxyURL(action dialog.ActionSetProxyURL) tea.Cmd {
-	return func() tea.Msg {
-		proxyURL := strings.TrimSpace(action.URL)
-		noProxy := "localhost,127.0.0.1"
-		if !action.Enabled {
-			if err := m.com.Workspace.SetConfigField(config.ScopeGlobal, "options.network.enabled", false); err != nil {
-				return util.NewErrorMsg(err)
-			}
-			return util.NewInfoMsg("Network proxy disabled")
-		}
-		if action.Args != nil {
-			proxyURL = strings.TrimSpace(action.Args["PROXY_URL"])
-			if value := strings.TrimSpace(action.Args["NO_PROXY"]); value != "" {
-				noProxy = value
-			}
-		}
-		if proxyURL == "" {
-			return util.NewErrorMsg(errors.New("proxy URL is required"))
-		}
-		if err := m.com.Workspace.SetConfigField(config.ScopeGlobal, "options.network.enabled", action.Enabled); err != nil {
-			return util.NewErrorMsg(err)
-		}
-		if err := m.com.Workspace.SetConfigField(config.ScopeGlobal, "options.network.proxy_url", proxyURL); err != nil {
-			return util.NewErrorMsg(err)
-		}
-		if err := m.com.Workspace.SetConfigField(config.ScopeGlobal, "options.network.no_proxy", noProxy); err != nil {
-			return util.NewErrorMsg(err)
-		}
-		status := "disabled"
-		if action.Enabled {
-			status = "enabled"
-		}
-		return util.NewInfoMsg("Network proxy " + status + ": " + proxyURL)
-	}
-}
-
-func (m *UI) headerStats() headerStats {
-	stats := headerStats{
-		startedAt: m.startedAt,
-		frame:     m.hudFrame,
-	}
-	if m.session != nil {
-		stats.cacheReadTokens = m.session.CacheReadTokens
-		stats.cacheCreationTokens = m.session.CacheCreationTokens
-		stats.hasCache = m.session.CacheReadTokens > 0 || m.session.CacheCreationTokens > 0
-	}
-	return stats
-}
-
-func (m *UI) statusLine(width int) string {
-	if width <= 0 {
-		return ""
-	}
-	t := m.com.Styles
-	if m.state == uiLanding {
-		return ansi.Truncate(strings.Join([]string{
-			t.Header.Keystroke.Render("ctrl+p") + t.Header.KeystrokeTip.Render(" slash"),
-		}, t.Header.Separator.Render(" │ ")), max(0, width), "…")
-	}
-	var parts []string
-
-	// Show agent status if active
-	if m.agentStatus != "" {
-		parts = append(parts, t.Header.Keystroke.Render("status ")+t.Header.KeystrokeTip.Render(m.agentStatus))
-	}
-
-	if model := m.selectedLargeModel(); model != nil {
-		parts = append(parts, t.Header.Keystroke.Render("model ")+t.Header.KeystrokeTip.Render(model.CatwalkCfg.Name))
-	}
-	if mode := activeAgentMode(m.com); mode != "" {
-		parts = append(parts, t.Header.Keystroke.Render("agent ")+t.Header.KeystrokeTip.Render(mode))
-	}
-	servers, enabled, tools, prompts, resources := m.mcpSummaryCounts()
-	if servers > 0 {
-		parts = append(parts, t.Header.Keystroke.Render("mcp ")+t.Header.KeystrokeTip.Render(fmt.Sprintf("%d/%d servers %d tools", enabled, servers, tools)))
-		if prompts+resources > 0 && width > 100 {
-			parts = append(parts, t.Header.KeystrokeTip.Render(fmt.Sprintf("%d prompts %d res", prompts, resources)))
-		}
-	}
-	if diagnostics := m.lspDiagnosticCount(); diagnostics > 0 {
-		parts = append(parts, t.LSP.ErrorDiagnostic.Render(fmt.Sprintf("%s%d lsp", styles.LSPErrorIcon, diagnostics)))
-	}
-	if m.promptQueue > 0 {
-		parts = append(parts, t.Header.Keystroke.Render("queue ")+t.Header.KeystrokeTip.Render(strconv.Itoa(m.promptQueue)))
-	}
-	parts = append(
-		parts,
-		t.Header.Keystroke.Render("ctrl+p")+t.Header.KeystrokeTip.Render(" slash"),
-	)
-
-	line := strings.Join(parts, t.Header.Separator.Render(" │ "))
-	return ansi.Truncate(line, max(0, width), "…")
-}
-
-func (m *UI) lspDiagnosticCount() int {
-	total := 0
-	for _, state := range m.lspStates {
-		total += state.DiagnosticCount
-	}
-	return total
-}
 
 // Draw implements [uv.Drawable] and draws the UI model.
 func (m *UI) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
@@ -1908,32 +1753,7 @@ func (m *UI) FullHelp() [][]key.Binding {
 	return binds
 }
 
-func (m *UI) currentModelSupportsImages() bool {
-	cfg := m.com.Config()
-	if cfg == nil {
-		return false
-	}
-	agentCfg, ok := cfg.Agents[config.AgentCoder]
-	if !ok {
-		return false
-	}
-	model := cfg.GetModelByType(agentCfg.Model)
-	return model != nil && model.SupportsImages
-}
-
 // toggleCompactMode toggles compact mode between uiChat and uiChatCompact states.
-func (m *UI) toggleCompactMode() tea.Cmd {
-	m.forceCompactMode = !m.forceCompactMode
-
-	err := m.com.Workspace.SetCompactMode(config.ScopeGlobal, m.forceCompactMode)
-	if err != nil {
-		return util.ReportError(err)
-	}
-
-	m.updateLayoutAndSize()
-
-	return nil
-}
 
 // updateLayoutAndSize updates the layout and sizes of UI components.
 
@@ -1989,96 +1809,16 @@ type uiLayout struct {
 	sessionDetails uv.Rectangle
 }
 
-func (m *UI) openEditor(value string) tea.Cmd {
-	tmpfile, err := os.CreateTemp("", "msg_*.md")
-	if err != nil {
-		return util.ReportError(err)
-	}
-	tmpPath := tmpfile.Name()
-	defer tmpfile.Close() //nolint:errcheck
-	if _, err := tmpfile.WriteString(value); err != nil {
-		return util.ReportError(err)
-	}
-	cmd, err := editor.Command(
-		"mocode",
-		tmpPath,
-		editor.AtPosition(
-			m.textarea.Line()+1,
-			m.textarea.Column()+1,
-		),
-	)
-	if err != nil {
-		return util.ReportError(err)
-	}
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		defer func() {
-			_ = os.Remove(tmpPath)
-		}()
-
-		if err != nil {
-			return util.ReportError(err)
-		}
-		content, err := os.ReadFile(tmpPath)
-		if err != nil {
-			return util.ReportError(err)
-		}
-		if len(content) == 0 {
-			return util.ReportWarn("Message is empty")
-		}
-		return openEditorMsg{
-			Text: strings.TrimSpace(string(content)),
-		}
-	})
-}
-
 // setEditorPrompt configures the textarea prompt function based on whether
 // yolo mode is enabled.
-func (m *UI) setEditorPrompt(yolo bool) {
-	if yolo {
-		m.textarea.SetPromptFunc(4, m.yoloPromptFunc)
-		return
-	}
-	m.textarea.SetPromptFunc(4, m.normalPromptFunc)
-}
 
 // normalPromptFunc returns the normal editor prompt style ("  > " on first
 // line, "::: " on subsequent lines).
 // When the agent is busy, the "::: " dots alternate between bright and dim
 // colors to create a breathing/pulsing effect.
-func (m *UI) normalPromptFunc(info textarea.PromptInfo) string {
-	t := m.com.Styles
-	if info.LineNumber == 0 {
-		if info.Focused {
-			return "  > "
-		}
-		return "::: "
-	}
-	if info.Focused {
-		return t.Editor.PromptNormalFocused.Render()
-	}
-	// When the agent is busy, alternate between bright and dim (breathing).
-	if m.breathOn {
-		return t.Editor.PromptNormalFocused.Render()
-	}
-	return t.Editor.PromptNormalBlurred.Render()
-}
 
 // yoloPromptFunc returns the yolo mode editor prompt style with warning icon
 // and colored dots.
-func (m *UI) yoloPromptFunc(info textarea.PromptInfo) string {
-	t := m.com.Styles
-	if info.LineNumber == 0 {
-		if info.Focused {
-			return t.Editor.PromptYoloIconFocused.Render()
-		} else {
-			return t.Editor.PromptYoloIconBlurred.Render()
-		}
-	}
-	if info.Focused {
-		return t.Editor.PromptYoloDotsFocused.Render()
-	}
-	return t.Editor.PromptYoloDotsBlurred.Render()
-}
 
 // closeCompletions closes the completions popup and resets state.
 
@@ -2137,46 +1877,13 @@ var workingPlaceholders = [...]string{
 // ready and working states.
 
 // renderEditorView renders the editor view with attachments if any.
-func (m *UI) renderEditorView(width int) string {
-	var attachmentsView string
-	if len(m.attachments.List()) > 0 {
-		attachmentsView = m.attachments.Render(width)
-	}
-	separator := m.com.Styles.Header.Separator.Render(strings.Repeat("─", max(0, width)))
-	return strings.Join([]string{
-		separator,
-		attachmentsView,
-		m.textarea.View(),
-		"", // margin at bottom of editor
-	}, "\n")
-}
 
 // applyTheme replaces the active styles with the given theme, drops the
 // shared markdown renderer cache, and refreshes every component that
 // caches style data.
-func (m *UI) applyTheme(s styles.Styles) {
-	*m.com.Styles = s
-	common.InvalidateMarkdownRendererCache()
-	m.chat.InvalidateRenderCaches()
-	m.refreshStyles()
-}
 
 // refreshStyles pushes the current *m.com.Styles into every subcomponent
 // that copies or pre-renders style-dependent values at construction time.
-func (m *UI) refreshStyles() {
-	t := m.com.Styles
-	m.header.refresh()
-	m.textarea.SetStyles(t.Editor.Textarea)
-	m.completions.SetStyles(t.Completions.Normal, t.Completions.Focused, t.Completions.Match)
-	m.attachments.Renderer().SetStyles(
-		t.Attachments.Normal,
-		t.Attachments.Deleting,
-		t.Attachments.Image,
-		t.Attachments.Text,
-	)
-	m.todoSpinner.Style = t.Pills.TodoSpinner
-	m.chat.InvalidateRenderCaches()
-}
 
 // sendMessage sends a message with the given content and attachments.
 func (m *UI) sendMessage(content string, attachments ...message.Attachment) tea.Cmd {
