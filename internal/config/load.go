@@ -2,27 +2,20 @@ package config
 
 import (
 	"cmp"
-	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
-	"testing"
 
 	"charm.land/catwalk/pkg/catwalk"
 	powernapConfig "github.com/charmbracelet/x/powernap/pkg/config"
 	"github.com/package-register/mocode/internal/csync"
 	"github.com/package-register/mocode/internal/fsext"
-	"github.com/package-register/mocode/internal/infra/home"
-	"github.com/qjebbs/go-jsons"
 )
 
 const defaultCatwalkURL = "https://catwalk.charm.land"
@@ -684,255 +677,36 @@ func configureSelectedModels(store *ConfigStore, knownProviders []catwalk.Provid
 }
 
 // lookupConfigs searches config files recursively from CWD up to FS root
-func lookupConfigs(cwd string) []string {
-	// prepend default config paths
-	configPaths := []string{
-		GlobalConfig(),
-		GlobalConfigData(),
-	}
-
-	configNames := []string{appName + ".json", "." + appName + ".json"}
-
-	foundConfigs, err := fsext.Lookup(cwd, configNames...)
-	if err != nil {
-		// returns at least default configs
-		return configPaths
-	}
-
-	// reverse order so last config has more priority
-	slices.Reverse(foundConfigs)
-
-	return append(configPaths, foundConfigs...)
-}
-
-func loadFromConfigPaths(configPaths []string) (*Config, []string, error) {
-	var configs [][]byte
-	var loaded []string
-
-	for _, path := range configPaths {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return nil, nil, fmt.Errorf("failed to open config file %s: %w", path, err)
-		}
-		if len(data) == 0 {
-			continue
-		}
-		configs = append(configs, data)
-		loaded = append(loaded, path)
-	}
-
-	cfg, err := loadFromBytes(configs)
-	if err != nil {
-		return nil, nil, err
-	}
-	return cfg, loaded, nil
-}
-
-func loadFromBytes(configs [][]byte) (*Config, error) {
-	if len(configs) == 0 {
-		return &Config{}, nil
-	}
-
-	data, err := jsons.Merge(configs)
-	if err != nil {
-		return nil, err
-	}
-	var config Config
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, err
-	}
-	return &config, nil
-}
-
-func hasAWSCredentials(env Env) bool {
-	if env.Get("AWS_BEARER_TOKEN_BEDROCK") != "" {
-		return true
-	}
-
-	if env.Get("AWS_ACCESS_KEY_ID") != "" && env.Get("AWS_SECRET_ACCESS_KEY") != "" {
-		return true
-	}
-
-	if env.Get("AWS_PROFILE") != "" || env.Get("AWS_DEFAULT_PROFILE") != "" {
-		return true
-	}
-
-	if env.Get("AWS_REGION") != "" || env.Get("AWS_DEFAULT_REGION") != "" {
-		return true
-	}
-
-	if env.Get("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI") != "" ||
-		env.Get("AWS_CONTAINER_CREDENTIALS_FULL_URI") != "" {
-		return true
-	}
-
-	if _, err := os.Stat(filepath.Join(home.Dir(), ".aws/credentials")); err == nil && !testing.Testing() {
-		return true
-	}
-
-	return false
-}
 
 // GlobalConfig returns the global configuration file path for the application.
-func GlobalConfig() string {
-	if MocodeGlobal := os.Getenv("MOCODE_GLOBAL_CONFIG"); MocodeGlobal != "" {
-		return filepath.Join(MocodeGlobal, fmt.Sprintf("%s.json", appName))
-	}
-	return filepath.Join(home.Config(), appName, fmt.Sprintf("%s.json", appName))
-}
 
 // GlobalCacheDir returns the path to the global cache directory for the
 // application.
-func GlobalCacheDir() string {
-	if MocodeCache := os.Getenv("MOCODE_CACHE_DIR"); MocodeCache != "" {
-		return MocodeCache
-	}
-	if xdgCacheHome := os.Getenv("XDG_CACHE_HOME"); xdgCacheHome != "" {
-		return filepath.Join(xdgCacheHome, appName)
-	}
-	if runtime.GOOS == "windows" {
-		localAppData := cmp.Or(
-			os.Getenv("LOCALAPPDATA"),
-			filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local"),
-		)
-		return filepath.Join(localAppData, appName, "cache")
-	}
-	return filepath.Join(home.Dir(), ".cache", appName)
-}
 
 // GlobalConfigData returns the path to the main data directory for the application.
 // this config is used when the app overrides configurations instead of updating the global config.
-func GlobalConfigData() string {
-	if MocodeData := os.Getenv("MOCODE_GLOBAL_DATA"); MocodeData != "" {
-		return filepath.Join(MocodeData, fmt.Sprintf("%s.json", appName))
-	}
-	if xdgDataHome := os.Getenv("XDG_DATA_HOME"); xdgDataHome != "" {
-		return filepath.Join(xdgDataHome, appName, fmt.Sprintf("%s.json", appName))
-	}
-
-	// return the path to the main data directory
-	// for windows, it should be in `%LOCALAPPDATA%/mocode/`
-	// for linux and macOS, it should be in `$HOME/.local/share/mocode/`
-	if runtime.GOOS == "windows" {
-		localAppData := cmp.Or(
-			os.Getenv("LOCALAPPDATA"),
-			filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local"),
-		)
-		return filepath.Join(localAppData, appName, fmt.Sprintf("%s.json", appName))
-	}
-
-	return filepath.Join(home.Dir(), ".local", "share", appName, fmt.Sprintf("%s.json", appName))
-}
 
 // GlobalWorkspaceDir returns the path to the global server workspace
 // directory. This directory acts as a meta-workspace for the server
 // process, giving it a real workingDir so that config loading, scoped
 // writes, and provider resolution behave identically to project
 // workspaces.
-func GlobalWorkspaceDir() string {
-	return filepath.Dir(GlobalConfigData())
-}
-
-func assignIfNil[T any](ptr **T, val T) {
-	if *ptr == nil {
-		*ptr = &val
-	}
-}
-
-func isInsideWorktree() bool {
-	bts, err := exec.CommandContext(
-		context.Background(),
-		"git", "rev-parse",
-		"--is-inside-work-tree",
-	).CombinedOutput()
-	return err == nil && strings.TrimSpace(string(bts)) == "true"
-}
 
 // GlobalSkillsDirs returns the default directories for Agent Skills.
 // Skills in these directories are auto-discovered and their files can be read
 // without permission prompts.
-func GlobalSkillsDirs() []string {
-	if MocodeSkills := os.Getenv("MOCODE_SKILLS_DIR"); MocodeSkills != "" {
-		return []string{MocodeSkills}
-	}
-
-	paths := []string{
-		filepath.Join(home.Config(), appName, "skills"),
-		filepath.Join(home.Config(), "agents", "skills"),
-	}
-
-	// On Windows, also load from app data on top of `$HOME/.config/mocode`.
-	// This is here mostly for backwards compatibility.
-	if runtime.GOOS == "windows" {
-		appData := cmp.Or(
-			os.Getenv("LOCALAPPDATA"),
-			filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local"),
-		)
-		paths = append(
-			paths,
-			filepath.Join(appData, appName, "skills"),
-			filepath.Join(appData, "agents", "skills"),
-		)
-	}
-
-	return paths
-}
 
 // ProjectSkillsDir returns the default project directories for which Mocode
 // will look for skills.
-func ProjectSkillsDir(workingDir string) []string {
-	return []string{
-		filepath.Join(workingDir, ".agents/skills"),
-		filepath.Join(workingDir, ".mocode/skills"),
-		filepath.Join(workingDir, ".claude/skills"),
-		filepath.Join(workingDir, ".cursor/skills"),
-	}
-}
 
 func isAppleTerminal() bool { return os.Getenv("TERM_PROGRAM") == "Apple_Terminal" }
 
 // normalizeHookEvent maps user-provided event names to their canonical
 // form. Matching is case-insensitive and accepts snake_case variants
 // (e.g. "pre_tool_use" 闁?"PreToolUse").
-func normalizeHookEvent(name string) string {
-	switch strings.ToLower(strings.ReplaceAll(name, "_", "")) {
-	case "pretooluse":
-		return "PreToolUse"
-	default:
-		return name
-	}
-}
 
 // ValidateHooks normalizes event names and checks that every configured
 // hook has a command and a syntactically valid matcher regex. Matcher
 // compilation used for matching is owned by hooks.Runner; this function
 // only validates up front so the user sees config errors at load time
 // rather than on the first tool call.
-func (c *Config) ValidateHooks() error {
-	// Normalize event name keys.
-	for event, eventHooks := range c.Hooks {
-		canonical := normalizeHookEvent(event)
-		if canonical != event {
-			c.Hooks[canonical] = append(c.Hooks[canonical], eventHooks...)
-			delete(c.Hooks, event)
-		}
-	}
-
-	for event, eventHooks := range c.Hooks {
-		for i, h := range eventHooks {
-			if h.Command == "" {
-				return fmt.Errorf("hook %s[%d]: command is required", event, i)
-			}
-			if h.Matcher == "" {
-				continue
-			}
-			if _, err := regexp.Compile(h.Matcher); err != nil {
-				return fmt.Errorf("hook %s[%d]: invalid matcher regex %q: %w", event, i, h.Matcher, err)
-			}
-		}
-	}
-	return nil
-}
