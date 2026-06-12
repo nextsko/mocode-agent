@@ -150,7 +150,25 @@ type ToolCall struct {
 
 func (ToolCall) isPart() {}
 
-// ToolResult represents the result of a tool call.
+// ToolResult is the SERIALIZATION representation of a tool execution result.
+//
+// It implements the ContentPart interface (via unexported isPart())
+// and is used in wire protocol (WebSocket/JSON) serialization.
+// Contains 8 fields — the same as message.ToolResult.
+//
+// For the RUNTIME type used in Session message storage, see
+// message.ToolResult in internal/session/message.
+//
+// For the public DTO used by SDK and external consumers, see
+// types.ToolResult in internal/types (re-exported as pkg/types.ToolResult).
+//
+// To convert between proto and message ToolResults, use the dedicated
+// functions (both preserve all 8 fields):
+//   - ToMessageToolResult(p ToolResult) message.ToolResult
+//   - FromMessageToolResult(m message.ToolResult) ToolResult
+//
+// Note: the three ToolResult types are NOT interchangeable due to Go's
+// sealed interface pattern. See internal/types/tool.go for details.
 type ToolResult struct {
 	ToolCallID string `json:"tool_call_id"`
 	Name       string `json:"name"`
