@@ -20,6 +20,7 @@ import (
 	"github.com/package-register/mocode/internal/agent/notify"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/csync"
+	"github.com/package-register/mocode/internal/errcoll"
 	"github.com/package-register/mocode/internal/evolution"
 	"github.com/package-register/mocode/internal/knowledge/memory"
 	"github.com/package-register/mocode/internal/pubsub"
@@ -105,8 +106,9 @@ type sessionAgent struct {
 	notify               pubsub.Publisher[notify.Notification]
 	callbacks            *AgentCallbacks
 
-	errorLearner *evolution.ErrorLearner
-	compressor   *ctxcompress.Pipeline
+	errorLearner   *evolution.ErrorLearner
+	errorCollector *errcoll.Collector
+	compressor     *ctxcompress.Pipeline
 
 	messageQueue   *csync.Map[string, []SessionAgentCall]
 	activeRequests *csync.Map[string, context.CancelFunc]
@@ -128,6 +130,7 @@ type SessionAgentOptions struct {
 	Notify               pubsub.Publisher[notify.Notification]
 	Callbacks            *AgentCallbacks
 	ErrorLearner         *evolution.ErrorLearner
+	ErrorCollector       *errcoll.Collector
 }
 
 func NewSessionAgent(
@@ -149,6 +152,7 @@ func NewSessionAgent(
 		notify:               opts.Notify,
 		callbacks:            opts.Callbacks,
 		errorLearner:         opts.ErrorLearner,
+		errorCollector:       opts.ErrorCollector,
 		compressor:           ctxcompress.NewPipeline(ctxcompress.DefaultPolicy()),
 		messageQueue:         csync.NewMap[string, []SessionAgentCall](),
 		activeRequests:       csync.NewMap[string, context.CancelFunc](),

@@ -18,6 +18,7 @@ import (
 	"github.com/package-register/mocode/internal/agent/notify"
 	"github.com/package-register/mocode/internal/agent/tools"
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
+	"github.com/package-register/mocode/internal/errcoll"
 	"github.com/package-register/mocode/internal/knowledge/memory"
 	"github.com/package-register/mocode/internal/pubsub"
 	"github.com/package-register/mocode/internal/session/message"
@@ -124,6 +125,9 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 
 	// Add the session to the context.
 	ctx = context.WithValue(ctx, tools.SessionIDContextKey, call.SessionID)
+
+	// Add the error collector to the context for tool error recording.
+	ctx = errcoll.WithContext(ctx, a.errorCollector)
 
 	// Add memory service and user info to context for memory tools.
 	if a.memory != nil {

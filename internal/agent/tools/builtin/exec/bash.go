@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/errcoll"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/config"
@@ -188,11 +189,52 @@ func blockFuncs() []shell.BlockFunc {
 	}
 }
 
+func classifyCommandError(stderr string) errcoll.ErrorCategory {
+	lower := strings.ToLower(stderr)
+	switch {
+	case strings.Contains(lower, "command not found"),
+		strings.Contains(lower, "is not recognized"),
+		strings.Contains(lower, "cannot find"),
+		strings.Contains(lower, "the term") && strings.Contains(lower, "not recognized"):
+		return errcoll.CategoryCrossPlatform
+	case strings.Contains(lower, "permission denied") || strings.Contains(lower, "access is denied"):
+		return errcoll.CategoryPermission
+	default:
+		return errcoll.CategoryToolExecution
+	}
+}
+
+// isRecoverableCommandError reports whether the shell error is something the
+// model can reasonably recover from (e.g. a missing cross-platform command)
+// rather than an internal failure that should abort the turn.
+func isRecoverableCommandError(stderr string, execErr error) bool {
+	if execErr == nil {
+		return false
+	}
+	lower := strings.ToLower(stderr)
+	return strings.Contains(lower, "command not found") ||
+		strings.Contains(lower, "is not recognized") ||
+		strings.Contains(lower, "cannot find") ||
+		(strings.Contains(lower, "the term") && strings.Contains(lower, "not recognized"))
+}
+
 func NewBashTool(permissions permission.Service, workingDir string, attribution *config.Attribution, modelName string) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		BashToolName,
 		bashDescription(attribution, modelName),
 		func(ctx context.Context, params BashParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
+			record := func(category errcoll.ErrorCategory, err error, msg string) {
+				if c := errcoll.FromContext(ctx); c != nil {
+					c.Record(errcoll.ErrorRecord{
+						SessionID: shared.GetSessionFromContext(ctx),
+						ToolName:  BashToolName,
+						Command:   params.Command,
+						Error:     msg,
+						Category:  category,
+					})
+				}
+			}
+
 			if params.Command == "" {
 				return fantasy.NewTextErrorResponse("missing command"), nil
 			}
@@ -214,7 +256,9 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 
 			sessionID := shared.GetSessionFromContext(ctx)
 			if sessionID == "" {
-				return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for executing shell command")
+				msg := "session ID is required for executing shell command"
+				record(errcoll.CategoryToolExecution, nil, msg)
+				return fantasy.NewTextErrorResponse(msg), nil
 			}
 			if !isSafeReadOnly {
 				p, err := permissions.Request(
@@ -230,9 +274,12 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 					},
 				)
 				if err != nil {
-					return fantasy.ToolResponse{}, err
+					msg := "Permission request failed: " + err.Error()
+					record(errcoll.CategoryPermission, err, msg)
+					return fantasy.NewTextErrorResponse(msg), nil
 				}
 				if !p {
+					record(errcoll.CategoryPermission, nil, "permission denied")
 					return shared.NewPermissionDeniedResponse(), nil
 				}
 			}
@@ -252,7 +299,9 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 					shell.BackgroundShellOptions{TTY: params.TTY},
 				)
 				if err != nil {
-					return fantasy.ToolResponse{}, fmt.Errorf("error starting background shell: %w", err)
+					msg := fmt.Sprintf("error starting background shell: %v", err)
+					record(errcoll.CategoryToolExecution, err, msg)
+					return fantasy.NewTextErrorResponse(msg), nil
 				}
 
 				// Wait a short time to detect fast failures (blocked commands, syntax errors, etc.)
@@ -266,7 +315,7 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 					interrupted := shell.IsInterrupt(execErr)
 					exitCode := shell.ExitCode(execErr)
 					if exitCode == 0 && !interrupted && execErr != nil {
-						return fantasy.ToolResponse{}, fmt.Errorf("[Job %s] error executing command: %w", bgShell.ID, execErr)
+						record(classifyCommandError(stderr), execErr, execErr.Error())
 					}
 
 					stdout = formatOutput(stdout, stderr, execErr)
@@ -316,7 +365,9 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 				shell.BackgroundShellOptions{TTY: params.TTY},
 			)
 			if err != nil {
-				return fantasy.ToolResponse{}, fmt.Errorf("error starting shell: %w", err)
+				msg := fmt.Sprintf("error starting shell: %v", err)
+				record(errcoll.CategoryToolExecution, err, msg)
+				return fantasy.NewTextErrorResponse(msg), nil
 			}
 
 			// Wait for either completion, auto-background threshold, or context cancellation
@@ -359,7 +410,7 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 				interrupted := shell.IsInterrupt(execErr)
 				exitCode := shell.ExitCode(execErr)
 				if exitCode == 0 && !interrupted && execErr != nil {
-					return fantasy.ToolResponse{}, fmt.Errorf("[Job %s] error executing command: %w", bgShell.ID, execErr)
+					record(classifyCommandError(stderr), execErr, execErr.Error())
 				}
 
 				stdout = formatOutput(stdout, stderr, execErr)

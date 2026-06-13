@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/errcoll"
 
 	"charm.land/fantasy"
 	md "github.com/JohannesKaufmann/html-to-markdown"
@@ -43,6 +44,17 @@ func NewFetchTool(permissions permission.Service, workingDir string, client *htt
 		FetchToolName,
 		shared.FirstLineDescription(fetchDescription),
 		func(ctx context.Context, params FetchParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
+			record := func(category errcoll.ErrorCategory, err error, msg string) {
+				if c := errcoll.FromContext(ctx); c != nil {
+					c.Record(errcoll.ErrorRecord{
+						SessionID: shared.GetSessionFromContext(ctx),
+						ToolName:  FetchToolName,
+						Error:     msg,
+						Category:  category,
+					})
+				}
+			}
+
 			if params.URL == "" {
 				return fantasy.NewTextErrorResponse("URL parameter is required"), nil
 			}
@@ -58,7 +70,9 @@ func NewFetchTool(permissions permission.Service, workingDir string, client *htt
 
 			sessionID := shared.GetSessionFromContext(ctx)
 			if sessionID == "" {
-				return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for creating a new file")
+				msg := "session ID is required for fetch"
+				record(errcoll.CategoryToolExecution, nil, msg)
+				return fantasy.NewTextErrorResponse(msg), nil
 			}
 
 			p, err := permissions.Request(ctx,
@@ -73,9 +87,12 @@ func NewFetchTool(permissions permission.Service, workingDir string, client *htt
 				},
 			)
 			if err != nil {
-				return fantasy.ToolResponse{}, err
+				msg := "Permission request failed: " + err.Error()
+				record(errcoll.CategoryPermission, err, msg)
+				return fantasy.NewTextErrorResponse(msg), nil
 			}
 			if !p {
+				record(errcoll.CategoryPermission, nil, "permission denied")
 				return shared.NewPermissionDeniedResponse(), nil
 			}
 
@@ -95,31 +112,41 @@ func NewFetchTool(permissions permission.Service, workingDir string, client *htt
 
 			req, err := http.NewRequestWithContext(requestCtx, "GET", params.URL, nil)
 			if err != nil {
-				return fantasy.ToolResponse{}, fmt.Errorf("failed to create request: %w", err)
+				msg := fmt.Sprintf("failed to create request: %v", err)
+				record(errcoll.CategoryToolExecution, err, msg)
+				return fantasy.NewTextErrorResponse(msg), nil
 			}
 
 			req.Header.Set("User-Agent", BrowserUserAgent)
 
 			resp, err := client.Do(req)
 			if err != nil {
-				return fantasy.ToolResponse{}, fmt.Errorf("failed to fetch URL: %w", err)
+				msg := fmt.Sprintf("failed to fetch URL: %v", err)
+				record(errcoll.CategoryToolExecution, err, msg)
+				return fantasy.NewTextErrorResponse(msg), nil
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK {
-				return fantasy.NewTextErrorResponse(fmt.Sprintf("Request failed with status code: %d", resp.StatusCode)), nil
+				msg := fmt.Sprintf("Request failed with status code: %d", resp.StatusCode)
+				record(errcoll.CategoryToolExecution, nil, msg)
+				return fantasy.NewTextErrorResponse(msg), nil
 			}
 
 			body, err := io.ReadAll(io.LimitReader(resp.Body, MaxFetchSize))
 			if err != nil {
-				return fantasy.NewTextErrorResponse("Failed to read response body: " + err.Error()), nil
+				msg := "Failed to read response body: " + err.Error()
+				record(errcoll.CategoryToolExecution, err, msg)
+				return fantasy.NewTextErrorResponse(msg), nil
 			}
 
 			content := string(body)
 
 			validUTF8 := utf8.ValidString(content)
 			if !validUTF8 {
-				return fantasy.NewTextErrorResponse("Response content is not valid UTF-8"), nil
+				msg := "Response content is not valid UTF-8"
+				record(errcoll.CategoryToolExecution, nil, msg)
+				return fantasy.NewTextErrorResponse(msg), nil
 			}
 			contentType := resp.Header.Get("Content-Type")
 
@@ -128,7 +155,9 @@ func NewFetchTool(permissions permission.Service, workingDir string, client *htt
 				if strings.Contains(contentType, "text/html") {
 					text, err := extractTextFromHTML(content)
 					if err != nil {
-						return fantasy.NewTextErrorResponse("Failed to extract text from HTML: " + err.Error()), nil
+						msg := "Failed to extract text from HTML: " + err.Error()
+						record(errcoll.CategoryToolExecution, err, msg)
+						return fantasy.NewTextErrorResponse(msg), nil
 					}
 					content = text
 				}
@@ -137,7 +166,9 @@ func NewFetchTool(permissions permission.Service, workingDir string, client *htt
 				if strings.Contains(contentType, "text/html") {
 					markdown, err := convertHTMLToMarkdown(content)
 					if err != nil {
-						return fantasy.NewTextErrorResponse("Failed to convert HTML to Markdown: " + err.Error()), nil
+						msg := "Failed to convert HTML to Markdown: " + err.Error()
+						record(errcoll.CategoryToolExecution, err, msg)
+						return fantasy.NewTextErrorResponse(msg), nil
 					}
 					content = markdown
 				}
@@ -149,14 +180,20 @@ func NewFetchTool(permissions permission.Service, workingDir string, client *htt
 				if strings.Contains(contentType, "text/html") {
 					doc, err := goquery.NewDocumentFromReader(strings.NewReader(content))
 					if err != nil {
-						return fantasy.NewTextErrorResponse("Failed to parse HTML: " + err.Error()), nil
+						msg := "Failed to parse HTML: " + err.Error()
+						record(errcoll.CategoryToolExecution, err, msg)
+						return fantasy.NewTextErrorResponse(msg), nil
 					}
 					body, err := doc.Find("body").Html()
 					if err != nil {
-						return fantasy.NewTextErrorResponse("Failed to extract body from HTML: " + err.Error()), nil
+						msg := "Failed to extract body from HTML: " + err.Error()
+						record(errcoll.CategoryToolExecution, err, msg)
+						return fantasy.NewTextErrorResponse(msg), nil
 					}
 					if body == "" {
-						return fantasy.NewTextErrorResponse("No body content found in HTML"), nil
+						msg := "No body content found in HTML"
+						record(errcoll.CategoryToolExecution, nil, msg)
+						return fantasy.NewTextErrorResponse(msg), nil
 					}
 					content = "<html>\n<body>\n" + body + "\n</body>\n</html>"
 				}

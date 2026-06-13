@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/package-register/mocode/internal/agent/notify"
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/config"
+	"github.com/package-register/mocode/internal/errcoll"
 	"github.com/package-register/mocode/internal/filetracker"
 	"github.com/package-register/mocode/internal/history"
 	"github.com/package-register/mocode/internal/knowledge/memory"
@@ -71,6 +73,9 @@ type App struct {
 	sessionRoot     string
 	sessionStoreID  string
 	currentServices *SessionServices
+
+	// ErrorCollector records tool execution failures for later analysis.
+	ErrorCollector *errcoll.Collector
 }
 
 type SessionServices struct {
@@ -110,6 +115,23 @@ func New(ctx context.Context, storeCfg *config.ConfigStore) (*App, error) {
 		agentNotifications: pubsub.NewBroker[notify.Notification](),
 		sessionRoot:        session.DefaultStoreRoot(),
 	}
+
+	// Initialize the project-local error collector.
+	dataDir := cfg.Options.DataDirectory
+	if dataDir == "" {
+		dataDir = ".mocode"
+	}
+	errorsDir := filepath.Join(storeCfg.WorkingDir(), dataDir, "errors")
+	collector, err := errcoll.New(errorsDir)
+	if err != nil {
+		return nil, fmt.Errorf("init error collector: %w", err)
+	}
+	app.ErrorCollector = collector
+	app.cleanupFuncs = append(app.cleanupFuncs, func(context.Context) error {
+		collector.Stop()
+		return nil
+	})
+
 	if err := app.useStoreServices(); err != nil {
 		return nil, err
 	}
@@ -221,6 +243,12 @@ func (app *App) Store() *config.ConfigStore {
 // DataStore returns the file-based data store.
 func (app *App) DataStore() *store.Store {
 	return app.store
+}
+
+// ErrorCollectorService returns the project-local asynchronous error
+// collector used by tools.
+func (app *App) ErrorCollectorService() *errcoll.Collector {
+	return app.ErrorCollector
 }
 
 // Events returns a per-caller subscription channel for application events.
@@ -608,6 +636,7 @@ func (app *App) InitCoderAgent(ctx context.Context) error {
 		app.LSPManager,
 		app.Memory,
 		app.agentNotifications,
+		app.ErrorCollector,
 	)
 	if err != nil {
 		slog.Error("Failed to create coder agent", "err", err)

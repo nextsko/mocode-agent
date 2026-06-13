@@ -23,6 +23,7 @@ import (
 	"github.com/package-register/mocode/internal/agent/prompt"
 	"github.com/package-register/mocode/internal/agent/tools"
 	"github.com/package-register/mocode/internal/config"
+	"github.com/package-register/mocode/internal/errcoll"
 	"github.com/package-register/mocode/internal/evolution"
 	"github.com/package-register/mocode/internal/filetracker"
 	"github.com/package-register/mocode/internal/history"
@@ -55,7 +56,7 @@ import (
 
 // Coordinator errors.
 var (
-	errDefaultAgentNotConfigured     = errors.New("default agent not configured")
+	errDefaultAgentNotConfigured       = errors.New("default agent not configured")
 	errModelProviderNotConfigured      = errors.New("model provider not configured")
 	errLargeModelNotSelected           = errors.New("large model not selected")
 	errSmallModelNotSelected           = errors.New("small model not selected")
@@ -94,13 +95,14 @@ type coordinator struct {
 	memory      memory.Service
 	notify      pubsub.Publisher[notify.Notification]
 
-	currentAgent  SessionAgent
-	activeAgentID string
-	agents        map[string]SessionAgent
-	summaryQueue  *sessionSummaryQueue
-	swarmWF       *swarm.WorkflowRuntime // nil if swarm mode not active
-	sessionLogDir string                 // base dir for session logs
-	errorLearner  *evolution.ErrorLearner
+	currentAgent   SessionAgent
+	activeAgentID  string
+	agents         map[string]SessionAgent
+	summaryQueue   *sessionSummaryQueue
+	swarmWF        *swarm.WorkflowRuntime // nil if swarm mode not active
+	sessionLogDir  string                 // base dir for session logs
+	errorLearner   *evolution.ErrorLearner
+	errorCollector *errcoll.Collector
 
 	// Skills discovery results (session-start snapshot).
 	allSkills    []*skills.Skill // Pre-filter: all discovered after dedup.
@@ -121,27 +123,34 @@ func NewCoordinator(
 	lspManager *lsp.Manager,
 	memory memory.Service,
 	notify pubsub.Publisher[notify.Notification],
+	errorCollector *errcoll.Collector,
 ) (Coordinator, error) {
 	// Discover skills once at session start.
 	allSkills, activeSkills := discoverSkills(cfg)
 	skillTracker := skills.NewTracker(activeSkills)
 
+	dataDir := ".mocode"
+	if cfg.Config().Options != nil && cfg.Config().Options.DataDirectory != "" {
+		dataDir = cfg.Config().Options.DataDirectory
+	}
+
 	c := &coordinator{
-		cfg:           cfg,
-		sessions:      sessions,
-		messages:      messages,
-		permissions:   permissions,
-		history:       history,
-		filetracker:   filetracker,
-		lspManager:    lspManager,
-		memory:        memory,
-		notify:        notify,
-		agents:        make(map[string]SessionAgent),
-		summaryQueue:  sessionSummaryQueueNew(),
-		allSkills:     allSkills,
-		activeSkills:  activeSkills,
-		skillTracker:  skillTracker,
-		sessionLogDir: filepath.Join(cfg.WorkingDir(), ".mocode", "sessions"),
+		cfg:            cfg,
+		sessions:       sessions,
+		messages:       messages,
+		permissions:    permissions,
+		history:        history,
+		filetracker:    filetracker,
+		lspManager:     lspManager,
+		memory:         memory,
+		notify:         notify,
+		agents:         make(map[string]SessionAgent),
+		summaryQueue:   sessionSummaryQueueNew(),
+		allSkills:      allSkills,
+		activeSkills:   activeSkills,
+		skillTracker:   skillTracker,
+		sessionLogDir:  filepath.Join(cfg.WorkingDir(), dataDir, "sessions"),
+		errorCollector: errorCollector,
 	}
 
 	// Initialize error learner for provider-specific mistake tracking.
@@ -485,6 +494,7 @@ func (c *coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, age
 		Memory:               c.memory,
 		WorkingDir:           c.cfg.WorkingDir(),
 		ErrorLearner:         c.errorLearner,
+		ErrorCollector:       c.errorCollector,
 	})
 
 	c.readyWg.Go(func() error {

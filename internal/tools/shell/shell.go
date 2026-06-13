@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"github.com/charmbracelet/x/exp/slice"
+	"github.com/package-register/mocode/internal/errcoll"
 	"mvdan.cc/sh/moreinterp/coreutils"
 	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/interp"
@@ -35,6 +36,10 @@ const (
 	ShellTypeCmd
 	ShellTypePowerShell
 )
+
+// shellErrorToolName is the tool name used when recording shell execution
+// failures from this package.
+const shellErrorToolName = "bash"
 
 // Logger interface for optional logging
 type Logger interface {
@@ -298,6 +303,16 @@ func (s *Shell) execCommon(ctx context.Context, command string, stdout, stderr i
 		if runner != nil {
 			s.updateShellFromRunner(runner)
 		}
+		if err != nil && !errcoll.IsRecorded(ctx) {
+			if c := errcoll.FromContext(ctx); c != nil {
+				c.Record(errcoll.ErrorRecord{
+					ToolName: shellErrorToolName,
+					Command:  command,
+					Error:    err.Error(),
+					Category: classifyShellError(err, command),
+				})
+			}
+		}
 		s.logger.InfoPersist("command finished", "command", command, "err", err)
 	}()
 
@@ -354,4 +369,28 @@ func ExitCode(err error) int {
 		return int(exitErr)
 	}
 	return 1
+}
+
+// classifyShellError categorizes shell execution errors for the error
+// collector. It detects common cross-platform mistakes (e.g. Linux-only
+// commands on Windows) and permission/security blocks.
+func classifyShellError(err error, _ string) errcoll.ErrorCategory {
+	if err == nil {
+		return errcoll.CategoryToolExecution
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "command not found"),
+		strings.Contains(msg, "is not recognized"),
+		strings.Contains(msg, "cannot find"),
+		strings.Contains(msg, "the term") && strings.Contains(msg, "not recognized"):
+		return errcoll.CategoryCrossPlatform
+	case strings.Contains(msg, "permission denied"),
+		strings.Contains(msg, "access is denied"):
+		return errcoll.CategoryPermission
+	case strings.Contains(msg, "command is not allowed"):
+		return errcoll.CategoryCommandBlocked
+	default:
+		return errcoll.CategoryToolExecution
+	}
 }
