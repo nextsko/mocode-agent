@@ -35,13 +35,14 @@ type FetchToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (f *FetchToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
-	if opts.IsPending() {
-		return pendingTool(sty, "Fetch", opts.Anim, opts.Compact)
-	}
 
 	var params tools.FetchParams
 	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
 		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+	}
+
+	if opts.IsPending() {
+		return pendingTool(sty, "Fetch", opts.Anim, opts.Compact, cappedWidth, params.URL)
 	}
 
 	toolParams := []string{params.URL}
@@ -110,13 +111,14 @@ type WebFetchToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (w *WebFetchToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
-	if opts.IsPending() {
-		return pendingTool(sty, "Fetch", opts.Anim, opts.Compact)
-	}
 
 	var params tools.WebFetchParams
 	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
 		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+	}
+
+	if opts.IsPending() {
+		return pendingTool(sty, "Fetch", opts.Anim, opts.Compact, cappedWidth, params.URL)
 	}
 
 	toolParams := []string{params.URL}
@@ -164,13 +166,14 @@ type WebSearchToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (w *WebSearchToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
-	if opts.IsPending() {
-		return pendingTool(sty, "Search", opts.Anim, opts.Compact)
-	}
 
 	var params tools.WebSearchParams
 	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
 		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+	}
+
+	if opts.IsPending() {
+		return pendingTool(sty, "Search", opts.Anim, opts.Compact, cappedWidth, params.Query)
 	}
 
 	toolParams := []string{params.Query}

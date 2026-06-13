@@ -40,13 +40,17 @@ type BashToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (b *BashToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
-	if opts.IsPending() {
-		return pendingTool(sty, "Bash", opts.Anim, opts.Compact)
-	}
 
 	var params tools.BashParams
 	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
 		params.Command = "failed to parse command"
+	}
+
+	cmd := strings.ReplaceAll(params.Command, "\n", " ")
+	cmd = strings.ReplaceAll(cmd, "\t", "    ")
+
+	if opts.IsPending() {
+		return pendingTool(sty, "Bash", opts.Anim, opts.Compact, cappedWidth, cmd)
 	}
 
 	// Check if this is a background job.
@@ -62,8 +66,6 @@ func (b *BashToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *
 	}
 
 	// Regular bash command.
-	cmd := strings.ReplaceAll(params.Command, "\n", " ")
-	cmd = strings.ReplaceAll(cmd, "\t", "    ")
 	toolParams := []string{cmd}
 	if params.RunInBackground {
 		toolParams = append(toolParams, "background", "true")
@@ -122,12 +124,14 @@ type JobOutputToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (j *JobOutputToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
+	var params tools.JobOutputParams
+	_ = json.Unmarshal([]byte(opts.ToolCall.Input), &params)
+
 	if opts.IsPending() {
-		return pendingTool(sty, "Job", opts.Anim, opts.Compact)
+		return pendingTool(sty, "Job", opts.Anim, opts.Compact, cappedWidth, params.ShellID)
 	}
 
-	var params tools.JobOutputParams
-	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
+	if params.ShellID == "" {
 		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
 	}
 
@@ -173,12 +177,14 @@ type JobKillToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (j *JobKillToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
+	var params tools.JobKillParams
+	_ = json.Unmarshal([]byte(opts.ToolCall.Input), &params)
+
 	if opts.IsPending() {
-		return pendingTool(sty, "Job", opts.Anim, opts.Compact)
+		return pendingTool(sty, "Job", opts.Anim, opts.Compact, cappedWidth, params.ShellID)
 	}
 
-	var params tools.JobKillParams
-	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
+	if params.ShellID == "" {
 		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
 	}
 

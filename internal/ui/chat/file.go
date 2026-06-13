@@ -38,9 +38,6 @@ type ViewToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (v *ViewToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
-	if opts.IsPending() {
-		return pendingTool(sty, "View", opts.Anim, opts.Compact)
-	}
 
 	var params tools.ViewParams
 	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
@@ -48,6 +45,10 @@ func (v *ViewToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *
 	}
 
 	file := fsext.PrettyPath(params.FilePath)
+
+	if opts.IsPending() {
+		return pendingTool(sty, "View", opts.Anim, opts.Compact, cappedWidth, file)
+	}
 	toolParams := []string{file}
 	if params.Limit != 0 {
 		toolParams = append(toolParams, "limit", fmt.Sprintf("%d", params.Limit))
@@ -124,9 +125,6 @@ type WriteToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (w *WriteToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
-	if opts.IsPending() {
-		return pendingTool(sty, "Write", opts.Anim, opts.Compact)
-	}
 
 	var params tools.WriteParams
 	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
@@ -134,6 +132,10 @@ func (w *WriteToolRenderContext) RenderTool(sty *styles.Styles, width int, opts 
 	}
 
 	file := fsext.PrettyPath(params.FilePath)
+
+	if opts.IsPending() {
+		return pendingTool(sty, "Write", opts.Anim, opts.Compact, cappedWidth, file)
+	}
 	header := toolHeader(sty, opts.Status, "Write", cappedWidth, opts.Compact, file)
 	if opts.Compact {
 		return header
@@ -179,9 +181,6 @@ type EditToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (e *EditToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	// Edit tool uses full width for diffs.
-	if opts.IsPending() {
-		return pendingTool(sty, "Edit", opts.Anim, opts.Compact)
-	}
 
 	var params tools.EditParams
 	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
@@ -189,6 +188,10 @@ func (e *EditToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *
 	}
 
 	file := fsext.PrettyPath(params.FilePath)
+
+	if opts.IsPending() {
+		return pendingTool(sty, "Edit", opts.Anim, opts.Compact, width, file)
+	}
 	header := toolHeader(sty, opts.Status, "Edit", width, opts.Compact, file)
 	if opts.Compact {
 		return header
@@ -242,9 +245,6 @@ type MultiEditToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (m *MultiEditToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	// MultiEdit tool uses full width for diffs.
-	if opts.IsPending() {
-		return pendingTool(sty, "Multi-Edit", opts.Anim, opts.Compact)
-	}
 
 	var params tools.MultiEditParams
 	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
@@ -252,6 +252,10 @@ func (m *MultiEditToolRenderContext) RenderTool(sty *styles.Styles, width int, o
 	}
 
 	file := fsext.PrettyPath(params.FilePath)
+
+	if opts.IsPending() {
+		return pendingTool(sty, "Multi-Edit", opts.Anim, opts.Compact, width, file)
+	}
 	toolParams := []string{file}
 	if len(params.Edits) > 0 {
 		toolParams = append(toolParams, "edits", fmt.Sprintf("%d", len(params.Edits)))
@@ -310,13 +314,14 @@ type DownloadToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (d *DownloadToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
-	if opts.IsPending() {
-		return pendingTool(sty, "Download", opts.Anim, opts.Compact)
-	}
 
 	var params tools.DownloadParams
 	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
 		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+	}
+
+	if opts.IsPending() {
+		return pendingTool(sty, "Download", opts.Anim, opts.Compact, cappedWidth, params.URL)
 	}
 
 	toolParams := []string{params.URL}
@@ -372,13 +377,14 @@ type ReadFilesToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (r *ReadFilesToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
-	if opts.IsPending() {
-		return pendingTool(sty, "Read Files", opts.Anim, opts.Compact)
-	}
 
 	var params tools.ReadFilesParams
 	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
 		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+	}
+
+	if opts.IsPending() {
+		return pendingTool(sty, "Read Files", opts.Anim, opts.Compact, cappedWidth, fmt.Sprintf("%d paths", len(params.Paths)))
 	}
 
 	toolParams := []string{fmt.Sprintf("%d paths", len(params.Paths))}

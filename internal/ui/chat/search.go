@@ -36,13 +36,14 @@ type GlobToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (g *GlobToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
-	if opts.IsPending() {
-		return pendingTool(sty, "Glob", opts.Anim, opts.Compact)
-	}
 
 	var params tools.GlobParams
 	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
 		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+	}
+
+	if opts.IsPending() {
+		return pendingTool(sty, "Glob", opts.Anim, opts.Compact, cappedWidth, params.Pattern)
 	}
 
 	toolParams := []string{params.Pattern}
@@ -95,13 +96,14 @@ type GrepToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (g *GrepToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
-	if opts.IsPending() {
-		return pendingTool(sty, "Grep", opts.Anim, opts.Compact)
-	}
 
 	var params tools.GrepParams
 	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
 		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+	}
+
+	if opts.IsPending() {
+		return pendingTool(sty, "Grep", opts.Anim, opts.Compact, cappedWidth, params.Pattern)
 	}
 
 	toolParams := []string{params.Pattern}
@@ -160,9 +162,6 @@ type LSToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (l *LSToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
-	if opts.IsPending() {
-		return pendingTool(sty, "List", opts.Anim, opts.Compact)
-	}
 
 	var params tools.LSParams
 	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
@@ -174,6 +173,10 @@ func (l *LSToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *To
 		path = "."
 	}
 	path = fsext.PrettyPath(path)
+
+	if opts.IsPending() {
+		return pendingTool(sty, "List", opts.Anim, opts.Compact, cappedWidth, path)
+	}
 
 	header := toolHeader(sty, opts.Status, "List", cappedWidth, opts.Compact, path)
 	if opts.Compact {
@@ -220,13 +223,14 @@ type SourcegraphToolRenderContext struct{}
 // RenderTool implements the [ToolRenderer] interface.
 func (s *SourcegraphToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
-	if opts.IsPending() {
-		return pendingTool(sty, "Sourcegraph", opts.Anim, opts.Compact)
-	}
 
 	var params tools.SourcegraphParams
 	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
 		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+	}
+
+	if opts.IsPending() {
+		return pendingTool(sty, "Sourcegraph", opts.Anim, opts.Compact, cappedWidth, params.Query)
 	}
 
 	toolParams := []string{params.Query}

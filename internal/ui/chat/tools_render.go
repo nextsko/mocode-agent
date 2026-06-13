@@ -296,7 +296,7 @@ func toolParamList(sty *styles.Styles, params []string, width int) string {
 	return sty.Tool.ParamMain.Render(output)
 }
 
-func pendingTool(sty *styles.Styles, name string, anim *anim.Anim, nested bool) string {
+func pendingTool(sty *styles.Styles, name string, anim *anim.Anim, nested bool, width int, params ...string) string {
 	icon := sty.Tool.IconPending.Render()
 	nameStyle := sty.Tool.NameNormal
 	if nested {
@@ -304,12 +304,25 @@ func pendingTool(sty *styles.Styles, name string, anim *anim.Anim, nested bool) 
 	}
 	toolName := nameStyle.Render(name)
 
+	prefix := fmt.Sprintf("%s %s ", icon, toolName)
+	var paramView string
+	if len(params) > 0 && params[0] != "" && width > 0 {
+		prefixWidth := lipgloss.Width(prefix)
+		remainingWidth := width - prefixWidth - 2 // 2 for spacing before animation
+		if remainingWidth > 0 {
+			paramView = sty.Tool.ParamMain.Render(ansi.Truncate(params[0], remainingWidth, "…"))
+		}
+	}
+
 	var animView string
 	if anim != nil {
 		animView = anim.Render()
 	}
 
-	return fmt.Sprintf("%s %s %s", icon, toolName, animView)
+	if paramView != "" {
+		return prefix + paramView + " " + animView
+	}
+	return prefix + animView
 }
 
 func toolEarlyStateContent(sty *styles.Styles, opts *ToolRenderOpts, width int) (string, bool) {

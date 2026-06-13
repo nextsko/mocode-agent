@@ -449,6 +449,174 @@ func TestSetSessionMessages_LoadsNestedBatchSubAgentHistory(t *testing.T) {
 	require.Equal(t, "bash-call-1", toolItem.NestedTools()[0].ToolCall().ID)
 }
 
+func TestHandleChildSessionMessage_RendersNestedToolTreeForSingleSubAgent(t *testing.T) {
+	t.Parallel()
+
+	ui := newTestUIWithConfig(t, &config.Config{
+		Providers: csync.NewMap[string, config.ProviderConfig](),
+		Options:   &config.Options{},
+	})
+	ui.session = &session.Session{ID: "session-parent", Title: "Parent"}
+
+	parentMsg := message.Message{
+		ID:        "msg-parent",
+		Role:      message.Assistant,
+		SessionID: "session-parent",
+		Parts: []message.ContentPart{
+			message.ToolCall{
+				ID:    "agent-call",
+				Name:  agentcore.AgentToolName,
+				Input: `{"prompt":"Analyze the failing test"}`,
+			},
+		},
+	}
+
+	_ = ui.updateSessionMessage(parentMsg)
+
+	childSessionID := ui.com.Workspace.CreateAgentToolSessionID(parentMsg.ID, "agent-call")
+	childMsg := message.Message{
+		ID:        "child-msg-1",
+		Role:      message.Assistant,
+		SessionID: childSessionID,
+		Parts: []message.ContentPart{
+			message.ToolCall{
+				ID:    "bash-call-1",
+				Name:  "bash",
+				Input: `{"command":"echo hi"}`,
+			},
+		},
+	}
+
+	_ = ui.handleChildSessionMessage(pubsub.Event[message.Message]{
+		Type:    pubsub.UpdatedEvent,
+		Payload: childMsg,
+	})
+
+	toolItem, ok := ui.chat.MessageItem("agent-call").(chat.NestedToolContainer)
+	require.True(t, ok)
+	require.Len(t, toolItem.NestedTools(), 1)
+
+	rendered := ui.chat.MessageItem("agent-call").Render(80)
+	require.Contains(t, rendered, "Bash")
+	require.Contains(t, rendered, "echo hi")
+}
+
+func TestHandleChildSessionMessage_RendersNestedToolTreeForBatchSubAgent(t *testing.T) {
+	t.Parallel()
+
+	ui := newTestUIWithConfig(t, &config.Config{
+		Providers: csync.NewMap[string, config.ProviderConfig](),
+		Options:   &config.Options{},
+	})
+	ui.session = &session.Session{ID: "session-parent", Title: "Parent"}
+
+	parentMsg := message.Message{
+		ID:        "msg-parent",
+		Role:      message.Assistant,
+		SessionID: "session-parent",
+		Parts: []message.ContentPart{
+			message.ToolCall{
+				ID:    "agent-call",
+				Name:  agentcore.AgentToolName,
+				Input: `{"tasks":[{"prompt":"Inspect UI"},{"prompt":"Patch UI"}]}`,
+			},
+		},
+	}
+
+	_ = ui.updateSessionMessage(parentMsg)
+
+	childSessionID := ui.com.Workspace.CreateAgentToolSessionID(parentMsg.ID, "agent-call-1")
+	childMsg := message.Message{
+		ID:        "child-msg-1",
+		Role:      message.Assistant,
+		SessionID: childSessionID,
+		Parts: []message.ContentPart{
+			message.ToolCall{
+				ID:    "bash-call-1",
+				Name:  "bash",
+				Input: `{"command":"echo hi"}`,
+			},
+		},
+	}
+
+	_ = ui.handleChildSessionMessage(pubsub.Event[message.Message]{
+		Type:    pubsub.UpdatedEvent,
+		Payload: childMsg,
+	})
+
+	toolItem, ok := ui.chat.MessageItem("agent-call").(chat.NestedToolContainer)
+	require.True(t, ok)
+	require.Len(t, toolItem.NestedTools(), 1)
+
+	rendered := ui.chat.MessageItem("agent-call").Render(80)
+	require.Contains(t, rendered, "Bash")
+	require.Contains(t, rendered, "echo hi")
+}
+
+func TestUISubAgentTreeViaUpdateLoop(t *testing.T) {
+	t.Parallel()
+
+	ui := newTestUIWithConfig(t, &config.Config{
+		Providers: csync.NewMap[string, config.ProviderConfig](),
+		Options:   &config.Options{},
+	})
+	ui.session = &session.Session{ID: "session-parent", Title: "Parent"}
+
+	parentMsg := message.Message{
+		ID:        "msg-parent",
+		Role:      message.Assistant,
+		SessionID: "session-parent",
+		Parts: []message.ContentPart{
+			message.ToolCall{
+				ID:    "agent-call",
+				Name:  agentcore.AgentToolName,
+				Input: `{"prompt":"Analyze the failing test"}`,
+			},
+		},
+	}
+
+	// Simulate the real message event flow through UI.Update.
+	_, _ = ui.Update(pubsub.Event[message.Message]{
+		Type:    pubsub.CreatedEvent,
+		Payload: parentMsg,
+	})
+
+	childSessionID := ui.com.Workspace.CreateAgentToolSessionID(parentMsg.ID, "agent-call")
+
+	_, _ = ui.Update(pubsub.Event[message.Message]{
+		Type: pubsub.CreatedEvent,
+		Payload: message.Message{
+			ID:        "child-msg-1",
+			Role:      message.Assistant,
+			SessionID: childSessionID,
+			Parts:     []message.ContentPart{},
+		},
+	})
+
+	_, _ = ui.Update(pubsub.Event[message.Message]{
+		Type: pubsub.UpdatedEvent,
+		Payload: message.Message{
+			ID:        "child-msg-1",
+			Role:      message.Assistant,
+			SessionID: childSessionID,
+			Parts: []message.ContentPart{
+				message.ToolCall{
+					ID:    "bash-call-1",
+					Name:  "bash",
+					Input: `{"command":"echo hi"}`,
+				},
+			},
+		},
+	})
+
+	toolItem, ok := ui.chat.MessageItem("agent-call").(chat.NestedToolContainer)
+	require.True(t, ok)
+	require.Len(t, toolItem.NestedTools(), 1)
+
+	rendered := ui.chat.MessageItem("agent-call").Render(80)
+	require.Contains(t, rendered, "Bash")
+}
+
 func TestPillClickTargetAt(t *testing.T) {
 	t.Parallel()
 
