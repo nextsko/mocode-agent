@@ -36,7 +36,7 @@ func New(cfg Config) (*Roundtable, error) {
 		Transcript:  nil,
 		CurrentSeq:  0,
 		CurrentTurn: 0,
-		Usage:       Usage{ByRole: make(map[string]Usage)},
+		Usage:       Usage{ByRole: make(map[string]RoleUsage)},
 	}, nil
 }
 

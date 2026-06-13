@@ -104,7 +104,15 @@ type Usage struct {
 	InputTokens  int
 	OutputTokens int
 	TotalTokens  int
-	ByRole       map[string]Usage
+	ByRole       map[string]RoleUsage
+}
+
+// RoleUsage tracks token consumption for a single participant role.
+type RoleUsage struct {
+	Turns        int
+	InputTokens  int
+	OutputTokens int
+	TotalTokens  int
 }
 
 // Config is the static configuration for a roundtable meeting.
