@@ -4,10 +4,16 @@
 package notify
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// testSessionID is shared across table-driven test cases that all exercise
+// the same baseline session. Lifting it into a constant keeps goconst quiet
+// and makes the assertions easier to read.
+const testSessionID = "session-123"
 
 // Test_Type_Constants 测试 Type 常量定义。
 func Test_Type_Constants(t *testing.T) {
@@ -20,6 +26,7 @@ func Test_Type_Constants(t *testing.T) {
 		{"TypeAgentToolExecuting", TypeAgentToolExecuting, "agent_tool_executing"},
 		{"TypeAgentFinished", TypeAgentFinished, "agent_finished"},
 		{"TypeReAuthenticate", TypeReAuthenticate, "re_authenticate"},
+		{"TypeSubagentCompleted", TypeSubagentCompleted, "subagent_completed"},
 	}
 
 	for _, tt := range tests {
@@ -41,10 +48,10 @@ func Test_Notification_Creation(t *testing.T) {
 		{
 			name: "思考状态通知",
 			notification: Notification{
-				SessionID: "session-123",
+				SessionID: testSessionID,
 				Type:      TypeAgentThinking,
 			},
-			wantSession: "session-123",
+			wantSession: testSessionID,
 			wantType:    TypeAgentThinking,
 			wantTool:    "",
 		},
@@ -115,4 +122,71 @@ func Test_Notification_Fields(t *testing.T) {
 	assert.NotEmpty(t, full.SessionTitle)
 	assert.NotEmpty(t, full.ProviderID)
 	assert.NotEmpty(t, full.ToolName)
+}
+
+// Test_SubagentStatus_Constants 验证子代理状态枚举值稳定。
+func Test_SubagentStatus_Constants(t *testing.T) {
+	cases := map[SubagentStatus]string{
+		SubagentStatusSuccess:   "success",
+		SubagentStatusError:     "error",
+		SubagentStatusCancelled: "cancelled",
+		SubagentStatusBlocked:   "blocked",
+	}
+	for got, want := range cases {
+		assert.Equal(t, want, string(got), "SubagentStatus enum should be stable")
+	}
+}
+
+// Test_SubagentCompletedEvent_RoundTrip 验证事件可被 JSON 往返保留。
+func Test_SubagentCompletedEvent_RoundTrip(t *testing.T) {
+	original := SubagentCompletedEvent{
+		ParentSessionID:  "parent-1",
+		ParentToolCallID: "tool-1",
+		AgentID:          "agent-7",
+		SubagentType:     "plan",
+		Status:           SubagentStatusSuccess,
+		DurationMs:       2500,
+		Usage: SubagentTokenUsage{
+			Input:         10,
+			Output:        20,
+			CacheRead:     5,
+			CacheCreation: 1,
+			Total:         36,
+		},
+		Summary: "drafted plan",
+	}
+
+	data, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var decoded SubagentCompletedEvent
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	assert.Equal(t, original, decoded)
+}
+
+// Test_Notification_SubagentCompleted_CarriesPayload 验证 SubagentCompleted
+// 通知携带完整 payload。
+func Test_Notification_SubagentCompleted_CarriesPayload(t *testing.T) {
+	ev := SubagentCompletedEvent{
+		ParentToolCallID: "tool-1",
+		Status:           SubagentStatusError,
+		DurationMs:       100,
+		Usage:            SubagentTokenUsage{Input: 1, Output: 0, Total: 1},
+		Error:            "context deadline exceeded",
+	}
+	n := Notification{
+		SessionID:         "parent-session",
+		Type:              TypeSubagentCompleted,
+		SubagentCompleted: &ev,
+	}
+	assert.Equal(t, TypeSubagentCompleted, n.Type)
+	if assert.NotNil(t, n.SubagentCompleted) {
+		assert.Equal(t, "tool-1", n.SubagentCompleted.ParentToolCallID)
+		assert.Equal(t, SubagentStatusError, n.SubagentCompleted.Status)
+		assert.Equal(t, "context deadline exceeded", n.SubagentCompleted.Error)
+	}
 }

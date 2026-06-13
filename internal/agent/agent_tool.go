@@ -11,6 +11,7 @@ import (
 
 	"charm.land/fantasy"
 
+	"github.com/package-register/mocode/internal/agent/notify"
 	"github.com/package-register/mocode/internal/agent/prompt"
 	"github.com/package-register/mocode/internal/agent/tools"
 	"github.com/package-register/mocode/internal/config"
@@ -40,16 +41,69 @@ type AgentTaskParams struct {
 	DependsOn []string `json:"depends_on,omitempty" description:"Optional list of task IDs this task depends on"`
 }
 
+// TaskResultStatus enumerates the possible terminal status values reported
+// on a TaskResult. Keeping them as named constants lets the goconst lint
+// rule recognise them, and gives the frontend a single source of truth.
+const (
+	TaskResultStatusSuccess   = "success"
+	TaskResultStatusError     = "error"
+	TaskResultStatusBlocked   = "blocked"
+	TaskResultStatusCancelled = "cancelled"
+)
+
 // TaskResult is the structured output envelope returned by sub-agent execution.
 // It provides machine-parseable status/summary/artifacts alongside the raw text.
 type TaskResult struct {
-	Status      string   `json:"status"`                 // "success" or "error"
-	Summary     string   `json:"summary,omitempty"`      // one-line summary of the sub-agent's work
-	Artifacts   []string `json:"artifacts,omitempty"`    // files created or modified
-	Risks       []string `json:"risks,omitempty"`        // risks or concerns found
-	Evidence    []string `json:"evidence,omitempty"`     // evidence refs (e.g. "file:line")
-	NextActions []string `json:"next_actions,omitempty"` // suggested follow-up actions
-	Error       string   `json:"error,omitempty"`        // error message if status == "error"
+	Status      string     `json:"status"`                 // TaskResultStatusSuccess, ...Error, ...Blocked, ...Cancelled
+	Summary     string     `json:"summary,omitempty"`      // one-line summary of the sub-agent's work
+	Artifacts   []string   `json:"artifacts,omitempty"`    // files created or modified
+	Risks       []string   `json:"risks,omitempty"`        // risks or concerns found
+	Evidence    []string   `json:"evidence,omitempty"`     // evidence refs (e.g. "file:line")
+	NextActions []string   `json:"next_actions,omitempty"` // suggested follow-up actions
+	Error       string     `json:"error,omitempty"`        // error message if status == "error"
+	DurationMs  int64      `json:"duration_ms,omitempty"`  // wall-clock duration of the sub-agent run
+	Usage       *TaskUsage `json:"usage,omitempty"`        // aggregated token usage of the run
+}
+
+// TaskUsage is the wire-level token usage reported on each TaskResult. It
+// mirrors fantasy.Usage but is kept here so the Agent tool's output envelope
+// is self-contained and decoupled from the model layer.
+type TaskUsage struct {
+	Input         int64 `json:"input"`
+	Output        int64 `json:"output"`
+	CacheRead     int64 `json:"cache_read"`
+	CacheCreation int64 `json:"cache_creation"`
+	Total         int64 `json:"total"`
+}
+
+// ToNotifyUsage converts the wire-level TaskUsage into the notify package's
+// sub-agent token usage representation.
+func (u *TaskUsage) ToNotifyUsage() notify.SubagentTokenUsage {
+	if u == nil {
+		return notify.SubagentTokenUsage{}
+	}
+	return notify.SubagentTokenUsage{
+		Input:         u.Input,
+		Output:        u.Output,
+		CacheRead:     u.CacheRead,
+		CacheCreation: u.CacheCreation,
+		Total:         u.Total,
+	}
+}
+
+// FromFantasyUsage converts a fantasy.Usage into the wire-level TaskUsage
+// representation. The conversion is total-loss free for the numeric fields.
+func FromFantasyUsage(u fantasy.Usage) *TaskUsage {
+	if u.TotalTokens == 0 && u.InputTokens == 0 && u.OutputTokens == 0 {
+		return nil
+	}
+	return &TaskUsage{
+		Input:         u.InputTokens,
+		Output:        u.OutputTokens,
+		CacheRead:     u.CacheReadTokens,
+		CacheCreation: u.CacheCreationTokens,
+		Total:         u.TotalTokens,
+	}
 }
 
 const (
@@ -95,6 +149,8 @@ func (c *coordinator) agentTool(ctx context.Context) (fantasy.AgentTool, error) 
 				ToolCallID:     call.ID,
 				Prompt:         params.Prompt,
 				SessionTitle:   "New Agent Session",
+				AgentID:        call.ID,
+				SubagentType:   config.AgentTask,
 			})
 		}), nil
 }
@@ -144,10 +200,12 @@ func (c *coordinator) runSubAgentBatch(ctx context.Context, params subAgentBatch
 // runSubAgentParallel runs all tasks concurrently (no dependencies).
 func (c *coordinator) runSubAgentParallel(ctx context.Context, params subAgentBatchParams) (fantasy.ToolResponse, error) {
 	type batchEntry struct {
-		idx    int
-		task   AgentTaskParams
-		result string
-		err    string
+		idx      int
+		task     AgentTaskParams
+		result   string
+		err      string
+		duration int64
+		usage    *TaskUsage
 	}
 	entries := make([]batchEntry, len(params.Tasks))
 
@@ -169,16 +227,20 @@ func (c *coordinator) runSubAgentParallel(ctx context.Context, params subAgentBa
 				e.err = err.Error()
 				return nil
 			}
-			resp, err := c.runSubAgent(ctx, subAgentParams{
+			resp, meta, callErr := c.runSubAgentWithMeta(ctx, subAgentParams{
 				Agent:          agent,
 				SessionID:      params.SessionID,
 				AgentMessageID: params.AgentMessageID,
 				ToolCallID:     fmt.Sprintf("%s-%d", params.ToolCallID, e.idx+1),
 				Prompt:         e.task.Prompt,
 				SessionTitle:   fmt.Sprintf("Agent %s: %s", agentID, e.task.Prompt),
+				AgentID:        fmt.Sprintf("%s-%d", params.ToolCallID, e.idx+1),
+				SubagentType:   agentID,
 			})
-			if err != nil {
-				e.err = err.Error()
+			e.duration = meta.DurationMs
+			e.usage = FromFantasyUsage(meta.Usage)
+			if callErr != nil {
+				e.err = callErr.Error()
 				return nil
 			}
 			e.result = strings.TrimSpace(resp.Content)
@@ -192,15 +254,15 @@ func (c *coordinator) runSubAgentParallel(ctx context.Context, params subAgentBa
 	// Build structured results array.
 	taskResults := make([]TaskResult, len(entries))
 	for _, e := range entries {
-		tr := TaskResult{}
+		tr := TaskResult{DurationMs: e.duration, Usage: e.usage}
 		if e.err != "" {
-			tr.Status = "error"
+			tr.Status = TaskResultStatusError
 			tr.Error = e.err
 		} else if e.result == "" {
-			tr.Status = "error"
+			tr.Status = TaskResultStatusError
 			tr.Error = "empty result"
 		} else {
-			tr.Status = "success"
+			tr.Status = TaskResultStatusSuccess
 			tr.Summary = firstLine(e.result)
 		}
 		taskResults[e.idx] = tr
@@ -323,34 +385,45 @@ func (c *coordinator) runSubAgentDAG(ctx context.Context, params subAgentBatchPa
 	// Run in phases.
 	done := make(map[string]bool, n)
 	failed := make(map[string]bool, n)
+	blocked := make(map[string]bool, n)
 	results := make([]string, n)
+	durations := make([]int64, n)
+	usages := make([]*TaskUsage, n)
 
-	for len(done)+len(failed) < n {
+	for len(done)+len(failed)+len(blocked) < n {
 		// Find ready tasks: all deps done, not yet processed, and no dep failed.
 		var ready []int
 		for i, t := range params.Tasks {
-			if done[t.ID] || failed[t.ID] {
+			if done[t.ID] || failed[t.ID] || blocked[t.ID] {
 				continue
 			}
-			blocked := false
+			isReady := true
 			for _, dep := range t.DependsOn {
-				if failed[dep] || !done[dep] {
-					blocked = true
+				if failed[dep] {
+					// Dependency failed or blocked: this task is blocked.
+					isReady = false
+					blocked[t.ID] = true
+					results[byID[t.ID]] = "blocked: upstream dependency failed"
+					break
+				}
+				if !done[dep] {
+					isReady = false
 					break
 				}
 			}
-			if !blocked {
+			if isReady {
 				ready = append(ready, i)
 			}
 		}
 
 		if len(ready) == 0 {
-			// Remaining tasks are all blocked.
+			// Remaining tasks are all blocked or have unmet deps.
 			for _, t := range params.Tasks {
-				if !done[t.ID] && !failed[t.ID] {
-					results[byID[t.ID]] = "blocked: upstream dependency failed"
-					failed[t.ID] = true
+				if done[t.ID] || failed[t.ID] || blocked[t.ID] {
+					continue
 				}
+				results[byID[t.ID]] = "blocked: no ready tasks"
+				blocked[t.ID] = true
 			}
 			break
 		}
@@ -376,16 +449,20 @@ func (c *coordinator) runSubAgentDAG(ctx context.Context, params subAgentBatchPa
 					failed[task.ID] = true
 					return nil
 				}
-				resp, err := c.runSubAgent(gctx, subAgentParams{
+				resp, meta, callErr := c.runSubAgentWithMeta(gctx, subAgentParams{
 					Agent:          agent,
 					SessionID:      params.SessionID,
 					AgentMessageID: params.AgentMessageID,
 					ToolCallID:     fmt.Sprintf("%s-%s", params.ToolCallID, task.ID),
 					Prompt:         task.Prompt,
 					SessionTitle:   fmt.Sprintf("Agent %s: %s", agentID, task.Prompt),
+					AgentID:        fmt.Sprintf("%s-%s", params.ToolCallID, task.ID),
+					SubagentType:   agentID,
 				})
-				if err != nil {
-					results[i] = "error: " + err.Error()
+				durations[i] = meta.DurationMs
+				usages[i] = FromFantasyUsage(meta.Usage)
+				if callErr != nil {
+					results[i] = "error: " + callErr.Error()
 					failed[task.ID] = true
 					return nil
 				}
@@ -407,9 +484,14 @@ func (c *coordinator) runSubAgentDAG(ctx context.Context, params subAgentBatchPa
 		if agentName == "" {
 			agentName = config.AgentTask
 		}
-		status := "✅"
-		if failed[t.ID] {
+		var status string
+		switch {
+		case failed[t.ID]:
 			status = "❌"
+		case blocked[t.ID]:
+			status = "⏸"
+		default:
+			status = "✅"
 		}
 		out.WriteString(fmt.Sprintf("\n## %s %s [%s]\n\n", status, t.ID, agentName))
 		if results[i] != "" {
@@ -423,12 +505,20 @@ func (c *coordinator) runSubAgentDAG(ctx context.Context, params subAgentBatchPa
 	// Structured envelope.
 	taskResults := make([]TaskResult, n)
 	for i := range params.Tasks {
-		tr := TaskResult{}
-		if results[i] == "" || strings.HasPrefix(results[i], "error:") || strings.HasPrefix(results[i], "blocked:") {
-			tr.Status = "error"
+		t := params.Tasks[i]
+		tr := TaskResult{DurationMs: durations[i], Usage: usages[i]}
+		switch {
+		case blocked[t.ID]:
+			tr.Status = TaskResultStatusBlocked
+			tr.Error = strings.TrimPrefix(results[i], "blocked: ")
+		case failed[t.ID] || strings.HasPrefix(results[i], "error:"):
+			tr.Status = TaskResultStatusError
 			tr.Error = strings.TrimPrefix(results[i], "error: ")
-		} else {
-			tr.Status = "success"
+		case results[i] == "":
+			tr.Status = TaskResultStatusError
+			tr.Error = "empty result"
+		default:
+			tr.Status = TaskResultStatusSuccess
 			tr.Summary = firstLine(results[i])
 		}
 		taskResults[i] = tr

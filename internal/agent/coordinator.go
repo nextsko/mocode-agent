@@ -129,6 +129,10 @@ func NewCoordinator(
 	allSkills, activeSkills := discoverSkills(cfg)
 	skillTracker := skills.NewTracker(activeSkills)
 
+	// cfg.Config().Options.DataDirectory is always resolved to an absolute
+	// path by config.setDefaults, so it can be used directly. Joining it
+	// with cfg.WorkingDir() would produce a path with two drive letters
+	// on Windows (e.g. "C:\wd\C:\wd\.mocode\sessions").
 	dataDir := ".mocode"
 	if cfg.Config().Options != nil && cfg.Config().Options.DataDirectory != "" {
 		dataDir = cfg.Config().Options.DataDirectory
@@ -149,7 +153,7 @@ func NewCoordinator(
 		allSkills:      allSkills,
 		activeSkills:   activeSkills,
 		skillTracker:   skillTracker,
-		sessionLogDir:  filepath.Join(cfg.WorkingDir(), dataDir, "sessions"),
+		sessionLogDir:  filepath.Join(dataDir, "sessions"),
 		errorCollector: errorCollector,
 	}
 
@@ -535,6 +539,13 @@ func (c *coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 		}
 		allTools = append(allTools, agenticFetchTool)
 	}
+	if slices.Contains(agentCfg.AllowedTools, RoundtableToolName) {
+		roundtableTool, err := c.roundtableTool(ctx)
+		if err != nil {
+			return nil, err
+		}
+		allTools = append(allTools, roundtableTool)
+	}
 
 	// ── standard tools via registry ──────────────────────────────────────────
 	modelName := ""
@@ -609,6 +620,7 @@ func (c *coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 	coordOwned := map[string]bool{
 		AgentToolName:                  true,
 		tools.AgenticFetchToolName:     true,
+		RoundtableToolName:             true,
 		tools.TransferToolName:         true,
 		tools.WeChatSendImageToolName:  true,
 		tools.WeChatSendFileToolName:   true,
@@ -1176,22 +1188,51 @@ type subAgentParams struct {
 	ToolCallID     string
 	Prompt         string
 	SessionTitle   string
+	// AgentID is an optional instance identifier for the sub-agent.
+	// When non-empty, it is propagated to the SubagentCompleted event so
+	// that listeners (e.g. the web UI) can address the run uniquely.
+	AgentID string
+	// SubagentType is the built-in type label (e.g. "coder" / "explore"
+	// / "plan") or a custom agent name. It is forwarded to the
+	// SubagentCompleted event for UI styling.
+	SubagentType string
 	// SessionSetup is an optional callback invoked after session creation
 	// but before agent execution, for custom session configuration.
 	SessionSetup func(sessionID string)
+}
+
+// subAgentResult wraps a sub-agent ToolResponse with the timing and usage
+// metadata collected during the run. Callers use this to populate the
+// TaskResult envelope (duration_ms, usage) without having to re-derive the
+// values from session state.
+type subAgentResult struct {
+	Response   fantasy.ToolResponse
+	DurationMs int64
+	Usage      fantasy.Usage
 }
 
 // runSubAgent runs a sub-agent and handles session management and cost accumulation.
 // It creates a sub-session, runs the agent with the given prompt, and propagates
 // the cost to the parent session.
 func (c *coordinator) runSubAgent(ctx context.Context, params subAgentParams) (fantasy.ToolResponse, error) {
+	resp, _, err := c.runSubAgentWithMeta(ctx, params)
+	return resp, err
+}
+
+// runSubAgentWithMeta is the metadata-returning variant of runSubAgent. It is
+// used by the parallel and DAG batch runners so they can populate
+// TaskResult.DurationMs and TaskResult.Usage on each envelope.
+func (c *coordinator) runSubAgentWithMeta(ctx context.Context, params subAgentParams) (fantasy.ToolResponse, subAgentResult, error) {
 	startTime := time.Now()
 
 	// Create sub-session
 	agentToolSessionID := c.sessions.CreateAgentToolSessionID(params.AgentMessageID, params.ToolCallID)
 	session, err := c.sessions.CreateTaskSession(ctx, agentToolSessionID, params.SessionID, params.SessionTitle)
 	if err != nil {
-		return fantasy.ToolResponse{}, fmt.Errorf("create session: %w", err)
+		duration := time.Since(startTime)
+		c.publishSubagentCompleted(ctx, params, notify.SubagentStatusError, duration, notify.SubagentTokenUsage{},
+			"", fmt.Sprintf("create session: %s", err))
+		return fantasy.ToolResponse{}, subAgentResult{DurationMs: duration.Milliseconds()}, fmt.Errorf("create session: %w", err)
 	}
 
 	// Call session setup function if provided
@@ -1208,7 +1249,10 @@ func (c *coordinator) runSubAgent(ctx context.Context, params subAgentParams) (f
 
 	providerCfg, ok := c.cfg.Config().Providers.Get(model.ModelCfg.Provider)
 	if !ok {
-		return fantasy.ToolResponse{}, errModelProviderNotConfigured
+		duration := time.Since(startTime)
+		c.publishSubagentCompleted(ctx, params, notify.SubagentStatusError, duration, notify.SubagentTokenUsage{},
+			"", errModelProviderNotConfigured.Error())
+		return fantasy.ToolResponse{}, subAgentResult{DurationMs: duration.Milliseconds()}, errModelProviderNotConfigured
 	}
 
 	// Run the agent
@@ -1233,18 +1277,83 @@ func (c *coordinator) runSubAgent(ctx context.Context, params subAgentParams) (f
 			"duration_ms", duration.Milliseconds(),
 			"error", err,
 		)
-		return fantasy.NewTextErrorResponse(fmt.Sprintf("error generating response: %s", err)), nil
+		c.publishSubagentCompleted(ctx, params, notify.SubagentStatusError, duration, notify.SubagentTokenUsage{},
+			"", err.Error())
+		return fantasy.NewTextErrorResponse(fmt.Sprintf("error generating response: %s", err)),
+			subAgentResult{DurationMs: duration.Milliseconds()},
+			nil
 	}
 	if result == nil {
-		return fantasy.NewTextErrorResponse("sub-agent returned no result (session busy)"), nil
+		c.publishSubagentCompleted(ctx, params, notify.SubagentStatusError, duration, notify.SubagentTokenUsage{},
+			"", "sub-agent returned no result (session busy)")
+		return fantasy.NewTextErrorResponse("sub-agent returned no result (session busy)"),
+			subAgentResult{DurationMs: duration.Milliseconds()},
+			nil
+	}
+
+	meta := subAgentResult{
+		DurationMs: duration.Milliseconds(),
+		Usage:      result.TotalUsage,
 	}
 
 	// Update parent session cost
 	if err := c.updateParentSessionCost(ctx, session.ID, params.SessionID); err != nil {
-		return fantasy.ToolResponse{}, err
+		// Best-effort: still publish a completed event so the UI can move
+		// out of the running state, but include the cost update error in
+		// the payload for observability.
+		c.publishSubagentCompleted(ctx, params, notify.SubagentStatusError, duration, subagentUsageFromTotal(result.TotalUsage),
+			firstLine(result.Response.Content.Text()), err.Error())
+		return fantasy.ToolResponse{}, meta, err
 	}
 
-	return fantasy.NewTextResponse(result.Response.Content.Text()), nil
+	c.publishSubagentCompleted(ctx, params, notify.SubagentStatusSuccess, duration, subagentUsageFromTotal(result.TotalUsage),
+		firstLine(result.Response.Content.Text()), "")
+
+	return fantasy.NewTextResponse(result.Response.Content.Text()), meta, nil
+}
+
+// publishSubagentCompleted emits a SubagentCompleted notification when the
+// coordinator has a notify publisher configured. The call is a no-op when no
+// publisher is wired (e.g. inside tests) so callers do not need to nil-check.
+func (c *coordinator) publishSubagentCompleted(
+	_ context.Context, // reserved for future cancellation propagation
+	params subAgentParams,
+	status notify.SubagentStatus,
+	duration time.Duration,
+	usage notify.SubagentTokenUsage,
+	summary string,
+	errMsg string,
+) {
+	if c.notify == nil {
+		return
+	}
+	c.notify.Publish(pubsub.CreatedEvent, notify.Notification{
+		SessionID: params.SessionID,
+		Type:      notify.TypeSubagentCompleted,
+		SubagentCompleted: &notify.SubagentCompletedEvent{
+			ParentSessionID:  params.SessionID,
+			ParentToolCallID: params.ToolCallID,
+			AgentID:          params.AgentID,
+			SubagentType:     params.SubagentType,
+			Status:           status,
+			DurationMs:       duration.Milliseconds(),
+			Usage:            usage,
+			Summary:          summary,
+			Error:            errMsg,
+		},
+	})
+}
+
+// subagentUsageFromTotal converts a fantasy provider's TotalUsage into the
+// notify package's sub-agent token usage representation.
+func subagentUsageFromTotal(usage fantasy.Usage) notify.SubagentTokenUsage {
+	return notify.SubagentTokenUsage{
+		Input:         usage.InputTokens,
+		Output:        usage.OutputTokens,
+		CacheRead:     usage.CacheReadTokens,
+		CacheCreation: usage.CacheCreationTokens,
+		Total:         usage.TotalTokens,
+	}
 }
 
 // updateParentSessionCost accumulates the cost from a child session to its parent session.
