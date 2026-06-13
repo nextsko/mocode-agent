@@ -1,16 +1,59 @@
+// Package web tests for the WebSocket bridge helpers. The bridge sends
+// JSON-RPC envelopes with literal string keys, so we assert on literal
+// strings instead of pulling them into named constants: that way a failure
+// points at the wire contract, not a test-local constant.
+//
+//nolint:goconst,nestif
 package web
 
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/package-register/mocode/internal/agent/notify"
 	agentexec "github.com/package-register/mocode/internal/agent/tools/builtin/exec"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
 	"github.com/package-register/mocode/internal/tools/shell"
 )
+
+// recorder captures every payload routed through wsSender.Send so tests can
+// assert on the produced JSON-RPC envelopes without standing up a real
+// websocket.Conn.
+type recorder struct {
+	mu      sync.Mutex
+	payload []map[string]any
+}
+
+func (r *recorder) Send(v any) {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.payload = append(r.payload, m)
+}
+
+func (r *recorder) last() map[string]any {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.payload) == 0 {
+		return nil
+	}
+	return r.payload[len(r.payload)-1]
+}
+
+func (r *recorder) all() []map[string]any {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]map[string]any, len(r.payload))
+	copy(out, r.payload)
+	return out
+}
 
 func TestStatusTokenUsageSplitsCachedTokens(t *testing.T) {
 	got := statusTokenUsage(session.Session{
@@ -184,5 +227,162 @@ func TestBuildBackgroundToolResultPayloadTracksRunningState(t *testing.T) {
 func TestBackgroundShellStatusClassifiesInterrupts(t *testing.T) {
 	if got := backgroundShellStatus(true, true, context.Canceled); got != "interrupted" {
 		t.Fatalf("expected interrupted status, got %q", got)
+	}
+}
+
+func TestBridgeSubagentEventWrapsInnerPayload(t *testing.T) {
+	rec := &recorder{}
+	srv := &Server{}
+
+	srv.bridgeSubagentEvent(rec, "tool-1", "agent-7", "coder", "ToolCall", map[string]any{"name": "bash"})
+
+	if got := rec.last(); got == nil {
+		t.Fatal("expected a payload to be sent")
+	} else {
+		if got["method"] != "event" {
+			t.Fatalf("expected method=event, got %#v", got["method"])
+		}
+		params := got["params"].(map[string]any)
+		if params["type"] != "SubagentEvent" {
+			t.Fatalf("expected SubagentEvent, got %#v", params["type"])
+		}
+		payload := params["payload"].(map[string]any)
+		if payload["parent_tool_call_id"] != "tool-1" {
+			t.Fatalf("expected parent_tool_call_id=tool-1, got %#v", payload["parent_tool_call_id"])
+		}
+		if payload["agent_id"] != "agent-7" {
+			t.Fatalf("expected agent_id=agent-7, got %#v", payload["agent_id"])
+		}
+		if payload["subagent_type"] != "coder" {
+			t.Fatalf("expected subagent_type=coder, got %#v", payload["subagent_type"])
+		}
+		inner := payload["event"].(map[string]any)
+		if inner["type"] != "ToolCall" {
+			t.Fatalf("expected inner type ToolCall, got %#v", inner["type"])
+		}
+		innerPayload := inner["payload"].(map[string]any)
+		if innerPayload["name"] != "bash" {
+			t.Fatalf("expected inner payload name=bash, got %#v", innerPayload["name"])
+		}
+	}
+}
+
+func TestBridgeSubagentCompletedEventEmitsStatusAndUsage(t *testing.T) {
+	rec := &recorder{}
+	srv := &Server{}
+
+	srv.bridgeSubagentCompletedEvent(rec, notify.SubagentCompletedEvent{
+		ParentSessionID:  "parent-1",
+		ParentToolCallID: "tool-1",
+		AgentID:          "agent-42",
+		SubagentType:     "explore",
+		Status:           notify.SubagentStatusSuccess,
+		DurationMs:       1234,
+		Usage: notify.SubagentTokenUsage{
+			Input:         100,
+			Output:        50,
+			CacheRead:     25,
+			CacheCreation: 10,
+			Total:         185,
+		},
+		Summary: "explored 3 modules",
+	})
+
+	got := rec.last()
+	if got == nil {
+		t.Fatal("expected a payload to be sent")
+	}
+	params := got["params"].(map[string]any)
+	if params["type"] != "SubagentEvent" {
+		t.Fatalf("expected SubagentEvent, got %#v", params["type"])
+	}
+	payload := params["payload"].(map[string]any)
+	if payload["parent_tool_call_id"] != "tool-1" {
+		t.Fatalf("expected parent_tool_call_id=tool-1, got %#v", payload["parent_tool_call_id"])
+	}
+	inner := payload["event"].(map[string]any)
+	if inner["type"] != "SubagentCompleted" {
+		t.Fatalf("expected SubagentCompleted inner type, got %#v", inner["type"])
+	}
+	innerPayload := inner["payload"].(map[string]any)
+	if innerPayload["status"] != "success" {
+		t.Fatalf("expected status=success, got %#v", innerPayload["status"])
+	}
+	if innerPayload["duration_ms"] != int64(1234) {
+		t.Fatalf("expected duration_ms=1234, got %#v", innerPayload["duration_ms"])
+	}
+	usage := innerPayload["usage"].(map[string]any)
+	if usage["total"] != int64(185) {
+		t.Fatalf("expected total=185, got %#v", usage["total"])
+	}
+	if innerPayload["summary"] != "explored 3 modules" {
+		t.Fatalf("expected summary to round-trip, got %#v", innerPayload["summary"])
+	}
+	if _, hasErr := innerPayload["error"]; hasErr {
+		t.Fatalf("did not expect error key on success event, got %#v", innerPayload["error"])
+	}
+}
+
+func TestBridgeSubagentCompletedEventIncludesErrorOnFailure(t *testing.T) {
+	rec := &recorder{}
+	srv := &Server{}
+
+	srv.bridgeSubagentCompletedEvent(rec, notify.SubagentCompletedEvent{
+		ParentToolCallID: "tool-1",
+		Status:           notify.SubagentStatusError,
+		DurationMs:       500,
+		Usage:            notify.SubagentTokenUsage{Input: 1, Output: 0, Total: 1},
+		Error:            "boom",
+	})
+
+	got := rec.last()
+	if got == nil {
+		t.Fatal("expected a payload to be sent")
+	}
+	inner := got["params"].(map[string]any)["payload"].(map[string]any)["event"].(map[string]any)
+	innerPayload := inner["payload"].(map[string]any)
+	if innerPayload["status"] != "error" {
+		t.Fatalf("expected status=error, got %#v", innerPayload["status"])
+	}
+	if innerPayload["error"] != "boom" {
+		t.Fatalf("expected error=boom, got %#v", innerPayload["error"])
+	}
+	if _, hasSummary := innerPayload["summary"]; hasSummary {
+		t.Fatalf("did not expect summary key on error event, got %#v", innerPayload["summary"])
+	}
+}
+
+func TestBridgeSubagentCompletedEventBlockedStatus(t *testing.T) {
+	rec := &recorder{}
+	srv := &Server{}
+
+	srv.bridgeSubagentCompletedEvent(rec, notify.SubagentCompletedEvent{
+		ParentToolCallID: "tool-1",
+		Status:           notify.SubagentStatusBlocked,
+		DurationMs:       0,
+		Usage:            notify.SubagentTokenUsage{},
+	})
+
+	got := rec.last()
+	if got == nil {
+		t.Fatal("expected a payload to be sent")
+	}
+	innerPayload := got["params"].(map[string]any)["payload"].(map[string]any)["event"].(map[string]any)["payload"].(map[string]any)
+	if innerPayload["status"] != "blocked" {
+		t.Fatalf("expected status=blocked, got %#v", innerPayload["status"])
+	}
+}
+
+func TestRecorderAccumulatesAllPayloads(t *testing.T) {
+	rec := &recorder{}
+	srv := &Server{}
+
+	srv.bridgeSubagentEvent(rec, "tool-1", "", "", "ContentPart", map[string]any{"type": "text"})
+	srv.bridgeSubagentEvent(rec, "tool-1", "", "", "ToolCall", map[string]any{"name": "view"})
+	srv.bridgeSubagentEvent(rec, "tool-1", "", "", "SubagentCompleted", map[string]any{"status": "success"})
+
+	all := rec.all()
+	if len(all) != 3 {
+		t.Fatalf("expected 3 payloads, got %d", len(all))
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/package-register/mocode/internal/agent/notify"
 	agentexec "github.com/package-register/mocode/internal/agent/tools/builtin/exec"
 	"github.com/package-register/mocode/internal/app"
 	"github.com/package-register/mocode/internal/permission"
@@ -77,6 +78,7 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 	msgCh := appInstance.Messages.Subscribe(ctx)
 	permReqCh := appInstance.Permissions.Subscribe(ctx)
 	permNotifCh := appInstance.Permissions.SubscribeNotifications(ctx)
+	agentNotifCh := appInstance.AgentNotifications().Subscribe(ctx)
 	bridgeState := newWSBridgeState(appInstance, sessionID)
 	resumeBackgroundToolStreams(ctx, writer, appInstance, sessionID)
 
@@ -104,6 +106,17 @@ func (s *Server) handleWebSocketStream(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				s.bridgePermissionNotification(writer, ev)
+			case ev, ok := <-agentNotifCh:
+				if !ok {
+					return
+				}
+				if ev.Payload.SessionID != sessionID {
+					continue
+				}
+				if ev.Payload.Type != notify.TypeSubagentCompleted || ev.Payload.SubagentCompleted == nil {
+					continue
+				}
+				s.bridgeSubagentCompletedEvent(writer, *ev.Payload.SubagentCompleted)
 			case <-ctx.Done():
 				return
 			}
@@ -469,6 +482,14 @@ func (s *Server) bridgeQuestionRequest(writer *wsConnWriter, reqID, toolCallID s
 	})
 }
 
+// wsSender is the minimal surface the bridge helpers need to push a JSON-RPC
+// payload to a connected client. *wsConnWriter implements it for production
+// use; tests can substitute a recording implementation to assert on the
+// produced payloads without standing up a real WebSocket.
+type wsSender interface {
+	Send(v any)
+}
+
 // bridgeSubagentEvent sends a SubagentEvent wrapping an inner event from a
 // sub-agent (Agent tool) to the frontend.
 //
@@ -478,8 +499,8 @@ func (s *Server) bridgeQuestionRequest(writer *wsConnWriter, reqID, toolCallID s
 // Frontend expects payload: {parent_tool_call_id, agent_id?, subagent_type?, event: {type, payload}}
 //
 //lint:ignore U1000 — reserved for future use.
-func (s *Server) bridgeSubagentEvent(writer *wsConnWriter, parentToolCallID, agentID, subagentType string, innerType string, innerPayload any) {
-	writer.Send(map[string]any{
+func (s *Server) bridgeSubagentEvent(sender wsSender, parentToolCallID, agentID, subagentType string, innerType string, innerPayload any) {
+	sender.Send(map[string]any{
 		"jsonrpc": "2.0",
 		"method":  "event",
 		"params": map[string]any{
@@ -495,6 +516,42 @@ func (s *Server) bridgeSubagentEvent(writer *wsConnWriter, parentToolCallID, age
 			},
 		},
 	})
+}
+
+// bridgeSubagentCompletedEvent forwards a notify.SubagentCompletedEvent to the
+// web frontend as a SubagentEvent whose inner type is "SubagentCompleted".
+//
+// The frontend already has a processSubagentEvent handler for arbitrary
+// inner events; routing the completed notification through the same channel
+// keeps the contract uniform and lets existing consumer logic drive state
+// transitions on the parent tool call (e.g. subagentRunning -> false).
+func (s *Server) bridgeSubagentCompletedEvent(sender wsSender, ev notify.SubagentCompletedEvent) {
+	payload := map[string]any{
+		"status":      string(ev.Status),
+		"duration_ms": ev.DurationMs,
+		//nolint:goconst // wire keys are intentionally stable for the JS client
+		"usage": map[string]any{
+			"input":          ev.Usage.Input,
+			"output":         ev.Usage.Output,
+			"cache_read":     ev.Usage.CacheRead,
+			"cache_creation": ev.Usage.CacheCreation,
+			"total":          ev.Usage.Total,
+		},
+	}
+	if ev.Summary != "" {
+		payload["summary"] = ev.Summary
+	}
+	if ev.Error != "" {
+		payload["error"] = ev.Error
+	}
+	s.bridgeSubagentEvent(
+		sender,
+		ev.ParentToolCallID,
+		ev.AgentID,
+		ev.SubagentType,
+		"SubagentCompleted",
+		payload,
+	)
 }
 
 func replayHistory(writer *wsConnWriter, sessionID string) {
