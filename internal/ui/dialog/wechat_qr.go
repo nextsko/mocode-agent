@@ -115,7 +115,6 @@ func (d *WeChatQR) StartLogin() {
 				d.sendMsg(ctx, WeChatQRMsg{State: WeChatQRStateLoggedIn, UserID: userID})
 			},
 		}, d.client)
-
 		if err != nil {
 			select {
 			case d.loginDone <- WeChatQRMsg{State: WeChatQRStateError, Error: err.Error()}:

@@ -14,8 +14,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
 	"github.com/package-register/mocode/internal/agent/tools/plugins/search"
+	"github.com/package-register/mocode/internal/agent/toolutil/shared"
 
 	"charm.land/fantasy"
 	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"

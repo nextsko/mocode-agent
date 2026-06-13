@@ -106,4 +106,3 @@ func TestSshListHostsTool_BuildsCleanly(t *testing.T) {
 		t.Fatal("tool is nil")
 	}
 }
-

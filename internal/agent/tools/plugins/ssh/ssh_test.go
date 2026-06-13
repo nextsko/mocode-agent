@@ -218,10 +218,10 @@ func TestResolver_ExplicitForm(t *testing.T) {
 	r := NewResolver(nil)
 
 	cases := []struct {
-		in     string
-		host   string
-		port   int
-		user   string
+		in   string
+		host string
+		port int
+		user string
 	}{
 		{"root@10.0.0.5:2222", "10.0.0.5", 2222, "root"},
 		{"admin@127.0.0.1", "127.0.0.1", 22, "admin"},

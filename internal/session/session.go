@@ -57,8 +57,8 @@ type Session struct {
 	UpdatedAt           int64
 	// AgentToolCallID tracks which tool call created this sub-session (for traceability).
 	// Not persisted as part of the session ID, just metadata.
-	AgentToolCallID     string `json:"-"`
-	AgentMessageID      string `json:"-"`
+	AgentToolCallID string `json:"-"`
+	AgentMessageID  string `json:"-"`
 }
 
 type Service interface {

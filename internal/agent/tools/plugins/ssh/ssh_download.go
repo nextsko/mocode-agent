@@ -30,10 +30,10 @@ type SshDownloadPermissionsParams struct {
 
 // SshDownloadResponseMetadata is the structured response.
 type SshDownloadResponseMetadata struct {
-	Host        string `json:"host"`
-	Remote      string `json:"remote"`
-	Local       string `json:"local"`
-	BytesRead   int64  `json:"bytes_read"`
+	Host      string `json:"host"`
+	Remote    string `json:"remote"`
+	Local     string `json:"local"`
+	BytesRead int64  `json:"bytes_read"`
 }
 
 // NewSshDownloadTool returns a tool that copies remote → local via scp.

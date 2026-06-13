@@ -138,7 +138,7 @@ func TestQuitSummaryMethod(t *testing.T) {
 				Model:     "openai / gpt-4",
 				CWD:       "/tmp/test",
 				SessionID: "sid",
-			AppName:   "TestApp",
+				AppName:   "TestApp",
 			},
 		}
 		require.NotNil(t, ui.pendingQuitSummary)

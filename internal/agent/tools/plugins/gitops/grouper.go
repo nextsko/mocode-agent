@@ -45,11 +45,11 @@ type CommitPlan struct {
 // sub-directory when they exceed maxFilesPerGroup.
 func GroupFiles(result *ScanResult) *CommitPlan {
 	plan := &CommitPlan{
-		Branch:   result.Branch,
-		Ahead:    result.Ahead,
+		Branch:     result.Branch,
+		Ahead:      result.Ahead,
 		TotalFiles: len(result.Files),
-		TotalAdd: result.TotalAdd,
-		TotalDel: result.TotalDel,
+		TotalAdd:   result.TotalAdd,
+		TotalDel:   result.TotalDel,
 	}
 
 	// Step 1: Classify every file

@@ -216,13 +216,6 @@ func (c *Commands) Cursor() *tea.Cursor {
 	return cur
 }
 
-
-
-
-
-
-
-
 // nextCommandType returns the next command type in the cycle.
 
 // previousCommandType returns the previous command type in the cycle.
@@ -231,13 +224,6 @@ func (c *Commands) Cursor() *tea.Cursor {
 
 // flattenItems recursively collects all CommandItems (parents + children)
 // into a flat slice for cross-level fuzzy search.
-
-
-
-
-
-
-
 
 // defaultCommands returns the list of default system commands organized
 // into hierarchical parent/child groups for the top-level command palette.

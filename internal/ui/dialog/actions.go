@@ -118,8 +118,6 @@ type (
 	}
 )
 
-
-
 // ActionCmd represents an action that carries a [tea.Cmd] to be passed to the
 // Bubble Tea program loop.
 type ActionCmd struct {

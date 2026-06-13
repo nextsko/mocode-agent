@@ -18,11 +18,11 @@ var sshExecDescription []byte
 
 // SshExecParams are the inputs the LLM fills in to call the tool.
 type SshExecParams struct {
-	Host         string `json:"host"          description:"SSH host: alias from ~/.ssh/config, 'user@host', or 'user@host:port'"`
-	Command      string `json:"command"       description:"The shell command to execute on the remote host"`
-	WorkingDir   string `json:"working_dir,omitempty"  description:"Remote working directory (defaults to the remote user's home)"`
-	TimeoutSecs  int    `json:"timeout_secs,omitempty" description:"Kill the command after this many seconds (default 30)"`
-	Description  string `json:"description,omitempty"  description:"A short, human-readable description of what this command does"`
+	Host        string `json:"host"          description:"SSH host: alias from ~/.ssh/config, 'user@host', or 'user@host:port'"`
+	Command     string `json:"command"       description:"The shell command to execute on the remote host"`
+	WorkingDir  string `json:"working_dir,omitempty"  description:"Remote working directory (defaults to the remote user's home)"`
+	TimeoutSecs int    `json:"timeout_secs,omitempty" description:"Kill the command after this many seconds (default 30)"`
+	Description string `json:"description,omitempty"  description:"A short, human-readable description of what this command does"`
 }
 
 // SshExecPermissionsParams is the JSON payload sent to the permission
@@ -37,14 +37,14 @@ type SshExecPermissionsParams struct {
 
 // SshExecResponseMetadata is the structured part of the tool response.
 type SshExecResponseMetadata struct {
-	Host        string `json:"host"`
-	Command     string `json:"command"`
-	ExitCode    int    `json:"exit_code"`
-	Stdout      string `json:"stdout,omitempty"`
-	Stderr      string `json:"stderr,omitempty"`
-	DurationMs  int64  `json:"duration_ms"`
-	TimedOut    bool   `json:"timed_out,omitempty"`
-	WorkingDir  string `json:"working_dir,omitempty"`
+	Host       string `json:"host"`
+	Command    string `json:"command"`
+	ExitCode   int    `json:"exit_code"`
+	Stdout     string `json:"stdout,omitempty"`
+	Stderr     string `json:"stderr,omitempty"`
+	DurationMs int64  `json:"duration_ms"`
+	TimedOut   bool   `json:"timed_out,omitempty"`
+	WorkingDir string `json:"working_dir,omitempty"`
 }
 
 // NewSshExecTool returns a fantasy.AgentTool that runs a single command

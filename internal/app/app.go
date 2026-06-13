@@ -117,11 +117,16 @@ func New(ctx context.Context, storeCfg *config.ConfigStore) (*App, error) {
 	}
 
 	// Initialize the project-local error collector.
+	// cfg.Options.DataDirectory is always resolved to an absolute path by
+	// config.setDefaults (see internal/config/load.go), so it is safe to use
+	// it directly here. Joining it with storeCfg.WorkingDir() would produce
+	// an invalid path with two drive letters on Windows (e.g.
+	// "C:\wd\C:\wd\.mocode\errors"), which os.MkdirAll rejects.
 	dataDir := cfg.Options.DataDirectory
 	if dataDir == "" {
-		dataDir = ".mocode"
+		dataDir = filepath.Join(storeCfg.WorkingDir(), ".mocode")
 	}
-	errorsDir := filepath.Join(storeCfg.WorkingDir(), dataDir, "errors")
+	errorsDir := filepath.Join(dataDir, "errors")
 	collector, err := errcoll.New(errorsDir)
 	if err != nil {
 		return nil, fmt.Errorf("init error collector: %w", err)

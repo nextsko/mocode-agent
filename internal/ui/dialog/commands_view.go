@@ -4,10 +4,10 @@ import (
 	"image"
 	"strings"
 
-	tea "charm.land/bubbletea/v2"
-	uv "github.com/charmbracelet/ultraviolet"
-	"charm.land/lipgloss/v2"
 	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/styles"
 )
@@ -130,7 +130,6 @@ func commandPaletteHeader(t *styles.Styles, title, info string, width int) strin
 	return lipgloss.NewStyle().Width(width).Render(title + gap + info)
 }
 
-
 func commandPaletteSeparator(t *styles.Styles, width int) string {
 	return t.Dialog.ListItem.InfoBlurred.Render(strings.Repeat("─", max(0, width)))
 }
@@ -179,4 +178,3 @@ func (c *Commands) breadcrumb() string {
 	}
 	return strings.Join(parts, " ▸ ")
 }
-

@@ -3,9 +3,9 @@ package dialog
 import (
 	"image"
 
-	tea "charm.land/bubbletea/v2"
-	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 	"github.com/package-register/mocode/internal/ui/list"
 )
 

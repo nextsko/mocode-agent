@@ -4,8 +4,8 @@ import (
 	"os"
 	"strings"
 
-	tea "charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/textarea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/editor"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/ui/common"

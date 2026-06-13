@@ -319,9 +319,9 @@ func (c *Client) Exec(ctx context.Context, cmd string, timeout time.Duration) (*
 		}, nil
 	case err := <-done:
 		res := &ExecResult{
-			Stdout:   stdout.String(),
-			Stderr:   stderr.String(),
-			Took:     time.Since(start),
+			Stdout: stdout.String(),
+			Stderr: stderr.String(),
+			Took:   time.Since(start),
 		}
 		if exitErr, ok := err.(*ssh.ExitError); ok {
 			res.ExitCode = exitErr.ExitStatus()

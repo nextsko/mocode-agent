@@ -17,18 +17,20 @@ import (
 )
 
 const (
-	WeChatManagerID = "wechat_manager"
-	wechatManagerMaxWidth  = 88
-	wechatManagerMaxHeight = 24
+	WeChatManagerID              = "wechat_manager"
+	wechatManagerMaxWidth        = 88
+	wechatManagerMaxHeight       = 24
 	wechatManagerRefreshInterval = 2 * time.Second
 )
 
 type WeChatManagerTickMsg time.Time
 
-type ActionWeChatReconnect struct{ AccountID string }
-type ActionWeChatStart struct{ AccountID string }
-type ActionWeChatStop struct{ AccountID string }
-type ActionWeChatDelete struct{ AccountID string }
+type (
+	ActionWeChatReconnect struct{ AccountID string }
+	ActionWeChatStart     struct{ AccountID string }
+	ActionWeChatStop      struct{ AccountID string }
+	ActionWeChatDelete    struct{ AccountID string }
+)
 
 // WeChatManager is a two-panel dialog for managing WeChat accounts.
 //

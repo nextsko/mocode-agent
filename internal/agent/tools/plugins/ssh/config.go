@@ -24,12 +24,12 @@ import (
 // All fields are populated after Resolve(); the only optional field at
 // construction time is Alias (the entry in the user's ssh config).
 type HostSpec struct {
-	Alias       string // the value passed in (may be empty)
-	Host        string // resolved hostname or IP
-	Port        int    // 0 means "use default 22"
-	User        string // empty means "use current OS user"
+	Alias        string // the value passed in (may be empty)
+	Host         string // resolved hostname or IP
+	Port         int    // 0 means "use default 22"
+	User         string // empty means "use current OS user"
 	IdentityFile string // path to private key (may be empty)
-	ProxyJump   string // optional JumpHost
+	ProxyJump    string // optional JumpHost
 }
 
 // String renders the spec in a form suitable for log lines and error

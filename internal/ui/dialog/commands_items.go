@@ -245,13 +245,13 @@ func descriptorsFromCommandItems(items []*CommandItem, category capability.Comma
 				continue
 			}
 			descriptors = append(descriptors, capability.CommandDescriptor{
-				ID:          child.id,
-				Title:       child.title,
-				Shortcut:    child.shortcut,
-				Category:    category,
-				Risk:        risk,
-				Action:      child.action,
-				ParentID:    item.id, // non-empty = child of this parent
+				ID:       child.id,
+				Title:    child.title,
+				Shortcut: child.shortcut,
+				Category: category,
+				Risk:     risk,
+				Action:   child.action,
+				ParentID: item.id, // non-empty = child of this parent
 			})
 		}
 	}
