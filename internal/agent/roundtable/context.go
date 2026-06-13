@@ -64,7 +64,7 @@ func (b *ContextBuilder) BuildTurnPrompt(rt *Roundtable, speaker string) (TurnPr
 
 	context := strings.Join(parts, "\n")
 
-	instructions := `Speak as your role. Be concise. If you want to propose a plan or end the meeting, use a formal motion. During discussion you may only use read-only tools; do not write files or execute commands.`
+	instructions := `Speak as your role. Be concise. If you want to propose a plan or end the meeting, use a formal motion. To vote on the active motion, say "VOTE: yes|no|abstain" optionally followed by a reason. During discussion you may only use read-only tools; do not write files or execute commands.`
 
 	return TurnPrompt{
 		SystemPrompt: system,

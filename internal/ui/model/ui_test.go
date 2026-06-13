@@ -25,6 +25,7 @@ import (
 	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/package-register/mocode/internal/ui/util"
 	"github.com/package-register/mocode/internal/workspace"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -960,4 +961,25 @@ func (w *testWorkspace) AvailableAgents() []workspace.AgentInfo {
 func (w *testWorkspace) InitKnowledge(_ context.Context) ([]string, error) {
 	w.initKnowledgeCalls++
 	return []string{"written.md"}, nil
+}
+
+func TestHandleAgentNotification_Roundtable(t *testing.T) {
+	t.Parallel()
+
+	ui := newTestUIWithConfig(t, &config.Config{})
+	ui.session = &session.Session{ID: "session-a"}
+
+	ui.handleAgentNotification(notify.Notification{
+		Type:         notify.TypeRoundtableTurn,
+		SessionID:    "roundtable-session",
+		SessionTitle: "Design Review",
+	})
+	assert.Equal(t, "roundtable turn: Design Review", ui.agentStatus)
+
+	ui.handleAgentNotification(notify.Notification{
+		Type:         notify.TypeRoundtableFinished,
+		SessionID:    "roundtable-session",
+		SessionTitle: "Design Review",
+	})
+	assert.Empty(t, ui.agentStatus)
 }

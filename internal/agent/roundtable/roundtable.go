@@ -193,11 +193,11 @@ func (rt *Roundtable) DetectLoop(window int) (bool, string) {
 		return true, fmt.Sprintf("speaker %q repeated the same message %d times", first.Speaker, window)
 	}
 
-	// Cycling speaker transitions A -> B -> A -> B.
+	// Cycling speaker transitions A -> B -> A -> B with the same content.
 	if len(recent) >= 4 {
 		cycle := true
 		for i := 2; i < len(recent); i++ {
-			if recent[i].Speaker != recent[i-2].Speaker {
+			if recent[i].Speaker != recent[i-2].Speaker || recent[i].Content != recent[i-2].Content {
 				cycle = false
 				break
 			}

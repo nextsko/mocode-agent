@@ -528,6 +528,7 @@ const maxRecentModelsPerType = 5
 func allToolNames() []string {
 	return []string{
 		"agent",
+		"roundtable",
 		"bash",
 		"mocode_info",
 		"mocode_logs",

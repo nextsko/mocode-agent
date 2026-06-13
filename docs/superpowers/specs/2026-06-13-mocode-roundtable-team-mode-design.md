@@ -1,8 +1,8 @@
 # Mocode Roundtable Team Mode — Design Spec
 
-**Status:** draft  
+**Status:** implemented  
 **Date:** 2026-06-13  
-**Scope:** design-only; implementation requires a follow-up plan after this spec is approved.
+**Scope:** Core engine, coordinator integration, pub/sub events, TUI status updates, persistence, and tests are implemented in `internal/agent/roundtable`, `internal/agent/roundtable_tool.go`, and `internal/ui/model/ui.go`.
 
 ---
 

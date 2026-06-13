@@ -2129,6 +2129,21 @@ func (m *UI) handleAgentNotification(n notify.Notification) tea.Cmd {
 			m.ensureTodoContinuationState(m.session.ID).ReauthBlocked = true
 		}
 		return m.handleReAuthenticate(n.ProviderID)
+	case notify.TypeRoundtableTurn:
+		if m.hasSession() {
+			m.agentStatus = fmt.Sprintf("roundtable turn: %s", n.SessionTitle)
+			m.agentStatusTime = time.Now()
+		}
+		return nil
+	case notify.TypeRoundtableFinished:
+		if m.hasSession() {
+			m.agentStatus = ""
+			m.agentStatusTime = time.Time{}
+		}
+		return m.sendNotification(notification.Notification{
+			Title:   fmt.Sprintf("%s roundtable finished", config.GetAppName(m.com.Config())),
+			Message: fmt.Sprintf("Roundtable %q completed", n.SessionTitle),
+		})
 	default:
 		return nil
 	}

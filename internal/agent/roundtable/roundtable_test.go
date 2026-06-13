@@ -89,8 +89,8 @@ func TestDetectLoop_CyclingSpeakers(t *testing.T) {
 	t.Parallel()
 	rt, _ := New(Config{Topic: "x", Participants: []Participant{{Name: "mod", IsModerator: true}, {Name: "a"}, {Name: "b"}}})
 	for i := 0; i < 4; i++ {
-		rt.AddStatement(Statement{Speaker: "a", Kind: StatementChat, Content: "x"})
-		rt.AddStatement(Statement{Speaker: "b", Kind: StatementChat, Content: "y"})
+		rt.AddStatement(Statement{Speaker: "a", Kind: StatementChat, Content: "same"})
+		rt.AddStatement(Statement{Speaker: "b", Kind: StatementChat, Content: "same"})
 	}
 	ok, reason := rt.DetectLoop(4)
 	require.True(t, ok)
