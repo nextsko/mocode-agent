@@ -90,6 +90,20 @@ If not, please feel free to ignore. Again do not mention this message to the use
 		}
 	}
 
+	// Final safety filter: drop any messages with empty content arrays.
+	// Empty content (e.g. {"role": "assistant", "content": []}) causes
+	// "messages.content.type is invalid" errors on most LLM APIs.
+	filteredHistory := history[:0]
+	for _, msg := range history {
+		if len(msg.Content) == 0 {
+			slog.Warn("Dropping message with empty content before sending to LLM API",
+				"role", msg.Role,
+			)
+			continue
+		}
+		filteredHistory = append(filteredHistory, msg)
+	}
+
 	var files []fantasy.FilePart
 	for _, attachment := range attachments {
 		if attachment.IsText() {
@@ -105,7 +119,7 @@ If not, please feel free to ignore. Again do not mention this message to the use
 		})
 	}
 
-	return history, files
+	return filteredHistory, files
 }
 
 func (a *sessionAgent) getSessionMessages(ctx context.Context, session session.Session) ([]message.Message, error) {

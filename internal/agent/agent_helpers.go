@@ -49,6 +49,24 @@ func filterImagePartsFromMessages(msgs []fantasy.Message) []fantasy.Message {
 	return result
 }
 
+// filterEmptyContentMessages drops any messages with empty content arrays.
+// Sending {"content": []} to LLM APIs causes "messages.content.type is
+// invalid" errors. System messages are preserved (they use a string content
+// field, not an array).
+func filterEmptyContentMessages(msgs []fantasy.Message) []fantasy.Message {
+	filtered := msgs[:0]
+	for _, msg := range msgs {
+		if msg.Role != fantasy.MessageRoleSystem && len(msg.Content) == 0 {
+			slog.Warn("Dropping message with empty content in PrepareStep",
+				"role", msg.Role,
+			)
+			continue
+		}
+		filtered = append(filtered, msg)
+	}
+	return filtered
+}
+
 func filterOrphanedToolResults(m message.Message, knownToolCallIDs map[string]struct{}) (fantasy.Message, bool) {
 	aiMsgs := m.ToAIMessage()
 	if len(aiMsgs) == 0 {

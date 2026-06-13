@@ -518,6 +518,11 @@ func (m *Message) ToAIMessage() []fantasy.Message {
 				MediaType: content.MIMEType,
 			})
 		}
+		// Skip empty user messages — sending {"content": []} causes
+		// "messages.content.type is invalid" errors on most LLM APIs.
+		if len(parts) == 0 {
+			break
+		}
 		messages = append(messages, fantasy.Message{
 			Role:    fantasy.MessageRoleUser,
 			Content: parts,
@@ -555,6 +560,11 @@ func (m *Message) ToAIMessage() []fantasy.Message {
 				ProviderExecuted: call.ProviderExecuted,
 			})
 		}
+		// Skip empty assistant messages — sending {"content": []} causes
+		// "messages.content.type is invalid" errors on most LLM APIs.
+		if len(parts) == 0 {
+			break
+		}
 		messages = append(messages, fantasy.Message{
 			Role:    fantasy.MessageRoleAssistant,
 			Content: parts,
@@ -587,6 +597,11 @@ func (m *Message) ToAIMessage() []fantasy.Message {
 				ToolCallID: result.ToolCallID,
 				Output:     content,
 			})
+		}
+		// Skip empty tool messages — sending {"content": []} causes
+		// "messages.content.type is invalid" errors on most LLM APIs.
+		if len(parts) == 0 {
+			break
 		}
 		messages = append(messages, fantasy.Message{
 			Role:    fantasy.MessageRoleTool,

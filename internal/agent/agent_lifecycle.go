@@ -194,6 +194,10 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 
 			prepared.Messages = a.workaroundProviderMediaLimitations(prepared.Messages, largeModel)
 
+			// Final safety: drop messages with empty content arrays to
+			// prevent "messages.content.type is invalid" API errors.
+			prepared.Messages = filterEmptyContentMessages(prepared.Messages)
+
 			lastSystemRoleInx := 0
 			systemMessageUpdated := false
 			for i, msg := range prepared.Messages {
