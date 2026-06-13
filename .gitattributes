@@ -1,3 +1,6 @@
+# Normalize line endings: always use LF in the repo
+* text=auto eol=lf
+
 *.golden linguist-generated=true -text
 .github/crush-schema.json linguist-generated=true
 internal/agent/testdata/**/*.yaml -diff linguist-generated=true

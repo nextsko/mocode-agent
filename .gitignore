@@ -53,4 +53,5 @@ completions/crush.*sh
 .task
 .mocode/
 .windsurf/
+.superpowers/
 vendor/
