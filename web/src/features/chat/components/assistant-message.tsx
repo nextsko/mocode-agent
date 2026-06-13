@@ -56,6 +56,12 @@ type AssistantMessageProps = {
    * SubagentCompleted event update the UI.
    */
   onCancelSubagent?: (subagentAgentId: string) => void | Promise<void>;
+  /**
+   * Invoked when the user confirms retrying a failed sub-agent. The
+   * host is responsible for re-dispatching the sub-agent; this prop
+   * only controls whether the retry button is rendered.
+   */
+  onRetrySubagent?: (subagentAgentId: string) => void | Promise<void>;
 };
 
 export function AssistantMessage({
@@ -65,6 +71,7 @@ export function AssistantMessage({
   canRespondToApproval,
   blocksExpanded,
   onCancelSubagent,
+  onRetrySubagent,
 }: AssistantMessageProps) {
   const content = useMemo(() => {
     switch (message.variant) {
@@ -241,6 +248,7 @@ const renderToolMessage = ({
               subagentRunSummary={toolCall.subagentRunSummary}
               subagentAgentId={toolCall.subagentAgentId}
               onCancelSubagent={onCancelSubagent}
+              onRetrySubagent={onRetrySubagent}
             />
           ) : null}
           {shouldShowOutput ? (

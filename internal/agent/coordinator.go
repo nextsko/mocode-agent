@@ -101,16 +101,16 @@ type coordinator struct {
 	memory      memory.Service
 	notify      pubsub.Publisher[notify.Notification]
 
-	currentAgent   SessionAgent
-	activeAgentID  string
-	agents         map[string]SessionAgent
+	currentAgent  SessionAgent
+	activeAgentID string
+	agents        map[string]SessionAgent
 	// subagentIndex maps the user-visible sub-agent ID (params.AgentID,
 	// e.g. "<parentToolCallID>-1") to the internal sub-session ID used by
 	// sessionAgent.Cancel. The mapping is populated by runSubAgentWithMeta
 	// before the sub-agent goroutine starts and removed in a defer so
 	// that cancelled sub-agents can be stopped without affecting the
 	// parent session.
-	subagentIndex *csync.Map[string, string]
+	subagentIndex  *csync.Map[string, string]
 	summaryQueue   *sessionSummaryQueue
 	swarmWF        *swarm.WorkflowRuntime // nil if swarm mode not active
 	sessionLogDir  string                 // base dir for session logs

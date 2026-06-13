@@ -18,6 +18,7 @@ import {
   AlertCircleIcon,
   BanIcon,
   CheckIcon,
+  ChevronDownIcon,
   ChevronRightIcon,
   ClockIcon,
   CoinsIcon,
@@ -148,6 +149,14 @@ export type SubagentActivityProps = ComponentProps<"div"> & {
    * success. When unset, the cancel button is hidden.
    */
   onCancelSubagent?: (subagentAgentId: string) => void;
+  /**
+   * Optional callback invoked when the user confirms retrying a failed
+   * sub-agent. The host is responsible for dispatching the retry; this
+   * component only renders the trigger button. The button is hidden
+   * when no terminal error is recorded or when the host does not
+   * provide a handler.
+   */
+  onRetrySubagent?: (subagentAgentId: string) => void;
 };
 
 export const SubagentActivity = memo(
@@ -160,6 +169,7 @@ export const SubagentActivity = memo(
     subagentRunSummary,
     subagentAgentId,
     onCancelSubagent,
+    onRetrySubagent,
     ...props
   }: SubagentActivityProps) => {
     const agentLabel = subagentType
@@ -167,6 +177,13 @@ export const SubagentActivity = memo(
       : "Agent";
     const [isOpen, setIsOpen] = useState(defaultOpen);
     const [confirmCancel, setConfirmCancel] = useState(false);
+    // detailOpen controls an inline detail panel that surfaces the
+    // full token breakdown, raw tool-call input/output and the terminal
+    // error message without leaving the conversation context. It is
+    // independent of the main Collapsible body which always shows the
+    // compressed step list.
+    const [detailOpen, setDetailOpen] = useState(false);
+    const [confirmRetry, setConfirmRetry] = useState(false);
 
     const status = resolveStatus({
       isRunning,
@@ -197,6 +214,24 @@ export const SubagentActivity = memo(
       }
       onCancelSubagent(subagentAgentId);
       setConfirmCancel(false);
+    };
+
+    // The retry button is only actionable when the sub-agent has a
+    // terminal error AND we have a subagentID AND we have a retry
+    // handler. The handler is hidden otherwise to avoid offering
+    // unsupported affordances.
+    const canRetry =
+      status === "error" && !!subagentAgentId && !!onRetrySubagent;
+
+    const handleRetryClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!subagentAgentId || !onRetrySubagent) return;
+      if (!confirmRetry) {
+        setConfirmRetry(true);
+        return;
+      }
+      onRetrySubagent(subagentAgentId);
+      setConfirmRetry(false);
     };
 
     // Compose the secondary line: "step 3/8 · 2,341 tok · 12s" or
@@ -306,6 +341,60 @@ export const SubagentActivity = memo(
               click again to confirm
             </span>
           )}
+          {canRetry && (
+            <button
+              type="button"
+              onClick={handleRetryClick}
+              aria-label={confirmRetry ? "Confirm retry sub-agent" : "Retry sub-agent"}
+              title={
+                confirmRetry
+                  ? "Click again to confirm"
+                  : "Re-dispatch this sub-agent with the same prompt."
+              }
+              className={cn(
+                "ml-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5",
+                "text-muted-foreground hover:text-foreground",
+                "opacity-0 group-hover:opacity-100 focus:opacity-100",
+                "transition-opacity",
+                confirmRetry &&
+                  "opacity-100 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20",
+              )}
+            >
+              <PlayIcon className="size-3" />
+              <span>{confirmRetry ? "Confirm retry" : "Retry"}</span>
+            </button>
+          )}
+          {/* The detail panel button is only useful when there is at
+              least one terminal piece of information to show: a summary
+              (duration/usage/error) or any tool-call output. While the
+              sub-agent is still streaming without any of that, the
+              inline Collapsible body is enough. */}
+          {(subagentRunSummary ||
+            steps.some((s) => s.kind === "tool-call")) && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDetailOpen((v) => !v);
+              }}
+              aria-label={detailOpen ? "Hide sub-agent details" : "Show sub-agent details"}
+              aria-expanded={detailOpen}
+              className={cn(
+                "ml-0.5 inline-flex items-center gap-1 rounded px-1.5 py-0.5",
+                "text-muted-foreground hover:text-foreground",
+                "opacity-0 group-hover:opacity-100 focus:opacity-100",
+                "transition-opacity",
+                detailOpen && "opacity-100",
+              )}
+            >
+              {detailOpen ? (
+                <ChevronDownIcon className="size-3" />
+              ) : (
+                <ChevronRightIcon className="size-3" />
+              )}
+              <span>{detailOpen ? "Hide details" : "Details"}</span>
+            </button>
+          )}
           <ChevronRightIcon
             className={cn(
               "size-3 text-muted-foreground transition-transform duration-200",
@@ -330,6 +419,12 @@ export const SubagentActivity = memo(
           ))}
           {subagentRunSummary && (
             <SubagentRunFooter summary={subagentRunSummary} />
+          )}
+          {detailOpen && (
+            <SubagentDetailPanel
+              steps={steps}
+              summary={subagentRunSummary}
+            />
           )}
         </CollapsibleContent>
       </Collapsible>
@@ -365,6 +460,134 @@ const SubagentRunFooter = ({ summary }: { summary: SubagentRunSummary }) => {
           <CoinsIcon className="size-2.5" />
           {formatTokenCount(tokens)} tokens
         </span>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// SubagentDetailPanel — inline detail surface that shows the full token
+// breakdown, every tool-call input/output and the terminal error. Lives
+// in-place so the user never has to navigate away from the conversation
+// context (per design.md §Phase 2 详情抽屉).
+// ---------------------------------------------------------------------------
+
+function formatJson(value: unknown): string {
+  if (value === undefined) return "(no input)";
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+const SubagentDetailPanel = ({
+  steps,
+  summary,
+}: {
+  steps: SubagentStep[];
+  summary?: SubagentRunSummary;
+}) => {
+  const toolCalls = steps.filter(
+    (s): s is Extract<SubagentStep, { kind: "tool-call" }> =>
+      s.kind === "tool-call",
+  );
+  const hasToolCalls = toolCalls.length > 0;
+  const hasSummary = summary !== undefined;
+
+  if (!hasToolCalls && !hasSummary) {
+    return null;
+  }
+
+  return (
+    <div className="mt-1.5 rounded border border-border/60 bg-muted/20 p-2 text-xs space-y-2">
+      {hasSummary && (
+        <div className="space-y-1">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Run summary
+          </div>
+          <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 tabular-nums">
+            <dt className="text-muted-foreground">status</dt>
+            <dd className="font-medium">{summary!.status}</dd>
+            <dt className="text-muted-foreground">duration</dt>
+            <dd>{formatDuration(summary!.durationMs)}</dd>
+            <dt className="text-muted-foreground">total tokens</dt>
+            <dd>{formatTokenCount(summary!.usage.total)}</dd>
+            <dt className="text-muted-foreground">in / out</dt>
+            <dd>
+              {formatTokenCount(summary!.usage.input)} in ·{" "}
+              {formatTokenCount(summary!.usage.output)} out
+            </dd>
+            <dt className="text-muted-foreground">cache read</dt>
+            <dd>{formatTokenCount(summary!.usage.cache_read)}</dd>
+            <dt className="text-muted-foreground">cache creation</dt>
+            <dd>{formatTokenCount(summary!.usage.cache_creation)}</dd>
+            {summary!.summary && (
+              <>
+                <dt className="text-muted-foreground">summary</dt>
+                <dd className="whitespace-pre-wrap break-words">
+                  {summary!.summary}
+                </dd>
+              </>
+            )}
+            {summary!.error && (
+              <>
+                <dt className="text-muted-foreground text-destructive">error</dt>
+                <dd className="whitespace-pre-wrap break-words text-destructive">
+                  {summary!.error}
+                </dd>
+              </>
+            )}
+          </dl>
+        </div>
+      )}
+      {hasToolCalls && (
+        <div className="space-y-1">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Tool calls ({toolCalls.length})
+          </div>
+          <ol className="space-y-1.5 pl-0 list-none">
+            {toolCalls.map((tc, idx) => (
+              <li
+                key={tc.toolCallId || `tc-${idx}`}
+                className="rounded border border-border/40 bg-background/40 p-1.5"
+              >
+                <div className="flex items-center gap-1 text-foreground/80">
+                  <span className="text-muted-foreground/60 tabular-nums">
+                    {idx + 1}.
+                  </span>
+                  <span className="font-medium">{tc.toolName}</span>
+                  <span className="text-muted-foreground text-[10px] ml-1">
+                    · {tc.status}
+                  </span>
+                </div>
+                {tc.input !== undefined && (
+                  <pre className="mt-1 max-h-32 overflow-y-auto rounded bg-muted/40 p-1 text-[10px] leading-relaxed text-foreground/70 whitespace-pre-wrap break-words">
+                    {formatJson(tc.input)}
+                  </pre>
+                )}
+                {tc.output && (
+                  <div className="mt-1">
+                    <div className="text-[10px] text-muted-foreground">
+                      output
+                    </div>
+                    <pre className="max-h-40 overflow-y-auto rounded bg-muted/40 p-1 text-[10px] leading-relaxed text-foreground/70 whitespace-pre-wrap break-words">
+                      {tc.output}
+                    </pre>
+                  </div>
+                )}
+                {tc.errorText && (
+                  <div className="mt-1">
+                    <div className="text-[10px] text-destructive">error</div>
+                    <pre className="max-h-40 overflow-y-auto rounded bg-destructive/10 p-1 text-[10px] leading-relaxed text-destructive whitespace-pre-wrap break-words">
+                      {tc.errorText}
+                    </pre>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
     </div>
   );
