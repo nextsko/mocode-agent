@@ -1315,8 +1315,14 @@ func (c *coordinator) runSubAgentWithMeta(ctx context.Context, params subAgentPa
 // publishSubagentCompleted emits a SubagentCompleted notification when the
 // coordinator has a notify publisher configured. The call is a no-op when no
 // publisher is wired (e.g. inside tests) so callers do not need to nil-check.
+//
+// The context argument is intentionally unused today: pubsub.Publish is
+// non-blocking and discards events when no subscribers are attached, so
+// cancellation should not gate emission. It is part of the signature so
+// future refinements (e.g. honouring a parent ctx when bridging to a
+// downstream that may block) can adopt it without churning call sites.
 func (c *coordinator) publishSubagentCompleted(
-	_ context.Context, // reserved for future cancellation propagation
+	_ context.Context, // reserved for future cancellation propagation; see doc comment
 	params subAgentParams,
 	status notify.SubagentStatus,
 	duration time.Duration,

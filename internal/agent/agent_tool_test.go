@@ -145,3 +145,22 @@ func TestFromFantasyUsage_EmptyReturnsNil(t *testing.T) {
 		t.Errorf("expected nil for empty usage, got %#v", got)
 	}
 }
+
+// TestFromFantasyUsage_CacheOnlyUsageIsNotDropped 验证 cache-only 流量不被
+// 误判为"零 usage"而丢失——某些 provider 会在 input/output/total 都是 0
+// 的情况下仍记录 cache_read / cache_creation 命中。
+func TestFromFantasyUsage_CacheOnlyUsageIsNotDropped(t *testing.T) {
+	got := FromFantasyUsage(fantasy.Usage{
+		CacheReadTokens:     100,
+		CacheCreationTokens: 5,
+	})
+	if got == nil {
+		t.Fatal("expected non-nil conversion for cache-only usage")
+	}
+	if got.CacheRead != 100 {
+		t.Errorf("expected cache_read 100, got %d", got.CacheRead)
+	}
+	if got.CacheCreation != 5 {
+		t.Errorf("expected cache_creation 5, got %d", got.CacheCreation)
+	}
+}

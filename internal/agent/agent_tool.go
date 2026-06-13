@@ -92,9 +92,18 @@ func (u *TaskUsage) ToNotifyUsage() notify.SubagentTokenUsage {
 }
 
 // FromFantasyUsage converts a fantasy.Usage into the wire-level TaskUsage
-// representation. The conversion is total-loss free for the numeric fields.
+// representation. Returns nil when every token bucket is zero, so the wire
+// envelope (which uses omitempty) can suppress the "usage" key entirely
+// for runs that produced no measurable usage. The check covers all five
+// buckets — Total, Input, Output, CacheRead, CacheCreation — because some
+// providers can bill cache-only traffic that leaves Total/Input/Output at
+// zero but reports non-zero cache reads or creations.
 func FromFantasyUsage(u fantasy.Usage) *TaskUsage {
-	if u.TotalTokens == 0 && u.InputTokens == 0 && u.OutputTokens == 0 {
+	if u.TotalTokens == 0 &&
+		u.InputTokens == 0 &&
+		u.OutputTokens == 0 &&
+		u.CacheReadTokens == 0 &&
+		u.CacheCreationTokens == 0 {
 		return nil
 	}
 	return &TaskUsage{
@@ -508,15 +517,18 @@ func (c *coordinator) runSubAgentDAG(ctx context.Context, params subAgentBatchPa
 		t := params.Tasks[i]
 		tr := TaskResult{DurationMs: durations[i], Usage: usages[i]}
 		switch {
+		case results[i] == "":
+			// Empty result wins over status flags: a failed/blocked task
+			// with no captured message is more usefully described as
+			// "empty result" than as an empty Error string.
+			tr.Status = TaskResultStatusError
+			tr.Error = "empty result"
 		case blocked[t.ID]:
 			tr.Status = TaskResultStatusBlocked
 			tr.Error = strings.TrimPrefix(results[i], "blocked: ")
 		case failed[t.ID] || strings.HasPrefix(results[i], "error:"):
 			tr.Status = TaskResultStatusError
 			tr.Error = strings.TrimPrefix(results[i], "error: ")
-		case results[i] == "":
-			tr.Status = TaskResultStatusError
-			tr.Error = "empty result"
 		default:
 			tr.Status = TaskResultStatusSuccess
 			tr.Summary = firstLine(results[i])

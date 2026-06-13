@@ -55,6 +55,11 @@ export type SubagentRunStatus =
 /**
  * SubagentTokenUsage is the wire-level token usage reported on each
  * SubagentCompleted event. Mirrors the backend's notify.SubagentTokenUsage.
+ *
+ * NOTE: the backend emits int64 values. The JSON wire format encodes them
+ * as plain numbers, which the JavaScript client receives as IEEE-754
+ * doubles. Token counts well under Number.MAX_SAFE_INTEGER (2^53 - 1)
+ * round-trip exactly, which holds for every realistic LLM run today.
  */
 export type SubagentTokenUsage = {
   input: number;
