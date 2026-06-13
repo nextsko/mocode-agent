@@ -658,6 +658,23 @@ func (c *Client) CancelAgentSession(ctx context.Context, id string, sessionID st
 	return nil
 }
 
+// CancelAgentSubagent stops a single sub-agent dispatched by the Agent
+// tool. subagentID is the user-visible identifier reported on
+// SubagentCompleted events (e.g. "<parentToolCallID>-1"). The parent
+// session is left running. No-op when the sub-agent is unknown or
+// already finished.
+func (c *Client) CancelAgentSubagent(ctx context.Context, id string, subagentID string) error {
+	rsp, err := c.post(ctx, fmt.Sprintf("/workspaces/%s/agent/subagents/%s/cancel", id, subagentID), nil, nil, nil)
+	if err != nil {
+		return fmt.Errorf("failed to cancel agent subagent: %w", err)
+	}
+	defer rsp.Body.Close()
+	if rsp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to cancel agent subagent: status code %d", rsp.StatusCode)
+	}
+	return nil
+}
+
 // GetAgentSessionQueuedPromptsList retrieves the list of queued prompt
 // strings for a session.
 func (c *Client) GetAgentSessionQueuedPromptsList(ctx context.Context, id string, sessionID string) ([]string, error) {

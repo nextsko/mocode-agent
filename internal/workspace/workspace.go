@@ -91,6 +91,12 @@ type Workspace interface {
 	// Agent
 	AgentRun(ctx context.Context, sessionID, prompt string, attachments ...message.Attachment) error
 	AgentCancel(sessionID string)
+	// AgentCancelSubagent stops a single sub-agent dispatched by the
+	// Agent tool. subagentID is the user-visible identifier reported
+	// on SubagentCompleted events (e.g. "<parentToolCallID>-1"). The
+	// parent session is left running. No-op when the sub-agent is
+	// unknown or already finished.
+	AgentCancelSubagent(subagentID string)
 	AgentIsBusy() bool
 	AgentIsSessionBusy(sessionID string) bool
 	AgentModel() AgentModel

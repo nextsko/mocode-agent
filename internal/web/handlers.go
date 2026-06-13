@@ -767,6 +767,20 @@ func (s *Server) handleGetStartupDir(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, dir)
 }
 
+// handleCancelSubagent stops a single sub-agent dispatched by the Agent
+// tool. The sub-agent's subagentID is the user-visible identifier reported
+// on SubagentCompleted events (e.g. "<parentToolCallID>-1"); the parent
+// session is left running.
+func (s *Server) handleCancelSubagent(w http.ResponseWriter, r *http.Request) {
+	subagentID := r.PathValue("subagent_id")
+	if subagentID == "" {
+		writeError(w, http.StatusBadRequest, "missing subagent_id")
+		return
+	}
+	s.workspace.AgentCancelSubagent(subagentID)
+	writeJSON(w, map[string]any{"ok": true, "subagent_id": subagentID})
+}
+
 // --- Open in ---
 
 func (s *Server) handleOpenIn(w http.ResponseWriter, r *http.Request) {

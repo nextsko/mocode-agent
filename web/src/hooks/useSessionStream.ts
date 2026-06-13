@@ -647,6 +647,54 @@ export function useSessionStream(
     [baseUrl, sessionId],
   );
 
+  const cancelSubagent = useCallback(
+    async (subagentID: string): Promise<void> => {
+      if (!sessionId) {
+        throw new Error("No session selected");
+      }
+      if (!subagentID) {
+        return;
+      }
+      const basePath = baseUrl ?? getApiBaseUrl();
+      const token = getAuthToken();
+      const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+      const url = `${basePath}/api/sessions/${encodeURIComponent(
+        sessionId,
+      )}/subagents/${encodeURIComponent(subagentID)}/cancel${tokenParam}`;
+
+      const headers: Record<string, string> = {
+        Accept: "application/json",
+      };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const rsp = await fetch(url, {
+        method: "POST",
+        headers,
+      });
+      if (!rsp.ok) {
+        let message = `cancelSubagent failed: HTTP ${rsp.status}`;
+        try {
+          const data = (await rsp.json()) as { detail?: string; error?: string };
+          if (typeof data?.detail === "string") {
+            message = data.detail;
+          } else if (typeof data?.error === "string") {
+            message = data.error;
+          }
+        } catch {
+          // body not JSON; keep the default message
+        }
+        throw new Error(message);
+      }
+      // The terminal SubagentCompleted event arrives over the WebSocket
+      // and updates subagentRunSummary via the normal flow, so we do
+      // not patch local state here. The bridge in Phase 1 already
+      // surfaces the cancelled state to the UI.
+    },
+    [baseUrl, sessionId],
+  );
+
   const parseUserInput = useCallback(
     (input: string | ContentPart[]): ParsedUserInput => {
       if (typeof input === "string") {
@@ -3183,6 +3231,7 @@ export function useSessionStream(
     respondToApproval,
     respondToQuestion,
     cancel,
+    cancelSubagent,
     disconnect,
     reconnect,
     connect,

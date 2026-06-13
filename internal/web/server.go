@@ -193,6 +193,8 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/sessions/{session_id}/generate-title", s.handleGenerateTitle)
 	mux.HandleFunc("POST /api/sessions/{session_id}/fork", s.handleForkSession)
 	mux.HandleFunc("GET /api/sessions/{session_id}/git-diff", s.handleGitDiff)
+	// Stop a single sub-agent dispatched by the Agent tool.
+	mux.HandleFunc("POST /api/sessions/{session_id}/subagents/{subagent_id}/cancel", s.handleCancelSubagent)
 
 	// Work dirs
 	mux.HandleFunc("GET /api/work-dirs/", s.handleListWorkDirs)

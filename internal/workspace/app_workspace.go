@@ -11,8 +11,8 @@ import (
 	"github.com/package-register/mocode/internal/agent"
 	mcptools "github.com/package-register/mocode/internal/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/app"
-	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/capability"
+	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/history"
 	"github.com/package-register/mocode/internal/knowledge/kngs"
@@ -139,6 +139,12 @@ func (w *AppWorkspace) AgentRun(ctx context.Context, sessionID, prompt string, a
 func (w *AppWorkspace) AgentCancel(sessionID string) {
 	if w.app.AgentCoordinator != nil {
 		w.app.AgentCoordinator.Cancel(sessionID)
+	}
+}
+
+func (w *AppWorkspace) AgentCancelSubagent(subagentID string) {
+	if w.app.AgentCoordinator != nil {
+		w.app.AgentCoordinator.CancelSubagent(subagentID)
 	}
 }
 
@@ -529,12 +535,12 @@ func (w *AppWorkspace) BuildCommandRegistry() []capability.CommandDescriptor {
 	if mcpPrompts, err := commands.LoadMCPPrompts(); err == nil {
 		for _, prompt := range mcpPrompts {
 			mcpDescs = append(mcpDescs, capability.CommandDescriptor{
-				ID: "mcp_" + prompt.ID,
+				ID:    "mcp_" + prompt.ID,
 				Title: prompt.Title, Description: prompt.Description,
-				Category: capability.CommandCategoryMCP,
+				Category:  capability.CommandCategoryMCP,
 				Arguments: prompt.Arguments,
-				Risk: capability.RiskLevelNetwork,
-				Provider: capability.ProviderInfo{ID: "mcp-" + prompt.ClientID, Name: prompt.ClientID, Kind: capability.ProviderKindMCP},
+				Risk:      capability.RiskLevelNetwork,
+				Provider:  capability.ProviderInfo{ID: "mcp-" + prompt.ClientID, Name: prompt.ClientID, Kind: capability.ProviderKindMCP},
 			})
 		}
 	}

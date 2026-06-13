@@ -23,6 +23,7 @@ import (
 	"github.com/package-register/mocode/internal/agent/prompt"
 	"github.com/package-register/mocode/internal/agent/tools"
 	"github.com/package-register/mocode/internal/config"
+	"github.com/package-register/mocode/internal/csync"
 	"github.com/package-register/mocode/internal/errcoll"
 	"github.com/package-register/mocode/internal/evolution"
 	"github.com/package-register/mocode/internal/filetracker"
@@ -72,6 +73,11 @@ type Coordinator interface {
 	SetMainAgent(agentID string) error
 	Run(ctx context.Context, sessionID, prompt string, attachments ...message.Attachment) (*fantasy.AgentResult, error)
 	Cancel(sessionID string)
+	// CancelSubagent stops a single sub-agent dispatched by the Agent
+	// tool without cancelling the parent session. subagentID is the
+	// user-visible identifier (params.AgentID), e.g. "<parentToolCallID>-1".
+	// No-op when the sub-agent is unknown or already finished.
+	CancelSubagent(subagentID string)
 	CancelAll()
 	IsSessionBusy(sessionID string) bool
 	IsBusy() bool
@@ -98,6 +104,13 @@ type coordinator struct {
 	currentAgent   SessionAgent
 	activeAgentID  string
 	agents         map[string]SessionAgent
+	// subagentIndex maps the user-visible sub-agent ID (params.AgentID,
+	// e.g. "<parentToolCallID>-1") to the internal sub-session ID used by
+	// sessionAgent.Cancel. The mapping is populated by runSubAgentWithMeta
+	// before the sub-agent goroutine starts and removed in a defer so
+	// that cancelled sub-agents can be stopped without affecting the
+	// parent session.
+	subagentIndex *csync.Map[string, string]
 	summaryQueue   *sessionSummaryQueue
 	swarmWF        *swarm.WorkflowRuntime // nil if swarm mode not active
 	sessionLogDir  string                 // base dir for session logs
@@ -149,6 +162,7 @@ func NewCoordinator(
 		memory:         memory,
 		notify:         notify,
 		agents:         make(map[string]SessionAgent),
+		subagentIndex:  csync.NewMap[string, string](),
 		summaryQueue:   sessionSummaryQueueNew(),
 		allSkills:      allSkills,
 		activeSkills:   activeSkills,
@@ -1061,6 +1075,26 @@ func (c *coordinator) Cancel(sessionID string) {
 	c.currentAgent.Cancel(sessionID)
 }
 
+// CancelSubagent stops a single sub-agent dispatched by the Agent tool,
+// identified by its user-visible subagentID (params.AgentID, e.g.
+// "<parentToolCallID>-1"). The parent session is left running.
+//
+// The mapping from subagentID to internal sub-session ID is maintained by
+// runSubAgentWithMeta and removed in a defer. If the subagentID is
+// unknown (already completed, never registered, or never ran in this
+// process) the call is a silent no-op — that matches the behaviour of
+// sessionAgent.Cancel for arbitrary session IDs.
+func (c *coordinator) CancelSubagent(subagentID string) {
+	if subagentID == "" || c.subagentIndex == nil {
+		return
+	}
+	subSessionID, ok := c.subagentIndex.Take(subagentID)
+	if !ok || subSessionID == "" {
+		return
+	}
+	c.currentAgent.Cancel(subSessionID)
+}
+
 func (c *coordinator) CancelAll() {
 	c.currentAgent.CancelAll()
 }
@@ -1255,6 +1289,15 @@ func (c *coordinator) runSubAgentWithMeta(ctx context.Context, params subAgentPa
 		return fantasy.ToolResponse{}, subAgentResult{DurationMs: duration.Milliseconds()}, errModelProviderNotConfigured
 	}
 
+	// Register the sub-agent in the index so an external caller can stop
+	// it via CancelSubagent without cancelling the parent session. The
+	// entry is removed when the agent run returns — whether the run
+	// finishes, errors out, or the sub-agent is cancelled.
+	if params.AgentID != "" && c.subagentIndex != nil {
+		c.subagentIndex.Set(params.AgentID, agentToolSessionID)
+		defer c.subagentIndex.Del(params.AgentID)
+	}
+
 	// Run the agent
 	result, err := params.Agent.Run(ctx, SessionAgentCall{
 		SessionID:        session.ID,
@@ -1271,13 +1314,24 @@ func (c *coordinator) runSubAgentWithMeta(ctx context.Context, params subAgentPa
 	duration := time.Since(startTime)
 
 	if err != nil {
+		// Distinguish user-initiated cancellation from a real error so
+		// the frontend can show the right terminal state. ctx.Err() is
+		// non-nil whenever the sub-agent's own ctx was cancelled
+		// (CancelSubagent) or its parent ctx was cancelled (parent
+		// session cancelled). In either case the LLM client returns a
+		// wrapped error and we want to label it cancelled, not error.
+		status := notify.SubagentStatusError
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			status = notify.SubagentStatusCancelled
+		}
 		slog.Warn("Sub-agent failed",
 			"sub_session", session.ID,
 			"tool_call_id", params.ToolCallID,
 			"duration_ms", duration.Milliseconds(),
+			"status", string(status),
 			"error", err,
 		)
-		c.publishSubagentCompleted(ctx, params, notify.SubagentStatusError, duration, notify.SubagentTokenUsage{},
+		c.publishSubagentCompleted(ctx, params, status, duration, notify.SubagentTokenUsage{},
 			"", err.Error())
 		return fantasy.NewTextErrorResponse(fmt.Sprintf("error generating response: %s", err)),
 			subAgentResult{DurationMs: duration.Milliseconds()},

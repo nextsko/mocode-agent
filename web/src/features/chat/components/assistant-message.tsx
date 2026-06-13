@@ -50,6 +50,12 @@ type AssistantMessageProps = {
   onApprovalAction?: AssistantApprovalHandler;
   canRespondToApproval: boolean;
   blocksExpanded: boolean;
+  /**
+   * Invoked when the user confirms stopping a sub-agent. The host
+   * component is expected to dispatch the cancel request and let the
+   * SubagentCompleted event update the UI.
+   */
+  onCancelSubagent?: (subagentAgentId: string) => void | Promise<void>;
 };
 
 export function AssistantMessage({
@@ -58,6 +64,7 @@ export function AssistantMessage({
   onApprovalAction,
   canRespondToApproval,
   blocksExpanded,
+  onCancelSubagent,
 }: AssistantMessageProps) {
   const content = useMemo(() => {
     switch (message.variant) {
@@ -232,6 +239,8 @@ const renderToolMessage = ({
               defaultOpen={blocksExpanded}
               subagentType={toolCall.subagentType}
               subagentRunSummary={toolCall.subagentRunSummary}
+              subagentAgentId={toolCall.subagentAgentId}
+              onCancelSubagent={onCancelSubagent}
             />
           ) : null}
           {shouldShowOutput ? (

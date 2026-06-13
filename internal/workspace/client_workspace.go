@@ -13,8 +13,8 @@ import (
 	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"
 	"github.com/package-register/mocode/internal/agent/notify"
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
-	"github.com/package-register/mocode/internal/client"
 	"github.com/package-register/mocode/internal/capability"
+	"github.com/package-register/mocode/internal/client"
 	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/history"
@@ -209,6 +209,10 @@ func (w *ClientWorkspace) AgentRun(ctx context.Context, sessionID, prompt string
 
 func (w *ClientWorkspace) AgentCancel(sessionID string) {
 	_ = w.client.CancelAgentSession(context.Background(), w.workspaceID(), sessionID)
+}
+
+func (w *ClientWorkspace) AgentCancelSubagent(subagentID string) {
+	_ = w.client.CancelAgentSubagent(context.Background(), w.workspaceID(), subagentID)
 }
 
 func (w *ClientWorkspace) AgentIsBusy() bool {

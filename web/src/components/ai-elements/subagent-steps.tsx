@@ -134,6 +134,20 @@ export type SubagentActivityProps = ComponentProps<"div"> & {
   subagentType?: string;
   /** Terminal run summary, populated from a SubagentCompleted event. */
   subagentRunSummary?: SubagentRunSummary;
+  /**
+   * Sub-agent instance ID, used to address CancelSubagent. The parent
+   * session ID comes from LiveMessage.sessionID upstream; we don't need
+   * it here because the cancel handler is wired at the parent tool-call
+   * level.
+   */
+  subagentAgentId?: string;
+  /**
+   * Optional callback invoked when the user clicks the cancel button. The
+   * host component is responsible for issuing the actual HTTP request
+   * to the backend and for refreshing the live subagentRunSummary on
+   * success. When unset, the cancel button is hidden.
+   */
+  onCancelSubagent?: (subagentAgentId: string) => void;
 };
 
 export const SubagentActivity = memo(
@@ -144,12 +158,15 @@ export const SubagentActivity = memo(
     defaultOpen = false,
     subagentType,
     subagentRunSummary,
+    subagentAgentId,
+    onCancelSubagent,
     ...props
   }: SubagentActivityProps) => {
     const agentLabel = subagentType
       ? `${subagentType.charAt(0).toUpperCase() + subagentType.slice(1)} agent`
       : "Agent";
     const [isOpen, setIsOpen] = useState(defaultOpen);
+    const [confirmCancel, setConfirmCancel] = useState(false);
 
     const status = resolveStatus({
       isRunning,
@@ -164,6 +181,23 @@ export const SubagentActivity = memo(
     const hasError =
       subagentRunSummary?.status === "error" ||
       steps.some((s) => s.kind === "tool-call" && s.status === "error");
+
+    // The cancel button is only actionable when the sub-agent is still
+    // running AND we have a subagentID AND we have a cancel handler.
+    const canCancel =
+      status === "running" && !subagentRunSummary && !!subagentAgentId && !!onCancelSubagent;
+
+    const handleCancelClick = (e: React.MouseEvent) => {
+      // Stop the click from bubbling up to the Collapsible trigger.
+      e.stopPropagation();
+      if (!subagentAgentId || !onCancelSubagent) return;
+      if (!confirmCancel) {
+        setConfirmCancel(true);
+        return;
+      }
+      onCancelSubagent(subagentAgentId);
+      setConfirmCancel(false);
+    };
 
     // Compose the secondary line: "step 3/8 · 2,341 tok · 12s" or
     // "4 tool calls · 12s" when no run summary is present.
@@ -242,6 +276,34 @@ export const SubagentActivity = memo(
               title={subagentRunSummary.error}
             >
               <AlertCircleIcon className="size-3" />
+            </span>
+          )}
+          {canCancel && (
+            <button
+              type="button"
+              onClick={handleCancelClick}
+              aria-label={confirmCancel ? "Confirm stop sub-agent" : "Stop sub-agent"}
+              title={
+                confirmCancel
+                  ? "Click again to confirm"
+                  : "Stop this sub-agent. Main task will continue."
+              }
+              className={cn(
+                "ml-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5",
+                "text-muted-foreground hover:text-foreground",
+                "opacity-0 group-hover:opacity-100 focus:opacity-100",
+                "transition-opacity",
+                confirmCancel &&
+                  "opacity-100 bg-destructive/10 text-destructive hover:bg-destructive/20",
+              )}
+            >
+              <XIcon className="size-3" />
+              <span>{confirmCancel ? "Confirm stop" : "Stop"}</span>
+            </button>
+          )}
+          {confirmCancel && (
+            <span className="text-[10px] text-muted-foreground/70 italic">
+              click again to confirm
             </span>
           )}
           <ChevronRightIcon
