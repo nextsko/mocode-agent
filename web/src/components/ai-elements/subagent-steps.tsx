@@ -1,9 +1,13 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import type { SubagentStep } from "@/hooks/types";
+import type {
+  SubagentRunStatus,
+  SubagentRunSummary,
+  SubagentStep,
+} from "@/hooks/types";
 import type { ComponentProps } from "react";
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -11,11 +15,112 @@ import {
 } from "@/components/ui/collapsible";
 import { Shimmer } from "./shimmer";
 import {
+  AlertCircleIcon,
+  BanIcon,
   CheckIcon,
   ChevronRightIcon,
+  ClockIcon,
+  CoinsIcon,
   Loader2Icon,
+  PauseIcon,
+  PlayIcon,
   XIcon,
 } from "lucide-react";
+
+// ---------------------------------------------------------------------------
+// Status visual language
+// ---------------------------------------------------------------------------
+//
+// Each SubAgent run has a single terminal status that drives colour, icon
+// and animation. The mapping is intentionally narrow so that the muscle
+// memory (blue=in flight, green=done, red=failed, amber=waiting, grey=stopped)
+// carries across surfaces.
+
+export type SubagentStatusStyle = {
+  dotClass: string;
+  textClass: string;
+  icon: ComponentProps<"span">["children"];
+  label: (agentLabel: string) => string;
+  isAnimated: boolean;
+};
+
+const STATUS_STYLES: Record<SubagentRunStatus, SubagentStatusStyle> = {
+  running: {
+    dotClass: "bg-blue-500 animate-pulse",
+    textClass: "text-blue-600 dark:text-blue-400",
+    icon: <Loader2Icon className="size-3 animate-spin" />,
+    label: (a) => `${a} working`,
+    isAnimated: true,
+  },
+  blocked: {
+    dotClass: "bg-amber-500",
+    textClass: "text-amber-600 dark:text-amber-400",
+    icon: <PauseIcon className="size-3" />,
+    label: (a) => `${a} blocked`,
+    isAnimated: false,
+  },
+  success: {
+    dotClass: "bg-emerald-500",
+    textClass: "text-emerald-600 dark:text-emerald-400",
+    icon: <CheckIcon className="size-3" />,
+    label: (a) => `${a} completed`,
+    isAnimated: false,
+  },
+  error: {
+    dotClass: "bg-red-500",
+    textClass: "text-red-600 dark:text-red-400",
+    icon: <XIcon className="size-3" />,
+    label: (a) => `${a} failed`,
+    isAnimated: false,
+  },
+  cancelled: {
+    dotClass: "bg-zinc-400",
+    textClass: "text-zinc-500 dark:text-zinc-400",
+    icon: <BanIcon className="size-3" />,
+    label: (a) => `${a} cancelled`,
+    isAnimated: false,
+  },
+};
+
+/** Resolves a status from the live flags we already track. */
+function resolveStatus(args: {
+  isRunning?: boolean;
+  summary?: SubagentRunSummary;
+}): SubagentRunStatus {
+  if (args.summary) {
+    return args.summary.status;
+  }
+  return args.isRunning ? "running" : "success";
+}
+
+// ---------------------------------------------------------------------------
+// Progress formatting helpers
+// ---------------------------------------------------------------------------
+
+function formatDuration(ms: number): string {
+  if (ms <= 0) return "0s";
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) {
+    return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes === 0
+    ? `${hours}h`
+    : `${hours}h ${remainingMinutes}m`;
+}
+
+function formatTokenCount(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 1_000_000) {
+    const k = n / 1000;
+    return `${k >= 10 ? k.toFixed(0) : k.toFixed(1)}K`;
+  }
+  return `${(n / 1_000_000).toFixed(1)}M`;
+}
 
 // ---------------------------------------------------------------------------
 // SubagentActivity — top-level wrapper rendered inside Tool's ToolContent area
@@ -27,6 +132,8 @@ export type SubagentActivityProps = ComponentProps<"div"> & {
   defaultOpen?: boolean;
   /** Built-in subagent type (coder / explore / plan) */
   subagentType?: string;
+  /** Terminal run summary, populated from a SubagentCompleted event. */
+  subagentRunSummary?: SubagentRunSummary;
 };
 
 export const SubagentActivity = memo(
@@ -36,6 +143,7 @@ export const SubagentActivity = memo(
     isRunning = false,
     defaultOpen = false,
     subagentType,
+    subagentRunSummary,
     ...props
   }: SubagentActivityProps) => {
     const agentLabel = subagentType
@@ -43,10 +151,44 @@ export const SubagentActivity = memo(
       : "Agent";
     const [isOpen, setIsOpen] = useState(defaultOpen);
 
+    const status = resolveStatus({
+      isRunning,
+      summary: subagentRunSummary,
+    });
+    const style = STATUS_STYLES[status];
+
     const toolCallCount = steps.filter((s) => s.kind === "tool-call").length;
-    const hasError = steps.some(
-      (s) => s.kind === "tool-call" && s.status === "error",
-    );
+    const completedToolCalls = steps.filter(
+      (s) => s.kind === "tool-call" && s.status !== "running",
+    ).length;
+    const hasError =
+      subagentRunSummary?.status === "error" ||
+      steps.some((s) => s.kind === "tool-call" && s.status === "error");
+
+    // Compose the secondary line: "step 3/8 · 2,341 tok · 12s" or
+    // "4 tool calls · 12s" when no run summary is present.
+    const metaLine = useMemo(() => {
+      const parts: string[] = [];
+      if (status === "running" && toolCallCount > 0) {
+        parts.push(
+          `step ${Math.min(completedToolCalls + 1, toolCallCount)}/${toolCallCount}`,
+        );
+      } else if (toolCallCount > 0) {
+        parts.push(
+          `${toolCallCount} tool call${toolCallCount !== 1 ? "s" : ""}`,
+        );
+      }
+      if (subagentRunSummary) {
+        if (subagentRunSummary.durationMs > 0) {
+          parts.push(formatDuration(subagentRunSummary.durationMs));
+        }
+        const total = subagentRunSummary.usage.total;
+        if (total > 0) {
+          parts.push(`${formatTokenCount(total)} tok`);
+        }
+      }
+      return parts.join(" · ");
+    }, [status, toolCallCount, completedToolCalls, subagentRunSummary]);
 
     return (
       <Collapsible
@@ -57,33 +199,51 @@ export const SubagentActivity = memo(
       >
         <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground group cursor-pointer">
           <span
+            aria-hidden
             className={cn(
               "size-1.5 rounded-full shrink-0",
-              isRunning
-                ? "bg-blue-500 animate-pulse"
-                : hasError
-                  ? "bg-destructive"
-                  : "bg-success",
+              status === "error" || hasError
+                ? "bg-destructive"
+                : style.dotClass,
             )}
           />
-          <span>
-            {isRunning ? (
-              <>
-                {agentLabel} working
-                <Shimmer
-                  as="span"
-                  duration={1}
-                  className="text-muted-foreground ml-0.5"
-                >
-                  ...
-                </Shimmer>
-              </>
-            ) : toolCallCount > 0 ? (
-              `${agentLabel} completed · ${toolCallCount} tool call${toolCallCount !== 1 ? "s" : ""}`
-            ) : (
-              `${agentLabel} completed`
-            )}
+          <span className="inline-flex items-center gap-1">
+            {style.icon}
+            <span>
+              {status === "running" ? (
+                <>
+                  {style.label(agentLabel)}
+                  <Shimmer
+                    as="span"
+                    duration={1}
+                    className="text-muted-foreground ml-0.5"
+                  >
+                    ...
+                  </Shimmer>
+                </>
+              ) : (
+                style.label(agentLabel)
+              )}
+            </span>
           </span>
+          {metaLine && (
+            <span
+              className={cn(
+                "text-muted-foreground/80 tabular-nums",
+                style.textClass,
+              )}
+            >
+              · {metaLine}
+            </span>
+          )}
+          {subagentRunSummary?.error && (
+            <span
+              className="text-destructive inline-flex items-center gap-0.5"
+              title={subagentRunSummary.error}
+            >
+              <AlertCircleIcon className="size-3" />
+            </span>
+          )}
           <ChevronRightIcon
             className={cn(
               "size-3 text-muted-foreground transition-transform duration-200",
@@ -98,9 +258,17 @@ export const SubagentActivity = memo(
             "data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-top-1 outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
           )}
         >
+          {subagentRunSummary?.error && (
+            <pre className="text-xs text-destructive whitespace-pre-wrap max-h-24 overflow-y-auto">
+              {subagentRunSummary.error}
+            </pre>
+          )}
           {steps.map((step, index) => (
             <SubagentStepItem key={`sa-step-${index}`} step={step} />
           ))}
+          {subagentRunSummary && (
+            <SubagentRunFooter summary={subagentRunSummary} />
+          )}
         </CollapsibleContent>
       </Collapsible>
     );
@@ -108,6 +276,37 @@ export const SubagentActivity = memo(
 );
 
 SubagentActivity.displayName = "SubagentActivity";
+
+// ---------------------------------------------------------------------------
+// SubagentRunFooter — terminal-state chips (duration / token / error)
+// ---------------------------------------------------------------------------
+
+const SubagentRunFooter = ({ summary }: { summary: SubagentRunSummary }) => {
+  const tokens = summary.usage.total;
+  const duration = summary.durationMs;
+  if (tokens === 0 && duration === 0) {
+    return null;
+  }
+  return (
+    <div className="mt-1.5 flex items-center gap-3 text-[10px] text-muted-foreground/80 tabular-nums">
+      {duration > 0 && (
+        <span className="inline-flex items-center gap-0.5">
+          <ClockIcon className="size-2.5" />
+          {formatDuration(duration)}
+        </span>
+      )}
+      {tokens > 0 && (
+        <span
+          className="inline-flex items-center gap-0.5"
+          title={`in ${summary.usage.input} · out ${summary.usage.output} · cache read ${summary.usage.cache_read} · cache creation ${summary.usage.cache_creation}`}
+        >
+          <CoinsIcon className="size-2.5" />
+          {formatTokenCount(tokens)} tokens
+        </span>
+      )}
+    </div>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // SubagentStepItem — renders a single step based on kind
@@ -225,4 +424,12 @@ const SubToolCallItem = ({
       )}
     </div>
   );
+};
+
+// Re-exported helpers for tests.
+export const __test = {
+  formatDuration,
+  formatTokenCount,
+  resolveStatus,
+  STATUS_STYLES,
 };

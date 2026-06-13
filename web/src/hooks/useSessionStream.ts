@@ -114,7 +114,13 @@ import {
   useLayoutEffect,
 } from "react";
 import type { ChatStatus, ToolUIPart } from "ai";
-import type { LiveMessage, MessageAttachmentPart, SubagentStep } from "./types";
+import type {
+  LiveMessage,
+  MessageAttachmentPart,
+  SubagentRunStatus,
+  SubagentRunSummary,
+  SubagentStep,
+} from "./types";
 import type { SessionStatus } from "@/lib/api/models";
 import { getAuthToken } from "@/lib/auth";
 import {
@@ -1195,6 +1201,53 @@ export function useSessionStream(
             // For now we skip nested SubagentEvents; the parent subagent's
             // direct tool calls/text/thinking are already captured.
             break;
+          }
+
+          case "SubagentCompleted": {
+            // Terminal event for the sub-agent run. Update the parent
+            // tool call so the UI can render duration / token / summary.
+            const completed = innerPayload as {
+              status?: string;
+              duration_ms?: number;
+              usage?: {
+                input?: number;
+                output?: number;
+                cache_read?: number;
+                cache_creation?: number;
+                total?: number;
+              };
+              summary?: string;
+              error?: string;
+            };
+            const statusRaw = completed.status ?? "success";
+            const status: SubagentRunStatus = (
+              ["running", "success", "error", "cancelled", "blocked"] as const
+            ).includes(statusRaw as SubagentRunStatus)
+              ? (statusRaw as SubagentRunStatus)
+              : "success";
+            const summaryPayload: SubagentRunSummary = {
+              status,
+              durationMs: typeof completed.duration_ms === "number" ? completed.duration_ms : 0,
+              usage: {
+                input: completed.usage?.input ?? 0,
+                output: completed.usage?.output ?? 0,
+                cache_read: completed.usage?.cache_read ?? 0,
+                cache_creation: completed.usage?.cache_creation ?? 0,
+                total: completed.usage?.total ?? 0,
+              },
+              ...(completed.summary ? { summary: completed.summary } : {}),
+              ...(completed.error ? { error: completed.error } : {}),
+            };
+            const completedNext = [...prev];
+            completedNext[parentIdx] = {
+              ...parentMsg,
+              toolCall: {
+                ...parentMsg.toolCall!,
+                subagentRunning: false,
+                subagentRunSummary: summaryPayload,
+              },
+            };
+            return completedNext;
           }
 
           default:

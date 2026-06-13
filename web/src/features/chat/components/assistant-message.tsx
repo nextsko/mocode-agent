@@ -231,6 +231,7 @@ const renderToolMessage = ({
               isRunning={toolCall.subagentRunning}
               defaultOpen={blocksExpanded}
               subagentType={toolCall.subagentType}
+              subagentRunSummary={toolCall.subagentRunSummary}
             />
           ) : null}
           {shouldShowOutput ? (

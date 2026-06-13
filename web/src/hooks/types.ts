@@ -37,6 +37,48 @@ export type SubagentStep =
     };
 
 /**
+ * Terminal status for a sub-agent run.
+ *
+ * - "running": the sub-agent is still executing
+ * - "success": the sub-agent finished without error
+ * - "error": the sub-agent failed
+ * - "cancelled": the sub-agent was cancelled by the user
+ * - "blocked": the sub-agent was blocked because a DAG dependency failed
+ */
+export type SubagentRunStatus =
+  | "running"
+  | "success"
+  | "error"
+  | "cancelled"
+  | "blocked";
+
+/**
+ * SubagentTokenUsage is the wire-level token usage reported on each
+ * SubagentCompleted event. Mirrors the backend's notify.SubagentTokenUsage.
+ */
+export type SubagentTokenUsage = {
+  input: number;
+  output: number;
+  cache_read: number;
+  cache_creation: number;
+  total: number;
+};
+
+/**
+ * SubagentRunSummary is the persisted summary of a sub-agent run, attached
+ * to the parent tool call when the backend publishes a SubagentCompleted
+ * event. It is used by the UI to render the post-run header and to keep
+ * duration/token counts visible after the live stream ends.
+ */
+export type SubagentRunSummary = {
+  status: SubagentRunStatus;
+  durationMs: number;
+  usage: SubagentTokenUsage;
+  summary?: string;
+  error?: string;
+};
+
+/**
  * Live message in the chat - this is a UI-specific type
  * that extends beyond what the API provides
  */
@@ -138,6 +180,8 @@ export type LiveMessage = {
     /** True when this tool message was created from a sub-agent's ApprovalRequest
      *  (the tool_call_id belongs to the sub-agent, not the main agent) */
     isSubagentOrigin?: boolean;
+    /** Terminal run summary populated from a SubagentCompleted event. */
+    subagentRunSummary?: SubagentRunSummary;
   };
   codeSnippet?: {
     title: string;
