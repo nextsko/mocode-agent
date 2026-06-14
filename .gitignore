@@ -55,3 +55,4 @@ completions/crush.*sh
 .windsurf/
 .superpowers/
 vendor/
+.workflow-confirmations.json
