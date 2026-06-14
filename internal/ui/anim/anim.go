@@ -51,7 +51,9 @@ var (
 )
 
 var (
-	availableRunes = []rune("0123456789abcdefABCDEF~!@#$£€%^&*()+=_")
+	// Only use single-byte ASCII-safe runes to avoid multi-byte UTF-8
+	// corruption when terminal width calculations truncate mid-rune.
+	availableRunes = []rune("0123456789abcdefABCDEF~!@#$%^&*()+=_")
 	ellipsisFrames = []string{".", "..", "...", ""}
 )
 

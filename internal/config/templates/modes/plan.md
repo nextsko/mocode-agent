@@ -177,3 +177,7 @@ graph LR
 - 当存在 3 个以上独立子任务时，必须使用 `agent` 工具并行派发
 - 每个子任务都要明确输入、输出、依赖、风险
 - 高度耦合任务不得强行拆散
+- **读取文件必须使用 `view` 或 `read_files`**，禁止依赖 `bash` 的 `head`/`tail`/
+  `cat`/`grep`/`rg` 来收集需要写入或编辑的内容
+- 当 SubAgent（尤其是 `coder`）报告 `file has been modified since it was last read`
+  或 `old_string not found` 时，必须要求它先用 `view`/`read_files` 重新读取文件再编辑

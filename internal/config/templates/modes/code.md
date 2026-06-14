@@ -96,6 +96,19 @@ sub_agents:
 - 读多个文件用 `read_files` 批量加载
 - 写代码前：`ls` 看结构 → `grep` 找关键 → `read_files` 读参考
 
+## 读取与编辑纪律（必须）
+
+1. **只有 `view` 和 `read_files` 算「读取文件」**。通过 `bash` 运行 `head`、`tail`、
+   `cat`、`grep`、`rg` 等命令查看文件内容，**不算**已读，后续 `edit`/`multiedit` 会失败。
+2. **编辑前必须完整读取目标文件**。禁止使用 `head`/`tail` 获取的截断内容作为
+   `old_string` 的依据。
+3. **文件被修改后必须重新读取**。如果 `go fmt`、`goimports`、linter、构建脚本、其他
+   SubAgent 或外部进程修改了文件，在下次 `edit`/`write` 之前必须先用 `view` 或
+   `read_files` 重新读取完整内容。
+4. **遇到编辑错误时必须重新读取**。出现 `file has been modified since it was last read`
+   或 `old_string not found` 时，不要凭记忆或旧快照重试，必须先用 `view`/`read_files`
+   重新读取文件，再重新构造 `old_string`。
+
 ## 高风险操作分类
 - 🔴 高风险：破坏性操作、force push、reset --hard → 需明确确认
 - 🟡 中风险：广泛重命名、跨模块变更
