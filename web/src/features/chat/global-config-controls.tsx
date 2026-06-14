@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, type ReactElement } from "react";
 import { toast } from "sonner";
-import { Check, Cpu, Paperclip, RefreshCcw } from "lucide-react";
+import { Check, Cpu, Paperclip, RefreshCcw, Zap } from "lucide-react";
 import { usePromptInputAttachments } from "@ai-elements";
 import type { ConfigModel } from "@/lib/api/models";
 import { ModelCapability } from "@/lib/api/models";
@@ -198,6 +198,43 @@ export function GlobalConfigControls({
     </div>
   );
 
+  const yoloChecked = config?.yolo ?? false;
+  const yoloDisabled = isLoading || isUpdating || !config;
+
+  const handleYoloToggle = useCallback(
+    async (checked: boolean) => {
+      if (!config) {
+        return;
+      }
+      try {
+        await update({ yolo: checked });
+        toast.success(checked ? "Yolo mode enabled" : "Yolo mode disabled", {
+          description: checked
+            ? "All permission requests will be auto-approved."
+            : "Permission requests will require manual approval.",
+        });
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to update yolo mode";
+        toast.error("Failed to update yolo mode", { description: message });
+      }
+    },
+    [config, update],
+  );
+
+  const yoloToggle = (
+    <div className="flex h-9 items-center gap-2 rounded-md px-2">
+      <Zap className={cn("size-4", yoloChecked && "fill-warning text-warning")} />
+      <span className="text-xs text-muted-foreground">Yolo</span>
+      <Switch
+        aria-label="Toggle yolo mode"
+        checked={yoloChecked}
+        disabled={yoloDisabled}
+        onCheckedChange={handleYoloToggle}
+      />
+    </div>
+  );
+
   const attachments = usePromptInputAttachments();
 
   return (
@@ -278,6 +315,17 @@ export function GlobalConfigControls({
       ) : (
         thinkingToggle
       )}
+
+      <div className="mx-0 h-4 w-px bg-border/70" />
+
+      <Tooltip>
+        <TooltipTrigger asChild>{yoloToggle}</TooltipTrigger>
+        <TooltipContent sideOffset={8}>
+          {yoloChecked
+            ? "Yolo mode is active. All permission requests are auto-approved."
+            : "Enable yolo mode to auto-approve all permission requests."}
+        </TooltipContent>
+      </Tooltip>
 
       {onPlanModeChange && (
         <>

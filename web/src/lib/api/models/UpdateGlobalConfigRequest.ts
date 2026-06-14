@@ -32,6 +32,12 @@ export interface UpdateGlobalConfigRequest {
      */
     defaultThinking?: boolean | null;
     /**
+     * Whether to enable auto-approve (yolo) mode
+     * @type {boolean}
+     * @memberof UpdateGlobalConfigRequest
+     */
+    yolo?: boolean | null;
+    /**
      * 
      * @type {boolean}
      * @memberof UpdateGlobalConfigRequest
@@ -64,6 +70,7 @@ export function UpdateGlobalConfigRequestFromJSONTyped(json: any, ignoreDiscrimi
         
         'defaultModel': json['default_model'] == null ? undefined : json['default_model'],
         'defaultThinking': json['default_thinking'] == null ? undefined : json['default_thinking'],
+        'yolo': json['yolo'] == null ? undefined : json['yolo'],
         'restartRunningSessions': json['restart_running_sessions'] == null ? undefined : json['restart_running_sessions'],
         'forceRestartBusySessions': json['force_restart_busy_sessions'] == null ? undefined : json['force_restart_busy_sessions'],
     };
@@ -82,6 +89,7 @@ export function UpdateGlobalConfigRequestToJSONTyped(value?: UpdateGlobalConfigR
         
         'default_model': value['defaultModel'],
         'default_thinking': value['defaultThinking'],
+        'yolo': value['yolo'],
         'restart_running_sessions': value['restartRunningSessions'],
         'force_restart_busy_sessions': value['forceRestartBusySessions'],
     };

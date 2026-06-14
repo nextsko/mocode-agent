@@ -41,6 +41,7 @@ type WebStatus struct {
 type GlobalConfigResponse struct {
 	DefaultModel    string            `json:"default_model"`
 	DefaultThinking bool              `json:"default_thinking"`
+	Yolo            bool              `json:"yolo"`
 	Models          []ConfigModelInfo `json:"models"`
 }
 
@@ -129,6 +130,7 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	resp := GlobalConfigResponse{
 		DefaultModel:    "",
 		DefaultThinking: false,
+		Yolo:            false,
 		Models:          []ConfigModelInfo{},
 	}
 
@@ -145,6 +147,7 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	if model := cfg.GetModelByType(config.SelectedModelTypeLarge); model != nil {
 		resp.DefaultThinking = model.CanReason
 	}
+	resp.Yolo = s.workspace.PermissionSkipRequests()
 
 	// Build model list from providers
 	for provEntry := range cfg.Providers.Seq() {
@@ -173,6 +176,7 @@ func (s *Server) handlePatchConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		DefaultModel             *string `json:"default_model,omitempty"`
 		DefaultThinking          *bool   `json:"default_thinking,omitempty"`
+		Yolo                     *bool   `json:"yolo,omitempty"`
 		RestartRunningSessions   *bool   `json:"restart_running_sessions,omitempty"`
 		ForceRestartBusySessions *bool   `json:"force_restart_busy_sessions,omitempty"`
 	}
@@ -203,17 +207,23 @@ func (s *Server) handlePatchConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 done:
+	if req.Yolo != nil {
+		s.workspace.PermissionSetSkipRequests(*req.Yolo)
+	}
+
 	// Return response in the shape frontend expects.
 	cfg := s.workspace.Config()
 	resp := GlobalConfigResponse{
 		DefaultModel:    "",
 		DefaultThinking: false,
+		Yolo:            false,
 		Models:          []ConfigModelInfo{},
 	}
 	if cfg != nil {
 		if m, ok := cfg.Models[config.SelectedModelTypeLarge]; ok {
 			resp.DefaultModel = m.Model
 		}
+		resp.Yolo = s.workspace.PermissionSkipRequests()
 		for provEntry := range cfg.Providers.Seq() {
 			for _, model := range provEntry.Models {
 				resp.Models = append(resp.Models, ConfigModelInfo{

@@ -909,6 +909,11 @@
             "title": "Default Thinking",
             "description": "Current default thinking mode"
           },
+          "yolo": {
+            "type": "boolean",
+            "title": "Yolo",
+            "description": "Whether auto-approve (yolo) mode is enabled"
+          },
           "models": {
             "items": { "$ref": "#/components/schemas/ConfigModel" },
             "type": "array",
@@ -917,7 +922,7 @@
           }
         },
         "type": "object",
-        "required": ["default_model", "default_thinking", "models"],
+        "required": ["default_model", "default_thinking", "yolo", "models"],
         "title": "GlobalConfig",
         "description": "Global configuration snapshot for frontend."
       },
@@ -1127,6 +1132,11 @@
             "anyOf": [{ "type": "boolean" }, { "type": "null" }],
             "title": "Default Thinking",
             "description": "New default thinking mode"
+          },
+          "yolo": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Yolo",
+            "description": "Whether to enable auto-approve (yolo) mode"
           },
           "restart_running_sessions": {
             "anyOf": [{ "type": "boolean" }, { "type": "null" }],
