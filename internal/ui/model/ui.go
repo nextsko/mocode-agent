@@ -1062,51 +1062,61 @@ func (m *UI) loadNestedToolCalls(items []chat.MessageItem) {
 			continue
 		}
 
-		tc := toolItem.ToolCall()
-		var nestedTools []chat.ToolMessageItem
-		for _, childToolCallID := range m.registerAgentToolTopology(toolItem.MessageID(), sessionIDOrEmpty(m.session), tc) {
-			agentSessionID := m.com.Workspace.CreateAgentToolSessionID(toolItem.MessageID(), childToolCallID)
-			taskID := childSessionTaskID(&tc, agentSessionID)
-			nestedMsgs, err := m.com.Workspace.ListMessages(context.Background(), agentSessionID)
-			if err != nil || len(nestedMsgs) == 0 {
-				continue
-			}
-
-			nestedMsgPtrs := make([]*message.Message, len(nestedMsgs))
-			for i := range nestedMsgs {
-				nestedMsgPtrs[i] = &nestedMsgs[i]
-				if m.hasSession() {
-					m.trackChildSessionRuntime(m.session.ID, agentSessionID, &tc, nestedMsgs[i])
-				}
-			}
-			nestedToolResultMap := chat.BuildToolResultMap(nestedMsgPtrs)
-
-			for _, nestedMsg := range nestedMsgPtrs {
-				nestedItems := chat.ExtractMessageItems(m.com.Styles, nestedMsg, nestedToolResultMap)
-				for _, nestedItem := range nestedItems {
-					nestedToolItem, ok := nestedItem.(chat.ToolMessageItem)
-					if !ok {
-						continue
-					}
-					m.registerAgentToolTaskID(nestedToolItem.ToolCall().ID, taskID)
-					if simplifiable, ok := nestedToolItem.(chat.Compactable); ok {
-						simplifiable.SetCompact(true)
-					}
-					nestedTools = append(nestedTools, nestedToolItem)
-				}
-			}
-		}
+		m.reloadNestedToolsForItem(toolItem)
 
 		// Recursively load nested tool calls for any agent tools within.
-		nestedMessageItems := make([]chat.MessageItem, len(nestedTools))
-		for i, nt := range nestedTools {
+		nestedMessageItems := make([]chat.MessageItem, len(nestedContainer.NestedTools()))
+		for i, nt := range nestedContainer.NestedTools() {
 			nestedMessageItems[i] = nt
 		}
 		m.loadNestedToolCalls(nestedMessageItems)
-
-		// Set nested tools on the parent.
-		nestedContainer.SetNestedTools(nestedTools)
 	}
+}
+
+// reloadNestedToolsForItem loads nested tool calls from child sessions for a
+// single agent/agentic_fetch tool item and sets them on the container.
+func (m *UI) reloadNestedToolsForItem(toolItem chat.ToolMessageItem) {
+	nestedContainer, ok := toolItem.(chat.NestedToolContainer)
+	if !ok {
+		return
+	}
+
+	tc := toolItem.ToolCall()
+	var nestedTools []chat.ToolMessageItem
+	for _, childToolCallID := range m.registerAgentToolTopology(toolItem.MessageID(), sessionIDOrEmpty(m.session), tc) {
+		agentSessionID := m.com.Workspace.CreateAgentToolSessionID(toolItem.MessageID(), childToolCallID)
+		taskID := childSessionTaskID(&tc, agentSessionID)
+		nestedMsgs, err := m.com.Workspace.ListMessages(context.Background(), agentSessionID)
+		if err != nil || len(nestedMsgs) == 0 {
+			continue
+		}
+
+		nestedMsgPtrs := make([]*message.Message, len(nestedMsgs))
+		for i := range nestedMsgs {
+			nestedMsgPtrs[i] = &nestedMsgs[i]
+			if m.hasSession() {
+				m.trackChildSessionRuntime(m.session.ID, agentSessionID, &tc, nestedMsgs[i])
+			}
+		}
+		nestedToolResultMap := chat.BuildToolResultMap(nestedMsgPtrs)
+
+		for _, nestedMsg := range nestedMsgPtrs {
+			nestedItems := chat.ExtractMessageItems(m.com.Styles, nestedMsg, nestedToolResultMap)
+			for _, nestedItem := range nestedItems {
+				nestedToolItem, ok := nestedItem.(chat.ToolMessageItem)
+				if !ok {
+					continue
+				}
+				m.registerAgentToolTaskID(nestedToolItem.ToolCall().ID, taskID)
+				if simplifiable, ok := nestedToolItem.(chat.Compactable); ok {
+					simplifiable.SetCompact(true)
+				}
+				nestedTools = append(nestedTools, nestedToolItem)
+			}
+		}
+	}
+
+	nestedContainer.SetNestedTools(nestedTools)
 }
 
 // appendSessionMessage appends a new message to the current session in the chat
@@ -1171,6 +1181,15 @@ func (m *UI) appendSessionMessage(msg message.Message) tea.Cmd {
 			}
 			if toolMsgItem, ok := toolItem.(chat.ToolMessageItem); ok {
 				toolMsgItem.SetResult(&tr)
+				// When an agent tool completes, reload nested tools from child
+				// sessions as a fallback. Live pubsub events may have been
+				// missed (e.g. client/server mode, timing issues) leaving the
+				// nested tool tree empty even though the sub-agent did work.
+				if nestedContainer, ok := toolItem.(chat.NestedToolContainer); ok {
+					if len(nestedContainer.NestedTools()) == 0 {
+						m.reloadNestedToolsForItem(toolMsgItem)
+					}
+				}
 				if m.chat.Follow() {
 					if cmd := m.chat.ScrollToBottomAndAnimate(); cmd != nil {
 						cmds = append(cmds, cmd)
@@ -1231,6 +1250,16 @@ func (m *UI) updateSessionMessage(msg message.Message) tea.Cmd {
 			// to avoid clearing the cache
 			if (tc.Finished && !existingToolCall.Finished) || tc.Input != existingToolCall.Input {
 				toolItem.SetToolCall(tc)
+				// When an agent/agentic_fetch tool transitions to finished,
+				// ensure nested tools are loaded from child sessions. This is
+				// a fallback for cases where live pubsub events were missed.
+				if tc.Finished && !existingToolCall.Finished {
+					if nestedContainer, ok := toolItem.(chat.NestedToolContainer); ok {
+						if len(nestedContainer.NestedTools()) == 0 {
+							m.reloadNestedToolsForItem(toolItem)
+						}
+					}
+				}
 			}
 		}
 		if existingToolItem == nil {
@@ -1283,6 +1312,21 @@ func (m *UI) handleChildSessionMessage(event pubsub.Event[message.Message]) tea.
 	}
 
 	if len(event.Payload.ToolCalls()) == 0 && len(event.Payload.ToolResults()) == 0 {
+		// Even though there are no tool calls/results to render as nested
+		// items, the sub-agent may have produced text (thinking/reasoning).
+		// Propagate the latest status summary to the agent tool item so the
+		// user can see what the sub-agent is doing.
+		if agentItem != nil {
+			if summaryEntry, ok := agentItem.(interface{ SetStatusSummary(string) }); ok {
+				summary := firstContentLine(event.Payload.Content().Text)
+				if summary == "" && event.Payload.IsThinking() {
+					summary = "thinking"
+				}
+				if summary != "" {
+					summaryEntry.SetStatusSummary(summary)
+				}
+			}
+		}
 		return nil
 	}
 	if agentItem == nil {

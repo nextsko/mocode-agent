@@ -179,7 +179,7 @@ func (a *sessionAgent) updateSessionUsage(model Model, session *session.Session,
 	session.CacheCreationTokens = usage.CacheCreationTokens
 }
 
-func (a *sessionAgent) compressToolMessage(msg fantasy.Message, distanceFromEnd int) fantasy.Message {
+func (a *sessionAgent) compressToolMessage(msg fantasy.Message, distanceFromEnd int, toolNames map[string]string) fantasy.Message {
 	if a.compressor == nil {
 		return msg
 	}
@@ -199,9 +199,10 @@ func (a *sessionAgent) compressToolMessage(msg fantasy.Message, distanceFromEnd 
 		text := extractToolResultText(tr)
 		isErr := isToolResultError(tr)
 		cm := ctxcompress.CompressedMessage{
-			Role:    "tool",
-			Content: text,
-			IsError: isErr,
+			Role:     "tool",
+			Content:  text,
+			IsError:  isErr,
+			ToolName: toolNames[tr.ToolCallID],
 		}
 		result := a.compressor.Compress(cm, level)
 		if result.Content != text {

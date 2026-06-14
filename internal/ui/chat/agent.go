@@ -30,7 +30,8 @@ type NestedToolContainer interface {
 type AgentToolMessageItem struct {
 	*baseToolMessageItem
 
-	nestedTools []ToolMessageItem
+	nestedTools   []ToolMessageItem
+	statusSummary string // live status summary from sub-agent runtime
 }
 
 var (
@@ -94,6 +95,17 @@ func (a *AgentToolMessageItem) AddNestedTool(tool ToolMessageItem) {
 	a.clearCache()
 }
 
+// SetStatusSummary updates the live status summary from the sub-agent runtime.
+func (a *AgentToolMessageItem) SetStatusSummary(summary string) {
+	a.statusSummary = summary
+	a.clearCache()
+}
+
+// StatusSummary returns the current status summary.
+func (a *AgentToolMessageItem) StatusSummary() string {
+	return a.statusSummary
+}
+
 // AgentToolRenderContext renders agent tool messages.
 type AgentToolRenderContext struct {
 	agent *AgentToolMessageItem
@@ -102,9 +114,6 @@ type AgentToolRenderContext struct {
 // RenderTool implements the [ToolRenderer] interface.
 func (r *AgentToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
-	if !opts.ToolCall.Finished && !opts.IsCanceled() && len(r.agent.nestedTools) == 0 {
-		return pendingTool(sty, "Agent", opts.Anim, opts.Compact, cappedWidth)
-	}
 
 	var params agent.AgentParams
 	_ = json.Unmarshal([]byte(opts.ToolCall.Input), &params)
@@ -112,10 +121,13 @@ func (r *AgentToolRenderContext) RenderTool(sty *styles.Styles, width int, opts 
 	prompt := params.Prompt
 	prompt = strings.ReplaceAll(prompt, "\n", " ")
 
-	header := toolHeader(sty, opts.Status, "Agent", cappedWidth, opts.Compact)
+	// If compact or no prompt, use the simple pending tool rendering.
 	if opts.Compact {
+		header := toolHeader(sty, opts.Status, "Agent", cappedWidth, opts.Compact)
 		return header
 	}
+
+	header := toolHeader(sty, opts.Status, "Agent", cappedWidth, opts.Compact)
 
 	// Build the task tag and prompt.
 	taskTag := sty.Tool.AgentTaskTag.Render("Task")
@@ -123,6 +135,9 @@ func (r *AgentToolRenderContext) RenderTool(sty *styles.Styles, width int, opts 
 
 	// Calculate remaining width for prompt.
 	remainingWidth := min(cappedWidth-taskTagWidth-3, maxTextWidth-taskTagWidth-3) // -3 for spacing
+	if remainingWidth < 0 {
+		remainingWidth = 0
+	}
 
 	promptText := sty.Tool.AgentPrompt.Width(remainingWidth).Render(prompt)
 
@@ -138,8 +153,38 @@ func (r *AgentToolRenderContext) RenderTool(sty *styles.Styles, width int, opts 
 		),
 	)
 
+	// If still running with no nested tools yet, show header + status + spinner.
+	if !opts.ToolCall.Finished && !opts.IsCanceled() && len(r.agent.nestedTools) == 0 {
+		var runningParts []string
+		runningParts = append(runningParts, header)
+		// Show live status summary from sub-agent runtime (e.g. "thinking",
+		// "executing grep", or the first line of the latest response).
+		if r.agent.statusSummary != "" {
+			summaryLine := sty.Tool.StateWaiting.Render(r.agent.statusSummary)
+			runningParts = append(runningParts, summaryLine)
+		}
+		if opts.Anim != nil {
+			runningParts = append(runningParts, opts.Anim.Render())
+		}
+		return lipgloss.JoinVertical(lipgloss.Left, runningParts...)
+	}
+
 	// Build tree with nested tool calls.
 	childTools := tree.Root(header)
+
+	// When running with nested tools, show a live status summary.
+	if !opts.HasResult() && !opts.IsCanceled() {
+		var summaryParts []string
+		if len(r.agent.nestedTools) > 0 {
+			summaryParts = append(summaryParts, fmt.Sprintf("%d tool calls", len(r.agent.nestedTools)))
+		}
+		if r.agent.statusSummary != "" {
+			summaryParts = append(summaryParts, r.agent.statusSummary)
+		}
+		if len(summaryParts) > 0 {
+			childTools.Child(sty.Tool.StateWaiting.Render(strings.Join(summaryParts, " · ")))
+		}
+	}
 
 	for _, nestedTool := range r.agent.nestedTools {
 		childView := nestedTool.Render(remainingWidth)
@@ -384,9 +429,6 @@ type agenticFetchParams struct {
 // RenderTool implements the [ToolRenderer] interface.
 func (r *AgenticFetchToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
-	if !opts.ToolCall.Finished && !opts.IsCanceled() && len(r.fetch.nestedTools) == 0 {
-		return pendingTool(sty, "Agentic Fetch", opts.Anim, opts.Compact, cappedWidth)
-	}
 
 	var params agenticFetchParams
 	_ = json.Unmarshal([]byte(opts.ToolCall.Input), &params)
@@ -411,6 +453,9 @@ func (r *AgenticFetchToolRenderContext) RenderTool(sty *styles.Styles, width int
 
 	// Calculate remaining width for prompt text.
 	remainingWidth := min(cappedWidth-promptTagWidth-3, maxTextWidth-promptTagWidth-3) // -3 for spacing
+	if remainingWidth < 0 {
+		remainingWidth = 0
+	}
 
 	promptText := sty.Tool.AgentPrompt.Width(remainingWidth).Render(prompt)
 
@@ -425,6 +470,15 @@ func (r *AgenticFetchToolRenderContext) RenderTool(sty *styles.Styles, width int
 			promptText,
 		),
 	)
+
+	// If still running with no nested tools yet, show header + spinner.
+	if !opts.ToolCall.Finished && !opts.IsCanceled() && len(r.fetch.nestedTools) == 0 {
+		animView := ""
+		if opts.Anim != nil {
+			animView = opts.Anim.Render()
+		}
+		return header + "\n" + animView
+	}
 
 	// Build tree with nested tool calls.
 	childTools := tree.Root(header)

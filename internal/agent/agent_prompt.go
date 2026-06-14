@@ -71,8 +71,14 @@ If not, please feel free to ignore. Again do not mention this message to the use
 		distanceFromEnd := totalMsgs - i - 1
 		if m.Role == message.Tool {
 			if msg, ok := filterOrphanedToolResults(m, knownToolCallIDs); ok {
+				// Build toolCallID → toolName map from the original message
+				// parts so the compressor can apply tool-specific rules.
+				toolNames := make(map[string]string, len(m.ToolResults()))
+				for _, tr := range m.ToolResults() {
+					toolNames[tr.ToolCallID] = tr.Name
+				}
 				// Apply multi-level compression to tool results.
-				msg = a.compressToolMessage(msg, distanceFromEnd)
+				msg = a.compressToolMessage(msg, distanceFromEnd, toolNames)
 				history = append(history, msg)
 			}
 			continue
