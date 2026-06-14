@@ -64,7 +64,26 @@ func (b *ContextBuilder) BuildTurnPrompt(rt *Roundtable, speaker string) (TurnPr
 
 	context := strings.Join(parts, "\n")
 
-	instructions := `Speak as your role. Be concise. If you want to propose a plan or end the meeting, use a formal motion. To vote on the active motion, say "VOTE: yes|no|abstain" optionally followed by a reason. During discussion you may only use read-only tools; do not write files or execute commands.`
+	instructions := `Speak as your role. Be concise.
+
+## Formal motions and voting
+
+If you want to propose a plan or end the meeting, emit a formal motion on its own line:
+- MOTION: conclude <summary> — end the meeting with a conclusion
+- MOTION: propose_plan <plan description> — propose a plan for execution
+
+Only ` + "`conclude`" + ` and ` + "`propose_plan`" + ` motions trigger a formal vote.
+
+To vote on the active motion, emit on its own line:
+- VOTE: yes|no|abstain <optional reason>
+
+The marker (MOTION: or VOTE:) must be at the start of a line. Do not embed it inside markdown formatting or other text on the same line.
+
+Examples:
+  MOTION: conclude The team agrees to use Redis for caching.
+  VOTE: yes This is the right approach.
+
+During discussion you may only use read-only tools; do not write files or execute commands.`
 
 	return TurnPrompt{
 		SystemPrompt: system,

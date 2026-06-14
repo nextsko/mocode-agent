@@ -331,6 +331,75 @@ func TestParseSeatStatement(t *testing.T) {
 		_, _, _, _, err := parseSeatStatement(rt2, "VOTE: yes")
 		require.Error(t, err)
 	})
+
+	t.Run("motion after explanatory text", func(t *testing.T) {
+		raw := "Let me wrap up.\n\nMOTION: conclude We are done here."
+		kind, content, motion, _, err := parseSeatStatement(rt, raw)
+		require.NoError(t, err)
+		assert.Equal(t, rtpkg.StatementMotion, kind)
+		assert.Equal(t, "We are done here.", content)
+		require.NotNil(t, motion)
+		assert.Equal(t, rtpkg.MotionConclude, motion.Type)
+	})
+
+	t.Run("motion wrapped in markdown bold", func(t *testing.T) {
+		raw := "**MOTION: conclude End the meeting.**"
+		kind, content, motion, _, err := parseSeatStatement(rt, raw)
+		require.NoError(t, err)
+		assert.Equal(t, rtpkg.StatementMotion, kind)
+		assert.Equal(t, "End the meeting.", content)
+		require.NotNil(t, motion)
+		assert.Equal(t, rtpkg.MotionConclude, motion.Type)
+	})
+
+	t.Run("vote after explanatory text", func(t *testing.T) {
+		// Add a motion to the transcript so the vote has a target.
+		rt4 := newTestRoundtable(t, "parse4", []rtpkg.Participant{
+			{Name: "Moderator", IsModerator: true},
+		}, 10)
+		rt4.AddStatement(rtpkg.Statement{
+			Speaker: "Moderator",
+			Kind:    rtpkg.StatementMotion,
+			Motion:  &rtpkg.Motion{Type: rtpkg.MotionConclude},
+			Content: "conclude test",
+			Seq:     1,
+		})
+		raw := "I agree with the plan.\n\nVOTE: yes Great idea."
+		kind, _, _, vote, err := parseSeatStatement(rt4, raw)
+		require.NoError(t, err)
+		assert.Equal(t, rtpkg.StatementVote, kind)
+		require.NotNil(t, vote)
+		assert.Equal(t, rtpkg.VoteYes, vote.Value)
+		assert.Equal(t, "Great idea.", vote.Reason)
+	})
+
+	t.Run("vote embedded in markdown bold", func(t *testing.T) {
+		rt3 := newTestRoundtable(t, "parse3", []rtpkg.Participant{
+			{Name: "Moderator", IsModerator: true},
+			{Name: "Researcher"},
+		}, 10)
+		// First create a motion.
+		rt3.AddStatement(rtpkg.Statement{
+			Speaker: "Moderator",
+			Kind:    rtpkg.StatementMotion,
+			Motion:  &rtpkg.Motion{Type: rtpkg.MotionConclude},
+			Content: "test conclusion",
+			Seq:     1,
+		})
+		raw := "同意提案。\n\n**VOTE: yes**"
+		kind, _, _, vote, err := parseSeatStatement(rt3, raw)
+		require.NoError(t, err)
+		assert.Equal(t, rtpkg.StatementVote, kind)
+		require.NotNil(t, vote)
+		assert.Equal(t, rtpkg.VoteYes, vote.Value)
+	})
+
+	t.Run("chat with no markers stays chat", func(t *testing.T) {
+		raw := "I think we should discuss the architecture.\nLet me elaborate."
+		kind, _, _, _, err := parseSeatStatement(rt, raw)
+		require.NoError(t, err)
+		assert.Equal(t, rtpkg.StatementChat, kind)
+	})
 }
 
 func TestRoundtableResultAsText(t *testing.T) {

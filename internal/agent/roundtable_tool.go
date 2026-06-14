@@ -507,53 +507,84 @@ func (r *coordinatorSeatRunner) RunSeat(ctx context.Context, seatSessionID strin
 }
 
 // parseSeatStatement inspects a seat's raw output and converts formal motion or
-// vote markers into structured transcript entries.
+// vote markers into structured transcript entries.  It scans every line of the
+// output, stripping leading markdown formatting (**, *, #, >, -), so that
+// markers embedded after explanatory text are still recognized.
 func parseSeatStatement(rt *rtpkg.Roundtable, raw string) (rtpkg.StatementKind, string, *rtpkg.Motion, *rtpkg.Vote, error) {
 	content := strings.TrimSpace(raw)
 	if content == "" {
 		return rtpkg.StatementChat, content, nil, nil, nil
 	}
 
-	upper := strings.ToUpper(content)
-	if strings.HasPrefix(upper, "MOTION:") {
-		rest := strings.TrimSpace(content[len("MOTION:"):])
-		parts := strings.SplitN(rest, " ", 2)
-		if len(parts) == 0 || parts[0] == "" {
-			return rtpkg.StatementChat, raw, nil, nil, errors.New("empty motion type")
-		}
-		motionType := parseMotionType(parts[0])
-		body := ""
-		if len(parts) > 1 {
-			body = strings.TrimSpace(parts[1])
-		}
-		var payload map[string]any
-		if idx := strings.Index(body, "|"); idx >= 0 {
-			jsonPart := strings.TrimSpace(body[idx+1:])
-			body = strings.TrimSpace(body[:idx])
-			_ = json.Unmarshal([]byte(jsonPart), &payload)
-		}
-		return rtpkg.StatementMotion, body, &rtpkg.Motion{Type: motionType, Payload: payload}, nil, nil
-	}
+	for _, line := range strings.Split(content, "\n") {
+		cleaned := stripMarkdownLinePrefix(line)
+		upper := strings.ToUpper(cleaned)
 
-	if strings.HasPrefix(upper, "VOTE:") {
-		rest := strings.TrimSpace(content[len("VOTE:"):])
-		parts := strings.SplitN(rest, " ", 2)
-		value := rtpkg.VoteYes
-		if len(parts) > 0 && parts[0] != "" {
-			value = parseVoteValue(parts[0])
+		if strings.HasPrefix(upper, "MOTION:") {
+			rest := strings.TrimSpace(cleaned[len("MOTION:"):])
+			parts := strings.SplitN(rest, " ", 2)
+			if len(parts) == 0 || parts[0] == "" {
+				return rtpkg.StatementChat, raw, nil, nil, errors.New("empty motion type")
+			}
+			motionType := parseMotionType(parts[0])
+			body := ""
+			if len(parts) > 1 {
+				body = strings.TrimSpace(parts[1])
+			}
+			body = strings.TrimSuffix(body, "**")
+			var payload map[string]any
+			if idx := strings.Index(body, "|"); idx >= 0 {
+				jsonPart := strings.TrimSpace(body[idx+1:])
+				body = strings.TrimSpace(body[:idx])
+				_ = json.Unmarshal([]byte(jsonPart), &payload)
+			}
+			return rtpkg.StatementMotion, body, &rtpkg.Motion{Type: motionType, Payload: payload}, nil, nil
 		}
-		reason := ""
-		if len(parts) > 1 {
-			reason = strings.TrimSpace(parts[1])
+
+		if strings.HasPrefix(upper, "VOTE:") {
+			rest := strings.TrimSpace(cleaned[len("VOTE:"):])
+			parts := strings.SplitN(rest, " ", 2)
+			value := rtpkg.VoteYes
+			if len(parts) > 0 && parts[0] != "" {
+				value = parseVoteValue(parts[0])
+			}
+			reason := ""
+			if len(parts) > 1 {
+				reason = strings.TrimSpace(parts[1])
+			}
+			reason = strings.TrimSuffix(reason, "**")
+			motionSeq := lastMotionSeq(rt)
+			if motionSeq == 0 {
+				return rtpkg.StatementChat, raw, nil, nil, errors.New("vote with no active motion — emit MOTION: conclude or MOTION: propose_plan before voting")
+			}
+			return rtpkg.StatementVote, rest, nil, &rtpkg.Vote{MotionSeq: motionSeq, Value: value, Reason: reason}, nil
 		}
-		motionSeq := lastMotionSeq(rt)
-		if motionSeq == 0 {
-			return rtpkg.StatementChat, raw, nil, nil, errors.New("vote with no active motion")
-		}
-		return rtpkg.StatementVote, rest, nil, &rtpkg.Vote{MotionSeq: motionSeq, Value: value, Reason: reason}, nil
 	}
 
 	return rtpkg.StatementChat, content, nil, nil, nil
+}
+
+// stripMarkdownLinePrefix removes leading whitespace and common markdown
+// formatting characters so that markers like MOTION: or VOTE: can be detected
+// even when wrapped in bold, headings, or blockquotes.
+func stripMarkdownLinePrefix(line string) string {
+	s := strings.TrimSpace(line)
+	for {
+		switch {
+		case strings.HasPrefix(s, "**"):
+			s = strings.TrimPrefix(s, "**")
+		case strings.HasPrefix(s, "*"):
+			s = strings.TrimPrefix(s, "*")
+		case strings.HasPrefix(s, "#"):
+			s = strings.TrimPrefix(s, "#")
+		case strings.HasPrefix(s, ">"):
+			s = strings.TrimPrefix(s, ">")
+		case strings.HasPrefix(s, "-"):
+			s = strings.TrimPrefix(s, "-")
+		default:
+			return strings.TrimSpace(s)
+		}
+	}
 }
 
 func parseMotionType(s string) rtpkg.MotionType {
