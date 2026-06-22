@@ -38,8 +38,10 @@ func (g *GlobToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *
 	cappedWidth := cappedMessageWidth(width)
 
 	var params tools.GlobParams
-	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
-		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+	if opts.ToolCall.Input != "" {
+		if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
+			return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+		}
 	}
 
 	if opts.IsPending() {
@@ -98,8 +100,10 @@ func (g *GrepToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *
 	cappedWidth := cappedMessageWidth(width)
 
 	var params tools.GrepParams
-	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
-		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+	if opts.ToolCall.Input != "" {
+		if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
+			return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+		}
 	}
 
 	if opts.IsPending() {
@@ -164,8 +168,10 @@ func (l *LSToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *To
 	cappedWidth := cappedMessageWidth(width)
 
 	var params tools.LSParams
-	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
-		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+	if opts.ToolCall.Input != "" {
+		if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
+			return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+		}
 	}
 
 	path := params.Path
@@ -225,8 +231,10 @@ func (s *SourcegraphToolRenderContext) RenderTool(sty *styles.Styles, width int,
 	cappedWidth := cappedMessageWidth(width)
 
 	var params tools.SourcegraphParams
-	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
-		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+	if opts.ToolCall.Input != "" {
+		if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
+			return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+		}
 	}
 
 	if opts.IsPending() {

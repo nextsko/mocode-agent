@@ -37,8 +37,10 @@ func (f *FetchToolRenderContext) RenderTool(sty *styles.Styles, width int, opts 
 	cappedWidth := cappedMessageWidth(width)
 
 	var params tools.FetchParams
-	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
-		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+	if opts.ToolCall.Input != "" {
+		if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
+			return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+		}
 	}
 
 	if opts.IsPending() {

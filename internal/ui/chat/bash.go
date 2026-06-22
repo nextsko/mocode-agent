@@ -42,8 +42,10 @@ func (b *BashToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *
 	cappedWidth := cappedMessageWidth(width)
 
 	var params tools.BashParams
-	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
-		params.Command = "failed to parse command"
+	if opts.ToolCall.Input != "" {
+		if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
+			params.Command = "failed to parse command"
+		}
 	}
 
 	cmd := strings.ReplaceAll(params.Command, "\n", " ")
