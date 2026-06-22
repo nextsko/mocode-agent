@@ -11,7 +11,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/filepathext"
@@ -320,7 +320,7 @@ func readFile(
 	relPath, err := filepath.Rel(absWorkingDir, absFilePath)
 	isOutsideWorkDir := err != nil || strings.HasPrefix(relPath, "..")
 
-	sessionID := shared.GetSessionFromContext(ctx)
+	sessionID := toolutil.GetSessionFromContext(ctx)
 	if isOutsideWorkDir && sessionID != "" {
 		granted, permErr := permissions.Request(ctx,
 			permission.CreatePermissionRequest{

@@ -5,7 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/session"
@@ -38,9 +38,9 @@ type TodosResponseMetadata struct {
 func NewTodosTool(sessions session.Service) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		TodosToolName,
-		shared.FirstLineDescription(todosDescription),
+		toolutil.FirstLineDescription(todosDescription),
 		func(ctx context.Context, params TodosParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			sessionID := shared.GetSessionFromContext(ctx)
+			sessionID := toolutil.GetSessionFromContext(ctx)
 			if sessionID == "" {
 				return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for managing todos")
 			}

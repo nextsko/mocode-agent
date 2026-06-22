@@ -6,7 +6,7 @@ import (
 	_ "embed"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 )
 
 //go:embed think.md
@@ -32,7 +32,7 @@ type ThinkResponseMetadata struct {
 func NewThinkTool() fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		ThinkToolName,
-		shared.FirstLineDescription(thinkDescription),
+		toolutil.FirstLineDescription(thinkDescription),
 		func(_ context.Context, params ThinkParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			meta := ThinkResponseMetadata{Thought: params.Thought}
 			return fantasy.WithResponseMetadata(

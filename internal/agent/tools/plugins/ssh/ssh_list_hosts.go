@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 )
 
 //go:embed ssh_list_hosts.md
@@ -45,7 +45,7 @@ type HostInfo struct {
 func NewSshListHostsTool(svc *Service) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		SshListHostsToolName,
-		shared.FirstLineDescription(sshListHostsDescription),
+		toolutil.FirstLineDescription(sshListHostsDescription),
 		func(_ context.Context, _ SshListHostsParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			path := ConfigPath()
 			if path == "" {

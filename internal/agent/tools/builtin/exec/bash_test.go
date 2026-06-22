@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/config"
@@ -44,7 +44,7 @@ func (m *mockBashPermissionService) SubscribeNotifications(ctx context.Context) 
 func TestBashTool_DefaultAutoBackgroundThreshold(t *testing.T) {
 	workingDir := t.TempDir()
 	tool := newBashToolForTest(workingDir)
-	ctx := context.WithValue(context.Background(), shared.SessionIDContextKeyVal, "test-session")
+	ctx := context.WithValue(context.Background(), toolutil.SessionIDContextKeyVal, "test-session")
 
 	resp := runBashTool(t, tool, ctx, BashParams{
 		Description: "default threshold",
@@ -62,7 +62,7 @@ func TestBashTool_DefaultAutoBackgroundThreshold(t *testing.T) {
 func TestBashTool_CustomAutoBackgroundThreshold(t *testing.T) {
 	workingDir := t.TempDir()
 	tool := newBashToolForTest(workingDir)
-	ctx := context.WithValue(context.Background(), shared.SessionIDContextKeyVal, "test-session")
+	ctx := context.WithValue(context.Background(), toolutil.SessionIDContextKeyVal, "test-session")
 
 	resp := runBashTool(t, tool, ctx, BashParams{
 		Description:         "custom threshold",

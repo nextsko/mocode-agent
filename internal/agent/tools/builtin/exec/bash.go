@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 	"github.com/package-register/mocode/internal/errcoll"
 
 	"charm.land/fantasy"
@@ -226,7 +226,7 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 			record := func(category errcoll.ErrorCategory, err error, msg string) {
 				if c := errcoll.FromContext(ctx); c != nil {
 					c.Record(errcoll.ErrorRecord{
-						SessionID: shared.GetSessionFromContext(ctx),
+						SessionID: toolutil.GetSessionFromContext(ctx),
 						ToolName:  BashToolName,
 						Command:   params.Command,
 						Error:     msg,
@@ -254,7 +254,7 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 				}
 			}
 
-			sessionID := shared.GetSessionFromContext(ctx)
+			sessionID := toolutil.GetSessionFromContext(ctx)
 			if sessionID == "" {
 				msg := "session ID is required for executing shell command"
 				record(errcoll.CategoryToolExecution, nil, msg)
@@ -280,7 +280,7 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 				}
 				if !p {
 					record(errcoll.CategoryPermission, nil, "permission denied")
-					return shared.NewPermissionDeniedResponse(), nil
+					return toolutil.NewPermissionDeniedResponse(), nil
 				}
 			}
 

@@ -1,13 +1,11 @@
-package capability_test
+package toolutil_test
 
 import (
 	"context"
 	"testing"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/toolutil/callback"
-	"github.com/package-register/mocode/internal/agent/toolutil/capability"
-	"github.com/package-register/mocode/internal/agent/toolutil/retry"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,7 +45,7 @@ func (w *wrapperTool) Unwrap() fantasy.AgentTool { return w.inner }
 func TestAs_BareToolFound(t *testing.T) {
 	t.Parallel()
 	tool := &simpleTool{name: "bare"}
-	got, ok := capability.As[*simpleTool](tool)
+	got, ok := toolutil.As[*simpleTool](tool)
 	require.True(t, ok)
 	assert.Equal(t, tool, got)
 }
@@ -55,14 +53,14 @@ func TestAs_BareToolFound(t *testing.T) {
 func TestAs_InterfaceMiss_ReturnsZeroFalse(t *testing.T) {
 	t.Parallel()
 	tool := &simpleTool{name: "bare"}
-	got, ok := capability.As[capability.Instructable](tool)
+	got, ok := toolutil.As[toolutil.Instructable](tool)
 	assert.False(t, ok)
 	assert.Nil(t, got)
 }
 
 func TestAs_NilInput_ReturnsZeroFalse(t *testing.T) {
 	t.Parallel()
-	got, ok := capability.As[capability.Instructable](nil)
+	got, ok := toolutil.As[toolutil.Instructable](nil)
 	assert.False(t, ok)
 	assert.Nil(t, got)
 }
@@ -74,7 +72,7 @@ func TestAs_TwoLayerChain_FindsInner(t *testing.T) {
 	inner := &instructableTool{simpleTool: simpleTool{name: "inner"}, instructions: "help text"}
 	outer := &wrapperTool{simpleTool: simpleTool{name: "outer"}, inner: inner}
 
-	got, ok := capability.As[capability.Instructable](outer)
+	got, ok := toolutil.As[toolutil.Instructable](outer)
 	require.True(t, ok)
 	assert.Equal(t, "help text", got.Instructions())
 }
@@ -85,7 +83,7 @@ func TestAs_ThreeLayerChain_FindsDeepInner(t *testing.T) {
 	mid := &wrapperTool{simpleTool: simpleTool{name: "mid"}, inner: deepInner}
 	outer := &wrapperTool{simpleTool: simpleTool{name: "outer"}, inner: mid}
 
-	got, ok := capability.As[capability.Instructable](outer)
+	got, ok := toolutil.As[toolutil.Instructable](outer)
 	require.True(t, ok)
 	assert.Equal(t, "deep help", got.Instructions())
 }
@@ -95,7 +93,7 @@ func TestAs_ChainMiss_ReturnsZeroFalse(t *testing.T) {
 	inner := &simpleTool{name: "inner"}
 	outer := &wrapperTool{simpleTool: simpleTool{name: "outer"}, inner: inner}
 
-	got, ok := capability.As[capability.Instructable](outer)
+	got, ok := toolutil.As[toolutil.Instructable](outer)
 	assert.False(t, ok)
 	assert.Nil(t, got)
 }
@@ -120,7 +118,7 @@ func TestAs_OutermostMatchWinsBeforeUnwrap(t *testing.T) {
 		instructions: "outer help",
 		inner:        inner,
 	}
-	got, ok := capability.As[capability.Instructable](outer)
+	got, ok := toolutil.As[toolutil.Instructable](outer)
 	require.True(t, ok)
 	assert.Equal(t, "outer help", got.Instructions())
 }
@@ -130,25 +128,25 @@ func TestAs_OutermostMatchWinsBeforeUnwrap(t *testing.T) {
 func TestGetInstructions_InstructableTool_ReturnsString(t *testing.T) {
 	t.Parallel()
 	tool := &instructableTool{simpleTool: simpleTool{name: "t"}, instructions: "do this"}
-	assert.Equal(t, "do this", capability.GetInstructions(tool))
+	assert.Equal(t, "do this", toolutil.GetInstructions(tool))
 }
 
 func TestGetInstructions_NonInstructable_ReturnsEmpty(t *testing.T) {
 	t.Parallel()
 	tool := &simpleTool{name: "plain"}
-	assert.Equal(t, "", capability.GetInstructions(tool))
+	assert.Equal(t, "", toolutil.GetInstructions(tool))
 }
 
 func TestGetInstructions_WrappedInstructable_WalksChain(t *testing.T) {
 	t.Parallel()
 	inner := &instructableTool{simpleTool: simpleTool{name: "i"}, instructions: "chain help"}
 	outer := &wrapperTool{simpleTool: simpleTool{name: "o"}, inner: inner}
-	assert.Equal(t, "chain help", capability.GetInstructions(outer))
+	assert.Equal(t, "chain help", toolutil.GetInstructions(outer))
 }
 
 func TestGetInstructions_NilTool_ReturnsEmpty(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, "", capability.GetInstructions(nil))
+	assert.Equal(t, "", toolutil.GetInstructions(nil))
 }
 
 // ─── Real decorator stack integration ────────────────────────────────────────
@@ -158,9 +156,9 @@ func TestGetInstructions_NilTool_ReturnsEmpty(t *testing.T) {
 func TestAs_ThroughRetryDecorator(t *testing.T) {
 	t.Parallel()
 	inner := &instructableTool{simpleTool: simpleTool{name: "inner"}, instructions: "via retry"}
-	wrapped := retry.Wrap(inner, retry.Policy{MaxAttempts: 2})
+	wrapped := toolutil.WithRetry(inner, toolutil.RetryPolicy{MaxAttempts: 2})
 
-	got, ok := capability.As[capability.Instructable](wrapped)
+	got, ok := toolutil.As[toolutil.Instructable](wrapped)
 	require.True(t, ok)
 	assert.Equal(t, "via retry", got.Instructions())
 }
@@ -168,12 +166,12 @@ func TestAs_ThroughRetryDecorator(t *testing.T) {
 func TestAs_ThroughCallbackDecorator(t *testing.T) {
 	t.Parallel()
 	inner := &instructableTool{simpleTool: simpleTool{name: "inner"}, instructions: "via callback"}
-	noop := callback.BeforeFunc(func(_ context.Context, _ *callback.BeforeArgs) (*callback.BeforeResult, error) {
+	noop := toolutil.BeforeFunc(func(_ context.Context, _ *toolutil.BeforeArgs) (*toolutil.BeforeResult, error) {
 		return nil, nil
 	})
-	wrapped := callback.Wrap(inner, noop)
+	wrapped := toolutil.Wrap(inner, noop)
 
-	got, ok := capability.As[capability.Instructable](wrapped)
+	got, ok := toolutil.As[toolutil.Instructable](wrapped)
 	require.True(t, ok)
 	assert.Equal(t, "via callback", got.Instructions())
 }
@@ -182,13 +180,13 @@ func TestAs_ThroughCallbackThenRetry_FullStack(t *testing.T) {
 	t.Parallel()
 	// Stack: callback → retry → instructableTool
 	inner := &instructableTool{simpleTool: simpleTool{name: "deep"}, instructions: "deep stack"}
-	withRetry := retry.Wrap(inner, retry.Policy{MaxAttempts: 2})
-	noop := callback.BeforeFunc(func(_ context.Context, _ *callback.BeforeArgs) (*callback.BeforeResult, error) {
+	withRetry := toolutil.WithRetry(inner, toolutil.RetryPolicy{MaxAttempts: 2})
+	noop := toolutil.BeforeFunc(func(_ context.Context, _ *toolutil.BeforeArgs) (*toolutil.BeforeResult, error) {
 		return nil, nil
 	})
-	withCallback := callback.Wrap(withRetry, noop)
+	withCallback := toolutil.Wrap(withRetry, noop)
 
-	got, ok := capability.As[capability.Instructable](withCallback)
+	got, ok := toolutil.As[toolutil.Instructable](withCallback)
 	require.True(t, ok)
 	assert.Equal(t, "deep stack", got.Instructions())
 }
@@ -196,9 +194,9 @@ func TestAs_ThroughCallbackThenRetry_FullStack(t *testing.T) {
 func TestRetryWrap_Unwrap_ReturnsInner(t *testing.T) {
 	t.Parallel()
 	inner := &simpleTool{name: "base"}
-	wrapped := retry.Wrap(inner, retry.Policy{MaxAttempts: 3})
+	wrapped := toolutil.WithRetry(inner, toolutil.RetryPolicy{MaxAttempts: 3})
 	// When retry is active, Unwrap should return inner.
-	got, ok := capability.As[*simpleTool](wrapped)
+	got, ok := toolutil.As[*simpleTool](wrapped)
 	require.True(t, ok)
 	assert.Equal(t, inner, got)
 }
@@ -206,11 +204,11 @@ func TestRetryWrap_Unwrap_ReturnsInner(t *testing.T) {
 func TestCallbackWrap_Unwrap_ReturnsInner(t *testing.T) {
 	t.Parallel()
 	inner := &simpleTool{name: "base"}
-	noop := callback.BeforeFunc(func(_ context.Context, _ *callback.BeforeArgs) (*callback.BeforeResult, error) {
+	noop := toolutil.BeforeFunc(func(_ context.Context, _ *toolutil.BeforeArgs) (*toolutil.BeforeResult, error) {
 		return nil, nil
 	})
-	wrapped := callback.Wrap(inner, noop)
-	got, ok := capability.As[*simpleTool](wrapped)
+	wrapped := toolutil.Wrap(inner, noop)
+	got, ok := toolutil.As[*simpleTool](wrapped)
 	require.True(t, ok)
 	assert.Equal(t, inner, got)
 }

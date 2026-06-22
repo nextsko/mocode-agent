@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/package-register/mocode/internal/agent/tools/plugins/search"
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"
@@ -39,7 +39,7 @@ var referencesDescription []byte
 func NewReferencesTool(lspManager *lsp.Manager) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		ReferencesToolName,
-		shared.FirstLineDescription(referencesDescription),
+		toolutil.FirstLineDescription(referencesDescription),
 		func(ctx context.Context, params ReferencesParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.Symbol == "" {
 				return fantasy.NewTextErrorResponse("symbol is required"), nil

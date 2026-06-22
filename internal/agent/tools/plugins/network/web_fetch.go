@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 )
@@ -33,7 +33,7 @@ func NewWebFetchTool(workingDir string, client *http.Client) fantasy.AgentTool {
 
 	return fantasy.NewParallelAgentTool(
 		WebFetchToolName,
-		shared.FirstLineDescription(webFetchToolDescription),
+		toolutil.FirstLineDescription(webFetchToolDescription),
 		func(ctx context.Context, params WebFetchParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.URL == "" {
 				return fantasy.NewTextErrorResponse("url is required"), nil

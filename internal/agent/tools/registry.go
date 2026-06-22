@@ -17,8 +17,7 @@ import (
 	sessiontool "github.com/package-register/mocode/internal/agent/tools/plugins/session"
 	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh"
 	"github.com/package-register/mocode/internal/agent/tools/plugins/think"
-	"github.com/package-register/mocode/internal/agent/toolutil/capability"
-	"github.com/package-register/mocode/internal/agent/toolutil/retry"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/filetracker"
 	"github.com/package-register/mocode/internal/history"
@@ -235,11 +234,11 @@ func (networkPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool
 	cfg := deps.Cfg.Config()
 	webClient := cfg.HTTPClient(deps.Cfg.Resolver(), 30)
 	downloadClient := cfg.HTTPClient(deps.Cfg.Resolver(), 300)
-	retryPolicy := retry.DefaultPolicy()
+	retryPolicy := toolutil.DefaultRetryPolicy()
 	return []fantasy.AgentTool{
-		retry.Wrap(network.NewFetchTool(deps.Permissions, wd, webClient), retryPolicy),
-		retry.Wrap(network.NewCrawlTool(webClient), retryPolicy),
-		retry.Wrap(network.NewDownloadTool(deps.Permissions, wd, downloadClient), retryPolicy),
+		toolutil.WithRetry(network.NewFetchTool(deps.Permissions, wd, webClient), retryPolicy),
+		toolutil.WithRetry(network.NewCrawlTool(webClient), retryPolicy),
+		toolutil.WithRetry(network.NewDownloadTool(deps.Permissions, wd, downloadClient), retryPolicy),
 		network.NewDownloadDocsTool(cfg.ResolvedProxyURL(deps.Cfg.Resolver())),
 	}
 }
@@ -473,13 +472,13 @@ func (r *Registry) AddPlugin(p ToolPlugin) {
 	r.plugins = append(r.plugins, p)
 }
 
-// StartAll calls Start on every plugin that implements capability.Startable.
+// StartAll calls Start on every plugin that implements toolutil.Startable.
 // It stops on the first error and returns it wrapped with the plugin name.
 // Non-startable plugins are silently skipped.
 // Inspired by docker-agent/pkg/tools/startable.go.
 func (r *Registry) StartAll(ctx context.Context) error {
 	for _, p := range r.plugins {
-		if s, ok := p.(capability.Startable); ok {
+		if s, ok := p.(toolutil.Startable); ok {
 			if err := s.Start(ctx); err != nil {
 				return fmt.Errorf("StartAll: plugin start failed: %w", err)
 			}
@@ -488,13 +487,13 @@ func (r *Registry) StartAll(ctx context.Context) error {
 	return nil
 }
 
-// StopAll calls Stop on every plugin that implements capability.Startable.
+// StopAll calls Stop on every plugin that implements toolutil.Startable.
 // It continues through all plugins on error, collecting the last error seen.
 // Non-startable plugins are silently skipped.
 func (r *Registry) StopAll(ctx context.Context) error {
 	var lastErr error
 	for _, p := range r.plugins {
-		if s, ok := p.(capability.Startable); ok {
+		if s, ok := p.(toolutil.Startable); ok {
 			if err := s.Stop(ctx); err != nil {
 				lastErr = fmt.Errorf("StopAll: plugin stop failed: %w", err)
 			}

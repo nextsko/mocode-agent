@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/crawler"
@@ -32,7 +32,7 @@ type CrawlParams struct {
 func NewCrawlTool(client ...*http.Client) fantasy.AgentTool {
 	return fantasy.NewParallelAgentTool(
 		CrawlToolName,
-		shared.FirstLineDescription(crawlDescription),
+		toolutil.FirstLineDescription(crawlDescription),
 		func(ctx context.Context, params CrawlParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.URL == "" {
 				return fantasy.NewTextErrorResponse("URL parameter is required"), nil

@@ -1,6 +1,4 @@
-// Package lsputil provides LSP helper functions shared by tool sub-packages.
-// It must not import from the root tools package to avoid import cycles.
-package lsputil
+package toolutil
 
 import (
 	"context"

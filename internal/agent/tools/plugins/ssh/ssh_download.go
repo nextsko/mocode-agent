@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 	"github.com/package-register/mocode/internal/permission"
 )
 
@@ -40,7 +40,7 @@ type SshDownloadResponseMetadata struct {
 func NewSshDownloadTool(svc *Service, permissions permission.Service) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		SshDownloadToolName,
-		shared.FirstLineDescription(sshDownloadDescription),
+		toolutil.FirstLineDescription(sshDownloadDescription),
 		func(ctx context.Context, params SshDownloadParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.Host == "" {
 				return fantasy.NewTextErrorResponse("host is required"), nil
@@ -77,7 +77,7 @@ func NewSshDownloadTool(svc *Service, permissions permission.Service) fantasy.Ag
 				return fantasy.ToolResponse{}, err
 			}
 			if !granted {
-				return shared.NewPermissionDeniedResponse(), nil
+				return toolutil.NewPermissionDeniedResponse(), nil
 			}
 
 			client, spec, err := svc.acquireClient(ctx, params.Host)

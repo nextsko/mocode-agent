@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
@@ -33,14 +33,14 @@ var listMCPResourcesDescription []byte
 func NewListMCPResourcesTool(cfg *config.ConfigStore, permissions permission.Service) fantasy.AgentTool {
 	return fantasy.NewParallelAgentTool(
 		ListMCPResourcesToolName,
-		shared.FirstLineDescription(listMCPResourcesDescription),
+		toolutil.FirstLineDescription(listMCPResourcesDescription),
 		func(ctx context.Context, params ListMCPResourcesParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			params.MCPName = strings.TrimSpace(params.MCPName)
 			if params.MCPName == "" {
 				return fantasy.NewTextErrorResponse("mcp_name parameter is required"), nil
 			}
 
-			sessionID := shared.GetSessionFromContext(ctx)
+			sessionID := toolutil.GetSessionFromContext(ctx)
 			if sessionID == "" {
 				return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for listing MCP resources")
 			}
@@ -61,7 +61,7 @@ func NewListMCPResourcesTool(cfg *config.ConfigStore, permissions permission.Ser
 				return fantasy.ToolResponse{}, err
 			}
 			if !p {
-				return shared.NewPermissionDeniedResponse(), nil
+				return toolutil.NewPermissionDeniedResponse(), nil
 			}
 
 			resources, err := mcp.ListResources(ctx, cfg, params.MCPName)

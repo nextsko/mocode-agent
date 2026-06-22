@@ -5,8 +5,7 @@ import (
 	_ "embed"
 
 	"charm.land/fantasy"
-	lsputil "github.com/package-register/mocode/internal/agent/toolutil/lsputil"
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 	"github.com/package-register/mocode/internal/lsp"
 )
 
@@ -22,13 +21,13 @@ var diagnosticsDescription []byte
 func NewDiagnosticsTool(lspManager *lsp.Manager) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		DiagnosticsToolName,
-		shared.FirstLineDescription(diagnosticsDescription),
+		toolutil.FirstLineDescription(diagnosticsDescription),
 		func(ctx context.Context, params DiagnosticsParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if lspManager.Clients().Len() == 0 {
 				return fantasy.NewTextErrorResponse("no LSP clients available"), nil
 			}
-			lsputil.NotifyLSPs(ctx, lspManager, params.FilePath)
-			output := lsputil.GetDiagnostics(params.FilePath, lspManager)
+			toolutil.NotifyLSPs(ctx, lspManager, params.FilePath)
+			output := toolutil.GetDiagnostics(params.FilePath, lspManager)
 			return fantasy.NewTextResponse(output), nil
 		})
 }

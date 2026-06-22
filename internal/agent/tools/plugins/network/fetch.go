@@ -10,7 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 	"github.com/package-register/mocode/internal/errcoll"
 
 	"charm.land/fantasy"
@@ -42,12 +42,12 @@ func NewFetchTool(permissions permission.Service, workingDir string, client *htt
 
 	return fantasy.NewParallelAgentTool(
 		FetchToolName,
-		shared.FirstLineDescription(fetchDescription),
+		toolutil.FirstLineDescription(fetchDescription),
 		func(ctx context.Context, params FetchParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			record := func(category errcoll.ErrorCategory, err error, msg string) {
 				if c := errcoll.FromContext(ctx); c != nil {
 					c.Record(errcoll.ErrorRecord{
-						SessionID: shared.GetSessionFromContext(ctx),
+						SessionID: toolutil.GetSessionFromContext(ctx),
 						ToolName:  FetchToolName,
 						Error:     msg,
 						Category:  category,
@@ -68,7 +68,7 @@ func NewFetchTool(permissions permission.Service, workingDir string, client *htt
 				return fantasy.NewTextErrorResponse("URL must start with http:// or https://"), nil
 			}
 
-			sessionID := shared.GetSessionFromContext(ctx)
+			sessionID := toolutil.GetSessionFromContext(ctx)
 			if sessionID == "" {
 				msg := "session ID is required for fetch"
 				record(errcoll.CategoryToolExecution, nil, msg)
@@ -93,7 +93,7 @@ func NewFetchTool(permissions permission.Service, workingDir string, client *htt
 			}
 			if !p {
 				record(errcoll.CategoryPermission, nil, "permission denied")
-				return shared.NewPermissionDeniedResponse(), nil
+				return toolutil.NewPermissionDeniedResponse(), nil
 			}
 
 			// maxFetchTimeoutSeconds is the maximum allowed timeout for fetch requests (2 minutes)

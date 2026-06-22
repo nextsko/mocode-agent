@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/lsp"
@@ -29,7 +29,7 @@ type LSPRestartParams struct {
 func NewLSPRestartTool(lspManager *lsp.Manager) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		LSPRestartToolName,
-		shared.FirstLineDescription(lspRestartDescription),
+		toolutil.FirstLineDescription(lspRestartDescription),
 		func(ctx context.Context, params LSPRestartParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if lspManager.Clients().Len() == 0 {
 				return fantasy.NewTextErrorResponse("no LSP clients available to restart"), nil

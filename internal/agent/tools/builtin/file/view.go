@@ -13,8 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/lsputil"
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/filepathext"
@@ -71,7 +70,7 @@ func NewViewTool(
 ) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		ViewToolName,
-		shared.FirstLineDescription(viewDescription),
+		toolutil.FirstLineDescription(viewDescription),
 		func(ctx context.Context, params ViewParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.FilePath == "" {
 				return fantasy.NewTextErrorResponse("file_path is required"), nil
@@ -101,7 +100,7 @@ func NewViewTool(
 			isOutsideWorkDir := err != nil || strings.HasPrefix(relPath, "..")
 			isSkillFile := isInSkillsPath(absFilePath, skillsPaths)
 
-			sessionID := shared.GetSessionFromContext(ctx)
+			sessionID := toolutil.GetSessionFromContext(ctx)
 			if sessionID == "" {
 				return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for accessing files outside working directory")
 			}
@@ -123,7 +122,7 @@ func NewViewTool(
 					return fantasy.ToolResponse{}, permReqErr
 				}
 				if !granted {
-					return shared.NewPermissionDeniedResponse(), nil
+					return toolutil.NewPermissionDeniedResponse(), nil
 				}
 			}
 
@@ -181,8 +180,8 @@ func NewViewTool(
 
 			isSupportedImage, mimeType := getImageMimeType(filePath)
 			if isSupportedImage {
-				if !shared.GetSupportsImagesFromContext(ctx) {
-					modelName := shared.GetModelNameFromContext(ctx)
+				if !toolutil.GetSupportsImagesFromContext(ctx) {
+					modelName := toolutil.GetModelNameFromContext(ctx)
 					return fantasy.NewTextErrorResponse(fmt.Sprintf("This model (%s) does not support image data.", modelName)), nil
 				}
 
@@ -203,8 +202,8 @@ func NewViewTool(
 				return fantasy.NewTextErrorResponse("File content is not valid UTF-8"), nil
 			}
 
-			lsputil.OpenInLSPs(ctx, lspManager, filePath)
-			lsputil.WaitForLSPDiagnostics(ctx, lspManager, filePath, 300*time.Millisecond)
+			toolutil.OpenInLSPs(ctx, lspManager, filePath)
+			toolutil.WaitForLSPDiagnostics(ctx, lspManager, filePath, 300*time.Millisecond)
 			output := "<file>\n"
 			output += addLineNumbers(content, params.Offset+1)
 
@@ -213,7 +212,7 @@ func NewViewTool(
 					params.Offset+len(strings.Split(content, "\n")))
 			}
 			output += "\n</file>\n"
-			output += lsputil.GetDiagnostics(filePath, lspManager)
+			output += toolutil.GetDiagnostics(filePath, lspManager)
 			filetracker.RecordRead(ctx, sessionID, filePath)
 
 			meta := ViewResponseMetadata{

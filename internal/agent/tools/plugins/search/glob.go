@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/fsext"
@@ -36,7 +36,7 @@ type GlobResponseMetadata struct {
 func NewGlobTool(workingDir string) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		GlobToolName,
-		shared.FirstLineDescription(globDescription),
+		toolutil.FirstLineDescription(globDescription),
 		func(ctx context.Context, params GlobParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.Pattern == "" {
 				return fantasy.NewTextErrorResponse("pattern is required"), nil

@@ -1,4 +1,4 @@
-package retry_test
+package toolutil_test
 
 import (
 	"context"
@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"charm.land/fantasy"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/retry"
 )
 
 // stubTool is a minimal fantasy.AgentTool that records call count and can be
@@ -36,8 +36,8 @@ func (s *stubTool) ProviderOptions() fantasy.ProviderOptions     { return fantas
 func (s *stubTool) SetProviderOptions(_ fantasy.ProviderOptions) {}
 
 // fastPolicy returns a policy with zero delays for test speed.
-func fastPolicy(maxAttempts int) retry.Policy {
-	return retry.Policy{
+func fastPolicy(maxAttempts int) toolutil.RetryPolicy {
+	return toolutil.RetryPolicy{
 		MaxAttempts:     maxAttempts,
 		InitialInterval: 0,
 		BackoffFactor:   1,
@@ -47,7 +47,7 @@ func fastPolicy(maxAttempts int) retry.Policy {
 func TestRetry_SuccessOnFirstAttempt(t *testing.T) {
 	t.Parallel()
 	stub := &stubTool{failFor: 0}
-	tool := retry.Wrap(stub, fastPolicy(3))
+	tool := toolutil.WithRetry(stub, fastPolicy(3))
 
 	resp, err := tool.Run(context.Background(), fantasy.ToolCall{})
 	require.NoError(t, err)
@@ -59,7 +59,7 @@ func TestRetry_SuccessAfterTransientFailures(t *testing.T) {
 	t.Parallel()
 	netErr := &net.OpError{Op: "read", Err: &timeoutError{}}
 	stub := &stubTool{failFor: 2, err: netErr}
-	tool := retry.Wrap(stub, fastPolicy(4))
+	tool := toolutil.WithRetry(stub, fastPolicy(4))
 
 	resp, err := tool.Run(context.Background(), fantasy.ToolCall{})
 	require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestRetry_ExhaustsAttemptsReturnsLastError(t *testing.T) {
 	t.Parallel()
 	netErr := &net.OpError{Op: "read", Err: &timeoutError{}}
 	stub := &stubTool{failFor: 10, err: netErr}
-	tool := retry.Wrap(stub, fastPolicy(3))
+	tool := toolutil.WithRetry(stub, fastPolicy(3))
 
 	_, err := tool.Run(context.Background(), fantasy.ToolCall{})
 	require.Error(t, err)
@@ -82,7 +82,7 @@ func TestRetry_NonRetriableErrorNotRetried(t *testing.T) {
 	t.Parallel()
 	permanentErr := errors.New("permission denied")
 	stub := &stubTool{failFor: 10, err: permanentErr}
-	tool := retry.Wrap(stub, fastPolicy(5))
+	tool := toolutil.WithRetry(stub, fastPolicy(5))
 
 	_, err := tool.Run(context.Background(), fantasy.ToolCall{})
 	require.Error(t, err)
@@ -92,7 +92,7 @@ func TestRetry_NonRetriableErrorNotRetried(t *testing.T) {
 func TestRetry_EOFIsRetried(t *testing.T) {
 	t.Parallel()
 	stub := &stubTool{failFor: 2, err: io.EOF}
-	tool := retry.Wrap(stub, fastPolicy(5))
+	tool := toolutil.WithRetry(stub, fastPolicy(5))
 
 	resp, err := tool.Run(context.Background(), fantasy.ToolCall{})
 	require.NoError(t, err)
@@ -105,7 +105,7 @@ func TestRetry_ContextCancellationStopsRetrying(t *testing.T) {
 	netErr := &net.OpError{Op: "read", Err: &timeoutError{}}
 	stub := &stubTool{failFor: 10, err: netErr}
 
-	p := retry.Policy{
+	p := toolutil.RetryPolicy{
 		MaxAttempts:     10,
 		InitialInterval: 50 * time.Millisecond,
 		BackoffFactor:   1,
@@ -113,7 +113,7 @@ func TestRetry_ContextCancellationStopsRetrying(t *testing.T) {
 			return true // always says yes, but ctx cancellation should stop
 		},
 	}
-	tool := retry.Wrap(stub, p)
+	tool := toolutil.WithRetry(stub, p)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
 	defer cancel()
@@ -130,20 +130,20 @@ func TestRetry_MaxAttemptsBelowTwoDisablesRetry(t *testing.T) {
 	stub := &stubTool{failFor: 5, err: netErr}
 
 	// MaxAttempts < 2 → Wrap returns inner directly, no retry wrapper
-	tool := retry.Wrap(stub, retry.Policy{MaxAttempts: 1})
+	tool := toolutil.WithRetry(stub, toolutil.RetryPolicy{MaxAttempts: 1})
 	require.Equal(t, stub, tool) // same pointer, no wrapper
 }
 
 func TestRetry_InfoDelegatedToInner(t *testing.T) {
 	t.Parallel()
 	stub := &stubTool{}
-	tool := retry.Wrap(stub, fastPolicy(3))
+	tool := toolutil.WithRetry(stub, fastPolicy(3))
 	require.Equal(t, "stub", tool.Info().Name)
 }
 
 func TestDefaultPolicy(t *testing.T) {
 	t.Parallel()
-	p := retry.DefaultPolicy()
+	p := toolutil.DefaultRetryPolicy()
 	require.Equal(t, 3, p.MaxAttempts)
 	require.True(t, p.Jitter)
 	require.Greater(t, p.InitialInterval, time.Duration(0))
@@ -153,13 +153,13 @@ func TestDefaultShouldRetry(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	require.False(t, retry.DefaultShouldRetry(ctx, 1, nil))
-	require.False(t, retry.DefaultShouldRetry(ctx, 1, context.Canceled))
-	require.False(t, retry.DefaultShouldRetry(ctx, 1, context.DeadlineExceeded))
-	require.True(t, retry.DefaultShouldRetry(ctx, 1, io.EOF))
-	require.True(t, retry.DefaultShouldRetry(ctx, 1, io.ErrUnexpectedEOF))
-	require.True(t, retry.DefaultShouldRetry(ctx, 1, &net.OpError{Op: "r", Err: &timeoutError{}}))
-	require.False(t, retry.DefaultShouldRetry(ctx, 1, errors.New("other")))
+	require.False(t, toolutil.DefaultShouldRetry(ctx, 1, nil))
+	require.False(t, toolutil.DefaultShouldRetry(ctx, 1, context.Canceled))
+	require.False(t, toolutil.DefaultShouldRetry(ctx, 1, context.DeadlineExceeded))
+	require.True(t, toolutil.DefaultShouldRetry(ctx, 1, io.EOF))
+	require.True(t, toolutil.DefaultShouldRetry(ctx, 1, io.ErrUnexpectedEOF))
+	require.True(t, toolutil.DefaultShouldRetry(ctx, 1, &net.OpError{Op: "r", Err: &timeoutError{}}))
+	require.False(t, toolutil.DefaultShouldRetry(ctx, 1, errors.New("other")))
 }
 
 // timeoutError implements net.Error with Timeout() == true.

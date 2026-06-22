@@ -10,8 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/lsputil"
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/diff"
@@ -55,7 +54,7 @@ func NewWriteTool(
 ) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		WriteToolName,
-		shared.FirstLineDescription(writeDescription),
+		toolutil.FirstLineDescription(writeDescription),
 		func(ctx context.Context, params WriteParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.FilePath == "" {
 				return fantasy.NewTextErrorResponse("file_path is required"), nil
@@ -65,7 +64,7 @@ func NewWriteTool(
 				return fantasy.NewTextErrorResponse("content is required"), nil
 			}
 
-			sessionID := shared.GetSessionFromContext(ctx)
+			sessionID := toolutil.GetSessionFromContext(ctx)
 			if sessionID == "" {
 				return fantasy.ToolResponse{}, fmt.Errorf("session_id is required")
 			}
@@ -131,7 +130,7 @@ func NewWriteTool(
 				return fantasy.ToolResponse{}, err
 			}
 			if !p {
-				return shared.NewPermissionDeniedResponse(), nil
+				return toolutil.NewPermissionDeniedResponse(), nil
 			}
 
 			err = os.WriteFile(filePath, []byte(params.Content), 0o644)
@@ -163,11 +162,11 @@ func NewWriteTool(
 
 			filetracker.RecordRead(ctx, sessionID, filePath)
 
-			lsputil.NotifyLSPs(ctx, lspManager, params.FilePath)
+			toolutil.NotifyLSPs(ctx, lspManager, params.FilePath)
 
 			result := fmt.Sprintf("File successfully written: %s", filePath)
 			result = fmt.Sprintf("<result>\n%s\n</result>", result)
-			result += lsputil.GetDiagnostics(filePath, lspManager)
+			result += toolutil.GetDiagnostics(filePath, lspManager)
 			return fantasy.WithResponseMetadata(fantasy.NewTextResponse(result),
 				WriteResponseMetadata{
 					Diff:      diff,

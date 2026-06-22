@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 )
@@ -31,7 +31,7 @@ func NewWebSearchTool(client *http.Client) fantasy.AgentTool {
 
 	return fantasy.NewParallelAgentTool(
 		WebSearchToolName,
-		shared.FirstLineDescription(webSearchToolDescription),
+		toolutil.FirstLineDescription(webSearchToolDescription),
 		func(ctx context.Context, params WebSearchParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.Query == "" {
 				return fantasy.NewTextErrorResponse("query is required"), nil

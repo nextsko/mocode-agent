@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/tools/shell"
@@ -35,7 +35,7 @@ type JobOutputResponseMetadata struct {
 func NewJobOutputTool() fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		JobOutputToolName,
-		shared.FirstLineDescription(jobOutputDescription),
+		toolutil.FirstLineDescription(jobOutputDescription),
 		func(ctx context.Context, params JobOutputParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.ShellID == "" {
 				return fantasy.NewTextErrorResponse("missing shell_id"), nil

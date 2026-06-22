@@ -1,19 +1,4 @@
-// Package toolctx provides context helpers for propagating tool call metadata
-// through the call stack.
-//
-// Inspired by ToolCallIDFromContext in trpc-agent-go/tool/context.go.
-//
-// The callback.wrappedTool.Run injects the call ID before invoking the
-// before-chain, so any code running inside the tool (including inner layers
-// of a decorator stack) can read it without extra parameters.
-//
-// Usage:
-//
-//	// Inside a tool implementation:
-//	if id, ok := toolctx.ToolCallIDFromCtx(ctx); ok {
-//	    log.Printf("processing call %s", id)
-//	}
-package toolctx
+package toolutil
 
 import "context"
 

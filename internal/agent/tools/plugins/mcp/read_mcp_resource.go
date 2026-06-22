@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
@@ -35,7 +35,7 @@ var readMCPResourceDescription []byte
 func NewReadMCPResourceTool(cfg *config.ConfigStore, permissions permission.Service) fantasy.AgentTool {
 	return fantasy.NewParallelAgentTool(
 		ReadMCPResourceToolName,
-		shared.FirstLineDescription(readMCPResourceDescription),
+		toolutil.FirstLineDescription(readMCPResourceDescription),
 		func(ctx context.Context, params ReadMCPResourceParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			params.MCPName = strings.TrimSpace(params.MCPName)
 			params.URI = strings.TrimSpace(params.URI)
@@ -46,7 +46,7 @@ func NewReadMCPResourceTool(cfg *config.ConfigStore, permissions permission.Serv
 				return fantasy.NewTextErrorResponse("uri parameter is required"), nil
 			}
 
-			sessionID := shared.GetSessionFromContext(ctx)
+			sessionID := toolutil.GetSessionFromContext(ctx)
 			if sessionID == "" {
 				return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for reading MCP resources")
 			}
@@ -67,7 +67,7 @@ func NewReadMCPResourceTool(cfg *config.ConfigStore, permissions permission.Serv
 				return fantasy.ToolResponse{}, err
 			}
 			if !p {
-				return shared.NewPermissionDeniedResponse(), nil
+				return toolutil.NewPermissionDeniedResponse(), nil
 			}
 
 			contents, err := mcp.ReadResource(ctx, cfg, params.MCPName, params.URI)

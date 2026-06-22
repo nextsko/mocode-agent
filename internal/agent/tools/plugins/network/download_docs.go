@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/crawler"
@@ -29,7 +29,7 @@ type DownloadDocsParams struct {
 func NewDownloadDocsTool(proxyURL ...string) fantasy.AgentTool {
 	return fantasy.NewParallelAgentTool(
 		DownloadDocsToolName,
-		shared.FirstLineDescription(downloadDocsDescription),
+		toolutil.FirstLineDescription(downloadDocsDescription),
 		func(ctx context.Context, params DownloadDocsParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.RepoURL == "" {
 				return fantasy.NewTextErrorResponse("repo_url parameter is required"), nil

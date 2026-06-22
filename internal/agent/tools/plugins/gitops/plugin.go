@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 )
 
 // ── Tool names ─────────────────────────────────────────────────────────────────
@@ -66,7 +66,7 @@ type ExecuteResponseMetadata struct {
 func NewPlanCommitsTool(workingDir string) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		PlanCommitsToolName,
-		shared.FirstLineDescription(planDescription),
+		toolutil.FirstLineDescription(planDescription),
 		func(_ context.Context, _ PlanCommitsParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if workingDir == "" {
 				return fantasy.NewTextErrorResponse("no working directory configured"), nil
@@ -96,7 +96,7 @@ func NewPlanCommitsTool(workingDir string) fantasy.AgentTool {
 func NewExecuteCommitsTool(workingDir string) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		ExecuteCommitsToolName,
-		shared.FirstLineDescription(executeDescription),
+		toolutil.FirstLineDescription(executeDescription),
 		func(_ context.Context, params ExecuteCommitsParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if workingDir == "" {
 				return fantasy.NewTextErrorResponse("no working directory configured"), nil

@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/config"
@@ -60,7 +60,7 @@ var lsDescription []byte
 func NewLsTool(permissions permission.Service, workingDir string, lsConfig config.ToolLs) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		LSToolName,
-		shared.FirstLineDescription(lsDescription),
+		toolutil.FirstLineDescription(lsDescription),
 		func(ctx context.Context, params LSParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			searchPath, err := fsext.Expand(cmp.Or(params.Path, workingDir))
 			if err != nil {
@@ -83,7 +83,7 @@ func NewLsTool(permissions permission.Service, workingDir string, lsConfig confi
 			relPath, err := filepath.Rel(absWorkingDir, absSearchPath)
 			if err != nil || strings.HasPrefix(relPath, "..") {
 				// Directory is outside working directory, request permission
-				sessionID := shared.GetSessionFromContext(ctx)
+				sessionID := toolutil.GetSessionFromContext(ctx)
 				if sessionID == "" {
 					return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for accessing directories outside working directory")
 				}
@@ -103,7 +103,7 @@ func NewLsTool(permissions permission.Service, workingDir string, lsConfig confi
 					return fantasy.ToolResponse{}, err
 				}
 				if !granted {
-					return shared.NewPermissionDeniedResponse(), nil
+					return toolutil.NewPermissionDeniedResponse(), nil
 				}
 			}
 

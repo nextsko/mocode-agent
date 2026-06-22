@@ -7,7 +7,7 @@ import (
 	"os/exec"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 )
 
 // PullsToolName is the registered name of the gitea_pulls tool.
@@ -27,7 +27,7 @@ type PullsParams struct {
 func NewPullsTool() fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		PullsToolName,
-		shared.FirstLineDescription(pullsDescription),
+		toolutil.FirstLineDescription(pullsDescription),
 		func(ctx context.Context, params PullsParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if getTea() == "" {
 				return fantasy.NewTextErrorResponse(errTeaNotFound), nil

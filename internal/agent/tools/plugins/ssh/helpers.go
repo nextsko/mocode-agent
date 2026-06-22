@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 	"github.com/package-register/mocode/internal/permission"
 )
 
@@ -19,7 +19,7 @@ func describeFailure(action, host string, err error) string {
 // mustSessionID is a helper that fails the tool if the session ID is
 // missing from context.  Mirrors builtin/exec.
 func mustSessionID(ctx context.Context) (string, error) {
-	id := shared.GetSessionFromContext(ctx)
+	id := toolutil.GetSessionFromContext(ctx)
 	if id == "" {
 		return "", fmt.Errorf("session ID is required for ssh operations")
 	}

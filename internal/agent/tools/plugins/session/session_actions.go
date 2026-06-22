@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/session"
@@ -48,7 +48,7 @@ func NewSessionExportTool(messages message.Service, workingDir string) fantasy.A
 		SessionExportToolName,
 		"Export the current session transcript to a local Markdown or HTML file.",
 		func(ctx context.Context, params SessionExportParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			sessionID := shared.GetSessionFromContext(ctx)
+			sessionID := toolutil.GetSessionFromContext(ctx)
 			if sessionID == "" {
 				return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for export")
 			}
@@ -89,7 +89,7 @@ func NewSessionSummaryTool(sessions session.Service, messages message.Service, w
 		SessionSummaryToolName,
 		"Inspect or schedule summarization for the current session.",
 		func(ctx context.Context, params SessionSummaryParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			sessionID := shared.GetSessionFromContext(ctx)
+			sessionID := toolutil.GetSessionFromContext(ctx)
 			if sessionID == "" {
 				return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for summary")
 			}
@@ -216,7 +216,7 @@ func NewMessageExportTool(messages message.Service, workingDir string) fantasy.A
 		MessageExportToolName,
 		"Export selected messages to .mocode/export/recents/<dir>_<time>.md. If no message_ids given, exports the last assistant reply.",
 		func(ctx context.Context, params MessageExportParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			sessionID := shared.GetSessionFromContext(ctx)
+			sessionID := toolutil.GetSessionFromContext(ctx)
 			if sessionID == "" {
 				return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for export")
 			}

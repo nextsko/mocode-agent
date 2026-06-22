@@ -7,7 +7,7 @@ import (
 	"os/exec"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 )
 
 // NotificationsToolName is the registered name of the gitea_notifications tool.
@@ -28,7 +28,7 @@ type NotificationsParams struct {
 func NewNotificationsTool() fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		NotificationsToolName,
-		shared.FirstLineDescription(notificationsDescription),
+		toolutil.FirstLineDescription(notificationsDescription),
 		func(ctx context.Context, params NotificationsParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if getTea() == "" {
 				return fantasy.NewTextErrorResponse(errTeaNotFound), nil

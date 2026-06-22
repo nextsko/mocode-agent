@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/filepathext"
@@ -50,7 +50,7 @@ func NewDownloadTool(permissions permission.Service, workingDir string, client *
 	}
 	return fantasy.NewParallelAgentTool(
 		DownloadToolName,
-		shared.FirstLineDescription(downloadDescription),
+		toolutil.FirstLineDescription(downloadDescription),
 		func(ctx context.Context, params DownloadParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.URL == "" {
 				return fantasy.NewTextErrorResponse("URL parameter is required"), nil
@@ -68,7 +68,7 @@ func NewDownloadTool(permissions permission.Service, workingDir string, client *
 			relPath, _ := filepath.Rel(workingDir, filePath)
 			relPath = filepath.ToSlash(cmp.Or(relPath, filePath))
 
-			sessionID := shared.GetSessionFromContext(ctx)
+			sessionID := toolutil.GetSessionFromContext(ctx)
 			if sessionID == "" {
 				return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for downloading files")
 			}
@@ -87,7 +87,7 @@ func NewDownloadTool(permissions permission.Service, workingDir string, client *
 				return fantasy.ToolResponse{}, err
 			}
 			if !p {
-				return shared.NewPermissionDeniedResponse(), nil
+				return toolutil.NewPermissionDeniedResponse(), nil
 			}
 
 			// Handle timeout with context

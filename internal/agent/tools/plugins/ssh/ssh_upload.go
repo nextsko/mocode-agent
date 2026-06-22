@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 	"github.com/package-register/mocode/internal/permission"
 )
 
@@ -43,7 +43,7 @@ type SshUploadResponseMetadata struct {
 func NewSshUploadTool(svc *Service, permissions permission.Service) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		SshUploadToolName,
-		shared.FirstLineDescription(sshUploadDescription),
+		toolutil.FirstLineDescription(sshUploadDescription),
 		func(ctx context.Context, params SshUploadParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.Host == "" {
 				return fantasy.NewTextErrorResponse("host is required"), nil
@@ -79,7 +79,7 @@ func NewSshUploadTool(svc *Service, permissions permission.Service) fantasy.Agen
 				return fantasy.ToolResponse{}, err
 			}
 			if !granted {
-				return shared.NewPermissionDeniedResponse(), nil
+				return toolutil.NewPermissionDeniedResponse(), nil
 			}
 
 			client, spec, err := svc.acquireClient(ctx, params.Host)

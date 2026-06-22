@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 )
@@ -47,7 +47,7 @@ func NewSourcegraphTool(client *http.Client) fantasy.AgentTool {
 	}
 	return fantasy.NewParallelAgentTool(
 		SourcegraphToolName,
-		shared.FirstLineDescription(sourcegraphDescription),
+		toolutil.FirstLineDescription(sourcegraphDescription),
 		func(ctx context.Context, params SourcegraphParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.Query == "" {
 				return fantasy.NewTextErrorResponse("Query parameter is required"), nil

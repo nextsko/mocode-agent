@@ -10,8 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/lsputil"
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/diff"
@@ -69,7 +68,7 @@ func NewMultiEditTool(
 ) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		MultiEditToolName,
-		shared.FirstLineDescription(multieditDescription),
+		toolutil.FirstLineDescription(multieditDescription),
 		func(ctx context.Context, params MultiEditParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.FilePath == "" {
 				return fantasy.NewTextErrorResponse("file_path is required"), nil
@@ -106,11 +105,11 @@ func NewMultiEditTool(
 			}
 
 			// Notify LSP clients about the change
-			lsputil.NotifyLSPs(ctx, lspManager, params.FilePath)
+			toolutil.NotifyLSPs(ctx, lspManager, params.FilePath)
 
 			// Wait for LSP diagnostics and add them to the response
 			text := fmt.Sprintf("<result>\n%s\n</result>\n", response.Content)
-			text += lsputil.GetDiagnostics(params.FilePath, lspManager)
+			text += toolutil.GetDiagnostics(params.FilePath, lspManager)
 			response.Content = text
 			return response, nil
 		})
@@ -166,7 +165,7 @@ func processMultiEditWithCreation(edit editContext, params MultiEditParams, call
 	}
 
 	// Get session and message IDs
-	sessionID := shared.GetSessionFromContext(edit.ctx)
+	sessionID := toolutil.GetSessionFromContext(edit.ctx)
 	if sessionID == "" {
 		return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for creating a new file")
 	}
@@ -198,7 +197,7 @@ func processMultiEditWithCreation(edit editContext, params MultiEditParams, call
 		return fantasy.ToolResponse{}, err
 	}
 	if !p {
-		return shared.NewPermissionDeniedResponse(), nil
+		return toolutil.NewPermissionDeniedResponse(), nil
 	}
 
 	// Write the file
@@ -254,7 +253,7 @@ func processMultiEditExistingFile(edit editContext, params MultiEditParams, call
 		return fantasy.NewTextErrorResponse(fmt.Sprintf("path is a directory, not a file: %s", params.FilePath)), nil
 	}
 
-	sessionID := shared.GetSessionFromContext(edit.ctx)
+	sessionID := toolutil.GetSessionFromContext(edit.ctx)
 	if sessionID == "" {
 		return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for editing file")
 	}
@@ -340,7 +339,7 @@ func processMultiEditExistingFile(edit editContext, params MultiEditParams, call
 		return fantasy.ToolResponse{}, err
 	}
 	if !p {
-		return shared.NewPermissionDeniedResponse(), nil
+		return toolutil.NewPermissionDeniedResponse(), nil
 	}
 
 	if isCrlf {

@@ -1,7 +1,4 @@
-// Package shared provides low-level utility helpers shared across all tool
-// sub-packages.  It must not import any package from the tools tree to avoid
-// import cycles.
-package shared
+package toolutil
 
 import (
 	"context"

@@ -10,8 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/agent/toolutil/lsputil"
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/diff"
@@ -71,7 +70,7 @@ func NewEditTool(
 ) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		EditToolName,
-		shared.FirstLineDescription(editDescription),
+		toolutil.FirstLineDescription(editDescription),
 		func(ctx context.Context, params EditParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if params.FilePath == "" {
 				return fantasy.NewTextErrorResponse("file_path is required"), nil
@@ -101,10 +100,10 @@ func NewEditTool(
 				return response, nil
 			}
 
-			lsputil.NotifyLSPs(ctx, lspManager, params.FilePath)
+			toolutil.NotifyLSPs(ctx, lspManager, params.FilePath)
 
 			text := fmt.Sprintf("<result>\n%s\n</result>\n", response.Content)
-			text += lsputil.GetDiagnostics(params.FilePath, lspManager)
+			text += toolutil.GetDiagnostics(params.FilePath, lspManager)
 			response.Content = text
 			return response, nil
 		})
@@ -126,7 +125,7 @@ func createNewFile(edit editContext, filePath, content string, call fantasy.Tool
 		return fantasy.ToolResponse{}, fmt.Errorf("failed to create parent directories: %w", err)
 	}
 
-	sessionID := shared.GetSessionFromContext(edit.ctx)
+	sessionID := toolutil.GetSessionFromContext(edit.ctx)
 	if sessionID == "" {
 		return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for creating a new file")
 	}
@@ -155,7 +154,7 @@ func createNewFile(edit editContext, filePath, content string, call fantasy.Tool
 		return fantasy.ToolResponse{}, err
 	}
 	if !p {
-		return shared.NewPermissionDeniedResponse(), nil
+		return toolutil.NewPermissionDeniedResponse(), nil
 	}
 
 	err = os.WriteFile(filePath, []byte(content), 0o644)
@@ -203,7 +202,7 @@ func deleteContent(edit editContext, filePath, oldString string, replaceAll bool
 		return fantasy.NewTextErrorResponse(fmt.Sprintf("path is a directory, not a file: %s", filePath)), nil
 	}
 
-	sessionID := shared.GetSessionFromContext(edit.ctx)
+	sessionID := toolutil.GetSessionFromContext(edit.ctx)
 	if sessionID == "" {
 		return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for deleting content")
 	}
@@ -274,7 +273,7 @@ func deleteContent(edit editContext, filePath, oldString string, replaceAll bool
 		return fantasy.ToolResponse{}, err
 	}
 	if !p {
-		return shared.NewPermissionDeniedResponse(), nil
+		return toolutil.NewPermissionDeniedResponse(), nil
 	}
 
 	if isCrlf {
@@ -334,7 +333,7 @@ func replaceContent(edit editContext, filePath, oldString, newString string, rep
 		return fantasy.NewTextErrorResponse(fmt.Sprintf("path is a directory, not a file: %s", filePath)), nil
 	}
 
-	sessionID := shared.GetSessionFromContext(edit.ctx)
+	sessionID := toolutil.GetSessionFromContext(edit.ctx)
 	if sessionID == "" {
 		return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for edit a file")
 	}
@@ -405,7 +404,7 @@ func replaceContent(edit editContext, filePath, oldString, newString string, rep
 		return fantasy.ToolResponse{}, err
 	}
 	if !p {
-		return shared.NewPermissionDeniedResponse(), nil
+		return toolutil.NewPermissionDeniedResponse(), nil
 	}
 
 	if isCrlf {

@@ -7,7 +7,7 @@ import (
 	"os/exec"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/toolutil/shared"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 )
 
 // IssuesToolName is the registered name of the gitea_issues tool.
@@ -29,7 +29,7 @@ type IssuesParams struct {
 func NewIssuesTool() fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		IssuesToolName,
-		shared.FirstLineDescription(issuesDescription),
+		toolutil.FirstLineDescription(issuesDescription),
 		func(ctx context.Context, params IssuesParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if getTea() == "" {
 				return fantasy.NewTextErrorResponse(errTeaNotFound), nil
