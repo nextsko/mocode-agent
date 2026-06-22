@@ -69,7 +69,7 @@ const (
 	AgentGit     string = "git"
 	AgentRust    string = "rust"
 	AgentPlan    string = "plan"
-	AgentDefault string = AgentPlan
+	AgentDefault string = AgentCoder
 )
 
 type SelectedModel struct {
