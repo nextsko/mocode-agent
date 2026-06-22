@@ -1,4 +1,4 @@
-package swarm
+package orchestration
 
 import (
 	"encoding/json"

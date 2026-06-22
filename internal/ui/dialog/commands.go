@@ -8,7 +8,6 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"github.com/package-register/mocode/internal/capability"
 	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/ui/common"
@@ -84,7 +83,7 @@ type Commands struct {
 
 	customCommands []commands.CustomCommand
 	mcpPrompts     []commands.MCPPrompt
-	registry       *capability.CommandRegistry
+	registry       *commands.CommandRegistry
 
 	dockerMCPAvailable     *bool
 	dockerMCPCheckInFlight bool

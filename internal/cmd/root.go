@@ -30,7 +30,7 @@ import (
 	"github.com/package-register/mocode/internal/app"
 	"github.com/package-register/mocode/internal/client"
 	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/infra/projects"
+	"github.com/package-register/mocode/internal/config/projects"
 	mocodelog "github.com/package-register/mocode/internal/log"
 	"github.com/package-register/mocode/internal/proto"
 	"github.com/package-register/mocode/internal/server"

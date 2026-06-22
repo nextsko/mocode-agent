@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 )
 
 // Lookup searches for a target files or directories starting from dir
@@ -71,7 +71,7 @@ func LookupClosest(dir, target string) (string, bool) {
 			return fmt.Errorf("error probing file %s: %w", fpath, err)
 		}
 
-		if cwd == home.Dir() {
+		if cwd == infra.Dir() {
 			return filepath.SkipAll
 		}
 

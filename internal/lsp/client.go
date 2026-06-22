@@ -19,7 +19,7 @@ import (
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/csync"
 	"github.com/package-register/mocode/internal/fsext"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 )
 
 // DiagnosticCounts holds the count of diagnostics by severity.
@@ -170,7 +170,7 @@ func (c *Client) createPowernapClient() error {
 	}
 
 	clientConfig := powernap.ClientConfig{
-		Command:     home.Long(command),
+		Command:     infra.Long(command),
 		Args:        c.config.Args,
 		RootURI:     rootURI,
 		Environment: maps.Clone(c.config.Env),

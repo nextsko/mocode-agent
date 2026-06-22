@@ -13,9 +13,8 @@ import (
 	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"
 	"github.com/package-register/mocode/internal/agent/notify"
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
-	"github.com/package-register/mocode/internal/capability"
-	"github.com/package-register/mocode/internal/client"
 	"github.com/package-register/mocode/internal/commands"
+	"github.com/package-register/mocode/internal/client"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/history"
 	"github.com/package-register/mocode/internal/knowledge/kngs"
@@ -922,27 +921,27 @@ func sessionToProto(s session.Session) proto.Session {
 
 // BuildCommandRegistry returns a unified CommandRegistry from all registered providers.
 // BuildCommandRegistry returns a flat list of all command descriptors.
-func (w *ClientWorkspace) BuildCommandRegistry() []capability.CommandDescriptor {
-	customDescs := make([]capability.CommandDescriptor, 0)
+func (w *ClientWorkspace) BuildCommandRegistry() []commands.CommandDescriptor {
+	customDescs := make([]commands.CommandDescriptor, 0)
 	if cfg := w.Config(); cfg != nil {
 		if customCommands, err := commands.LoadCustomCommands(cfg); err == nil {
 			for _, cmd := range customCommands {
-				customDescs = append(customDescs, capability.CommandDescriptor{
+				customDescs = append(customDescs, commands.CommandDescriptor{
 					ID: "custom_" + cmd.ID, Title: cmd.Name,
-					Category: capability.CommandCategoryUser, Arguments: cmd.Arguments,
-					Risk: capability.RiskLevelRead,
+					Category: commands.CommandCategoryUser, Arguments: cmd.Arguments,
+					Risk: commands.RiskLevelRead,
 				})
 			}
 		}
 	}
-	builtinDescs := []capability.CommandDescriptor{
-		{ID: "new", Title: "New Session", Shortcut: "/new", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "history", Title: "Browse Past Sessions", Shortcut: "/history", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "approve", Title: "Toggle Auto-Approve (Yolo)", Shortcut: "/approve", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "notifications", Title: "Toggle Notifications", Shortcut: "/notifications", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "theme", Title: "Toggle Transparent Background", Shortcut: "/theme", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "help", Title: "Show Help & Key Bindings", Shortcut: "/help", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "quit", Title: "Quit", Shortcut: "/quit", Category: capability.CommandCategoryAdmin, Risk: capability.RiskLevelDangerous},
+	builtinDescs := []commands.CommandDescriptor{
+		{ID: "new", Title: "New Session", Shortcut: "/new", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "history", Title: "Browse Past Sessions", Shortcut: "/history", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "approve", Title: "Toggle Auto-Approve (Yolo)", Shortcut: "/approve", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "notifications", Title: "Toggle Notifications", Shortcut: "/notifications", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "theme", Title: "Toggle Transparent Background", Shortcut: "/theme", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "help", Title: "Show Help & Key Bindings", Shortcut: "/help", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "quit", Title: "Quit", Shortcut: "/quit", Category: commands.CommandCategoryAdmin, Risk: commands.RiskLevelDangerous},
 	}
 	return append(builtinDescs, customDescs...)
 }

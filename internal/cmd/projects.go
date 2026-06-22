@@ -7,7 +7,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
 	"github.com/charmbracelet/x/term"
-	"github.com/package-register/mocode/internal/infra/projects"
+	"github.com/package-register/mocode/internal/config/projects"
 	"github.com/spf13/cobra"
 )
 

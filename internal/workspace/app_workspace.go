@@ -11,7 +11,6 @@ import (
 	"github.com/package-register/mocode/internal/agent"
 	mcptools "github.com/package-register/mocode/internal/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/app"
-	"github.com/package-register/mocode/internal/capability"
 	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/history"
@@ -514,69 +513,69 @@ func (w *AppWorkspace) SwitchAgent(ctx context.Context, agentID string) error {
 
 // BuildCommandRegistry returns a flat list of all command descriptors from all registered
 // providers. Action is nil — UI layer maps ID to Action to avoid circular deps.
-func (w *AppWorkspace) BuildCommandRegistry() []capability.CommandDescriptor {
+func (w *AppWorkspace) BuildCommandRegistry() []commands.CommandDescriptor {
 	cfg := w.Config()
 
-	var customDescs []capability.CommandDescriptor
+	var customDescs []commands.CommandDescriptor
 	if cfg != nil {
 		if customCommands, err := commands.LoadCustomCommands(cfg); err == nil {
-			customDescs = make([]capability.CommandDescriptor, 0, len(customCommands))
+			customDescs = make([]commands.CommandDescriptor, 0, len(customCommands))
 			for _, cmd := range customCommands {
-				customDescs = append(customDescs, capability.CommandDescriptor{
+				customDescs = append(customDescs, commands.CommandDescriptor{
 					ID: "custom_" + cmd.ID, Title: cmd.Name,
-					Category: capability.CommandCategoryUser, Arguments: cmd.Arguments,
-					Risk: capability.RiskLevelRead,
+					Category: commands.CommandCategoryUser, Arguments: cmd.Arguments,
+					Risk: commands.RiskLevelRead,
 				})
 			}
 		}
 	}
 
-	mcpDescs := make([]capability.CommandDescriptor, 0)
+	mcpDescs := make([]commands.CommandDescriptor, 0)
 	if mcpPrompts, err := commands.LoadMCPPrompts(); err == nil {
 		for _, prompt := range mcpPrompts {
-			mcpDescs = append(mcpDescs, capability.CommandDescriptor{
+			mcpDescs = append(mcpDescs, commands.CommandDescriptor{
 				ID:    "mcp_" + prompt.ID,
 				Title: prompt.Title, Description: prompt.Description,
-				Category:  capability.CommandCategoryMCP,
+				Category:  commands.CommandCategoryMCP,
 				Arguments: prompt.Arguments,
-				Risk:      capability.RiskLevelNetwork,
-				Provider:  capability.ProviderInfo{ID: "mcp-" + prompt.ClientID, Name: prompt.ClientID, Kind: capability.ProviderKindMCP},
+				Risk:      commands.RiskLevelNetwork,
+				Provider:  commands.ProviderInfo{ID: "mcp-" + prompt.ClientID, Name: prompt.ClientID, Kind: commands.ProviderKindMCP},
 			})
 		}
 	}
 
-	builtinDescs := []capability.CommandDescriptor{
-		{ID: "skplan", Title: "SK Plan", Description: "/plan", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "skplan_start", Title: "Start New Plan", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead, ParentID: "skplan"},
-		{ID: "skplan_code", Title: "Quick Code Mode", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead, ParentID: "skplan"},
-		{ID: "code", Title: "Quick Code Mode", Shortcut: "/code", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "switch_mode", Title: "Switch Agent Mode...", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "switch_model", Title: "Switch Model...", Shortcut: "ctrl+l", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "new", Title: "New Session", Shortcut: "/new", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "history", Title: "Browse Past Sessions", Shortcut: "/history", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "init", Title: "Initialize Project", Shortcut: "/init", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelWrite},
-		{ID: "init_kng", Title: "Initialize Kng Knowledge Templates", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelWrite},
-		{ID: "context", Title: "Browse Current Context Messages", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "rollback", Title: "Rollback Files to Session Node", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelWrite},
-		{ID: "summarize", Title: "Summarize Current Session", Shortcut: "/summarize", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelWrite},
-		{ID: "export_md", Title: "Export Session as Markdown", Shortcut: "/export-md", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelWrite},
-		{ID: "export_html", Title: "Export Session as HTML", Shortcut: "/export-html", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelWrite},
-		{ID: "sidebar", Title: "Toggle Sidebar", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "tasks", Title: "Toggle To-Dos / Queue", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "mcps", Title: "MCP Servers", Shortcut: "/mcps", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "wechat", Title: "Manage WeChat Accounts", Shortcut: "/wechat", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "editor", Title: "Open External Editor", Shortcut: "/editor", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelWrite},
-		{ID: "approve", Title: "Toggle Auto-Approve (Yolo)", Shortcut: "/approve", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "notifications", Title: "Toggle Notifications", Shortcut: "/notifications", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "theme", Title: "Toggle Transparent Background", Shortcut: "/theme", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "think", Title: "Toggle Thinking Mode", Shortcut: "/think", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "reasoning", Title: "Select Reasoning Effort", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "help", Title: "Show Help & Key Bindings", Shortcut: "/help", Category: capability.CommandCategorySystem, Risk: capability.RiskLevelRead},
-		{ID: "admin", Title: "Open Admin Panel", Shortcut: "/admin", Category: capability.CommandCategoryAdmin, Risk: capability.RiskLevelRead},
-		{ID: "admin_start", Title: "Start Admin Server", Shortcut: "/admin-start", Category: capability.CommandCategoryAdmin, Risk: capability.RiskLevelWrite},
-		{ID: "admin_stop", Title: "Stop Admin Server", Shortcut: "/admin-stop", Category: capability.CommandCategoryAdmin, Risk: capability.RiskLevelWrite},
-		{ID: "minimax", Title: "MiniMax Quota", Shortcut: "/minimax", Category: capability.CommandCategoryAdmin, Risk: capability.RiskLevelRead},
-		{ID: "quit", Title: "Quit", Shortcut: "/quit", Category: capability.CommandCategoryAdmin, Risk: capability.RiskLevelDangerous},
+	builtinDescs := []commands.CommandDescriptor{
+		{ID: "skplan", Title: "SK Plan", Description: "/plan", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "skplan_start", Title: "Start New Plan", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead, ParentID: "skplan"},
+		{ID: "skplan_code", Title: "Quick Code Mode", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead, ParentID: "skplan"},
+		{ID: "code", Title: "Quick Code Mode", Shortcut: "/code", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "switch_mode", Title: "Switch Agent Mode...", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "switch_model", Title: "Switch Model...", Shortcut: "ctrl+l", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "new", Title: "New Session", Shortcut: "/new", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "history", Title: "Browse Past Sessions", Shortcut: "/history", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "init", Title: "Initialize Project", Shortcut: "/init", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelWrite},
+		{ID: "init_kng", Title: "Initialize Kng Knowledge Templates", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelWrite},
+		{ID: "context", Title: "Browse Current Context Messages", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "rollback", Title: "Rollback Files to Session Node", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelWrite},
+		{ID: "summarize", Title: "Summarize Current Session", Shortcut: "/summarize", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelWrite},
+		{ID: "export_md", Title: "Export Session as Markdown", Shortcut: "/export-md", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelWrite},
+		{ID: "export_html", Title: "Export Session as HTML", Shortcut: "/export-html", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelWrite},
+		{ID: "sidebar", Title: "Toggle Sidebar", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "tasks", Title: "Toggle To-Dos / Queue", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "mcps", Title: "MCP Servers", Shortcut: "/mcps", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "wechat", Title: "Manage WeChat Accounts", Shortcut: "/wechat", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "editor", Title: "Open External Editor", Shortcut: "/editor", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelWrite},
+		{ID: "approve", Title: "Toggle Auto-Approve (Yolo)", Shortcut: "/approve", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "notifications", Title: "Toggle Notifications", Shortcut: "/notifications", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "theme", Title: "Toggle Transparent Background", Shortcut: "/theme", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "think", Title: "Toggle Thinking Mode", Shortcut: "/think", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "reasoning", Title: "Select Reasoning Effort", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "help", Title: "Show Help & Key Bindings", Shortcut: "/help", Category: commands.CommandCategorySystem, Risk: commands.RiskLevelRead},
+		{ID: "admin", Title: "Open Admin Panel", Shortcut: "/admin", Category: commands.CommandCategoryAdmin, Risk: commands.RiskLevelRead},
+		{ID: "admin_start", Title: "Start Admin Server", Shortcut: "/admin-start", Category: commands.CommandCategoryAdmin, Risk: commands.RiskLevelWrite},
+		{ID: "admin_stop", Title: "Stop Admin Server", Shortcut: "/admin-stop", Category: commands.CommandCategoryAdmin, Risk: commands.RiskLevelWrite},
+		{ID: "minimax", Title: "MiniMax Quota", Shortcut: "/minimax", Category: commands.CommandCategoryAdmin, Risk: commands.RiskLevelRead},
+		{ID: "quit", Title: "Quit", Shortcut: "/quit", Category: commands.CommandCategoryAdmin, Risk: commands.RiskLevelDangerous},
 	}
 
 	return append(append(builtinDescs, customDescs...), mcpDescs...)

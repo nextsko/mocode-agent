@@ -19,7 +19,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/csync"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/pubsub"
 	"github.com/package-register/mocode/internal/version"
@@ -448,7 +448,7 @@ func createTransport(ctx context.Context, m config.MCPConfig, cfg *config.Config
 		if strings.TrimSpace(command) == "" {
 			return nil, fmt.Errorf("mcp stdio config requires a non-empty 'command' field")
 		}
-		cmd := exec.CommandContext(ctx, home.Long(command), m.Args...)
+		cmd := exec.CommandContext(ctx, infra.Long(command), m.Args...)
 		cmd.Env = append(os.Environ(), m.ResolvedEnv()...)
 		return &mcp.CommandTransport{
 			Command: cmd,

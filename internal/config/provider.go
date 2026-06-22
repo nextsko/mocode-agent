@@ -18,7 +18,7 @@ import (
 	"charm.land/catwalk/pkg/embedded"
 	"github.com/charmbracelet/x/etag"
 	"github.com/package-register/mocode/internal/csync"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 )
 
 type syncer[T any] interface {
@@ -49,7 +49,7 @@ func cachePathFor(name string) string {
 		return filepath.Join(localAppData, appName, name+".json")
 	}
 
-	return filepath.Join(home.Dir(), ".local", "share", appName, name+".json")
+	return filepath.Join(infra.Dir(), ".local", "share", appName, name+".json")
 }
 
 // UpdateProviders updates the Catwalk providers list from a specified source.

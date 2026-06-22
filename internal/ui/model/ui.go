@@ -38,7 +38,7 @@ import (
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/fsext"
 	"github.com/package-register/mocode/internal/history"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/pubsub"
 	"github.com/package-register/mocode/internal/session"
@@ -1558,7 +1558,7 @@ func (m *UI) View() tea.View {
 	}
 	v.MouseMode = tea.MouseModeCellMotion
 	v.ReportFocus = m.caps.ReportFocusEvents
-	v.WindowTitle = "mocode " + home.Short(m.com.Workspace.WorkingDir())
+	v.WindowTitle = "mocode " + infra.Short(m.com.Workspace.WorkingDir())
 
 	canvas := uv.NewScreenBuffer(m.width, m.height)
 	v.Cursor = m.Draw(canvas, canvas.Bounds())

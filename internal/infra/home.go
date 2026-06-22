@@ -1,5 +1,6 @@
-// Package home provides utilities for dealing with the user's home directory.
-package home
+// Package infra provides infrastructure utilities for dealing with the
+// user's home directory and configuration paths.
+package infra
 
 import (
 	"cmp"

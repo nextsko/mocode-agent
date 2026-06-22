@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 )
 
 // andyCodeAgentConfig is the TOML structure for a legacy agent file.
@@ -68,12 +68,12 @@ func resolveAgentsDir(cfg *Config) string {
 	if cfg.Options != nil && cfg.Options.AgentsDir != "" {
 		return expandPath(cfg.Options.AgentsDir)
 	}
-	return expandPath(filepath.Join(home.Dir(), ".mocode", "agents"))
+	return expandPath(filepath.Join(infra.Dir(), ".mocode", "agents"))
 }
 
 func expandPath(p string) string {
 	if strings.HasPrefix(p, "~/") {
-		return filepath.Join(home.Dir(), p[2:])
+		return filepath.Join(infra.Dir(), p[2:])
 	}
 	return p
 }

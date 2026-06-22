@@ -14,7 +14,7 @@ import (
 	"testing"
 
 	"github.com/package-register/mocode/internal/fsext"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 	"github.com/qjebbs/go-jsons"
 )
 
@@ -103,7 +103,7 @@ func hasAWSCredentials(env Env) bool {
 		return true
 	}
 
-	if _, err := os.Stat(filepath.Join(home.Dir(), ".aws/credentials")); err == nil && !testing.Testing() {
+	if _, err := os.Stat(filepath.Join(infra.Dir(), ".aws/credentials")); err == nil && !testing.Testing() {
 		return true
 	}
 
@@ -114,7 +114,7 @@ func GlobalConfig() string {
 	if MocodeGlobal := os.Getenv("MOCODE_GLOBAL_CONFIG"); MocodeGlobal != "" {
 		return filepath.Join(MocodeGlobal, fmt.Sprintf("%s.json", appName))
 	}
-	return filepath.Join(home.Config(), appName, fmt.Sprintf("%s.json", appName))
+	return filepath.Join(infra.Config(), appName, fmt.Sprintf("%s.json", appName))
 }
 
 func GlobalCacheDir() string {
@@ -131,7 +131,7 @@ func GlobalCacheDir() string {
 		)
 		return filepath.Join(localAppData, appName, "cache")
 	}
-	return filepath.Join(home.Dir(), ".cache", appName)
+	return filepath.Join(infra.Dir(), ".cache", appName)
 }
 
 func GlobalConfigData() string {
@@ -153,7 +153,7 @@ func GlobalConfigData() string {
 		return filepath.Join(localAppData, appName, fmt.Sprintf("%s.json", appName))
 	}
 
-	return filepath.Join(home.Dir(), ".local", "share", appName, fmt.Sprintf("%s.json", appName))
+	return filepath.Join(infra.Dir(), ".local", "share", appName, fmt.Sprintf("%s.json", appName))
 }
 
 func GlobalWorkspaceDir() string {
@@ -181,8 +181,8 @@ func GlobalSkillsDirs() []string {
 	}
 
 	paths := []string{
-		filepath.Join(home.Config(), appName, "skills"),
-		filepath.Join(home.Config(), "agents", "skills"),
+		filepath.Join(infra.Config(), appName, "skills"),
+		filepath.Join(infra.Config(), "agents", "skills"),
 	}
 
 	// On Windows, also load from app data on top of `$HOME/.config/mocode`.

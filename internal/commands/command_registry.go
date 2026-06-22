@@ -1,6 +1,4 @@
-package capability
-
-import "github.com/package-register/mocode/internal/commands"
+package commands
 
 type CommandCategory string
 
@@ -52,7 +50,7 @@ type CommandDescriptor struct {
 	Shortcut    string
 	Description string
 	Category    CommandCategory
-	Arguments   []commands.Argument
+	Arguments   []Argument
 	Risk        RiskLevel
 	Provider    ProviderInfo
 	ParentID    string // Non-empty means this command has a parent; used by palette for submenu grouping

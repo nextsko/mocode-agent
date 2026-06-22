@@ -4,7 +4,7 @@ import (
 	"os"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/package-register/mocode/internal/capability"
+	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/ui/list"
 )
@@ -81,7 +81,7 @@ func (c *Commands) setCommandItems(commandType CommandType) {
 	commandItems := []list.FilterableItem{}
 	category := commandCategoryForType(c.selected)
 	if c.registry != nil {
-		descriptors, _ := c.registry.Commands(capability.CommandContext{})
+		descriptors, _ := c.registry.Commands(commands.CommandContext{})
 		for _, cmd := range descriptors {
 			if cmd.Category != category {
 				continue
@@ -110,95 +110,95 @@ func flattenItems(items []*CommandItem) []list.FilterableItem {
 	return result
 }
 
-func commandCategoryForType(commandType CommandType) capability.CommandCategory {
+func commandCategoryForType(commandType CommandType) commands.CommandCategory {
 	switch commandType {
 	case UserCommands:
-		return capability.CommandCategoryUser
+		return commands.CommandCategoryUser
 	case MCPPrompts:
-		return capability.CommandCategoryMCP
+		return commands.CommandCategoryMCP
 	default:
-		return capability.CommandCategorySystem
+		return commands.CommandCategorySystem
 	}
 }
 
 func (c *Commands) refreshRegistry() {
-	c.registry = capability.NewCommandRegistry(
-		capability.StaticCommandProvider{
-			Info:  capability.ProviderInfo{ID: "builtin", Name: "Built-in Commands", Kind: capability.ProviderKindBuiltin},
+	c.registry = commands.NewCommandRegistry(
+		commands.StaticCommandProvider{
+			Info:  commands.ProviderInfo{ID: "builtin", Name: "Built-in Commands", Kind: commands.ProviderKindBuiltin},
 			Items: c.defaultCommandDescriptors(),
 		},
-		capability.StaticCommandProvider{
-			Info:  capability.ProviderInfo{ID: "session-actions", Name: "Session Actions", Kind: capability.ProviderKindSession},
+		commands.StaticCommandProvider{
+			Info:  commands.ProviderInfo{ID: "session-actions", Name: "Session Actions", Kind: commands.ProviderKindSession},
 			Items: c.sessionCommandDescriptors(),
 		},
-		capability.StaticCommandProvider{
-			Info:  capability.ProviderInfo{ID: "custom", Name: "Custom Commands", Kind: capability.ProviderKindCustomCommand},
+		commands.StaticCommandProvider{
+			Info:  commands.ProviderInfo{ID: "custom", Name: "Custom Commands", Kind: commands.ProviderKindCustomCommand},
 			Items: c.customCommandDescriptors(),
 		},
-		capability.StaticCommandProvider{
-			Info:  capability.ProviderInfo{ID: "mcp-prompts", Name: "MCP Prompts", Kind: capability.ProviderKindMCP},
+		commands.StaticCommandProvider{
+			Info:  commands.ProviderInfo{ID: "mcp-prompts", Name: "MCP Prompts", Kind: commands.ProviderKindMCP},
 			Items: c.mcpPromptCommandDescriptors(),
 		},
 	)
 }
 
-func (c *Commands) defaultCommandDescriptors() []capability.CommandDescriptor {
-	return descriptorsFromCommandItems(c.defaultCommands(), capability.CommandCategorySystem, capability.RiskLevelRead)
+func (c *Commands) defaultCommandDescriptors() []commands.CommandDescriptor {
+	return descriptorsFromCommandItems(c.defaultCommands(), commands.CommandCategorySystem, commands.RiskLevelRead)
 }
 
-func (c *Commands) sessionCommandDescriptors() []capability.CommandDescriptor {
+func (c *Commands) sessionCommandDescriptors() []commands.CommandDescriptor {
 	if !c.hasSession {
 		return nil
 	}
-	return []capability.CommandDescriptor{
+	return []commands.CommandDescriptor{
 		{
 			ID:          "summarize",
 			Title:       "Summarize Session",
 			Description: "Compress the active session context.",
-			Category:    capability.CommandCategorySystem,
-			Risk:        capability.RiskLevelWrite,
+			Category:    commands.CommandCategorySystem,
+			Risk:        commands.RiskLevelWrite,
 			Action:      ActionSummarize{SessionID: c.sessionID},
 		},
 		{
 			ID:          "export_markdown",
 			Title:       "Export Session as Markdown",
 			Description: "Export all active session messages to .mocode/export/ as Markdown.",
-			Category:    capability.CommandCategorySystem,
-			Risk:        capability.RiskLevelWrite,
+			Category:    commands.CommandCategorySystem,
+			Risk:        commands.RiskLevelWrite,
 			Action:      ActionExportSession{SessionID: c.sessionID, Format: "markdown", Scope: "all"},
 		},
 		{
 			ID:          "export_html",
 			Title:       "Export Session as HTML",
 			Description: "Export all active session messages to .mocode/export/ as HTML.",
-			Category:    capability.CommandCategorySystem,
-			Risk:        capability.RiskLevelWrite,
+			Category:    commands.CommandCategorySystem,
+			Risk:        commands.RiskLevelWrite,
 			Action:      ActionExportSession{SessionID: c.sessionID, Format: "html", Scope: "all"},
 		},
 	}
 }
 
-func (c *Commands) customCommandDescriptors() []capability.CommandDescriptor {
-	descriptors := make([]capability.CommandDescriptor, 0, len(c.customCommands))
+func (c *Commands) customCommandDescriptors() []commands.CommandDescriptor {
+	descriptors := make([]commands.CommandDescriptor, 0, len(c.customCommands))
 	for _, cmd := range c.customCommands {
 		action := ActionRunCustomCommand{
 			Content:   cmd.Content,
 			Arguments: cmd.Arguments,
 		}
-		descriptors = append(descriptors, capability.CommandDescriptor{
+		descriptors = append(descriptors, commands.CommandDescriptor{
 			ID:        "custom_" + cmd.ID,
 			Title:     cmd.Name,
-			Category:  capability.CommandCategoryUser,
+			Category:  commands.CommandCategoryUser,
 			Arguments: cmd.Arguments,
-			Risk:      capability.RiskLevelRead,
+			Risk:      commands.RiskLevelRead,
 			Action:    action,
 		})
 	}
 	return descriptors
 }
 
-func (c *Commands) mcpPromptCommandDescriptors() []capability.CommandDescriptor {
-	descriptors := make([]capability.CommandDescriptor, 0, len(c.mcpPrompts))
+func (c *Commands) mcpPromptCommandDescriptors() []commands.CommandDescriptor {
+	descriptors := make([]commands.CommandDescriptor, 0, len(c.mcpPrompts))
 	for _, cmd := range c.mcpPrompts {
 		action := ActionRunMCPPrompt{
 			Title:       cmd.Title,
@@ -207,26 +207,26 @@ func (c *Commands) mcpPromptCommandDescriptors() []capability.CommandDescriptor 
 			ClientID:    cmd.ClientID,
 			Arguments:   cmd.Arguments,
 		}
-		descriptors = append(descriptors, capability.CommandDescriptor{
+		descriptors = append(descriptors, commands.CommandDescriptor{
 			ID:          "mcp_" + cmd.ID,
 			Title:       cmd.PromptID,
 			Description: cmd.Description,
-			Category:    capability.CommandCategoryMCP,
+			Category:    commands.CommandCategoryMCP,
 			Arguments:   cmd.Arguments,
-			Risk:        capability.RiskLevelNetwork,
+			Risk:        commands.RiskLevelNetwork,
 			Action:      action,
 		})
 	}
 	return descriptors
 }
 
-func descriptorsFromCommandItems(items []*CommandItem, category capability.CommandCategory, risk capability.RiskLevel) []capability.CommandDescriptor {
-	descriptors := make([]capability.CommandDescriptor, 0, len(items))
+func descriptorsFromCommandItems(items []*CommandItem, category commands.CommandCategory, risk commands.RiskLevel) []commands.CommandDescriptor {
+	descriptors := make([]commands.CommandDescriptor, 0, len(items))
 	for _, item := range items {
 		if item == nil {
 			continue
 		}
-		desc := capability.CommandDescriptor{
+		desc := commands.CommandDescriptor{
 			ID:       item.id,
 			Title:    item.title,
 			Shortcut: item.shortcut,
@@ -244,7 +244,7 @@ func descriptorsFromCommandItems(items []*CommandItem, category capability.Comma
 			if child == nil {
 				continue
 			}
-			descriptors = append(descriptors, capability.CommandDescriptor{
+			descriptors = append(descriptors, commands.CommandDescriptor{
 				ID:       child.id,
 				Title:    child.title,
 				Shortcut: child.shortcut,

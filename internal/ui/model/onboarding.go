@@ -9,7 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/util"
 )
@@ -77,7 +77,7 @@ func (m *UI) skipInitializeProject() tea.Cmd {
 // initializeView renders the project initialization prompt with Yes/No buttons.
 func (m *UI) initializeView() string {
 	s := m.com.Styles.Initialize
-	cwd := home.Short(m.com.Workspace.WorkingDir())
+	cwd := infra.Short(m.com.Workspace.WorkingDir())
 	initFile := m.com.Config().Options.InitializeAs
 
 	header := s.Header.Render("Would you like to initialize this project?")

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 	"github.com/stretchr/testify/require"
 )
 
@@ -91,7 +91,7 @@ func TestLookupClosest(t *testing.T) {
 	t.Run("stops at home directory", func(t *testing.T) {
 		// This test is limited as we can't easily create files above home directory
 		// but we can test the behavior by searching from home directory itself
-		homeDir := home.Dir()
+		homeDir := infra.Dir()
 
 		// Search for a file that doesn't exist from home directory
 		foundPath, found := LookupClosest(homeDir, "nonexistent_file_12345.txt")

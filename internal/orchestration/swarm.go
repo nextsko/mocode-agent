@@ -1,7 +1,7 @@
-// Package swarm provides a lightweight workflow runtime for multi-agent
+// Package orchestration provides a lightweight workflow runtime for multi-agent
 // orchestration. It tracks task state, handoff history, and checkpoints
 // within a root session, enabling observable and recoverable swarm execution.
-package swarm
+package orchestration
 
 import (
 	"encoding/json"

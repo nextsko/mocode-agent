@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 	"github.com/package-register/mocode/internal/skills"
 	"github.com/package-register/mocode/internal/tools/shell"
 )
@@ -163,7 +163,7 @@ func processContextPath(p string, store *config.ConfigStore) []ContextFile {
 
 // expandPath expands ~ and environment variables in file paths
 func expandPath(path string, store *config.ConfigStore) string {
-	path = home.Long(path)
+	path = infra.Long(path)
 	// Handle environment variable expansion using the same pattern as config
 	if strings.HasPrefix(path, "$") {
 		if expanded, err := store.Resolver().ResolveValue(path); err == nil {

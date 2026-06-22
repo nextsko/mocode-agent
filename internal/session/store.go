@@ -6,14 +6,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 )
 
 var unsafeSessionPathChars = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)
 
 // DefaultStoreRoot returns the global directory used for session databases.
 func DefaultStoreRoot() string {
-	return filepath.Join(home.Dir(), ".mocode", "sessions")
+	return filepath.Join(infra.Dir(), ".mocode", "sessions")
 }
 
 // DBPath returns the database path for a session-specific store directory.

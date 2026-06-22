@@ -15,7 +15,7 @@ import (
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/package-register/mocode/internal/history"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 	sessionpkg "github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
 	"github.com/package-register/mocode/internal/ui/util"
@@ -178,7 +178,7 @@ func rollbackRepoDir(sess sessionpkg.Session, workingDir string) (string, error)
 	if project == "." || project == string(filepath.Separator) || project == "" {
 		project = "project"
 	}
-	root := filepath.Join(home.Dir(), ".mocode", "screens-shops")
+	root := filepath.Join(infra.Dir(), ".mocode", "screens-shops")
 	sessionDir := filepath.Base(sessionpkg.StoreDir(root, sess))
 	return filepath.Join(root, sessionDir, safePathName(project)), nil
 }

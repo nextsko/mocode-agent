@@ -9,7 +9,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 	"github.com/package-register/mocode/internal/ui/styles"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -18,7 +18,7 @@ import (
 // PrettyPath formats a file path with home directory shortening and applies
 // muted styling.
 func PrettyPath(t *styles.Styles, path string, width int) string {
-	formatted := home.Short(path)
+	formatted := infra.Short(path)
 	return t.Sidebar.WorkingDir.Width(width).Render(formatted)
 }
 

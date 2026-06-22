@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/package-register/mocode/internal/infra/projects"
+	"github.com/package-register/mocode/internal/config/projects"
 	"github.com/stretchr/testify/require"
 )
 

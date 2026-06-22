@@ -11,7 +11,7 @@ import (
 
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 )
 
 var namedArgPattern = regexp.MustCompile(`\$([A-Z][A-Z0-9_]*)`)
@@ -93,11 +93,11 @@ func LoadMCPPrompts() ([]MCPPrompt, error) {
 func buildCommandSources(cfg *config.Config) []commandSource {
 	return []commandSource{
 		{
-			path:   filepath.Join(home.Config(), "Mocode", "commands"),
+			path:   filepath.Join(infra.Config(), "Mocode", "commands"),
 			prefix: userCommandPrefix,
 		},
 		{
-			path:   filepath.Join(home.Dir(), ".Mocode", "commands"),
+			path:   filepath.Join(infra.Dir(), ".Mocode", "commands"),
 			prefix: userCommandPrefix,
 		},
 		{

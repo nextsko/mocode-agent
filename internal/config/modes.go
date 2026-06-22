@@ -11,7 +11,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/package-register/mocode/internal/fsext"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 	"gopkg.in/yaml.v3"
 )
 
@@ -51,7 +51,7 @@ func globalModesConfigPath() string {
 		}
 		return filepath.Join(localAppData, appName, modesConfigName)
 	}
-	return filepath.Join(home.Dir(), ".config", appName, modesConfigName)
+	return filepath.Join(infra.Dir(), ".config", appName, modesConfigName)
 }
 
 // lookupModesConfigs searches for modes.toml from CWD up to FS root.

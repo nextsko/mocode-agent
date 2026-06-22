@@ -12,7 +12,7 @@ import (
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/fsext"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 	"github.com/package-register/mocode/internal/session/message"
 	"github.com/package-register/mocode/internal/skills"
 	"github.com/package-register/mocode/internal/ui/common"
@@ -110,7 +110,7 @@ func (m *UI) atSkillItems() []completions.AtCompletionValue {
 	if cfg.Options != nil {
 		paths := make([]string, 0, len(cfg.Options.SkillsPaths))
 		for _, p := range cfg.Options.SkillsPaths {
-			paths = append(paths, home.Long(p))
+			paths = append(paths, infra.Long(p))
 		}
 		all = append(all, skills.Discover(paths)...)
 	}
@@ -186,9 +186,9 @@ func (m *UI) atWorkflowItems() []completions.AtCompletionValue {
 func windsurfWorkflowItems() []completions.AtCompletionValue {
 	dirs := []string{
 		filepath.Join(".windsurf", "workflows"),
-		filepath.Join(home.Dir(), ".windsurf", "workflows"),
-		filepath.Join(home.Config(), "windsurf", "workflows"),
-		filepath.Join(home.Config(), "Windsurf", "workflows"),
+		filepath.Join(infra.Dir(), ".windsurf", "workflows"),
+		filepath.Join(infra.Config(), "windsurf", "workflows"),
+		filepath.Join(infra.Config(), "Windsurf", "workflows"),
 	}
 	seenPaths := make(map[string]bool)
 	seenTokens := make(map[string]bool)

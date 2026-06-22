@@ -15,7 +15,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 	"github.com/package-register/mocode/internal/ui/common"
 	fimage "github.com/package-register/mocode/internal/ui/image"
 )
@@ -130,7 +130,7 @@ func (f *FilePicker) WorkingDir() string {
 
 	cwd, err := os.Getwd()
 	if err != nil {
-		return home.Dir()
+		return infra.Dir()
 	}
 
 	return cwd

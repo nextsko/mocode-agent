@@ -1,4 +1,4 @@
-package home
+package infra
 
 import (
 	"path/filepath"

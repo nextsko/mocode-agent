@@ -12,7 +12,7 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/charlievieth/fastwalk"
 	"github.com/package-register/mocode/internal/csync"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 )
 
 type FileInfo struct {
@@ -173,7 +173,7 @@ func ShouldExcludeFile(rootPath, filePath string) bool {
 }
 
 func PrettyPath(path string) string {
-	return home.Short(path)
+	return infra.Short(path)
 }
 
 func DirTrim(pwd string, lim int) string {

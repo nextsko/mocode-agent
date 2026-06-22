@@ -14,7 +14,7 @@ import (
 	gitconfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 	"github.com/package-register/mocode/internal/csync"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 )
 
 // fastIgnoreDirs is a set of directory names that are always ignored.
@@ -93,9 +93,9 @@ var gitGlobalIgnorePatterns = sync.OnceValue(func() []gitignore.Pattern {
 
 	excludesFilePath := cmp.Or(
 		cfg.Raw.Section("core").Options.Get("excludesfile"),
-		filepath.Join(home.Config(), "git", "ignore"),
+		filepath.Join(infra.Config(), "git", "ignore"),
 	)
-	excludesFilePath = home.Long(excludesFilePath)
+	excludesFilePath = infra.Long(excludesFilePath)
 
 	bts, err := os.ReadFile(excludesFilePath)
 	if err != nil {
@@ -111,7 +111,7 @@ var gitGlobalIgnorePatterns = sync.OnceValue(func() []gitignore.Pattern {
 // MocodeGlobalIgnorePatterns returns patterns from the user's
 // ~/.config/mocode/ignore file.
 var MocodeGlobalIgnorePatterns = sync.OnceValue(func() []gitignore.Pattern {
-	name := filepath.Join(home.Config(), "mocode", "ignore")
+	name := filepath.Join(infra.Config(), "mocode", "ignore")
 	bts, err := os.ReadFile(name)
 	if err != nil {
 		if !os.IsNotExist(err) {

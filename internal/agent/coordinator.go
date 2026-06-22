@@ -29,11 +29,11 @@ import (
 	"github.com/package-register/mocode/internal/filetracker"
 	"github.com/package-register/mocode/internal/history"
 	"github.com/package-register/mocode/internal/hooks"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 	"github.com/package-register/mocode/internal/knowledge/memory"
 	"github.com/package-register/mocode/internal/log"
 	"github.com/package-register/mocode/internal/lsp"
-	"github.com/package-register/mocode/internal/orchestration/swarm"
+	"github.com/package-register/mocode/internal/orchestration"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/pubsub"
 	"github.com/package-register/mocode/internal/session"
@@ -112,7 +112,7 @@ type coordinator struct {
 	// parent session.
 	subagentIndex  *csync.Map[string, string]
 	summaryQueue   *sessionSummaryQueue
-	swarmWF        *swarm.WorkflowRuntime // nil if swarm mode not active
+	swarmWF        *orchestration.WorkflowRuntime // nil if swarm mode not active
 	sessionLogDir  string                 // base dir for session logs
 	errorLearner   *evolution.ErrorLearner
 	errorCollector *errcoll.Collector
@@ -1452,7 +1452,7 @@ func discoverSkills(cfg *config.ConfigStore) (allSkills, activeSkills []*skills.
 	if opts != nil && len(opts.SkillsPaths) > 0 {
 		userPaths = make([]string, 0, len(opts.SkillsPaths))
 		for _, pth := range opts.SkillsPaths {
-			expanded := home.Long(pth)
+			expanded := infra.Long(pth)
 			if strings.HasPrefix(expanded, "$") {
 				if resolved, err := cfg.Resolver().ResolveValue(expanded); err == nil {
 					expanded = resolved

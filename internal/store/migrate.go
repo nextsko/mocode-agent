@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/infra/home"
+	"github.com/package-register/mocode/internal/infra"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
 	_ "modernc.org/sqlite"
@@ -105,7 +105,7 @@ func MigrateFromSQLite(ctx context.Context, dbPath string, projectPath string) (
 	fmt.Fprintf(os.Stderr, "  Migrated %d file versions\n", totalFiles)
 
 	// Phase 4: Migrate per-session databases (messages + files from old session stores)
-	sessionRoot := filepath.Join(home.Dir(), ".mocode", "sessions")
+	sessionRoot := filepath.Join(infra.Dir(), ".mocode", "sessions")
 	if entries, err := os.ReadDir(sessionRoot); err == nil {
 		fmt.Fprintf(os.Stderr, "Migrating per-session databases from %s...\n", sessionRoot)
 		sessionMsgs := 0
