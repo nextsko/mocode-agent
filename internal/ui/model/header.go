@@ -57,7 +57,7 @@ func (h *header) refresh() {
 	if !isHyper {
 		charm = " " + charm
 	}
-	name := "FROMSKO CODE"
+	name := "oMo code"
 	if isHyper {
 		name = "HYPERMOCODE"
 	}

@@ -21,7 +21,7 @@ import (
 
 const (
 	appName              = "mocode"
-	defaultAppName       = "Fromsko Code"
+	defaultAppName       = "oMo code"
 	defaultDataDirectory = ".mocode"
 	defaultInitializeAs  = "AGENTS.md"
 )
@@ -263,7 +263,7 @@ type Options struct {
 	DisabledSkills            []string        `json:"disabled_skills,omitempty" jsonschema:"description=List of skill names to disable and hide from the agent,example=mocode-config"`
 	AgentsDir                 string          `json:"agents_dir,omitempty" jsonschema:"description=Directory containing agent .toml configuration files,example=~/.mocode/agents"`
 	ActiveMode                string          `json:"active_mode,omitempty" jsonschema:"description=Currently active agent mode ID"`
-	AppName                   string          `json:"app_name,omitempty" jsonschema:"description=Display brand name shown in TUI header and notifications,example=Fromsko Code,example=My AI Tool"`
+	AppName                   string          `json:"app_name,omitempty" jsonschema:"description=Display brand name shown in TUI header and notifications,example=oMo code,example=My AI Tool"`
 	Network                   *NetworkOptions `json:"network,omitempty" jsonschema:"description=Network proxy settings"`
 	Records                   *RecordsOptions `json:"records,omitempty" jsonschema:"description=Debug records configuration"`
 }

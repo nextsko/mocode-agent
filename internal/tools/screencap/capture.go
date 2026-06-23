@@ -1,4 +1,4 @@
-// Package screencap provides screenshot capture tool for Fromsko Code.
+// Package screencap provides screenshot capture tool for oMo code.
 package screencap
 
 import (

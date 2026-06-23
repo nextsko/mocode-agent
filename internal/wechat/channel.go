@@ -1,4 +1,4 @@
-// Package wechat provides WeChat iLink Bot integration for Fromsko Code.
+// Package wechat provides WeChat iLink Bot integration for oMo code.
 package wechat
 
 import (
