@@ -1,4 +1,4 @@
-// Package app wires together services, coordinates agents, and manages
+﻿// Package app wires together services, coordinates agents, and manages
 // application lifecycle.
 package app
 
@@ -642,6 +642,7 @@ func (app *App) InitCoderAgent(ctx context.Context) error {
 		app.Memory,
 		app.agentNotifications,
 		app.ErrorCollector,
+		app.store.Search(),
 	)
 	if err != nil {
 		slog.Error("Failed to create coder agent", "err", err)

@@ -27,6 +27,7 @@ import (
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
 	"github.com/package-register/mocode/internal/skills"
+	"github.com/package-register/mocode/internal/store"
 )
 
 // ToolKind distinguishes builtin from plugin tools.
@@ -86,6 +87,7 @@ type ToolDeps struct {
 	SkillTracker    *skills.Tracker
 	ModelName       string
 	SummarySchedule SessionSummaryScheduler
+	SessionSearch   *store.SessionSearch
 }
 
 // AllToolDescriptors returns descriptors for every standard (non-coordinator) tool.
@@ -253,16 +255,21 @@ func (sessionPlugin) Descriptors() []ToolDescriptor {
 		{Name: SessionExportToolName, Kind: ToolKindPlugin, Category: CategorySession},
 		{Name: MessageExportToolName, Kind: ToolKindPlugin, Category: CategorySession},
 		{Name: SessionSummaryToolName, Kind: ToolKindPlugin, Category: CategorySession},
+		{Name: sessiontool.SessionSearchToolName, Kind: ToolKindPlugin, Category: CategorySession},
 	}
 }
 
 func (sessionPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
-	return []fantasy.AgentTool{
+	t := []fantasy.AgentTool{
 		sessiontool.NewTodosTool(deps.Sessions),
 		sessiontool.NewSessionExportTool(deps.Messages, deps.Cfg.WorkingDir()),
 		sessiontool.NewMessageExportTool(deps.Messages, deps.Cfg.WorkingDir()),
 		sessiontool.NewSessionSummaryTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), sessiontool.SessionSummaryScheduler(deps.SummarySchedule)),
 	}
+	if deps.SessionSearch != nil {
+		t = append(t, sessiontool.NewSessionSearchTool(deps.SessionSearch))
+	}
+	return t
 }
 
 // ─── plugin/mocode ────────────────────────────────────────────────────────────

@@ -40,6 +40,7 @@ import (
 	"github.com/package-register/mocode/internal/session/message"
 	"github.com/package-register/mocode/internal/session/sessionlog"
 	"github.com/package-register/mocode/internal/skills"
+	"github.com/package-register/mocode/internal/store"
 	"github.com/package-register/mocode/internal/tools/screencap"
 	"golang.org/x/sync/errgroup"
 
@@ -116,7 +117,7 @@ type coordinator struct {
 	sessionLogDir  string                 // base dir for session logs
 	errorLearner   *evolution.ErrorLearner
 	errorCollector *errcoll.Collector
-
+	sessionSearch  *store.SessionSearch
 	// Skills discovery results (session-start snapshot).
 	allSkills    []*skills.Skill // Pre-filter: all discovered after dedup.
 	activeSkills []*skills.Skill // Post-filter: active skills only.
@@ -137,6 +138,7 @@ func NewCoordinator(
 	memory memory.Service,
 	notify pubsub.Publisher[notify.Notification],
 	errorCollector *errcoll.Collector,
+	sessionSearch *store.SessionSearch,
 ) (Coordinator, error) {
 	// Discover skills once at session start.
 	allSkills, activeSkills := discoverSkills(cfg)
@@ -169,7 +171,8 @@ func NewCoordinator(
 		skillTracker:   skillTracker,
 		sessionLogDir:  filepath.Join(dataDir, "sessions"),
 		errorCollector: errorCollector,
-	}
+		sessionSearch:  sessionSearch,
+}
 
 	// Initialize error learner for provider-specific mistake tracking.
 	if learner, learnerErr := evolution.NewErrorLearner(filepath.Join(cfg.WorkingDir(), ".mocode", "evolution", "patterns")); learnerErr == nil {
@@ -582,10 +585,11 @@ func (c *coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 		SkillTracker: c.skillTracker,
 		ModelName:    modelName,
 		SummarySchedule: func(ctx context.Context, sessionID string) error {
-			c.summaryQueue.Add(sessionID)
+				c.summaryQueue.Add(sessionID)
 			return nil
 		},
-	}
+		SessionSearch:   c.sessionSearch,
+}
 	allTools = append(allTools, tools.NewRegistry().Build(ctx, deps)...)
 
 	// ── transfer_to_agent (coordinator-owned, config-driven) ─────────────────

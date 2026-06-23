@@ -39,6 +39,7 @@ type Store struct {
 	memories *MemoryStore
 	stats    *StatsEngine
 
+	search   *SessionSearch
 	mu sync.RWMutex
 }
 
@@ -73,6 +74,8 @@ func New(projectPath string, cfg *config.ConfigStore) (*Store, error) {
 	s.memories = newMemoryStore(s)
 	s.stats = &StatsEngine{store: s}
 
+	s.search = newSessionSearch(s)
+
 	return s, nil
 }
 
@@ -94,8 +97,16 @@ func (s *Store) Memories() *MemoryStore { return s.memories }
 // Stats returns the stats engine.
 func (s *Store) Stats() *StatsEngine { return s.stats }
 
+// Search returns the session search engine.
+func (s *Store) Search() *SessionSearch { return s.search }
+
 // Close releases any resources held by the store.
-func (s *Store) Close() error { return nil }
+func (s *Store) Close() error {
+	if s.search != nil {
+		_ = s.search.Close()
+	}
+	return nil
+}
 
 // sessionDir returns the directory for a specific session.
 func (s *Store) sessionDir(sess session.Session) string {
