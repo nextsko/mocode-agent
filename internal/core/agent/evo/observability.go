@@ -51,7 +51,9 @@ func (o *ObservabilityExtension) onEvent(ctx context.Context, ev extension.Event
 		// reconstructed optimal theory. A real implementation would distill
 		// the prompt + response into a refined principle; the baseline keeps
 		// the latest successful prompt as the working theory.
-		o.state.RecordIteration(ec.Prompt, ec.Response, nil)
+		// Capture the tools exercised during the run as emergent skills:
+		// each distinct tool name is a capability the agent demonstrated.
+		o.state.RecordIteration(ec.Prompt, ec.Response, ec.ToolNames)
 		slog.Debug("evo: recorded iteration",
 			"agent", ec.AgentName, "iterations", o.state.Iterations)
 	case extension.EventOnError:

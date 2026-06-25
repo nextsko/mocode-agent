@@ -357,7 +357,8 @@ func (c *coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 	}
 	c.fireExtensions(ctx, runEvt, &extension.Context{
 		SessionID: sessionID, AgentName: c.activeAgentID, Prompt: prompt,
-		Messages: resultMessages(result), Response: resultResponseText(result), Err: originalErr,
+		Messages: resultMessages(result), Response: resultResponseText(result),
+		ToolNames: resultToolNames(result), Err: originalErr,
 	})
 
 	// Effect loop: after a successful turn, asynchronously score it via an LLM
@@ -1158,6 +1159,32 @@ func resultResponseText(r *fantasy.AgentResult) string {
 		return ""
 	}
 	return r.Response.Content.Text()
+}
+
+// resultToolNames returns the distinct tool names the agent called during the
+// run, in first-use order. Each name is a skill the agent exercised — the /evo
+// loop captures them as emergent skills for the fixed agent's manifest.
+func resultToolNames(r *fantasy.AgentResult) []string {
+	if r == nil {
+		return nil
+	}
+	var names []string
+	seen := make(map[string]bool)
+	for _, step := range r.Steps {
+		for _, msg := range step.Messages {
+			for _, part := range msg.Content {
+				if tc, ok := fantasy.AsMessagePart[fantasy.ToolCallPart](part); ok {
+					name := strings.TrimSpace(tc.ToolName)
+					if name == "" || seen[name] {
+						continue
+					}
+					seen[name] = true
+					names = append(names, name)
+				}
+			}
+		}
+	}
+	return names
 }
 
 // SetMainAgent switches the active agent to the given agent/mode ID.

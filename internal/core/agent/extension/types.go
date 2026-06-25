@@ -44,6 +44,10 @@ type Context struct {
 	// observers (e.g. the evo distiller that turns a successful turn into a
 	// generalized principle). May be empty for non-text responses.
 	Response string
+	// ToolNames are the distinct tools the agent called during the run, in
+	// first-use order. Each is a skill the agent exercised; the evo loop
+	// captures them as emergent skills for the fixed agent.
+	ToolNames []string
 	// ToolCall is the tool call for BeforeToolCall/AfterToolCall.
 	ToolCall *fantasy.ToolCall
 	// ToolResult is the tool result for AfterToolCall.
