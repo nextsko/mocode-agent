@@ -132,7 +132,11 @@ func (m *UI) handleEvoCommand(args string) (tea.Cmd, bool) {
 func (m *UI) enterEvoMode(name string) {
 	m.evoPrevTheme = *m.com.Styles
 	m.applyTheme(styles.EvoCrimson())
-	m.evo.Enter(name)
+	// Empty base: the proven system prompt isn't surfaced through the
+	// workspace facade yet, so the optimal theory is reconstructed purely
+	// from the distilled lessons of successful runs. Capturing the base
+	// prompt is a documented refinement.
+	m.evo.Enter(name, "")
 	m.com.Workspace.AgentRegisterExtension(evo.NewObservabilityExtension(&m.evo))
 }
 

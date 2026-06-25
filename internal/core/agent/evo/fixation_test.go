@@ -111,7 +111,7 @@ func TestState_Lifecycle(t *testing.T) {
 	var st State
 	require.False(t, st.IsActive())
 
-	st.Enter("reviewer")
+	st.Enter("reviewer", "You are a careful engineer.")
 	require.True(t, st.IsActive())
 	require.Equal(t, ModeActive, st.Mode)
 
@@ -119,7 +119,10 @@ func TestState_Lifecycle(t *testing.T) {
 	st.RecordIteration("optimal theory v1", []string{"s1"})
 	st.RecordIteration("optimal theory v2", []string{"s2", "s1"}) // s1 deduped
 	require.Equal(t, 2, st.Iterations)
-	require.Equal(t, "optimal theory v2", st.PendingPrompt)
+	// The reconstructed theory keeps the proven base and layers both lessons.
+	require.Contains(t, st.PendingPrompt, "You are a careful engineer.")
+	require.Contains(t, st.PendingPrompt, "optimal theory v1")
+	require.Contains(t, st.PendingPrompt, "optimal theory v2")
 	require.ElementsMatch(t, []string{"s1", "s2"}, st.CapturedSkills)
 
 	// First exit request -> confirm; second -> snapshot returned.
@@ -134,7 +137,8 @@ func TestState_Lifecycle(t *testing.T) {
 	st.RequestExit()
 	rev := st.ConfirmExit()
 	require.Equal(t, "reviewer", rev.AgentName)
-	require.Equal(t, "optimal theory v2", rev.SystemPrompt)
+	require.Contains(t, rev.SystemPrompt, "optimal theory v1")
+	require.Contains(t, rev.SystemPrompt, "optimal theory v2")
 	require.ElementsMatch(t, []string{"s1", "s2"}, rev.Skills)
 	require.False(t, st.IsActive())
 }
