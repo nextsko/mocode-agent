@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/fantasy"
 	"charm.land/catwalk/pkg/catwalk"
 
 	"github.com/package-register/mocode/internal/core/agent/extension"
@@ -117,6 +118,9 @@ type Workspace interface {
 	// The /evo mode captures it at enter time as the stable base for
 	// optimal-theory reconstruction ("maintain optimal theory").
 	AgentSystemPrompt() string
+	// AgentSmallLanguageModel returns the configured small model for cheap
+	// auxiliary calls (the /evo lesson distiller), or nil if unconfigured.
+	AgentSmallLanguageModel(ctx context.Context) fantasy.LanguageModel
 
 	// Permissions
 	PermissionGrant(perm permission.PermissionRequest)

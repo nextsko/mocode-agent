@@ -258,5 +258,6 @@ func (a *coordinatorAgent) Summarize(context.Context, string, fantasy.ProviderOp
 	return "", nil
 }
 func (a *coordinatorAgent) Model() agent.Model { return agent.Model{} }
+func (a *coordinatorAgent) SmallModel() agent.Model { return agent.Model{} }
 
 var _ agent.SessionAgent = (*coordinatorAgent)(nil)

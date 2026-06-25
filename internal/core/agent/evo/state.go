@@ -160,7 +160,6 @@ func (s *State) ReconstructTheory() string {
 	return strings.TrimSpace(b.String())
 }
 
-
 // itoa is a dependency-free int->string for the reconstruction header.
 func itoa(n int) string {
 	if n == 0 {

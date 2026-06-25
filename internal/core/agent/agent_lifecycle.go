@@ -227,6 +227,16 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 				}
 			}
 
+			// Todo nudge: surface open todos at each model step so the agent is
+			// reminded to finish pending/in-progress items before declaring done.
+			// Re-fetch the session for fresh todo state (the todos tool may have
+			// updated it mid-run). Best-effort: a fetch failure just skips the nudge.
+			if nudgedSession, nudgeErr := a.sessions.Get(callContext, call.SessionID); nudgeErr == nil {
+				if nudge := buildTodoNudge(nudgedSession.Todos); nudge != "" {
+					prepared.Messages = append([]fantasy.Message{fantasy.NewSystemMessage(nudge)}, prepared.Messages...)
+				}
+			}
+
 			var assistantMsg message.Message
 			assistantMsg, err = a.messages.Create(callContext, call.SessionID, message.CreateMessageParams{
 				Role:     message.Assistant,
@@ -833,4 +843,14 @@ func (a *sessionAgent) SystemPrompt() string {
 
 func (a *sessionAgent) Model() Model {
 	return a.largeModel.Get()
+}
+
+// SmallModel returns the configured small model (used for cheap auxiliary
+// calls like the /evo lesson distiller). It is a zero-value Model when the
+// small model was never built, whose Model field is nil.
+func (a *sessionAgent) SmallModel() Model {
+	if a.smallModel == nil {
+		return Model{}
+	}
+	return a.smallModel.Get()
 }

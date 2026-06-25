@@ -82,6 +82,8 @@ type SessionAgent interface {
 	ClearQueue(sessionID string)
 	Summarize(context.Context, string, fantasy.ProviderOptions) (string, error)
 	Model() Model
+	// SmallModel returns the configured small model (cheap auxiliary calls).
+	SmallModel() Model
 }
 
 type Model struct {

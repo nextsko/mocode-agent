@@ -106,6 +106,11 @@ type Coordinator interface {
 	// agent. The /evo mode captures it at enter time so the reconstructed
 	// optimal theory preserves what already worked as a stable base.
 	ActiveAgentSystemPrompt() string
+	// SmallLanguageModel returns the configured small model, used for cheap
+	// auxiliary calls (the /evo lesson distiller). Returns nil when no small
+	// model is configured, in which case the distiller falls back to its
+	// zero-overhead default.
+	SmallLanguageModel(ctx context.Context) fantasy.LanguageModel
 	UpdateModels(ctx context.Context) error
 }
 
@@ -1260,6 +1265,17 @@ func (c *coordinator) ActiveAgentSystemPrompt() string {
 		return ""
 	}
 	return c.currentAgent.SystemPrompt()
+}
+
+// SmallLanguageModel returns the configured small model for cheap auxiliary
+// calls (the /evo lesson distiller). It ensures models are built first, then
+// returns nil when no small model is configured or no agent is active.
+func (c *coordinator) SmallLanguageModel(ctx context.Context) fantasy.LanguageModel {
+	if c.currentAgent == nil {
+		return nil
+	}
+	_ = c.UpdateModels(ctx)
+	return c.currentAgent.SmallModel().Model
 }
 
 func (c *coordinator) UpdateModels(ctx context.Context) error {

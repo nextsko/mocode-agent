@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/package-register/mocode/internal/core/agent"
+	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/core/agent/extension"
 	"github.com/package-register/mocode/internal/core/agent/tools/lsp"
 	mcptools "github.com/package-register/mocode/internal/core/agent/tools/mcp"
@@ -508,6 +509,15 @@ func (w *AppWorkspace) AgentSystemPrompt() string {
 		return ""
 	}
 	return w.app.AgentCoordinator.ActiveAgentSystemPrompt()
+}
+
+// AgentSmallLanguageModel returns the configured small model for cheap
+// auxiliary calls (the /evo lesson distiller), or nil if unconfigured.
+func (w *AppWorkspace) AgentSmallLanguageModel(ctx context.Context) fantasy.LanguageModel {
+	if w.app.AgentCoordinator == nil {
+		return nil
+	}
+	return w.app.AgentCoordinator.SmallLanguageModel(ctx)
 }
 
 func (w *AppWorkspace) SwitchAgent(ctx context.Context, agentID string) error {

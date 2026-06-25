@@ -137,6 +137,13 @@ func (m *UI) enterEvoMode(name string) {
 	// worked and layers the distilled lessons on top ("maintain optimal theory").
 	m.evo.Enter(name, m.com.Workspace.AgentSystemPrompt())
 	m.com.Workspace.AgentRegisterExtension(evo.NewObservabilityExtension(&m.evo))
+	// Install an LLM-backed lesson distiller when a small model is available,
+	// so successful turns are distilled into generalized principles (genuine
+	// emergence) rather than kept verbatim. With no model, the distiller keeps
+	// its zero-overhead default (trimmed prompt).
+	if sm := m.com.Workspace.AgentSmallLanguageModel(context.Background()); sm != nil {
+		evo.SetDistiller(evo.LLMDistiller(context.Background(), sm))
+	}
 }
 
 // evoSessionName resolves the agent name for a new evo session.
