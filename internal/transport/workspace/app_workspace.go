@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/package-register/mocode/internal/core/agent"
+	"github.com/package-register/mocode/internal/core/agent/extension"
 	"github.com/package-register/mocode/internal/core/agent/tools/lsp"
 	mcptools "github.com/package-register/mocode/internal/core/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/core/app"
@@ -510,6 +511,20 @@ func (w *AppWorkspace) SwitchAgent(ctx context.Context, agentID string) error {
 		cfg.Options.ActiveMode = agentID
 	}
 	return w.app.AgentCoordinator.SetMainAgent(agentID)
+}
+
+// AgentRegisterExtension attaches a lifecycle extension to the coordinator.
+func (w *AppWorkspace) AgentRegisterExtension(ext extension.Extension) {
+	if w.app.AgentCoordinator != nil {
+		w.app.AgentCoordinator.RegisterExtension(ext)
+	}
+}
+
+// AgentUnregisterExtension detaches a lifecycle extension by name.
+func (w *AppWorkspace) AgentUnregisterExtension(name string) {
+	if w.app.AgentCoordinator != nil {
+		w.app.AgentCoordinator.UnregisterExtension(name)
+	}
 }
 
 // BuildCommandRegistry returns a flat list of all command descriptors from all registered

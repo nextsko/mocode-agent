@@ -105,9 +105,7 @@ func (m *UI) handleEvoCommand(args string) (tea.Cmd, bool) {
 		if m.evo.IsActive() {
 			return infoCmd("already in /evo mode"), true
 		}
-		m.evoPrevTheme = *m.com.Styles
-		m.applyTheme(styles.EvoCrimson())
-		m.evo.Enter(evoSessionName(args))
+		m.enterEvoMode(evoSessionName(args))
 		return infoCmd("entered /evo — self-evolution active (red/purple)"), true
 	case "exit", "quit", "leave":
 		if !m.evo.IsActive() {
@@ -121,13 +119,21 @@ func (m *UI) handleEvoCommand(args string) (tea.Cmd, bool) {
 	default:
 		// A bare name is treated as the agent to tame.
 		if !m.evo.IsActive() {
-			m.evoPrevTheme = *m.com.Styles
-			m.applyTheme(styles.EvoCrimson())
-			m.evo.Enter(evoSessionName(args))
+			m.enterEvoMode(evoSessionName(args))
 			return infoCmd("entered /evo as " + args), true
 		}
 		return infoCmd("unknown /evo subcommand: " + args), true
 	}
+}
+
+// enterEvoMode swaps to the EvoCrimson theme, enters the evo state, and
+// registers the observability extension so each run folds into the
+// optimal-theory prompt being reconstructed.
+func (m *UI) enterEvoMode(name string) {
+	m.evoPrevTheme = *m.com.Styles
+	m.applyTheme(styles.EvoCrimson())
+	m.evo.Enter(name)
+	m.com.Workspace.AgentRegisterExtension(evo.NewObservabilityExtension(&m.evo))
 }
 
 // evoSessionName resolves the agent name for a new evo session.
@@ -142,6 +148,7 @@ func evoSessionName(arg string) string {
 // theme and, if a pending optimal-theory prompt was reconstructed, fixes it
 // as a revision via the fixation store.
 func (m *UI) confirmEvoExit() (tea.Cmd, bool) {
+	m.com.Workspace.AgentUnregisterExtension("evo.observability")
 	rev := m.evo.ConfirmExit()
 	m.applyTheme(m.evoPrevTheme)
 	if strings.TrimSpace(rev.SystemPrompt) == "" {
@@ -163,6 +170,7 @@ func infoCmd(msg string) tea.Cmd {
 func evoRoot() string {
 	return filepath.Join(infra.DataDir(), "evo")
 }
+
 // The recommended path is to use the modal via "/wechat" (no args) or the
 // command palette, but these sub-commands remain for scripting.
 func (m *UI) handleWeChatCommand(args string) tea.Cmd {
@@ -239,6 +247,7 @@ func (m *UI) handleWeChatCommand(args string) tea.Cmd {
 
 	default:
 		return util.CmdHandler(util.NewInfoMsg(
-			"Usage: /wechat [list|switch <id>|reconnect <id>|start <id>|stop <id>|delete <id>]"))
+			"Usage: /wechat [list|switch <id>|reconnect <id>|start <id>|stop <id>|delete <id>]",
+		))
 	}
 }

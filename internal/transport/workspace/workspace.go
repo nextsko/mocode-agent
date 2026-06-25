@@ -12,6 +12,7 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 
 	"github.com/package-register/mocode/internal/core/agent/tools/lsp"
+	"github.com/package-register/mocode/internal/core/agent/extension"
 	mcptools "github.com/package-register/mocode/internal/core/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/core/permission"
@@ -173,6 +174,13 @@ type Workspace interface {
 	// registered providers. This is the single source of truth for both
 	// the Slash Completions (input float layer) and Command Palette.
 	BuildCommandRegistry() []slash.CommandDescriptor
+
+	// AgentRegisterExtension attaches a lifecycle extension to the agent
+	// coordinator (e.g. the /evo observability extension). The extension is
+	// registered and enabled; dispatch considers it from the next run.
+	AgentRegisterExtension(ext extension.Extension)
+	// AgentUnregisterExtension detaches a lifecycle extension by name.
+	AgentUnregisterExtension(name string)
 }
 
 // MCPResourceContents holds the contents of an MCP resource.

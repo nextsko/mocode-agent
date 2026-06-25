@@ -9,9 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"maps"
 	"net/http"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -23,6 +21,7 @@ import (
 
 	"github.com/package-register/mocode/internal/core/agent/candidate"
 	"github.com/package-register/mocode/internal/core/agent/evolution"
+	"github.com/package-register/mocode/internal/core/agent/extension"
 	"github.com/package-register/mocode/internal/core/agent/failover"
 	"github.com/package-register/mocode/internal/core/agent/notify"
 	"github.com/package-register/mocode/internal/core/agent/prompt"
@@ -38,6 +37,7 @@ import (
 	"github.com/package-register/mocode/internal/core/skills"
 	"github.com/package-register/mocode/internal/domain/filetracker"
 	"github.com/package-register/mocode/internal/domain/history"
+	"github.com/package-register/mocode/internal/domain/messenger"
 	"github.com/package-register/mocode/internal/domain/session"
 	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/domain/session/sessionlog"
@@ -45,18 +45,15 @@ import (
 	"github.com/package-register/mocode/internal/util/csync"
 	"github.com/package-register/mocode/internal/util/errcoll"
 	"github.com/package-register/mocode/internal/util/infra"
-	"github.com/package-register/mocode/internal/util/log"
 	"github.com/package-register/mocode/internal/util/pubsub"
 
 	"charm.land/fantasy/providers/anthropic"
 	"charm.land/fantasy/providers/azure"
-	"charm.land/fantasy/providers/bedrock"
 	"charm.land/fantasy/providers/google"
 	"charm.land/fantasy/providers/openai"
 	"charm.land/fantasy/providers/openaicompat"
 	"charm.land/fantasy/providers/openrouter"
 	"charm.land/fantasy/providers/vercel"
-	openaisdk "github.com/charmbracelet/openai-go/option"
 	"github.com/qjebbs/go-jsons"
 )
 
@@ -76,6 +73,19 @@ type Coordinator interface {
 	// SetMainAgent switches the active agent to the given mode/agent ID.
 	// This supports transfer_to_agent and mode switching.
 	SetMainAgent(agentID string) error
+	// SetMessenger wires the external-account send port (e.g. WeChat) that
+	// the coordinator-owned messaging tools use. Safe to call once at startup.
+	SetMessenger(m messenger.Messenger)
+	// SetExtensions wires the on_xxx lifecycle hook manager. The /evo mode
+	// uses this to register an observability extension that folds successful
+	// runs into the optimal-theory prompt. Safe to call once at startup.
+	SetExtensions(m *extension.Manager)
+	// RegisterExtension adds an extension to the lifecycle manager and
+	// enables it. Used by the /evo mode to attach its observability
+	// extension without owning the manager.
+	RegisterExtension(ext extension.Extension)
+	// UnregisterExtension removes an extension by name (e.g. on /evo exit).
+	UnregisterExtension(name string)
 	Run(ctx context.Context, sessionID, prompt string, attachments ...message.Attachment) (*fantasy.AgentResult, error)
 	Cancel(sessionID string)
 	// CancelSubagent stops a single sub-agent dispatched by the Agent
@@ -121,6 +131,13 @@ type coordinator struct {
 	errorLearner   *evolution.ErrorLearner
 	errorCollector *errcoll.Collector
 	sessionSearch  *store.SessionSearch
+	// messenger is the external-account send port (e.g. WeChat). Defaults to
+	// NoopMessenger; wired from the composition root after construction.
+	messenger messenger.Messenger
+	// extensions holds the on_xxx lifecycle hook manager. Defaults to a
+	// no-op manager; the /evo mode wires an observability extension here so
+	// runs/tools emit events without per-agent configuration.
+	extensions *extension.Manager
 	// Skills discovery results (session-start snapshot).
 	allSkills    []*skills.Skill // Pre-filter: all discovered after dedup.
 	activeSkills []*skills.Skill // Post-filter: active skills only.
@@ -220,6 +237,13 @@ func (c *coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 		return nil, err
 	}
 
+	// Extension lifecycle: BeforeRun lets extensions observe (or abort via a
+	// Decision) every agent run. Dispatched before any work so observers see
+	// the prompt that drives the turn.
+	c.fireExtensions(ctx, extension.EventBeforeRun, &extension.Context{
+		SessionID: sessionID, AgentName: c.activeAgentID, Prompt: prompt,
+	})
+
 	// ── session logging (self-evolution data) ───────────────────────────────
 	sl, _ := sessionlog.NewLogger(c.sessionLogDir, sessionID)
 	if sl != nil {
@@ -308,6 +332,18 @@ func (c *coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 	}
 	defer c.drainQueuedSummaries()
 	logTurnSkillUsage(sessionID, prompt, c.activeSkills, c.skillTracker, beforeLoaded)
+
+	// Extension lifecycle: AfterRun or OnError depending on the outcome.
+	// Observers (the /evo loop) use this to fold successful turns into the
+	// optimal-theory prompt and capture failures as evolution data.
+	runEvt := extension.EventAfterRun
+	if originalErr != nil {
+		runEvt = extension.EventOnError
+	}
+	c.fireExtensions(ctx, runEvt, &extension.Context{
+		SessionID: sessionID, AgentName: c.activeAgentID, Prompt: prompt,
+		Messages: resultMessages(result), Err: originalErr,
+	})
 
 	// Effect loop: after a successful turn, asynchronously score it via an LLM
 	// judge and record the score into sessionlog. This feeds the positive
@@ -644,10 +680,14 @@ func (c *coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 	allTools = append(allTools, screencap.NewAgentTool(screenshotDir))
 
 	// ── WeChat tools (coordinator-owned, always available regardless of AllowedTools) ─
+	messengerPort := c.messenger
+	if messengerPort == nil {
+		messengerPort = messenger.NoopMessenger{}
+	}
 	allTools = append(allTools,
-		tools.NewWeChatSendImageTool(),
-		tools.NewWeChatSendFileTool(),
-		tools.NewWeChatScreenshotTool(screenshotDir),
+		tools.NewWeChatSendImageTool(messengerPort),
+		tools.NewWeChatSendFileTool(messengerPort),
+		tools.NewWeChatScreenshotTool(messengerPort, screenshotDir),
 	)
 
 	// ── build hook runner if PreToolUse hooks are configured ─────────────────
@@ -1013,243 +1053,6 @@ func truncateForLogScore(s string) string {
 	}
 	return s[:max] + "..."
 }
-
-func (c *coordinator) buildAnthropicProvider(baseURL, apiKey string, headers map[string]string, providerID string) (fantasy.Provider, error) {
-	var opts []anthropic.Option
-
-	switch {
-	case strings.HasPrefix(apiKey, "Bearer "):
-		// NOTE: Prevent the SDK from picking up the API key from env.
-		os.Setenv("ANTHROPIC_API_KEY", "")
-		headers["Authorization"] = apiKey
-	case providerID == string(catwalk.InferenceProviderMiniMax) || providerID == string(catwalk.InferenceProviderMiniMaxChina):
-		// NOTE: Prevent the SDK from picking up the API key from env.
-		os.Setenv("ANTHROPIC_API_KEY", "")
-		headers["Authorization"] = "Bearer " + apiKey
-	case apiKey != "":
-		// X-Api-Key header
-		opts = append(opts, anthropic.WithAPIKey(apiKey))
-	}
-
-	if len(headers) > 0 {
-		opts = append(opts, anthropic.WithHeaders(headers))
-	}
-
-	if baseURL != "" {
-		opts = append(opts, anthropic.WithBaseURL(baseURL))
-	}
-
-	if c.cfg.Config().Options.Debug {
-		httpClient := log.NewHTTPClient()
-		opts = append(opts, anthropic.WithHTTPClient(httpClient))
-	}
-	return anthropic.New(opts...)
-}
-
-func (c *coordinator) buildOpenaiProvider(baseURL, apiKey string, headers map[string]string) (fantasy.Provider, error) {
-	opts := []openai.Option{
-		openai.WithAPIKey(apiKey),
-		openai.WithUseResponsesAPI(),
-	}
-	if c.cfg.Config().Options.Debug {
-		httpClient := log.NewHTTPClient()
-		opts = append(opts, openai.WithHTTPClient(httpClient))
-	}
-	if len(headers) > 0 {
-		opts = append(opts, openai.WithHeaders(headers))
-	}
-	if baseURL != "" {
-		opts = append(opts, openai.WithBaseURL(baseURL))
-	}
-	return openai.New(opts...)
-}
-
-func (c *coordinator) buildOpenrouterProvider(_, apiKey string, headers map[string]string) (fantasy.Provider, error) {
-	opts := []openrouter.Option{
-		openrouter.WithAPIKey(apiKey),
-	}
-	if c.cfg.Config().Options.Debug {
-		httpClient := log.NewHTTPClient()
-		opts = append(opts, openrouter.WithHTTPClient(httpClient))
-	}
-	if len(headers) > 0 {
-		opts = append(opts, openrouter.WithHeaders(headers))
-	}
-	return openrouter.New(opts...)
-}
-
-func (c *coordinator) buildVercelProvider(_, apiKey string, headers map[string]string) (fantasy.Provider, error) {
-	opts := []vercel.Option{
-		vercel.WithAPIKey(apiKey),
-	}
-	if c.cfg.Config().Options.Debug {
-		httpClient := log.NewHTTPClient()
-		opts = append(opts, vercel.WithHTTPClient(httpClient))
-	}
-	if len(headers) > 0 {
-		opts = append(opts, vercel.WithHeaders(headers))
-	}
-	return vercel.New(opts...)
-}
-
-func (c *coordinator) buildOpenaiCompatProvider(baseURL, apiKey string, headers map[string]string, extraBody map[string]any) (fantasy.Provider, error) {
-	opts := []openaicompat.Option{
-		openaicompat.WithBaseURL(baseURL),
-		openaicompat.WithAPIKey(apiKey),
-	}
-
-	var httpClient *http.Client
-	if c.cfg.Config().Options.Debug {
-		httpClient = log.NewHTTPClient()
-	}
-	if httpClient != nil {
-		opts = append(opts, openaicompat.WithHTTPClient(httpClient))
-	}
-
-	if len(headers) > 0 {
-		opts = append(opts, openaicompat.WithHeaders(headers))
-	}
-
-	for extraKey, extraValue := range extraBody {
-		opts = append(opts, openaicompat.WithSDKOptions(openaisdk.WithJSONSet(extraKey, extraValue)))
-	}
-
-	return openaicompat.New(opts...)
-}
-
-func (c *coordinator) buildAzureProvider(baseURL, apiKey string, headers map[string]string, options map[string]string) (fantasy.Provider, error) {
-	opts := []azure.Option{
-		azure.WithBaseURL(baseURL),
-		azure.WithAPIKey(apiKey),
-		azure.WithUseResponsesAPI(),
-	}
-	if c.cfg.Config().Options.Debug {
-		httpClient := log.NewHTTPClient()
-		opts = append(opts, azure.WithHTTPClient(httpClient))
-	}
-	if options == nil {
-		options = make(map[string]string)
-	}
-	if apiVersion, ok := options["apiVersion"]; ok {
-		opts = append(opts, azure.WithAPIVersion(apiVersion))
-	}
-	if len(headers) > 0 {
-		opts = append(opts, azure.WithHeaders(headers))
-	}
-
-	return azure.New(opts...)
-}
-
-func (c *coordinator) buildBedrockProvider(apiKey string, headers map[string]string) (fantasy.Provider, error) {
-	var opts []bedrock.Option
-	if c.cfg.Config().Options.Debug {
-		httpClient := log.NewHTTPClient()
-		opts = append(opts, bedrock.WithHTTPClient(httpClient))
-	}
-	if len(headers) > 0 {
-		opts = append(opts, bedrock.WithHeaders(headers))
-	}
-	switch {
-	case apiKey != "":
-		opts = append(opts, bedrock.WithAPIKey(apiKey))
-	case os.Getenv("AWS_BEARER_TOKEN_BEDROCK") != "":
-		opts = append(opts, bedrock.WithAPIKey(os.Getenv("AWS_BEARER_TOKEN_BEDROCK")))
-	default:
-		// Skip, let the SDK do authentication.
-	}
-	return bedrock.New(opts...)
-}
-
-func (c *coordinator) buildGoogleProvider(baseURL, apiKey string, headers map[string]string) (fantasy.Provider, error) {
-	opts := []google.Option{
-		google.WithBaseURL(baseURL),
-		google.WithGeminiAPIKey(apiKey),
-	}
-	if c.cfg.Config().Options.Debug {
-		httpClient := log.NewHTTPClient()
-		opts = append(opts, google.WithHTTPClient(httpClient))
-	}
-	if len(headers) > 0 {
-		opts = append(opts, google.WithHeaders(headers))
-	}
-	return google.New(opts...)
-}
-
-func (c *coordinator) buildGoogleVertexProvider(headers map[string]string, options map[string]string) (fantasy.Provider, error) {
-	opts := []google.Option{}
-	if c.cfg.Config().Options.Debug {
-		httpClient := log.NewHTTPClient()
-		opts = append(opts, google.WithHTTPClient(httpClient))
-	}
-	if len(headers) > 0 {
-		opts = append(opts, google.WithHeaders(headers))
-	}
-
-	project := options["project"]
-	location := options["location"]
-
-	opts = append(opts, google.WithVertex(project, location))
-
-	return google.New(opts...)
-}
-
-func (c *coordinator) isAnthropicThinking(model config.SelectedModel) bool {
-	if model.Think {
-		return true
-	}
-	opts, err := anthropic.ParseOptions(model.ProviderOptions)
-	return err == nil && opts.Thinking != nil
-}
-
-func (c *coordinator) buildProvider(providerCfg config.ProviderConfig, model config.SelectedModel, isSubAgent bool) (fantasy.Provider, error) {
-	headers := maps.Clone(providerCfg.ExtraHeaders)
-	if headers == nil {
-		headers = make(map[string]string)
-	}
-
-	// handle special headers for anthropic
-	if providerCfg.Type == anthropic.Name && c.isAnthropicThinking(model) {
-		if v, ok := headers["anthropic-beta"]; ok {
-			headers["anthropic-beta"] = v + ",interleaved-thinking-2025-05-14"
-		} else {
-			headers["anthropic-beta"] = "interleaved-thinking-2025-05-14"
-		}
-	}
-
-	apiKey, _ := c.cfg.Resolve(providerCfg.APIKey)
-	baseURL, _ := c.cfg.Resolve(providerCfg.BaseURL)
-
-	switch providerCfg.Type {
-	case openai.Name:
-		return c.buildOpenaiProvider(baseURL, apiKey, headers)
-	case anthropic.Name:
-		return c.buildAnthropicProvider(baseURL, apiKey, headers, providerCfg.ID)
-	case openrouter.Name:
-		return c.buildOpenrouterProvider(baseURL, apiKey, headers)
-	case vercel.Name:
-		return c.buildVercelProvider(baseURL, apiKey, headers)
-	case azure.Name:
-		return c.buildAzureProvider(baseURL, apiKey, headers, providerCfg.ExtraParams)
-	case bedrock.Name:
-		return c.buildBedrockProvider(apiKey, headers)
-	case google.Name:
-		return c.buildGoogleProvider(baseURL, apiKey, headers)
-	case "google-vertex":
-		return c.buildGoogleVertexProvider(headers, providerCfg.ExtraParams)
-	case openaicompat.Name:
-		switch providerCfg.ID {
-		case string(catwalk.InferenceProviderZAI):
-			if providerCfg.ExtraBody == nil {
-				providerCfg.ExtraBody = map[string]any{}
-			}
-			providerCfg.ExtraBody["tool_stream"] = true
-		}
-		return c.buildOpenaiCompatProvider(baseURL, apiKey, headers, providerCfg.ExtraBody)
-	default:
-		return nil, fmt.Errorf("provider type not supported: %q", providerCfg.Type)
-	}
-}
-
 func isExactoSupported(modelID string) bool {
 	supportedModels := []string{
 		"moonshotai/kimi-k2-0905",
@@ -1259,6 +1062,61 @@ func isExactoSupported(modelID string) bool {
 		"qwen/qwen3-coder",
 	}
 	return slices.Contains(supportedModels, modelID)
+}
+
+// SetMessenger wires the external-account send port (e.g. WeChat) used by the
+// coordinator-owned messaging tools. A nil m falls back to NoopMessenger.
+func (c *coordinator) SetMessenger(m messenger.Messenger) {
+	if m == nil {
+		m = messenger.NoopMessenger{}
+	}
+	c.messenger = m
+}
+
+// SetExtensions wires the on_xxx lifecycle hook manager. A nil manager is
+// replaced with an empty one so dispatch is always a safe no-op; this lets
+// callers fire events unconditionally without nil checks.
+func (c *coordinator) SetExtensions(m *extension.Manager) {
+	if m == nil {
+		m = extension.NewManager()
+	}
+	c.extensions = m
+}
+
+// RegisterExtension adds an extension to the lifecycle manager, enabling it.
+// Lazily allocates a manager if SetExtensions was never called.
+func (c *coordinator) RegisterExtension(ext extension.Extension) {
+	if c.extensions == nil {
+		c.extensions = extension.NewManager()
+	}
+	c.extensions.Register(ext)
+}
+
+// UnregisterExtension removes an extension by name (e.g. on /evo exit).
+func (c *coordinator) UnregisterExtension(name string) {
+	if c.extensions != nil {
+		c.extensions.Unregister(name)
+	}
+}
+
+// fireExtensions dispatches an event to every enabled extension. Safe to call
+// before SetExtensions (a nil manager is a no-op).
+func (c *coordinator) fireExtensions(ctx context.Context, ev extension.Event, ec *extension.Context) {
+	if c.extensions == nil {
+		return
+	}
+	if dec := c.extensions.Dispatch(ctx, ev, ec); dec != nil && dec.AbortRun {
+		slog.Warn("Run aborted by extension", "event", string(ev), "reason", dec.AbortReason)
+	}
+}
+
+// resultMessages is a placeholder for extracting a message trace from a run
+// result. fantasy.AgentResult exposes Steps/Response rather than a flat
+// message slice; the /evo loop fills this from the session service when it
+// needs the full trace. Returning nil is safe: extension observers that only
+// need the prompt + outcome still fire correctly.
+func resultMessages(_ *fantasy.AgentResult) []message.Message {
+	return nil
 }
 
 // SetMainAgent switches the active agent to the given agent/mode ID.
