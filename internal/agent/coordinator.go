@@ -27,6 +27,7 @@ import (
 	"github.com/package-register/mocode/internal/candidate"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/csync"
+	"github.com/package-register/mocode/internal/evaluation/llmjudge"
 	"github.com/package-register/mocode/internal/errcoll"
 	"github.com/package-register/mocode/internal/evolution"
 	"github.com/package-register/mocode/internal/filetracker"
@@ -306,6 +307,14 @@ func (c *coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 	}
 	defer c.drainQueuedSummaries()
 	logTurnSkillUsage(sessionID, prompt, c.activeSkills, c.skillTracker, beforeLoaded)
+
+	// Effect loop: after a successful turn, asynchronously score it via an LLM
+	// judge and record the score into sessionlog. This feeds the positive
+	// (effect) side of the evolution loop — low scores become evolution data.
+	// Best-effort: failures are silent, never affect the returned result.
+	if result != nil && originalErr == nil {
+		go c.scoreTurn(sessionID, prompt)
+	}
 
 	if c.isUnauthorized(originalErr) {
 		switch {
@@ -956,6 +965,52 @@ func (c *coordinator) buildSmallLanguageModel(ctx context.Context) (fantasy.Lang
 		smallModelID += ":exacto"
 	}
 	return smallProvider.LanguageModel(ctx, smallModelID)
+}
+
+// scoreTurn asynchronously scores a completed turn with an LLM judge and
+// records the result into the session log. It is the online end of the
+// evaluation system: the same judging capability used offline by `mocode eval`
+// here produces a per-turn quality signal that feeds the evolution loop.
+//
+// Best-effort and non-blocking: any failure (no small model, judge error) is
+// logged at debug level and dropped. The returned turn result is unaffected.
+func (c *coordinator) scoreTurn(sessionID, prompt string) {
+	ctx := context.Background()
+	judgeModel, err := c.buildSmallLanguageModel(ctx)
+	if err != nil {
+		slog.Debug("effect loop: no judge model, skipping turn scoring", "error", err)
+		return
+	}
+	trace, err := c.messages.List(ctx, sessionID)
+	if err != nil || len(trace) == 0 {
+		slog.Debug("effect loop: no trace to score", "error", err)
+		return
+	}
+	judge := &llmjudge.Judge{Model: judgeModel}
+	// Score the turn against a general helpfulness rubric. This is deliberately
+	// broad: the goal is a quality signal, not a task-specific pass/fail.
+	res, err := judge.Judge(ctx, []string{
+		"Did the response address the user's request accurately and completely?",
+		"Was the response helpful, clear, and free of errors?",
+	}, trace)
+	if err != nil {
+		slog.Debug("effect loop: judge failed", "error", err)
+		return
+	}
+	// Record the score into the session log so the evolution producer and any
+	// analysis tooling can consume it.
+	if lg, _ := sessionlog.NewLogger(c.sessionLogDir, sessionID); lg != nil {
+		lg.LogInfo("turn_score", fmt.Sprintf("score=%.2f reason=%s", res.Score, truncateForLogScore(res.Reason)), sessionlog.Meta{})
+		lg.Close()
+	}
+}
+
+func truncateForLogScore(s string) string {
+	const max = 200
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "..."
 }
 
 func (c *coordinator) buildAnthropicProvider(baseURL, apiKey string, headers map[string]string, providerID string) (fantasy.Provider, error) {

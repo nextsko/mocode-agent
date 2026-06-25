@@ -378,7 +378,6 @@ func (c *Commands) defaultCommands() []*CommandItem {
 		NewCommandItem(t, "admin_panel", "Open Admin Panel", "", ActionOpenAdmin{}),
 		NewCommandItem(t, "admin_start", "Start Admin Server", "", ActionStartAdmin{}),
 		NewCommandItem(t, "admin_stop", "Stop Admin Server", "", ActionStopAdmin{}),
-		NewCommandItem(t, "minimax_quota", "MiniMax Quota", "", ActionShowQuota{}),
 		NewCommandItem(t, "wechat_login", "Connect WeChat", "", ActionOpenDialog{WeChatQRID}),
 		NewCommandItem(t, "wechat_manager", "Manage WeChat accounts", "", ActionOpenDialog{WeChatManagerID}),
 	}

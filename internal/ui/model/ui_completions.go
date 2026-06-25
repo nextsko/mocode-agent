@@ -183,7 +183,6 @@ func (m *UI) slashCompletionGroups() []completions.SlashGroup {
 		v("/admin", "Open Admin Panel", dialog.ActionOpenAdmin{}),
 		v("/admin-start", "Start Admin Server", dialog.ActionStartAdmin{}),
 		v("/admin-stop", "Stop Admin Server", dialog.ActionStopAdmin{}),
-		v("/minimax", "MiniMax Quota", dialog.ActionShowQuota{}),
 		v("/quit", "Quit", dialog.ActionQuit{}),
 	}
 

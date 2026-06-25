@@ -104,8 +104,6 @@ type (
 		Enabled bool
 		Args    map[string]string
 	}
-	// ActionShowQuota triggers a MiniMax quota fetch and display.
-	ActionShowQuota struct{}
 	// ActionOpenSubmenu is sent when a parent command item is activated
 	// (Enter/Right/Click). The Commands dialog opens the children list.
 	ActionOpenSubmenu struct{}

@@ -1,4 +1,4 @@
-﻿package model
+package model
 
 import (
 	"bytes"
@@ -2047,8 +2047,6 @@ func (m *UI) cancelAgent() tea.Cmd {
 // openModesDialog opens the agent mode selection dialog.
 
 // openHelpDialog opens the help key bindings dialog.
-
-// openMiniMaxQuotaDialog opens the MiniMax quota dialog.
 
 // openContextDialog opens the context message browser dialog.
 

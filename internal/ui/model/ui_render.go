@@ -130,10 +130,6 @@ func (m *UI) stopAdminServer() tea.Cmd {
 	}
 }
 
-func (m *UI) showMiniMaxQuota() tea.Cmd {
-	return m.openMiniMaxQuotaDialog()
-}
-
 func (m *UI) setProxyURL(action dialog.ActionSetProxyURL) tea.Cmd {
 	return func() tea.Msg {
 		proxyURL := strings.TrimSpace(action.URL)

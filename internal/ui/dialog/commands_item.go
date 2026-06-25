@@ -154,8 +154,6 @@ func (c *CommandItem) Label() string {
 		return "/admin-start"
 	case "admin_stop":
 		return "/admin-stop"
-	case "minimax_quota":
-		return "/minimax"
 	case "toggle_help":
 		return "/help"
 	case "init":

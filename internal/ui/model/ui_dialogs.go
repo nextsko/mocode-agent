@@ -192,8 +192,6 @@ func (m *UI) handleDialogAction(action tea.Msg) tea.Cmd {
 		cmds = append(cmds, m.startAdminServer(true))
 	case dialog.ActionStopAdmin:
 		cmds = append(cmds, m.stopAdminServer())
-	case dialog.ActionShowQuota:
-		cmds = append(cmds, m.showMiniMaxQuota())
 	case dialog.ActionSetProxyURL:
 		if !msg.Enabled {
 			cmds = append(cmds, m.setProxyURL(msg))
@@ -558,10 +556,6 @@ func (m *UI) openDialog(id string) tea.Cmd {
 		if cmd := m.openMCPDialog(); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
-	case dialog.MiniMaxQuotaID:
-		if cmd := m.openMiniMaxQuotaDialog(); cmd != nil {
-			cmds = append(cmds, cmd)
-		}
 	case dialog.ContextID:
 		if cmd := m.openContextDialog(); cmd != nil {
 			cmds = append(cmds, cmd)
@@ -735,21 +729,6 @@ func (m *UI) openHelpDialog() tea.Cmd {
 	helpDialog := dialog.NewHelp(m.com)
 	m.dialog.OpenDialog(helpDialog)
 	return nil
-}
-
-func (m *UI) openMiniMaxQuotaDialog() tea.Cmd {
-	if m.dialog.ContainsDialog(dialog.MiniMaxQuotaID) {
-		m.dialog.BringToFront(dialog.MiniMaxQuotaID)
-		return nil
-	}
-
-	quotaDialog, err := dialog.NewMiniMaxQuota(m.com)
-	if err != nil {
-		return util.ReportError(err)
-	}
-	m.dialog.OpenDialog(quotaDialog)
-
-	return quotaDialog.FetchQuotaCmd()
 }
 
 func (m *UI) openContextDialog() tea.Cmd {

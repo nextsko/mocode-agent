@@ -8,7 +8,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	execbuiltin "github.com/package-register/mocode/internal/agent/tools/builtin/exec"
+	execbuiltin "github.com/package-register/mocode/internal/agent/tools/builtin/bash"
 	"github.com/package-register/mocode/internal/session/message"
 	"github.com/package-register/mocode/internal/shellruntime/shell"
 	"github.com/package-register/mocode/internal/ui/chat"

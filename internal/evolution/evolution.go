@@ -49,6 +49,15 @@ type Patch struct {
 	Applied     bool      `json:"applied"` // has been loaded into context
 	AppliedAt   time.Time `json:"applied_at,omitempty"`
 
+	// InjectCount tracks how many times this patch has been injected into a
+	// system prompt. When it reaches MaxInjects the patch is auto-applied
+	// (convergence), preventing unbounded context growth.
+	InjectCount int `json:"inject_count,omitempty"`
+	// MaxInjects caps how many sessions a patch is injected into before it is
+	// considered learned and auto-applied. Zero means no auto-convergence
+	// (inject until manually applied).
+	MaxInjects int `json:"max_injects,omitempty"`
+
 	// File paths relative to the patch directory.
 	Files []string `json:"files,omitempty"`
 }
@@ -180,6 +189,32 @@ func (s *PatchStore) MarkApplied(patchID string) error {
 	return os.WriteFile(metaPath, data, 0o644)
 }
 
+// MarkInjected increments a patch's InjectCount and, if MaxInjects > 0 and the
+// count reaches it, marks the patch Applied (convergence). This is the
+// auto-convergence mechanism that prevents unapplied patches from accumulating
+// in every system prompt forever.
+func (s *PatchStore) MarkInjected(patchID string) error {
+	metaPath := filepath.Join(s.dir, patchID, "patch.json")
+	data, err := os.ReadFile(metaPath)
+	if err != nil {
+		return err
+	}
+	var p Patch
+	if err := json.Unmarshal(data, &p); err != nil {
+		return err
+	}
+	p.InjectCount++
+	if p.MaxInjects > 0 && p.InjectCount >= p.MaxInjects {
+		p.Applied = true
+		p.AppliedAt = time.Now()
+	}
+	data, err = json.MarshalIndent(p, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(metaPath, data, 0o644)
+}
+
 // Dir returns the patches root directory.
 func (s *PatchStore) Dir() string { return s.dir }
 
@@ -216,6 +251,13 @@ func (l *PatchLoader) BuildContext() (string, error) {
 	for _, p := range patches {
 		sb.WriteString(fmt.Sprintf("### %s [%s] (priority: %d)\n", p.Title, p.Kind, p.Priority))
 		sb.WriteString(fmt.Sprintf("%s\n\n", p.Description))
+
+		// Convergence: count this injection. Patches whose InjectCount reaches
+		// MaxInjects are auto-applied by MarkInjected, so they drop out of the
+		// unapplied set on subsequent runs instead of accumulating forever.
+		if p.MaxInjects > 0 {
+			_ = l.store.MarkInjected(p.ID)
+		}
 
 		// Load rule files — these are injected directly as constraints.
 		if p.Kind == KindRule {

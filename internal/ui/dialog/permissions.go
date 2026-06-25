@@ -14,7 +14,7 @@ import (
 	"github.com/package-register/mocode/internal/agent/tools"
 	"github.com/package-register/mocode/internal/fsext"
 	"github.com/package-register/mocode/internal/permission"
-	"github.com/package-register/mocode/internal/stringext"
+	"github.com/package-register/mocode/internal/ext"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/styles"
 )
@@ -518,7 +518,7 @@ func (p *Permissions) renderToolName(width int) string {
 func prettyName(name string) string {
 	name = strings.ReplaceAll(name, "_", " ")
 	name = strings.ReplaceAll(name, "-", " ")
-	return stringext.Capitalize(name)
+	return ext.Capitalize(name)
 }
 
 func (p *Permissions) renderContent(width int) string {
