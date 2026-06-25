@@ -18,12 +18,13 @@ import (
 	"github.com/package-register/mocode/internal/agent/notify"
 	"github.com/package-register/mocode/internal/agent/tools"
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
+	"github.com/package-register/mocode/internal/agent/toolutil"
 	"github.com/package-register/mocode/internal/errcoll"
 	"github.com/package-register/mocode/internal/knowledge/memory"
 	"github.com/package-register/mocode/internal/pubsub"
 	"github.com/package-register/mocode/internal/session/message"
 	"github.com/package-register/mocode/internal/session/sessionexport"
-	"github.com/package-register/mocode/internal/stringext"
+	"github.com/package-register/mocode/internal/ext"
 )
 
 func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy.AgentResult, error) {
@@ -250,6 +251,10 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 			return a.messages.Update(genCtx, *currentAssistant)
 		},
 		OnReasoningEnd: func(id string, reasoning fantasy.ReasoningContent) error {
+			// Record the reasoning trace for the evolution/observability layer.
+			if lg := toolutil.GetSessionLogger(ctx); lg != nil && reasoning.Text != "" {
+				lg.LogThink("reasoning", truncateForLog(reasoning.Text), toolutil.SessionLogMeta{})
+			}
 			// handle anthropic signature
 			if anthropicData, ok := reasoning.ProviderMetadata[anthropic.Name]; ok {
 				if reasoning, ok := anthropicData.(*anthropic.ReasoningOptionMetadata); ok {
@@ -313,12 +318,31 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 				Finished:         true,
 			}
 			currentAssistant.AddToolCall(toolCall)
+			// Record the tool invocation for the evolution/observability layer.
+			if lg := toolutil.GetSessionLogger(ctx); lg != nil {
+				lg.LogToolCall("tool_call", tc.ToolName+": "+truncateForLog(tc.Input), toolutil.SessionLogMeta{
+					ToolName: tc.ToolName, ToolCallID: tc.ToolCallID,
+				})
+			}
 			// Use parent ctx instead of genCtx to ensure the update succeeds
 			// even if the request is canceled mid-stream
 			return a.messages.Update(ctx, *currentAssistant)
 		},
 		OnToolResult: func(result fantasy.ToolResultContent) error {
 			toolResult := a.convertToToolResult(result)
+
+			// Record tool results (and errors) for the evolution/observability layer.
+			if lg := toolutil.GetSessionLogger(ctx); lg != nil {
+				if toolResult.IsError {
+					lg.LogBug("tool_error", result.ToolName+": "+truncateForLog(toolResult.Content), toolutil.SessionLogMeta{
+						ToolName: result.ToolName, ToolCallID: toolResult.ToolCallID, ErrorType: "tool_execution",
+					})
+				} else {
+					lg.LogToolCall("tool_result", result.ToolName+": "+truncateForLog(toolResult.Content), toolutil.SessionLogMeta{
+						ToolName: result.ToolName, ToolCallID: toolResult.ToolCallID,
+					})
+				}
+			}
 
 			// Record error patterns for evolution learning.
 			if toolResult.IsError && a.errorLearner != nil {
@@ -377,6 +401,13 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 				return sessionErr
 			}
 			currentSession = updatedSession
+			// Record per-step token usage for the evolution/observability layer.
+			if lg := toolutil.GetSessionLogger(ctx); lg != nil {
+				lg.LogInfo("step_usage", fmt.Sprintf("finish=%s in=%d out=%d cache_read=%d cache_create=%d",
+					finishReason, stepResult.Usage.InputTokens, stepResult.Usage.OutputTokens,
+					stepResult.Usage.CacheReadTokens, stepResult.Usage.CacheCreationTokens),
+					toolutil.SessionLogMeta{AgentID: largeModel.ModelCfg.Model})
+			}
 			return a.messages.Update(genCtx, *currentAssistant)
 		},
 		StopWhen: []fantasy.StopCondition{
@@ -485,9 +516,9 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 		} else if ctxTooLarge {
 			currentAssistant.AddFinish(message.FinishReasonError, "Context Too Large", "Context window exceeded; summarizing and retrying.")
 		} else if errors.As(err, &providerErr) {
-			currentAssistant.AddFinish(message.FinishReasonError, cmp.Or(stringext.Capitalize(providerErr.Title), defaultTitle), providerErr.Message)
+			currentAssistant.AddFinish(message.FinishReasonError, cmp.Or(ext.Capitalize(providerErr.Title), defaultTitle), providerErr.Message)
 		} else if errors.As(err, &fantasyErr) {
-			currentAssistant.AddFinish(message.FinishReasonError, cmp.Or(stringext.Capitalize(fantasyErr.Title), defaultTitle), fantasyErr.Message)
+			currentAssistant.AddFinish(message.FinishReasonError, cmp.Or(ext.Capitalize(fantasyErr.Title), defaultTitle), fantasyErr.Message)
 		} else {
 			currentAssistant.AddFinish(message.FinishReasonError, defaultTitle, err.Error())
 		}

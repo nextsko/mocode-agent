@@ -22,6 +22,9 @@ import (
 	"github.com/package-register/mocode/internal/agent/notify"
 	"github.com/package-register/mocode/internal/agent/prompt"
 	"github.com/package-register/mocode/internal/agent/tools"
+	"github.com/package-register/mocode/internal/agent/tools/lsp"
+	"github.com/package-register/mocode/internal/agent/toolutil"
+	"github.com/package-register/mocode/internal/candidate"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/csync"
 	"github.com/package-register/mocode/internal/errcoll"
@@ -32,8 +35,7 @@ import (
 	"github.com/package-register/mocode/internal/infra"
 	"github.com/package-register/mocode/internal/knowledge/memory"
 	"github.com/package-register/mocode/internal/log"
-	"github.com/package-register/mocode/internal/lsp"
-	"github.com/package-register/mocode/internal/orchestration"
+	"github.com/package-register/mocode/internal/model/failover"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/pubsub"
 	"github.com/package-register/mocode/internal/session"
@@ -113,8 +115,7 @@ type coordinator struct {
 	// parent session.
 	subagentIndex  *csync.Map[string, string]
 	summaryQueue   *sessionSummaryQueue
-	swarmWF        *orchestration.WorkflowRuntime // nil if swarm mode not active
-	sessionLogDir  string                         // base dir for session logs
+	sessionLogDir  string // base dir for session logs
 	errorLearner   *evolution.ErrorLearner
 	errorCollector *errcoll.Collector
 	sessionSearch  *store.SessionSearch
@@ -228,6 +229,13 @@ func (c *coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 	}
 	_ = sl // used below in sub-agent and transfer paths via closure
 
+	// Attach the session logger to ctx so agent callbacks (OnToolResult,
+	// OnToolCall, OnStepFinish) can record tool calls, reasoning, and errors
+	// without threading the logger through every signature.
+	if sl != nil {
+		ctx = context.WithValue(ctx, toolutil.SessionLoggerContextKeyVal, sessionLogSink{l: sl})
+	}
+
 	// refresh models before each run
 	if err := c.UpdateModels(ctx); err != nil {
 		return nil, fmt.Errorf("failed to update models: %w", err)
@@ -289,7 +297,13 @@ func (c *coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 		})
 	}
 	beforeLoaded := c.skillTracker.LoadedNames()
-	result, originalErr := run()
+	var result *fantasy.AgentResult
+	var originalErr error
+	if agentCfg := c.activeAgentConfig(); agentCfg != nil && agentCfg.BestOfN > 1 {
+		result, originalErr = c.runBestOfN(ctx, sessionID, prompt, maxTokens, mergedOptions, temp, topP, topK, freqPenalty, presPenalty, attachments, agentCfg.BestOfN)
+	} else {
+		result, originalErr = run()
+	}
 	defer c.drainQueuedSummaries()
 	logTurnSkillUsage(sessionID, prompt, c.activeSkills, c.skillTracker, beforeLoaded)
 
@@ -761,6 +775,17 @@ func (c *coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Mo
 		return Model{}, Model{}, err
 	}
 
+	// Wrap with failover when a fallback is declared. The wrap is a no-op when
+	// no fallback is configured, so existing behavior is unchanged.
+	largeModel, err = c.withFailover(ctx, largeModel, largeModelCfg)
+	if err != nil {
+		return Model{}, Model{}, err
+	}
+	smallModel, err = c.withFailover(ctx, smallModel, smallModelCfg)
+	if err != nil {
+		return Model{}, Model{}, err
+	}
+
 	return Model{
 			Model:      largeModel,
 			CatwalkCfg: *largeCatwalkModel,
@@ -770,6 +795,167 @@ func (c *coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Mo
 			CatwalkCfg: *smallCatwalkModel,
 			ModelCfg:   smallModelCfg,
 		}, nil
+}
+
+// withFailover wraps a primary LanguageModel with failover when the model's
+// config declares a Fallback. It mirrors the primary construction (resolve
+// provider config, build provider, resolve model id) for the fallback, then
+// wraps the two with failover.New. When no fallback is declared the primary is
+// returned unchanged, preserving existing behavior.
+func (c *coordinator) withFailover(ctx context.Context, primary fantasy.LanguageModel, cfg config.SelectedModel) (fantasy.LanguageModel, error) {
+	if cfg.Fallback == nil {
+		return primary, nil
+	}
+	fb := *cfg.Fallback
+	fbProviderCfg, ok := c.cfg.Config().Providers.Get(fb.Provider)
+	if !ok {
+		return nil, fmt.Errorf("failover: fallback provider %q not configured", fb.Provider)
+	}
+	fbProvider, err := c.buildProvider(fbProviderCfg, fb, true)
+	if err != nil {
+		return nil, fmt.Errorf("failover: build fallback provider: %w", err)
+	}
+	fbModelID := fb.Model
+	if fb.Provider == openrouter.Name && isExactoSupported(fbModelID) {
+		fbModelID += ":exacto"
+	}
+	fbModel, err := fbProvider.LanguageModel(ctx, fbModelID)
+	if err != nil {
+		return nil, fmt.Errorf("failover: build fallback model: %w", err)
+	}
+	wrapped, err := failover.New(failover.WithPrimary(primary), failover.WithFallback(fbModel))
+	if err != nil {
+		return nil, fmt.Errorf("failover: %w", err)
+	}
+	return wrapped, nil
+}
+
+// sessionLogSink adapts *sessionlog.Logger to toolutil.SessionLoggerSink.
+// It lives in the coordinator (not the tool layer) so toolutil stays free of
+// a sessionlog import.
+type sessionLogSink struct{ l *sessionlog.Logger }
+
+func (s sessionLogSink) LogToolCall(event, data string, m toolutil.SessionLogMeta) {
+	s.l.LogToolCall(event, data, toSessionLogMeta(m))
+}
+func (s sessionLogSink) LogThink(event, data string, m toolutil.SessionLogMeta) {
+	s.l.LogThink(event, data, toSessionLogMeta(m))
+}
+func (s sessionLogSink) LogBug(event, data string, m toolutil.SessionLogMeta) {
+	s.l.LogBug(event, data, toSessionLogMeta(m))
+}
+func (s sessionLogSink) LogInfo(event, data string, m toolutil.SessionLogMeta) {
+	s.l.LogInfo(event, data, toSessionLogMeta(m))
+}
+
+func toSessionLogMeta(m toolutil.SessionLogMeta) sessionlog.Meta {
+	return sessionlog.Meta{
+		ToolName:   m.ToolName,
+		ToolCallID: m.ToolCallID,
+		AgentID:    m.AgentID,
+		DurationMs: m.DurationMs,
+		ErrorType:  m.ErrorType,
+	}
+}
+
+// activeAgentConfig returns the config for the currently active agent, or nil
+// if it cannot be resolved.
+func (c *coordinator) activeAgentConfig() *config.Agent {
+	agentCfg, ok := c.cfg.Config().Agents[c.activeAgentID]
+	if !ok {
+		agentCfg, ok = c.cfg.Config().Agents[config.AgentDefault]
+		if !ok {
+			return nil
+		}
+	}
+	return &agentCfg
+}
+
+// runBestOfN generates n candidate responses in parallel (each in its own task
+// session) and uses an LLM judge to select the best. It is the best-of-N path
+// enabled by config.Agent.BestOfN > 1. When the judge model cannot be built,
+// it degrades to a single run.
+func (c *coordinator) runBestOfN(
+	ctx context.Context,
+	sessionID, prompt string,
+	maxTokens int64,
+	mergedOptions fantasy.ProviderOptions,
+	temp, topP *float64,
+	topK *int64,
+	freqPenalty, presPenalty *float64,
+	attachments []message.Attachment,
+	n int,
+) (*fantasy.AgentResult, error) {
+	judgeModel, err := c.buildSmallLanguageModel(ctx)
+	if err != nil {
+		slog.Warn("best-of-n: cannot build judge model, falling back to single run", "error", err)
+		return c.currentAgent.Run(ctx, SessionAgentCall{
+			SessionID:        sessionID,
+			Prompt:           prompt,
+			Attachments:      attachments,
+			MaxOutputTokens:  maxTokens,
+			ProviderOptions:  mergedOptions,
+			Temperature:      temp,
+			TopP:             topP,
+			TopK:             topK,
+			FrequencyPenalty: freqPenalty,
+			PresencePenalty:  presPenalty,
+		})
+	}
+	gen := func(ctx context.Context, runID int) (candidate.Result, error) {
+		taskSession, err := c.sessions.CreateTaskSession(ctx, fmt.Sprintf("bestofn-%d", runID), sessionID, fmt.Sprintf("best-of-n candidate %d", runID))
+		if err != nil {
+			return candidate.Result{}, err
+		}
+		res, err := c.currentAgent.Run(ctx, SessionAgentCall{
+			SessionID:        taskSession.ID,
+			Prompt:           prompt,
+			Attachments:      attachments,
+			MaxOutputTokens:  maxTokens,
+			ProviderOptions:  mergedOptions,
+			Temperature:      temp,
+			TopP:             topP,
+			TopK:             topK,
+			FrequencyPenalty: freqPenalty,
+			PresencePenalty:  presPenalty,
+		})
+		if err != nil {
+			return candidate.Result{Result: res, SessionID: taskSession.ID, Err: err}, err
+		}
+		trace, traceErr := c.messages.List(ctx, taskSession.ID)
+		if traceErr != nil {
+			trace = nil
+		}
+		return candidate.Result{Result: res, Trace: trace, SessionID: taskSession.ID}, nil
+	}
+	sel := &candidate.LLMSelector{Model: judgeModel, Prompt: prompt}
+	winner, err := candidate.Run(ctx, n, gen, sel)
+	if err != nil {
+		return nil, err
+	}
+	return winner.Result, nil
+}
+
+// buildSmallLanguageModel constructs the configured small model as a
+// fantasy.LanguageModel, for use as the best-of-N judge.
+func (c *coordinator) buildSmallLanguageModel(ctx context.Context) (fantasy.LanguageModel, error) {
+	smallModelCfg, ok := c.cfg.Config().Models[config.SelectedModelTypeSmall]
+	if !ok {
+		return nil, errSmallModelNotSelected
+	}
+	smallProviderCfg, ok := c.cfg.Config().Providers.Get(smallModelCfg.Provider)
+	if !ok {
+		return nil, errSmallModelProviderNotConfigured
+	}
+	smallProvider, err := c.buildProvider(smallProviderCfg, smallModelCfg, true)
+	if err != nil {
+		return nil, err
+	}
+	smallModelID := smallModelCfg.Model
+	if smallModelCfg.Provider == openrouter.Name && isExactoSupported(smallModelID) {
+		smallModelID += ":exacto"
+	}
+	return smallProvider.LanguageModel(ctx, smallModelID)
 }
 
 func (c *coordinator) buildAnthropicProvider(baseURL, apiKey string, headers map[string]string, providerID string) (fantasy.Provider, error) {
@@ -1022,7 +1208,6 @@ func isExactoSupported(modelID string) bool {
 // SetMainAgent switches the active agent to the given agent/mode ID.
 // It builds the target agent's system prompt and tools asynchronously
 // via readyWg so that the next Run() call waits for them to be ready.
-// When a swarm workflow is active, it records a handoff in the audit trail.
 func (c *coordinator) SetMainAgent(agentID string) error {
 	if agentID == c.activeAgentID {
 		return nil
@@ -1048,12 +1233,6 @@ func (c *coordinator) SetMainAgent(agentID string) error {
 	c.currentAgent = agent
 	c.activeAgentID = agentID
 	c.agents[agentID] = agent
-
-	// Record handoff in swarm workflow if active.
-	if c.swarmWF != nil {
-		c.swarmWF.RecordHandoff(fromAgent, agentID, c.swarmWF.ActiveTaskID, "")
-		c.swarmWF.SetActive(c.swarmWF.ActiveTaskID, agentID)
-	}
 
 	slog.Info("Agent switched", "from", fromAgent, "to", agentID)
 	return nil

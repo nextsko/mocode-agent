@@ -17,6 +17,33 @@ type (
 	ModelNameKey        string
 )
 
+// SessionLoggerKey carries an optional SessionLoggerSink into agent callbacks.
+type SessionLoggerKey string
+
+// SessionLoggerContextKeyVal is the context key for the session logger sink.
+const SessionLoggerContextKeyVal SessionLoggerKey = "session_logger"
+
+// SessionLoggerSink is the minimal logging surface an agent callback can use
+// to record tool calls, reasoning traces, and errors. *sessionlog.Logger
+// satisfies it. Declared here so the tool layer can carry a logger through
+// context without importing the sessionlog package (avoids a cycle).
+type SessionLoggerSink interface {
+	LogToolCall(event, data string, meta SessionLogMeta)
+	LogThink(event, data string, meta SessionLogMeta)
+	LogBug(event, data string, meta SessionLogMeta)
+	LogInfo(event, data string, meta SessionLogMeta)
+}
+
+// SessionLogMeta mirrors sessionlog.Meta. Duplicated here to keep the tool
+// layer free of a sessionlog import; the coordinator adapts between the two.
+type SessionLogMeta struct {
+	ToolName   string
+	ToolCallID string
+	AgentID    string
+	DurationMs int64
+	ErrorType  string
+}
+
 const (
 	// SessionIDContextKeyVal is the context key for the session ID.
 	SessionIDContextKeyVal SessionIDContextKey = "session_id"
@@ -58,6 +85,12 @@ func GetSupportsImagesFromContext(ctx context.Context) bool {
 // GetModelNameFromContext retrieves the model name from the context.
 func GetModelNameFromContext(ctx context.Context) string {
 	return GetContextValue(ctx, ModelNameContextKeyVal, "")
+}
+
+// GetSessionLogger retrieves the optional session logger sink from context.
+// Returns nil when no logger is attached (callers must nil-check).
+func GetSessionLogger(ctx context.Context) SessionLoggerSink {
+	return GetContextValue[SessionLoggerSink](ctx, SessionLoggerContextKeyVal, nil)
 }
 
 // NewPermissionDeniedResponse returns a tool response for a permission denial.

@@ -10,7 +10,7 @@ import (
 	"charm.land/lipgloss/v2/table"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/session/message"
-	"github.com/package-register/mocode/internal/stringext"
+	"github.com/package-register/mocode/internal/ext"
 	"github.com/package-register/mocode/internal/ui/styles"
 )
 
@@ -245,7 +245,7 @@ func (d *DockerMCPToolRenderContext) formatToolName(sty *styles.Styles, tool str
 	default:
 		action = strings.ReplaceAll(tool, "-", " ")
 		action = strings.ReplaceAll(action, "_", " ")
-		action = stringext.Capitalize(action)
+		action = ext.Capitalize(action)
 	}
 
 	toolNameStyled := sty.Tool.MCPName.Render(mainTool)

@@ -6,6 +6,16 @@ import (
 	"charm.land/fantasy"
 )
 
+// truncateForLog caps a string to a log-friendly length so session logs stay
+// readable and bounded. Used by the OnToolCall/OnToolResult observability hooks.
+func truncateForLog(s string) string {
+	const max = 500
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "...[truncated]"
+}
+
 func (a *sessionAgent) eventPromptSent(sessionID string) {
 	// Metrics collection removed
 }

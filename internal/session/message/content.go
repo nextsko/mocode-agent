@@ -13,7 +13,7 @@ import (
 	"charm.land/fantasy/providers/anthropic"
 	"charm.land/fantasy/providers/google"
 	"charm.land/fantasy/providers/openai"
-	"github.com/package-register/mocode/internal/stringext"
+	"github.com/package-register/mocode/internal/ext"
 )
 
 type MessageRole string
@@ -578,7 +578,7 @@ func (m *Message) ToAIMessage() []fantasy.Message {
 					Error: errors.New(result.Content),
 				}
 			} else if result.Data != "" {
-				if stringext.IsValidBase64(result.Data) {
+				if ext.IsValidBase64(result.Data) {
 					content = fantasy.ToolResultOutputContentMedia{
 						Data:      result.Data,
 						MediaType: result.MIMEType,

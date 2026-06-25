@@ -16,7 +16,7 @@ import (
 	"github.com/package-register/mocode/internal/agent/ctxcompress"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
-	"github.com/package-register/mocode/internal/stringext"
+	"github.com/package-register/mocode/internal/ext"
 )
 
 func (a *sessionAgent) convertToToolResult(result fantasy.ToolResultContent) message.ToolResult {
@@ -38,7 +38,7 @@ func (a *sessionAgent) convertToToolResult(result fantasy.ToolResultContent) mes
 		}
 	case fantasy.ToolResultContentTypeMedia:
 		if r, ok := fantasy.AsToolResultOutputType[fantasy.ToolResultOutputContentMedia](result.Result); ok {
-			if !stringext.IsValidBase64(r.Data) {
+			if !ext.IsValidBase64(r.Data) {
 				slog.Warn("Tool returned media with invalid base64 data, discarding image",
 					"tool", result.ToolName,
 					"tool_call_id", result.ToolCallID,

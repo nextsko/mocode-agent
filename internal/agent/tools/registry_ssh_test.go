@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/sshcommon"
 )
 
 // TestRegistry_IncludesSSHTools asserts that AllToolNames() returns
@@ -17,10 +17,10 @@ func TestRegistry_IncludesSSHTools(t *testing.T) {
 		have[n] = true
 	}
 	for _, want := range []string{
-		ssh.SshExecToolName,
-		ssh.SshUploadToolName,
-		ssh.SshDownloadToolName,
-		ssh.SshListHostsToolName,
+		sshcommon.SshExecToolName,
+		sshcommon.SshUploadToolName,
+		sshcommon.SshDownloadToolName,
+		sshcommon.SshListHostsToolName,
 	} {
 		if !have[want] {
 			t.Errorf("AllToolNames() missing %q", want)
@@ -40,10 +40,10 @@ func TestSSHPlugin_BuildsAllTools(t *testing.T) {
 		t.Fatalf("Descriptors() = %d, want 4", len(descs))
 	}
 	want := map[string]ToolCategory{
-		ssh.SshExecToolName:      CategorySSH,
-		ssh.SshUploadToolName:    CategorySSH,
-		ssh.SshDownloadToolName:  CategorySSH,
-		ssh.SshListHostsToolName: CategorySSH,
+		sshcommon.SshExecToolName:      CategorySSH,
+		sshcommon.SshUploadToolName:    CategorySSH,
+		sshcommon.SshDownloadToolName:  CategorySSH,
+		sshcommon.SshListHostsToolName: CategorySSH,
 	}
 	for _, d := range descs {
 		wantCat, ok := want[d.Name]

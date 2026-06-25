@@ -8,14 +8,14 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/package-register/mocode/internal/agent/tools"
 	"github.com/package-register/mocode/internal/session/message"
-	"github.com/package-register/mocode/internal/stringext"
+	"github.com/package-register/mocode/internal/ext"
 	"github.com/package-register/mocode/internal/ui/anim"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/styles"
 )
 
 func toolOutputPlainContent(sty *styles.Styles, content string, width int, expanded bool) string {
-	content = stringext.NormalizeSpace(content)
+	content = ext.NormalizeSpace(content)
 	lines := strings.Split(content, "\n")
 
 	maxLines := responseContextHeight
@@ -47,7 +47,7 @@ func toolOutputPlainContent(sty *styles.Styles, content string, width int, expan
 }
 
 func toolOutputCodeContent(sty *styles.Styles, path, content string, offset, width int, expanded bool) string {
-	content = stringext.NormalizeSpace(content)
+	content = ext.NormalizeSpace(content)
 
 	lines := strings.Split(content, "\n")
 	maxLines := responseContextHeight
@@ -195,7 +195,7 @@ func toolOutputMultiEditDiffContent(sty *styles.Styles, file string, meta tools.
 }
 
 func toolOutputMarkdownContent(sty *styles.Styles, content string, width int, expanded bool) string {
-	content = stringext.NormalizeSpace(content)
+	content = ext.NormalizeSpace(content)
 
 	// Cap width for readability.
 	if width > maxTextWidth {

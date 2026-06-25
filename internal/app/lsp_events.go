@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/package-register/mocode/internal/csync"
-	"github.com/package-register/mocode/internal/lsp"
+	"github.com/package-register/mocode/internal/agent/tools/lsp"
 	"github.com/package-register/mocode/internal/pubsub"
 )
 

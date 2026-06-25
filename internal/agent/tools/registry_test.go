@@ -5,8 +5,10 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/package-register/mocode/internal/agent/tools/plugins/gitops"
-	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/git_execute_commits"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/git_plan_commits"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/session_search"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/sshcommon"
 	"github.com/package-register/mocode/internal/knowledge/memory"
 	"github.com/stretchr/testify/assert"
 )
@@ -45,6 +47,7 @@ var knownAllToolNames = []string{
 	SessionExportToolName,
 	MessageExportToolName,
 	SessionSummaryToolName,
+	session_search.SessionSearchToolName,
 	ReadFilesToolName,
 	memory.AddToolName,
 	memory.UpdateToolName,
@@ -55,12 +58,12 @@ var knownAllToolNames = []string{
 	GiteaIssuesToolName,
 	GiteaPullsToolName,
 	GiteaNotificationsToolName,
-	gitops.PlanCommitsToolName,
-	gitops.ExecuteCommitsToolName,
-	ssh.SshExecToolName,
-	ssh.SshUploadToolName,
-	ssh.SshDownloadToolName,
-	ssh.SshListHostsToolName,
+	git_plan_commits.PlanCommitsToolName,
+	git_execute_commits.ExecuteCommitsToolName,
+	sshcommon.SshExecToolName,
+	sshcommon.SshUploadToolName,
+	sshcommon.SshDownloadToolName,
+	sshcommon.SshListHostsToolName,
 }
 
 // TestAllToolNames_MatchesConfigList asserts that the registry's standard tool

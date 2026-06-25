@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/package-register/mocode/internal/diff"
-	"github.com/package-register/mocode/internal/stringext"
+	"github.com/package-register/mocode/internal/ext"
 	"github.com/package-register/mocode/internal/ui/styles"
 )
 
@@ -17,7 +17,7 @@ type toolResultContentWidths struct {
 func humanizedToolName(name string) string {
 	name = strings.ReplaceAll(name, "_", " ")
 	name = strings.ReplaceAll(name, "-", " ")
-	return stringext.Capitalize(name)
+	return ext.Capitalize(name)
 }
 
 func looksLikeMarkdown(content string) bool {

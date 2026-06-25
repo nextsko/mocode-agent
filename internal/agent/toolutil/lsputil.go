@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"
-	"github.com/package-register/mocode/internal/lsp"
+	"github.com/package-register/mocode/internal/agent/tools/lsp"
 )
 
 // OpenInLSPs ensures LSP servers are running and aware of the file, but does

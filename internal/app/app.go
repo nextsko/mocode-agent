@@ -31,7 +31,7 @@ import (
 	"github.com/package-register/mocode/internal/history"
 	"github.com/package-register/mocode/internal/knowledge/memory"
 	"github.com/package-register/mocode/internal/log"
-	"github.com/package-register/mocode/internal/lsp"
+	"github.com/package-register/mocode/internal/agent/tools/lsp"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/pubsub"
 	"github.com/package-register/mocode/internal/session"

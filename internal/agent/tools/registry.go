@@ -5,25 +5,52 @@ import (
 	"fmt"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/agent/tools/builtin/exec"
-	"github.com/package-register/mocode/internal/agent/tools/builtin/file"
-	"github.com/package-register/mocode/internal/agent/tools/plugins/gitea"
-	"github.com/package-register/mocode/internal/agent/tools/plugins/gitops"
-	lsptool "github.com/package-register/mocode/internal/agent/tools/plugins/lsp"
-	"github.com/package-register/mocode/internal/agent/tools/plugins/mcp"
-	"github.com/package-register/mocode/internal/agent/tools/plugins/mocode"
-	"github.com/package-register/mocode/internal/agent/tools/plugins/network"
-	"github.com/package-register/mocode/internal/agent/tools/plugins/search"
-	sessiontool "github.com/package-register/mocode/internal/agent/tools/plugins/session"
-	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/bash"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/edit"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/job_kill"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/job_output"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/ls"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/multiedit"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/read_files"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/view"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/write"
+	"github.com/package-register/mocode/internal/agent/tools/lsp"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/crawl"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/diagnostics"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/download"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/download_docs"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/fetch"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/gitea_issues"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/gitea_notifications"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/gitea_pulls"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/git_execute_commits"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/git_plan_commits"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/glob"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/grep"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/list_mcp_resources"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/lsp_restart"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/message_export"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/mocode_info"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/mocode_logs"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/read_mcp_resource"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/references"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/session_export"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/session_search"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/session_summary"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/sourcegraph"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh_exec"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/sshcommon"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh_download"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh_list_hosts"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh_upload"
 	"github.com/package-register/mocode/internal/agent/tools/plugins/think"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/todos"
 	"github.com/package-register/mocode/internal/agent/toolutil"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/filetracker"
 	"github.com/package-register/mocode/internal/history"
 	"github.com/package-register/mocode/internal/knowledge/memory"
 	"github.com/package-register/mocode/internal/log"
-	"github.com/package-register/mocode/internal/lsp"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
@@ -163,9 +190,9 @@ func (execPlugin) Descriptors() []ToolDescriptor {
 
 func (execPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{
-		exec.NewBashTool(deps.Permissions, deps.Cfg.WorkingDir(), deps.Cfg.Config().Options.Attribution, deps.ModelName),
-		exec.NewJobOutputTool(),
-		exec.NewJobKillTool(),
+		bash.NewBashTool(deps.Permissions, deps.Cfg.WorkingDir(), deps.Cfg.Config().Options.Attribution, deps.ModelName),
+		job_output.NewJobOutputTool(),
+		job_kill.NewJobKillTool(),
 	}
 }
 
@@ -188,12 +215,12 @@ func (filePlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	wd := deps.Cfg.WorkingDir()
 	cfg := deps.Cfg.Config()
 	return []fantasy.AgentTool{
-		file.NewEditTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
-		file.NewMultiEditTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
-		file.NewViewTool(deps.LSPManager, deps.Permissions, deps.FileTracker, deps.SkillTracker, wd, cfg.Options.SkillsPaths...),
-		file.NewReadFilesTool(deps.Permissions, deps.FileTracker, wd),
-		file.NewWriteTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
-		file.NewLsTool(deps.Permissions, wd, cfg.Tools.Ls),
+		edit.NewEditTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
+		multiedit.NewMultiEditTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
+		view.NewViewTool(deps.LSPManager, deps.Permissions, deps.FileTracker, deps.SkillTracker, wd, cfg.Options.SkillsPaths...),
+		read_files.NewReadFilesTool(deps.Permissions, deps.FileTracker, wd),
+		write.NewWriteTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
+		ls.NewLsTool(deps.Permissions, wd, cfg.Tools.Ls),
 	}
 }
 
@@ -213,9 +240,9 @@ func (searchPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool 
 	wd := deps.Cfg.WorkingDir()
 	webClient := deps.Cfg.Config().HTTPClient(deps.Cfg.Resolver(), 30)
 	return []fantasy.AgentTool{
-		search.NewGlobTool(wd),
-		search.NewGrepTool(wd, deps.Cfg.Config().Tools.Grep),
-		search.NewSourcegraphTool(webClient),
+		glob.NewGlobTool(wd),
+		grep.NewGrepTool(wd, deps.Cfg.Config().Tools.Grep),
+		sourcegraph.NewSourcegraphTool(webClient),
 	}
 }
 
@@ -239,10 +266,10 @@ func (networkPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool
 	downloadClient := cfg.HTTPClient(deps.Cfg.Resolver(), 300)
 	retryPolicy := toolutil.DefaultRetryPolicy()
 	return []fantasy.AgentTool{
-		toolutil.WithRetry(network.NewFetchTool(deps.Permissions, wd, webClient), retryPolicy),
-		toolutil.WithRetry(network.NewCrawlTool(webClient), retryPolicy),
-		toolutil.WithRetry(network.NewDownloadTool(deps.Permissions, wd, downloadClient), retryPolicy),
-		network.NewDownloadDocsTool(cfg.ResolvedProxyURL(deps.Cfg.Resolver())),
+		toolutil.WithRetry(fetch.NewFetchTool(deps.Permissions, wd, webClient), retryPolicy),
+		toolutil.WithRetry(crawl.NewCrawlTool(webClient), retryPolicy),
+		toolutil.WithRetry(download.NewDownloadTool(deps.Permissions, wd, downloadClient), retryPolicy),
+		download_docs.NewDownloadDocsTool(cfg.ResolvedProxyURL(deps.Cfg.Resolver())),
 	}
 }
 
@@ -256,19 +283,19 @@ func (sessionPlugin) Descriptors() []ToolDescriptor {
 		{Name: SessionExportToolName, Kind: ToolKindPlugin, Category: CategorySession},
 		{Name: MessageExportToolName, Kind: ToolKindPlugin, Category: CategorySession},
 		{Name: SessionSummaryToolName, Kind: ToolKindPlugin, Category: CategorySession},
-		{Name: sessiontool.SessionSearchToolName, Kind: ToolKindPlugin, Category: CategorySession},
+		{Name: session_search.SessionSearchToolName, Kind: ToolKindPlugin, Category: CategorySession},
 	}
 }
 
 func (sessionPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	t := []fantasy.AgentTool{
-		sessiontool.NewTodosTool(deps.Sessions),
-		sessiontool.NewSessionExportTool(deps.Messages, deps.Cfg.WorkingDir()),
-		sessiontool.NewMessageExportTool(deps.Messages, deps.Cfg.WorkingDir()),
-		sessiontool.NewSessionSummaryTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), sessiontool.SessionSummaryScheduler(deps.SummarySchedule)),
+		todos.NewTodosTool(deps.Sessions),
+		session_export.NewSessionExportTool(deps.Messages, deps.Cfg.WorkingDir()),
+		message_export.NewMessageExportTool(deps.Messages, deps.Cfg.WorkingDir()),
+		session_summary.NewSessionSummaryTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), session_summary.SessionSummaryScheduler(deps.SummarySchedule)),
 	}
 	if deps.SessionSearch != nil {
-		t = append(t, sessiontool.NewSessionSearchTool(deps.SessionSearch))
+		t = append(t, session_search.NewSessionSearchTool(deps.SessionSearch))
 	}
 	return t
 }
@@ -286,8 +313,8 @@ func (mocodePlugin) Descriptors() []ToolDescriptor {
 
 func (mocodePlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{
-		mocode.NewMocodeInfoTool(deps.Cfg, deps.LSPManager, deps.AllSkills, deps.ActiveSkills, deps.SkillTracker),
-		mocode.NewMocodeLogsTool(log.MainLogPath(deps.Cfg.Config().Options.DataDirectory)),
+		mocode_info.NewMocodeInfoTool(deps.Cfg, deps.LSPManager, deps.AllSkills, deps.ActiveSkills, deps.SkillTracker),
+		mocode_logs.NewMocodeLogsTool(log.MainLogPath(deps.Cfg.Config().Options.DataDirectory)),
 	}
 }
 
@@ -311,9 +338,9 @@ func (lspPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 		return nil
 	}
 	return []fantasy.AgentTool{
-		lsptool.NewDiagnosticsTool(deps.LSPManager),
-		lsptool.NewReferencesTool(deps.LSPManager),
-		lsptool.NewLSPRestartTool(deps.LSPManager),
+		diagnostics.NewDiagnosticsTool(deps.LSPManager),
+		references.NewReferencesTool(deps.LSPManager),
+		lsp_restart.NewLSPRestartTool(deps.LSPManager),
 	}
 }
 
@@ -333,8 +360,8 @@ func (mcpMetaPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool
 		return nil
 	}
 	return []fantasy.AgentTool{
-		mcp.NewListMCPResourcesTool(deps.Cfg, deps.Permissions),
-		mcp.NewReadMCPResourceTool(deps.Cfg, deps.Permissions),
+		list_mcp_resources.NewListMCPResourcesTool(deps.Cfg, deps.Permissions),
+		read_mcp_resource.NewReadMCPResourceTool(deps.Cfg, deps.Permissions),
 	}
 }
 
@@ -366,17 +393,17 @@ type giteaPlugin struct{}
 
 func (giteaPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
-		{Name: gitea.IssuesToolName, Kind: ToolKindPlugin, Category: CategoryGitea},
-		{Name: gitea.PullsToolName, Kind: ToolKindPlugin, Category: CategoryGitea},
-		{Name: gitea.NotificationsToolName, Kind: ToolKindPlugin, Category: CategoryGitea},
+		{Name: gitea_issues.IssuesToolName, Kind: ToolKindPlugin, Category: CategoryGitea},
+		{Name: gitea_pulls.PullsToolName, Kind: ToolKindPlugin, Category: CategoryGitea},
+		{Name: gitea_notifications.NotificationsToolName, Kind: ToolKindPlugin, Category: CategoryGitea},
 	}
 }
 
 func (giteaPlugin) Build(_ context.Context, _ ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{
-		gitea.NewIssuesTool(),
-		gitea.NewPullsTool(),
-		gitea.NewNotificationsTool(),
+		gitea_issues.NewIssuesTool(),
+		gitea_pulls.NewPullsTool(),
+		gitea_notifications.NewNotificationsTool(),
 	}
 }
 
@@ -400,16 +427,16 @@ type gitOpsPlugin struct{}
 
 func (gitOpsPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
-		{Name: gitops.PlanCommitsToolName, Kind: ToolKindPlugin, Category: CategoryGitOps},
-		{Name: gitops.ExecuteCommitsToolName, Kind: ToolKindPlugin, Category: CategoryGitOps},
+		{Name: git_plan_commits.PlanCommitsToolName, Kind: ToolKindPlugin, Category: CategoryGitOps},
+		{Name: git_execute_commits.ExecuteCommitsToolName, Kind: ToolKindPlugin, Category: CategoryGitOps},
 	}
 }
 
 func (gitOpsPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	wd := deps.Cfg.WorkingDir()
 	return []fantasy.AgentTool{
-		gitops.NewPlanCommitsTool(wd),
-		gitops.NewExecuteCommitsTool(wd),
+		git_plan_commits.NewPlanCommitsTool(wd),
+		git_execute_commits.NewExecuteCommitsTool(wd),
 	}
 }
 
@@ -420,27 +447,27 @@ func (gitOpsPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool 
 // tools share state.  The Startable hooks let the registry close the
 // pool on shutdown.
 type sshPlugin struct {
-	svc *ssh.Service
+	svc *sshcommon.Service
 }
 
 func (p *sshPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
-		{Name: ssh.SshExecToolName, Kind: ToolKindPlugin, Category: CategorySSH},
-		{Name: ssh.SshUploadToolName, Kind: ToolKindPlugin, Category: CategorySSH},
-		{Name: ssh.SshDownloadToolName, Kind: ToolKindPlugin, Category: CategorySSH},
-		{Name: ssh.SshListHostsToolName, Kind: ToolKindPlugin, Category: CategorySSH},
+		{Name: sshcommon.SshExecToolName, Kind: ToolKindPlugin, Category: CategorySSH},
+		{Name: sshcommon.SshUploadToolName, Kind: ToolKindPlugin, Category: CategorySSH},
+		{Name: sshcommon.SshDownloadToolName, Kind: ToolKindPlugin, Category: CategorySSH},
+		{Name: sshcommon.SshListHostsToolName, Kind: ToolKindPlugin, Category: CategorySSH},
 	}
 }
 
 func (p *sshPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	if p.svc == nil {
-		p.svc = ssh.NewService()
+		p.svc = sshcommon.NewService()
 	}
 	return []fantasy.AgentTool{
-		ssh.NewSshExecTool(p.svc, deps.Permissions),
-		ssh.NewSshUploadTool(p.svc, deps.Permissions),
-		ssh.NewSshDownloadTool(p.svc, deps.Permissions),
-		ssh.NewSshListHostsTool(p.svc),
+		ssh_exec.NewSshExecTool(p.svc, deps.Permissions),
+		ssh_upload.NewSshUploadTool(p.svc, deps.Permissions),
+		ssh_download.NewSshDownloadTool(p.svc, deps.Permissions),
+		ssh_list_hosts.NewSshListHostsTool(p.svc),
 	}
 }
 

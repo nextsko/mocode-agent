@@ -4,206 +4,233 @@
 package tools
 
 import (
-	"github.com/package-register/mocode/internal/agent/tools/builtin/exec"
-	"github.com/package-register/mocode/internal/agent/tools/builtin/file"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/bash"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/edit"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/job_kill"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/job_output"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/ls"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/multiedit"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/read_files"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/view"
+	"github.com/package-register/mocode/internal/agent/tools/builtin/write"
 	"github.com/package-register/mocode/internal/agent/tools/filter"
-	"github.com/package-register/mocode/internal/agent/tools/plugins/gitea"
-	lsptool "github.com/package-register/mocode/internal/agent/tools/plugins/lsp"
-	"github.com/package-register/mocode/internal/agent/tools/plugins/mcp"
-	"github.com/package-register/mocode/internal/agent/tools/plugins/mocode"
-	"github.com/package-register/mocode/internal/agent/tools/plugins/network"
-	"github.com/package-register/mocode/internal/agent/tools/plugins/search"
-	sessiontool "github.com/package-register/mocode/internal/agent/tools/plugins/session"
-	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/crawl"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/diagnostics"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/download"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/download_docs"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/fetch"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/gitea_issues"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/gitea_notifications"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/gitea_pulls"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/glob"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/grep"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/list_mcp_resources"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/lsp_restart"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/message_export"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/mocode_info"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/mocode_logs"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/netcommon"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/read_mcp_resource"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/references"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/screenshot_to_wechat"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/send_wechat_file"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/send_wechat_image"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/session_export"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/session_summary"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/sourcegraph"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh_exec"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/sshcommon"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh_download"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh_list_hosts"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/ssh_upload"
 	"github.com/package-register/mocode/internal/agent/tools/plugins/think"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/todos"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/web_fetch"
+	"github.com/package-register/mocode/internal/agent/tools/plugins/web_search"
 )
 
-// ─── builtin/exec ─────────────────────────────────────────────────────────────
+// ─── builtin/bash ─────────────────────────────────────────────────────────────
 
 const (
-	BashToolName      = exec.BashToolName
-	JobOutputToolName = exec.JobOutputToolName
-	JobKillToolName   = exec.JobKillToolName
-	BashNoOutput      = exec.BashNoOutput
+	BashToolName      = bash.BashToolName
+	JobOutputToolName = job_output.JobOutputToolName
+	JobKillToolName   = job_kill.JobKillToolName
+	BashNoOutput      = bash.BashNoOutput
 )
 
 type (
-	BashParams                = exec.BashParams
-	BashPermissionsParams     = exec.BashPermissionsParams
-	BashResponseMetadata      = exec.BashResponseMetadata
-	JobOutputParams           = exec.JobOutputParams
-	JobOutputResponseMetadata = exec.JobOutputResponseMetadata
-	JobKillParams             = exec.JobKillParams
-	JobKillResponseMetadata   = exec.JobKillResponseMetadata
+	BashParams                = bash.BashParams
+	BashPermissionsParams     = bash.BashPermissionsParams
+	BashResponseMetadata      = bash.BashResponseMetadata
+	JobOutputParams           = job_output.JobOutputParams
+	JobOutputResponseMetadata = job_output.JobOutputResponseMetadata
+	JobKillParams             = job_kill.JobKillParams
+	JobKillResponseMetadata   = job_kill.JobKillResponseMetadata
 )
 
-// ─── builtin/file ─────────────────────────────────────────────────────────────
+// ─── builtin/file tools ───────────────────────────────────────────────────────
 
 const (
-	EditToolName      = file.EditToolName
-	MultiEditToolName = file.MultiEditToolName
-	ViewToolName      = file.ViewToolName
-	WriteToolName     = file.WriteToolName
-	LSToolName        = file.LSToolName
-	ReadFilesToolName = file.ReadFilesToolName
-	ViewResourceSkill = file.ViewResourceSkill
+	EditToolName      = edit.EditToolName
+	MultiEditToolName = multiedit.MultiEditToolName
+	ViewToolName      = view.ViewToolName
+	WriteToolName     = write.WriteToolName
+	LSToolName        = ls.LSToolName
+	ReadFilesToolName = read_files.ReadFilesToolName
+	ViewResourceSkill = view.ViewResourceSkill
 )
 
 type (
-	EditParams                 = file.EditParams
-	EditPermissionsParams      = file.EditPermissionsParams
-	EditResponseMetadata       = file.EditResponseMetadata
-	MultiEditOperation         = file.MultiEditOperation
-	MultiEditParams            = file.MultiEditParams
-	MultiEditPermissionsParams = file.MultiEditPermissionsParams
-	MultiEditResponseMetadata  = file.MultiEditResponseMetadata
-	FailedEdit                 = file.FailedEdit
-	ViewParams                 = file.ViewParams
-	ViewPermissionsParams      = file.ViewPermissionsParams
-	ViewResourceType           = file.ViewResourceType
-	ViewResponseMetadata       = file.ViewResponseMetadata
-	WriteParams                = file.WriteParams
-	WritePermissionsParams     = file.WritePermissionsParams
-	WriteResponseMetadata      = file.WriteResponseMetadata
-	LSParams                   = file.LSParams
-	LSPermissionsParams        = file.LSPermissionsParams
-	TreeNode                   = file.TreeNode
-	ReadFilesParams            = file.ReadFilesParams
-	ReadFilesPermissionsParams = file.ReadFilesPermissionsParams
-	ReadFilesResult            = file.ReadFilesResult
-	ReadFilesResponseMetadata  = file.ReadFilesResponseMetadata
+	EditParams                 = edit.EditParams
+	EditPermissionsParams      = edit.EditPermissionsParams
+	EditResponseMetadata       = edit.EditResponseMetadata
+	MultiEditOperation         = multiedit.MultiEditOperation
+	MultiEditParams            = multiedit.MultiEditParams
+	MultiEditPermissionsParams = multiedit.MultiEditPermissionsParams
+	MultiEditResponseMetadata  = multiedit.MultiEditResponseMetadata
+	FailedEdit                 = multiedit.FailedEdit
+	ViewParams                 = view.ViewParams
+	ViewPermissionsParams      = view.ViewPermissionsParams
+	ViewResourceType           = view.ViewResourceType
+	ViewResponseMetadata       = view.ViewResponseMetadata
+	WriteParams                = write.WriteParams
+	WritePermissionsParams     = write.WritePermissionsParams
+	WriteResponseMetadata      = write.WriteResponseMetadata
+	LSParams                   = ls.LSParams
+	LSPermissionsParams        = ls.LSPermissionsParams
+	TreeNode                   = ls.TreeNode
+	ReadFilesParams            = read_files.ReadFilesParams
+	ReadFilesPermissionsParams = read_files.ReadFilesPermissionsParams
+	ReadFilesResult            = read_files.ReadFilesResult
+	ReadFilesResponseMetadata  = read_files.ReadFilesResponseMetadata
 )
 
 // ─── plugins/search ───────────────────────────────────────────────────────────
 
 const (
-	GrepToolName        = search.GrepToolName
-	GlobToolName        = search.GlobToolName
-	SourcegraphToolName = search.SourcegraphToolName
+	GrepToolName        = grep.GrepToolName
+	GlobToolName        = glob.GlobToolName
+	SourcegraphToolName = sourcegraph.SourcegraphToolName
 )
 
 type (
-	GrepParams                  = search.GrepParams
-	GrepMatch                   = search.GrepMatch
-	GrepResponseMetadata        = search.GrepResponseMetadata
-	GlobParams                  = search.GlobParams
-	GlobResponseMetadata        = search.GlobResponseMetadata
-	SourcegraphParams           = search.SourcegraphParams
-	SourcegraphResponseMetadata = search.SourcegraphResponseMetadata
+	GrepParams                  = grep.GrepParams
+	GrepMatch                   = grep.GrepMatch
+	GrepResponseMetadata        = grep.GrepResponseMetadata
+	GlobParams                  = glob.GlobParams
+	GlobResponseMetadata        = glob.GlobResponseMetadata
+	SourcegraphParams           = sourcegraph.SourcegraphParams
+	SourcegraphResponseMetadata = sourcegraph.SourcegraphResponseMetadata
 )
 
 // ─── plugins/network ──────────────────────────────────────────────────────────
 
 const (
-	FetchToolName        = network.FetchToolName
-	CrawlToolName        = network.CrawlToolName
-	DownloadToolName     = network.DownloadToolName
-	DownloadDocsToolName = network.DownloadDocsToolName
+	FetchToolName        = fetch.FetchToolName
+	CrawlToolName        = crawl.CrawlToolName
+	DownloadToolName     = download.DownloadToolName
+	DownloadDocsToolName = download_docs.DownloadDocsToolName
 )
 
 const (
-	WebFetchToolName      = network.WebFetchToolName
-	WebSearchToolName     = network.WebSearchToolName
-	LargeContentThreshold = network.LargeContentThreshold
+	WebFetchToolName      = netcommon.WebFetchToolName
+	WebSearchToolName     = netcommon.WebSearchToolName
+	LargeContentThreshold = netcommon.LargeContentThreshold
 )
 
 type (
-	FetchParams               = network.FetchParams
-	FetchPermissionsParams    = network.FetchPermissionsParams
-	WebFetchParams            = network.WebFetchParams
-	WebSearchParams           = network.WebSearchParams
-	CrawlParams               = network.CrawlParams
-	DownloadParams            = network.DownloadParams
-	DownloadPermissionsParams = network.DownloadPermissionsParams
-	DownloadDocsParams        = network.DownloadDocsParams
+	FetchParams               = fetch.FetchParams
+	FetchPermissionsParams    = fetch.FetchPermissionsParams
+	WebFetchParams            = netcommon.WebFetchParams
+	WebSearchParams           = netcommon.WebSearchParams
+	CrawlParams               = crawl.CrawlParams
+	DownloadParams            = download.DownloadParams
+	DownloadPermissionsParams = download.DownloadPermissionsParams
+	DownloadDocsParams        = download_docs.DownloadDocsParams
 )
 
 // Function re-exports — agent-level callers keep using tools.New* unchanged.
 var (
-	// network
-	NewFetchTool        = network.NewFetchTool
-	NewCrawlTool        = network.NewCrawlTool
-	NewDownloadTool     = network.NewDownloadTool
-	NewDownloadDocsTool = network.NewDownloadDocsTool
-	NewWebFetchTool     = network.NewWebFetchTool
-	NewWebSearchTool    = network.NewWebSearchTool
-	FetchURLAndConvert  = network.FetchURLAndConvert
-	// search
-	NewGlobTool        = search.NewGlobTool
-	NewGrepTool        = search.NewGrepTool
-	NewSourcegraphTool = search.NewSourcegraphTool
-	ResetCache         = search.ResetCache
-	// file
-	NewEditTool      = file.NewEditTool
-	NewMultiEditTool = file.NewMultiEditTool
-	NewViewTool      = file.NewViewTool
-	NewWriteTool     = file.NewWriteTool
-	NewLsTool        = file.NewLsTool
-	NewReadFilesTool = file.NewReadFilesTool
-	// exec
-	NewBashTool      = exec.NewBashTool
-	NewJobOutputTool = exec.NewJobOutputTool
-	NewJobKillTool   = exec.NewJobKillTool
+	NewFetchTool        = fetch.NewFetchTool
+	NewCrawlTool        = crawl.NewCrawlTool
+	NewDownloadTool     = download.NewDownloadTool
+	NewDownloadDocsTool = download_docs.NewDownloadDocsTool
+	NewWebFetchTool     = web_fetch.NewWebFetchTool
+	NewWebSearchTool    = web_search.NewWebSearchTool
+	FetchURLAndConvert  = netcommon.FetchURLAndConvert
+	NewGlobTool         = glob.NewGlobTool
+	NewGrepTool         = grep.NewGrepTool
+	NewSourcegraphTool  = sourcegraph.NewSourcegraphTool
+	ResetCache          = grep.ResetCache
+	NewEditTool         = edit.NewEditTool
+	NewMultiEditTool    = multiedit.NewMultiEditTool
+	NewViewTool         = view.NewViewTool
+	NewWriteTool        = write.NewWriteTool
+	NewLsTool           = ls.NewLsTool
+	NewReadFilesTool    = read_files.NewReadFilesTool
+	NewBashTool         = bash.NewBashTool
+	NewJobOutputTool    = job_output.NewJobOutputTool
+	NewJobKillTool      = job_kill.NewJobKillTool
 )
 
 // ─── plugins/lsp ──────────────────────────────────────────────────────────────
 
 const (
-	DiagnosticsToolName = lsptool.DiagnosticsToolName
-	ReferencesToolName  = lsptool.ReferencesToolName
-	LSPRestartToolName  = lsptool.LSPRestartToolName
+	DiagnosticsToolName = diagnostics.DiagnosticsToolName
+	ReferencesToolName  = references.ReferencesToolName
+	LSPRestartToolName  = lsp_restart.LSPRestartToolName
 )
 
 type (
-	DiagnosticsParams = lsptool.DiagnosticsParams
-	ReferencesParams  = lsptool.ReferencesParams
-	LSPRestartParams  = lsptool.LSPRestartParams
+	DiagnosticsParams = diagnostics.DiagnosticsParams
+	ReferencesParams  = references.ReferencesParams
+	LSPRestartParams  = lsp_restart.LSPRestartParams
 )
 
 // ─── plugins/mocode ───────────────────────────────────────────────────────────
 
 const (
-	MocodeInfoToolName = mocode.MocodeInfoToolName
-	MocodeLogsToolName = mocode.MocodeLogsToolName
+	MocodeInfoToolName = mocode_info.MocodeInfoToolName
+	MocodeLogsToolName = mocode_logs.MocodeLogsToolName
 )
 
 type (
-	MocodeInfoParams = mocode.MocodeInfoParams
-	MocodeLogsParams = mocode.MocodeLogsParams
+	MocodeInfoParams = mocode_info.MocodeInfoParams
+	MocodeLogsParams = mocode_logs.MocodeLogsParams
 )
 
 // ─── plugins/session ──────────────────────────────────────────────────────────
 
 const (
-	TodosToolName          = sessiontool.TodosToolName
-	SessionExportToolName  = sessiontool.SessionExportToolName
-	MessageExportToolName  = sessiontool.MessageExportToolName
-	SessionSummaryToolName = sessiontool.SessionSummaryToolName
+	TodosToolName          = todos.TodosToolName
+	SessionExportToolName  = session_export.SessionExportToolName
+	MessageExportToolName  = message_export.MessageExportToolName
+	SessionSummaryToolName = session_summary.SessionSummaryToolName
 )
 
 type (
-	TodosParams             = sessiontool.TodosParams
-	TodoItem                = sessiontool.TodoItem
-	TodosResponseMetadata   = sessiontool.TodosResponseMetadata
-	SessionExportParams     = sessiontool.SessionExportParams
-	MessageExportParams     = sessiontool.MessageExportParams
-	SessionSummaryParams    = sessiontool.SessionSummaryParams
-	SessionSummaryScheduler = sessiontool.SessionSummaryScheduler
-	SessionSummaryMetadata  = sessiontool.SessionSummaryMetadata
+	TodosParams             = todos.TodosParams
+	TodoItem                = todos.TodoItem
+	TodosResponseMetadata   = todos.TodosResponseMetadata
+	SessionExportParams     = session_export.SessionExportParams
+	MessageExportParams     = message_export.MessageExportParams
+	SessionSummaryParams    = session_summary.SessionSummaryParams
+	SessionSummaryScheduler = session_summary.SessionSummaryScheduler
+	SessionSummaryMetadata  = session_summary.SessionSummaryMetadata
 )
 
 // ─── plugins/mcp ──────────────────────────────────────────────────────────────
 
 const (
-	ListMCPResourcesToolName = mcp.ListMCPResourcesToolName
-	ReadMCPResourceToolName  = mcp.ReadMCPResourceToolName
+	ListMCPResourcesToolName = list_mcp_resources.ListMCPResourcesToolName
+	ReadMCPResourceToolName  = read_mcp_resource.ReadMCPResourceToolName
 )
 
 type (
-	ListMCPResourcesParams            = mcp.ListMCPResourcesParams
-	ListMCPResourcesPermissionsParams = mcp.ListMCPResourcesPermissionsParams
-	ReadMCPResourceParams             = mcp.ReadMCPResourceParams
-	ReadMCPResourcePermissionsParams  = mcp.ReadMCPResourcePermissionsParams
+	ListMCPResourcesParams            = list_mcp_resources.ListMCPResourcesParams
+	ListMCPResourcesPermissionsParams = list_mcp_resources.ListMCPResourcesPermissionsParams
+	ReadMCPResourceParams             = read_mcp_resource.ReadMCPResourceParams
+	ReadMCPResourcePermissionsParams  = read_mcp_resource.ReadMCPResourcePermissionsParams
 )
 
 // ─── plugins/think ────────────────────────────────────────────────────────────
@@ -220,68 +247,76 @@ var NewThinkTool = think.NewThinkTool
 // ─── plugins/gitea ────────────────────────────────────────────────────────────
 
 const (
-	GiteaIssuesToolName        = gitea.IssuesToolName
-	GiteaPullsToolName         = gitea.PullsToolName
-	GiteaNotificationsToolName = gitea.NotificationsToolName
+	GiteaIssuesToolName        = gitea_issues.IssuesToolName
+	GiteaPullsToolName         = gitea_pulls.PullsToolName
+	GiteaNotificationsToolName = gitea_notifications.NotificationsToolName
 )
 
 type (
-	GiteaIssuesParams        = gitea.IssuesParams
-	GiteaPullsParams         = gitea.PullsParams
-	GiteaNotificationsParams = gitea.NotificationsParams
+	GiteaIssuesParams        = gitea_issues.IssuesParams
+	GiteaPullsParams         = gitea_pulls.PullsParams
+	GiteaNotificationsParams = gitea_notifications.NotificationsParams
 )
 
 var (
-	NewGiteaIssuesTool        = gitea.NewIssuesTool
-	NewGiteaPullsTool         = gitea.NewPullsTool
-	NewGiteaNotificationsTool = gitea.NewNotificationsTool
+	NewGiteaIssuesTool        = gitea_issues.NewIssuesTool
+	NewGiteaPullsTool         = gitea_pulls.NewPullsTool
+	NewGiteaNotificationsTool = gitea_notifications.NewNotificationsTool
 )
 
-// ─── plugins/ssh ────────────────────────────────────────────────────────────
+// ─── plugins/ssh ──────────────────────────────────────────────────────────────
 
 const (
-	SshExecToolName      = ssh.SshExecToolName
-	SshUploadToolName    = ssh.SshUploadToolName
-	SshDownloadToolName  = ssh.SshDownloadToolName
-	SshListHostsToolName = ssh.SshListHostsToolName
+	SshExecToolName      = sshcommon.SshExecToolName
+	SshUploadToolName    = sshcommon.SshUploadToolName
+	SshDownloadToolName  = sshcommon.SshDownloadToolName
+	SshListHostsToolName = sshcommon.SshListHostsToolName
 )
 
 type (
-	SshExecParams                = ssh.SshExecParams
-	SshExecPermissionsParams     = ssh.SshExecPermissionsParams
-	SshExecResponseMetadata      = ssh.SshExecResponseMetadata
-	SshUploadParams              = ssh.SshUploadParams
-	SshUploadPermissionsParams   = ssh.SshUploadPermissionsParams
-	SshUploadResponseMetadata    = ssh.SshUploadResponseMetadata
-	SshDownloadParams            = ssh.SshDownloadParams
-	SshDownloadPermissionsParams = ssh.SshDownloadPermissionsParams
-	SshDownloadResponseMetadata  = ssh.SshDownloadResponseMetadata
-	SshListHostsParams           = ssh.SshListHostsParams
-	SshListHostsResponseMetadata = ssh.SshListHostsResponseMetadata
-	HostInfo                     = ssh.HostInfo
+	SshExecParams                = ssh_exec.SshExecParams
+	SshExecPermissionsParams     = ssh_exec.SshExecPermissionsParams
+	SshExecResponseMetadata      = ssh_exec.SshExecResponseMetadata
+	SshUploadParams              = ssh_upload.SshUploadParams
+	SshUploadPermissionsParams   = ssh_upload.SshUploadPermissionsParams
+	SshUploadResponseMetadata    = ssh_upload.SshUploadResponseMetadata
+	SshDownloadParams            = ssh_download.SshDownloadParams
+	SshDownloadPermissionsParams = ssh_download.SshDownloadPermissionsParams
+	SshDownloadResponseMetadata  = ssh_download.SshDownloadResponseMetadata
+	SshListHostsParams           = ssh_list_hosts.SshListHostsParams
+	SshListHostsResponseMetadata = ssh_list_hosts.SshListHostsResponseMetadata
+	HostInfo                     = ssh_list_hosts.HostInfo
 )
 
 var (
-	NewSshExecTool      = ssh.NewSshExecTool
-	NewSshUploadTool    = ssh.NewSshUploadTool
-	NewSshDownloadTool  = ssh.NewSshDownloadTool
-	NewSshListHostsTool = ssh.NewSshListHostsTool
-	NewSSHService       = ssh.NewService
+	NewSshExecTool      = ssh_exec.NewSshExecTool
+	NewSshUploadTool    = ssh_upload.NewSshUploadTool
+	NewSshDownloadTool  = ssh_download.NewSshDownloadTool
+	NewSshListHostsTool = ssh_list_hosts.NewSshListHostsTool
+	NewSSHService       = sshcommon.NewService
 )
 
 // ─── filter ───────────────────────────────────────────────────────────────────
 
-// FilterFunc is re-exported so callers can write tools.FilterFunc without
-// importing the filter sub-package directly.
 type FilterFunc = filter.FilterFunc
 
 var (
-	// FilterApply applies FilterFuncs to a tool list.
-	FilterApply = filter.Apply
-	// FilterChain combines multiple FilterFuncs with AND semantics.
-	FilterChain = filter.Chain
-	// FilterIncludeNames keeps only tools whose name is in the allow-list.
-	FilterIncludeNames = filter.IncludeNames
-	// FilterExcludeNames drops any tool whose name is in the block-list.
-	FilterExcludeNames = filter.ExcludeNames
+	FilterApply          = filter.Apply
+	FilterChain          = filter.Chain
+	FilterIncludeNames   = filter.IncludeNames
+	FilterExcludeNames   = filter.ExcludeNames
+)
+
+// ─── plugins/wechat ───────────────────────────────────────────────────────────
+
+const (
+	WeChatSendImageToolName  = send_wechat_image.WeChatSendImageToolName
+	WeChatSendFileToolName   = send_wechat_file.WeChatSendFileToolName
+	WeChatScreenshotToolName = screenshot_to_wechat.WeChatScreenshotToolName
+)
+
+var (
+	NewWeChatSendImageTool  = send_wechat_image.NewWeChatSendImageTool
+	NewWeChatSendFileTool   = send_wechat_file.NewWeChatSendFileTool
+	NewWeChatScreenshotTool = screenshot_to_wechat.NewWeChatScreenshotTool
 )
