@@ -6,19 +6,16 @@ import (
 	"io"
 	"sort"
 
-	"github.com/package-register/mocode/internal/client"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/workspace"
 )
 
 // Env carries shared dependencies for auth handlers.
 type Env struct {
-	Store       *config.ConfigStore
-	Workspace   workspace.Workspace
-	Client      *client.Client
-	WorkspaceID string
-	Stdout      io.Writer
-	Stderr      io.Writer
+	Store     *config.ConfigStore
+	Workspace workspace.Workspace
+	Stdout    io.Writer
+	Stderr    io.Writer
 }
 
 // Handler authenticates mocode with one external service.

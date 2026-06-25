@@ -9,21 +9,19 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/package-register/mocode/internal/authhandler"
+	"github.com/package-register/mocode/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
 var loginCmd = &cobra.Command{
 	Aliases: []string{"login"},
-	Use:     "auth [wechat|minimax]",
+	Use:     "auth [wechat]",
 	Short:   "Authenticate mocode integrations",
 	Long: `Authenticate mocode with a supported integration.
-Available platforms are: wechat, minimax.`,
+Available platforms are: wechat.`,
 	Example: `
 # Authenticate WeChat bot
 mocode auth wechat
-
-# Authenticate MiniMax quota API
-mocode auth minimax
   `,
 	ValidArgsFunction: func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return authhandler.IDs(), cobra.ShellCompDirectiveNoFileComp
@@ -36,13 +34,18 @@ mocode auth minimax
 		return fmt.Errorf("platform required: %s", strings.Join(authhandler.IDs(), ", "))
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, ws, cleanup, err := connectToServer(cmd)
+		ws, cleanup, err := setupLocalWorkspace(cmd)
 		if err != nil {
 			return err
 		}
 		defer cleanup()
 
-		progressEnabled := ws.Config.Options.Progress == nil || *ws.Config.Options.Progress
+		appWs, ok := ws.(*workspace.AppWorkspace)
+		if !ok {
+			return fmt.Errorf("unexpected workspace type")
+		}
+
+		progressEnabled := ws.Config().Options.Progress == nil || *ws.Config().Options.Progress
 		if progressEnabled && supportsProgressBar() {
 			_, _ = fmt.Fprintf(os.Stderr, ansi.SetIndeterminateProgressBar)
 			defer func() { _, _ = fmt.Fprintf(os.Stderr, ansi.ResetProgressBar) }()
@@ -56,10 +59,10 @@ mocode auth minimax
 		}
 
 		return handler.Login(getLoginContext(), authhandler.Env{
-			Client:      c,
-			WorkspaceID: ws.ID,
-			Stdout:      os.Stdout,
-			Stderr:      os.Stderr,
+			Store:     appWs.Store(),
+			Workspace: ws,
+			Stdout:    os.Stdout,
+			Stderr:    os.Stderr,
 		})
 	},
 }

@@ -600,18 +600,6 @@
                             <button class="danger" onclick="deleteProvider()">Delete</button>
                         </div>
                         <pre id="provTest" class="quota" hidden></pre>
-                        <div id="minimaxQuotaPanel" hidden style="margin-top:10px">
-                            <div class="row">
-                                <div class="label">quota host</div><input id="mmQuotaBaseURL" value="https://api.minimaxi.com" />
-                            </div>
-                            <div class="row">
-                                <div class="label">quota cookie</div><input id="mmQuotaCookie" type="password" placeholder="optional cookie" autocomplete="off" />
-                            </div>
-                            <div class="actions">
-                                <button class="secondary" onclick="testMiniMaxQuota()">Test Quota</button>
-                            </div>
-                            <pre id="mmQuota" class="quota" hidden></pre>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -831,13 +819,6 @@
                 $('provMaxTokens').value = first.default_max_tokens || 65536;
                 $('provReasoning').value = first.default_reasoning_effort || 'medium';
             }
-            // Cascade: show MiniMax quota panel if provider is minimax
-            const isMiniMax = id.toLowerCase().includes('minimax');
-            $('minimaxQuotaPanel').hidden = !isMiniMax;
-            if (isMiniMax && p.provider_options) {
-                $('mmQuotaBaseURL').value = p.provider_options.quota_base_url || 'https://api.minimaxi.com';
-                $('mmQuotaCookie').placeholder = p.provider_options.quota_cookie ? 'configured: ' + mask(p.provider_options.quota_cookie) : 'optional cookie';
-            }
             loadProviders();
         }
 
@@ -852,7 +833,6 @@
             $('provModels').value = '';
             $('provMaxTokens').value = '65536';
             $('provReasoning').value = 'medium';
-            $('minimaxQuotaPanel').hidden = true;
             $('provTest').hidden = true;
         }
 
@@ -996,91 +976,6 @@
                 toast('config saved');
                 loadConfig();
             } catch (e) { toast('save failed: ' + e.message); }
-        }
-
-        /* ── MiniMax Quota (cascade: shows when minimax provider selected) ── */
-        async function testMiniMaxQuota() {
-            const id = $('provID').value.trim();
-            const apiKey = $('provAPIKey').value;
-            const quotaBaseURL = $('mmQuotaBaseURL').value || 'https://api.minimaxi.com';
-            const quotaCookie = $('mmQuotaCookie').value;
-            $('mmQuota').hidden = false;
-            $('mmQuota').textContent = 'fetching quota...';
-            try {
-                const q = await api('/api/minimax/quota', {
-                    method: 'POST',
-                    headers: { 'content-type': 'application/json' },
-                    body: JSON.stringify({ provider_id: id, api_key: apiKey, quota_base_url: quotaBaseURL, quota_cookie: quotaCookie })
-                });
-                const models = q.model_remains || q;
-                if (Array.isArray(models) && models.length > 0) {
-                    $('mmQuota').innerHTML = renderQuotaCards(models);
-                } else {
-                    $('mmQuota').textContent = JSON.stringify(models, null, 2);
-                }
-            } catch (e) {
-                $('mmQuota').textContent = e.message + '\nIf cookie is missing, save a MiniMax web login cookie.';
-            }
-        }
-
-        function renderQuotaCards(models) {
-            let html = '<div style="font-size:12px;color:var(--blue)">'
-            html += '<div style="margin-bottom:10px;font-weight:700;color:var(--acid)">MINIMAX Token Plan Dashboard</div>';
-            for (const m of models) {
-                const used = (m.current_interval_total_count || 0) - (m.current_interval_usage_count || 0);
-                const total = m.current_interval_total_count || 0;
-                const pct = total > 0 ? (used / total * 100) : 0;
-                const weekUsed = (m.current_weekly_total_count || 0) - (m.current_weekly_usage_count || 0);
-                const weekTotal = m.current_weekly_total_count || 0;
-                const weekPct = weekTotal > 0 ? (weekUsed / weekTotal * 100) : 0;
-                const resetsIn = formatResetTime(m.remains_time || 0);
-                const weekResetsIn = formatResetTime(m.weekly_remains_time || 0);
-
-                html += '<div style="background:#0a0c10;border:1px solid rgba(255,255,255,.08);padding:10px 12px;margin-bottom:8px">';
-                html += '<div style="color:var(--text);font-weight:700;margin-bottom:6px">' + esc(m.model_name || 'unknown') + '</div>';
-
-                // Interval bar
-                html += '<div style="margin-bottom:4px">';
-                html += '<span style="color:var(--muted)">Interval:</span> ';
-                html += '<span style="color:var(--line)">' + used + ' / ' + total + '</span>';
-                html += '</div>';
-                html += renderBar(pct, resetsIn);
-
-                // Weekly bar
-                html += '<div style="margin-top:6px;margin-bottom:4px">';
-                html += '<span style="color:var(--muted)">Weekly:</span> ';
-                html += '<span style="color:var(--line)">' + weekUsed + ' / ' + weekTotal + '</span>';
-                html += '</div>';
-                html += renderBar(weekPct, weekResetsIn);
-
-                html += '</div>';
-            }
-            html += '</div>';
-            return html;
-        }
-
-        function renderBar(pct, resetLabel) {
-            const w = 100;
-            const filled = Math.min(Math.max(pct, 0), 100);
-            const color = pct > 80 ? 'var(--danger)' : pct > 50 ? 'var(--acid)' : 'var(--line)';
-            let html = '<div style="display:flex;align-items:center;gap:8px">';
-            html += '<div style="flex:1;height:8px;background:#1a1c24;border-radius:4px;overflow:hidden">';
-            html += '<div style="width:' + filled + '%;height:100%;background:' + color + ';border-radius:4px;transition:width .3s"></div>';
-            html += '</div>';
-            html += '<span style="min-width:42px;text-align:right;color:' + color + '">' + pct.toFixed(1) + '%</span>';
-            html += '<span style="min-width:60px;color:var(--muted);font-size:11px">⏱ ' + resetLabel + '</span>';
-            html += '</div>';
-            return html;
-        }
-
-        function formatResetTime(seconds) {
-            if (seconds <= 0) return 'now';
-            const d = Math.floor(seconds / 86400);
-            const h = Math.floor((seconds % 86400) / 3600);
-            const m = Math.floor((seconds % 3600) / 60);
-            if (d > 0) return d + 'd' + h + 'h';
-            if (h > 0) return h + 'h' + m + 'm';
-            return m + 'm';
         }
 
         /* ── MCP ── */

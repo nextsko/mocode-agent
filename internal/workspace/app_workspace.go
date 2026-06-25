@@ -14,7 +14,7 @@ import (
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/history"
 	"github.com/package-register/mocode/internal/knowledge/kngs"
-	"github.com/package-register/mocode/internal/lsp"
+	"github.com/package-register/mocode/internal/agent/tools/lsp"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
@@ -574,7 +574,6 @@ func (w *AppWorkspace) BuildCommandRegistry() []slash.CommandDescriptor {
 		{ID: "admin", Title: "Open Admin Panel", Shortcut: "/admin", Category: slash.CommandCategoryAdmin, Risk: slash.RiskLevelRead},
 		{ID: "admin_start", Title: "Start Admin Server", Shortcut: "/admin-start", Category: slash.CommandCategoryAdmin, Risk: slash.RiskLevelWrite},
 		{ID: "admin_stop", Title: "Stop Admin Server", Shortcut: "/admin-stop", Category: slash.CommandCategoryAdmin, Risk: slash.RiskLevelWrite},
-		{ID: "minimax", Title: "MiniMax Quota", Shortcut: "/minimax", Category: slash.CommandCategoryAdmin, Risk: slash.RiskLevelRead},
 		{ID: "quit", Title: "Quit", Shortcut: "/quit", Category: slash.CommandCategoryAdmin, Risk: slash.RiskLevelDangerous},
 	}
 

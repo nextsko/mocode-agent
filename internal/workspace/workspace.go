@@ -13,7 +13,7 @@ import (
 	mcptools "github.com/package-register/mocode/internal/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/history"
-	"github.com/package-register/mocode/internal/lsp"
+	"github.com/package-register/mocode/internal/agent/tools/lsp"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"

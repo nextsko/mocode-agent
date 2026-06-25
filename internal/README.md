@@ -16,9 +16,6 @@ commands** live in `slash/` (formerly `commands`).
 | Persistence (JSONL) | `store/` |
 | Config loading | `config/` |
 | TUI | `ui/` — read `ui/AGENTS.md` first |
-| Web frontend (React) | `../web/` |
-| Web Go server | `web/` |
-| Remote API / daemon | `server/` + `backend/` |
 | Hooks | `hooks/` — see `../HOOKS.md` |
 | LSP | `lsp/` |
 | WeChat + gateway | `wechat/` + `wechat/gateway/` |
@@ -37,11 +34,11 @@ commands** live in `slash/` (formerly `commands`).
 
 ### Transport
 
-`cmd`, `server`, `backend`, `client`, `proto`, `web`, `admin`, `workspace`
+`cmd`, `proto`, `admin`, `workspace`
 
 ### Integrations
 
-`wechat`, `authhandler`, `minimax`, `gateway` (merged into `wechat`)
+`wechat`, `authhandler`, `gateway` (merged into `wechat`)
 
 ### UI
 
@@ -49,12 +46,12 @@ commands** live in `slash/` (formerly `commands`).
 
 ### Runtime Utilities
 
-`shellruntime` (shell/screencap), `fsext`, `filepathext`, `stringext`, `csync`,
+`shellruntime` (shell/screencap), `fsext`, `ext`, `csync`,
 `infra`, `log`, `errcoll`
 
 ### Agent Extensions
 
-`orchestration`, `evolution`, `knowledge`, `crawler`
+`evolution`, `knowledge`, `crawler`
 
 ## Naming Disambiguation
 
@@ -62,7 +59,6 @@ commands** live in `slash/` (formerly `commands`).
 |------|---|---|
 | `cmd` vs `slash` | Cobra CLI | TUI `/` commands |
 | `shellruntime` vs `agent/tools` | Bash engine | LLM tool plugins |
-| `web/` (root) vs `internal/web` | React source | Go HTTP+WS server |
 | `session` vs `store` | Domain model | JSONL persistence |
 
 ## Related

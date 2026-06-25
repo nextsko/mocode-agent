@@ -1,13 +1,4 @@
 // Package main is the entry point for the mocode CLI.
-//
-//	@title			mocode API
-//	@version		1.0
-//	@description	mocode is a terminal-based AI coding assistant. This API is served over a Unix socket (or Windows named pipe) and provides programmatic access to workspaces, sessions, agents, LSP, MCP, and more.
-//	@contact.name	Charm
-//	@contact.url	https://charm.sh
-//	@license.name	MIT
-//	@license.url	https://github.com/package-register/mocode/blob/main/LICENSE
-//	@BasePath		/v1
 package main
 
 import (

@@ -17,9 +17,7 @@ The module path is `github.com/package-register/mocode`.
 main.go                            CLI entry point (cobra via internal/cmd)
 internal/
   app/                             In-process composition root (store, agents, LSP, MCP)
-  workspace/                       Frontend facade (AppWorkspace / ClientWorkspace)
-  backend/                         Transport-agnostic RPC business layer
-  server/ + client/ + proto/       Remote daemon + SDK + DTOs
+  workspace/                       Frontend facade (AppWorkspace)
   store/                           JSONL file persistence (+ sidecar indexes)
   session/                         Session + message domain models
   agent/                           LLM agents, coordinator, tools, roundtable
@@ -29,7 +27,6 @@ internal/
   hooks/                           PreToolUse shell hooks (see HOOKS.md)
   lsp/                             LSP client manager
   ui/                              Bubble Tea TUI (see internal/ui/AGENTS.md)
-  web/                             Go HTTP+WS web chat server (embeds dist/)
   admin/                           Local admin HTTP settings UI
   wechat/                          WeChat bot + butler
     gateway/                       Long-running WeChat gateway entry
@@ -37,8 +34,6 @@ internal/
   shellruntime/                    Bash/screencap execution engine
     shell/                         Shell job runner used by bash tool
   knowledge/                       Memory service + kngs templates
-  httputil/                        Shared HTTP logging and auth middleware
-web/                               React frontend source (builds to internal/web/dist)
 ```
 
 ### Transport layer
@@ -46,9 +41,7 @@ web/                               React frontend source (builds to internal/web
 | Entry | Package | Role |
 |-------|---------|------|
 | TUI | `cmd` + `ui` | Default interactive experience |
-| Web chat | `internal/web` | Browser UI at `/api/*` |
 | Admin | `internal/admin` | Local settings at `127.0.0.1` |
-| RPC | `internal/server` | Unix socket / named pipe API |
 | Gateway | `internal/wechat/gateway` | Persistent WeChat bot |
 
 See [docs/architecture/control-plane.md](docs/architecture/control-plane.md).
@@ -261,9 +254,6 @@ new packages or files instead.
 
 - **`internal/ui/dialog/permissions.go`** (~790 lines, 34 methods) — permission
   dialog logic.
-
-`internal/swagger/docs.go` is larger still, but it is auto-generated Swagger
-documentation and not a concern for manual refactoring.
 
 ## Environment Quirks
 

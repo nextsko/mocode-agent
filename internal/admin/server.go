@@ -22,9 +22,7 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/httputil"
 	"github.com/package-register/mocode/internal/knowledge/memory"
-	"github.com/package-register/mocode/internal/minimax"
 	wechat "github.com/package-register/mocode/internal/wechat"
 	"github.com/package-register/mocode/internal/workspace"
 )
@@ -57,20 +55,6 @@ type ProxyRequest struct {
 	Enabled  bool   `json:"enabled"`
 	ProxyURL string `json:"proxy_url"`
 	NoProxy  string `json:"no_proxy"`
-}
-
-type MiniMaxProviderRequest struct {
-	ProviderID       string   `json:"provider_id"`
-	Name             string   `json:"name"`
-	Type             string   `json:"type"`
-	BaseURL          string   `json:"base_url"`
-	APIKey           string   `json:"api_key"`
-	QuotaBaseURL     string   `json:"quota_base_url"`
-	QuotaCookie      string   `json:"quota_cookie"`
-	ActiveModel      string   `json:"active_model"`
-	DefaultMaxTokens int64    `json:"default_max_tokens"`
-	ReasoningEffort  string   `json:"reasoning_effort"`
-	Models           []string `json:"models"`
 }
 
 type MCPServerRequest struct {
@@ -168,7 +152,7 @@ func (s *Server) Start(ctx context.Context, port int) (string, error) {
 	mux := http.NewServeMux()
 	s.routes(mux)
 	srv := &http.Server{
-		Handler:           httputil.RequestLogging("admin", mux),
+		Handler:           requestLogging("admin", mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	s.server = srv
@@ -215,7 +199,7 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServer(http.FS(assetSubFS()))))
 	api := http.NewServeMux()
 	s.registerAPIRoutes(api)
-	mux.Handle("/api/", httputil.BearerAuth(s.authToken, api))
+	mux.Handle("/api/", bearerAuth(s.authToken, api))
 }
 
 func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
@@ -229,9 +213,6 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /providers/catalog", s.handleProvidersCatalog)
 	mux.HandleFunc("POST /providers/save", s.handleProviderSave)
 	mux.HandleFunc("POST /providers/delete", s.handleProviderDelete)
-	mux.HandleFunc("GET /minimax/defaults", s.handleMiniMaxDefaults)
-	mux.HandleFunc("POST /minimax/provider", s.handleMiniMaxProvider)
-	mux.HandleFunc("POST /minimax/quota", s.handleMiniMaxQuota)
 	mux.HandleFunc("GET /mcp/servers", s.handleMCPServers)
 	mux.HandleFunc("POST /mcp/server", s.handleMCPServer)
 	mux.HandleFunc("POST /mcp/server/delete", s.handleMCPServerDelete)
@@ -530,122 +511,6 @@ func (s *Server) handleProxy(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": true})
 }
 
-func (s *Server) handleMiniMaxDefaults(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, map[string]any{
-		"provider_id":        "minimax",
-		"name":               "MiniMax",
-		"type":               string(catwalk.TypeAnthropic),
-		"base_url":           "https://api.minimaxi.com/anthropic",
-		"quota_base_url":     "https://api.minimaxi.com",
-		"default_max_tokens": int64(65536),
-		"reasoning_effort":   "medium",
-		"active_model":       "MiniMax-M2.7-highspeed",
-		"models":             defaultMiniMaxModels(65536, "medium", nil),
-	})
-}
-
-func (s *Server) handleMiniMaxProvider(w http.ResponseWriter, r *http.Request) {
-	var req MiniMaxProviderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-	providerID := cmpTrim(req.ProviderID, "minimax")
-	if !validConfigName(providerID) {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid provider id"))
-		return
-	}
-	baseURL := cmpTrim(req.BaseURL, "https://api.minimaxi.com/anthropic")
-	providerType := cmpTrim(req.Type, string(catwalk.TypeAnthropic))
-	maxTokens := req.DefaultMaxTokens
-	if maxTokens <= 0 {
-		maxTokens = 65536
-	}
-	reasoningEffort := cmpTrim(req.ReasoningEffort, "medium")
-	apiKey := strings.TrimSpace(req.APIKey)
-	quotaCookie := strings.TrimSpace(req.QuotaCookie)
-	if apiKey == "" {
-		if current, ok := s.workspace.Config().Providers.Get(providerID); ok {
-			apiKey = current.APIKey
-			if quotaCookie == "" {
-				if current.ProviderOptions != nil {
-					if value, ok := current.ProviderOptions["quota_cookie"].(string); ok {
-						quotaCookie = value
-					}
-				}
-			}
-		}
-	}
-	provider := config.ProviderConfig{
-		ID:      providerID,
-		Name:    cmpTrim(req.Name, "MiniMax"),
-		BaseURL: baseURL,
-		Type:    catwalk.Type(providerType),
-		APIKey:  apiKey,
-		Models:  defaultMiniMaxModels(maxTokens, reasoningEffort, req.Models),
-		ProviderOptions: map[string]any{
-			"quota_base_url": cmpTrim(req.QuotaBaseURL, "https://api.minimaxi.com"),
-		},
-	}
-	if quotaCookie != "" {
-		provider.ProviderOptions["quota_cookie"] = quotaCookie
-	}
-	if err := s.workspace.SetConfigField(config.ScopeGlobal, "providers."+providerID, provider); err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-	activeModel := cmpTrim(req.ActiveModel, "MiniMax-M2.7-highspeed")
-	if err := s.workspace.UpdatePreferredModel(config.ScopeGlobal, config.SelectedModelTypeLarge, config.SelectedModel{
-		Provider:        providerID,
-		Model:           activeModel,
-		MaxTokens:       maxTokens,
-		ReasoningEffort: reasoningEffort,
-	}); err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeJSON(w, map[string]any{"ok": true, "provider": maskedProvider(provider)})
-}
-
-func (s *Server) handleMiniMaxQuota(w http.ResponseWriter, r *http.Request) {
-	var req MiniMaxProviderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-	apiKey := strings.TrimSpace(req.APIKey)
-	baseURL := cmpTrim(req.QuotaBaseURL, "https://api.minimaxi.com")
-	if apiKey == "" {
-		providerID := cmpTrim(req.ProviderID, "minimax")
-		if provider, ok := s.workspace.Config().Providers.Get(providerID); ok {
-			apiKey = provider.APIKey
-			if v, ok := provider.ProviderOptions["quota_base_url"].(string); ok && strings.TrimSpace(v) != "" {
-				baseURL = strings.TrimSpace(v)
-			}
-			if req.QuotaCookie == "" {
-				if v, ok := provider.ProviderOptions["quota_cookie"].(string); ok {
-					req.QuotaCookie = v
-				}
-			}
-		}
-	}
-	if apiKey == "" {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("MiniMax API key is required"))
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	defer cancel()
-	client := minimax.NewMiniMaxQuotaClient(apiKey, baseURL)
-	client.SetHTTPClient(s.workspace.Config().HTTPClient(s.workspace.Resolver(), 15*time.Second))
-	client.SetCookie(strings.TrimSpace(req.QuotaCookie))
-	resp, err := client.FetchQuota(ctx)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err)
-		return
-	}
-	writeJSON(w, resp)
-}
-
 func (s *Server) handleMCPServers(w http.ResponseWriter, r *http.Request) {
 	states := s.workspace.MCPGetStates()
 	servers := make([]map[string]any, 0, len(s.workspace.Config().MCP))
@@ -885,47 +750,6 @@ func assetSubFS() fs.FS {
 		return assetsFS
 	}
 	return sub
-}
-
-func defaultMiniMaxModels(maxTokens int64, reasoningEffort string, ids []string) []catwalk.Model {
-	if maxTokens <= 0 {
-		maxTokens = 65536
-	}
-	reasoningEffort = cmpTrim(reasoningEffort, "medium")
-	if len(ids) == 0 {
-		ids = []string{"MiniMax-M2.7-highspeed", "MiniMax-M2.7"}
-	}
-	models := make([]catwalk.Model, 0, len(ids))
-	for _, id := range ids {
-		id = strings.TrimSpace(id)
-		if id == "" {
-			continue
-		}
-		models = append(models, catwalk.Model{
-			ID:                     id,
-			Name:                   miniMaxModelName(id),
-			ContextWindow:          204800,
-			DefaultMaxTokens:       maxTokens,
-			CanReason:              true,
-			ReasoningLevels:        []string{"low", "medium", "high"},
-			DefaultReasoningEffort: reasoningEffort,
-			SupportsImages:         true,
-		})
-	}
-	return models
-}
-
-func miniMaxModelName(id string) string {
-	switch id {
-	case "MiniMax-M2.7-highspeed":
-		return "MiniMax M2.7 Highspeed"
-	case "MiniMax-M2.7":
-		return "MiniMax M2.7"
-	case "MiniMax-M2.5":
-		return "MiniMax M2.5"
-	default:
-		return strings.ReplaceAll(id, "-", " ")
-	}
 }
 
 func normalizeMCPConfig(req MCPServerRequest) (config.MCPConfig, error) {

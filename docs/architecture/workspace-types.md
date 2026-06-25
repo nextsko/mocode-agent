@@ -1,32 +1,27 @@
 # Workspace Types
 
-Three different types share the name "Workspace". They are intentionally
-separate layers.
+Two layers share the name "Workspace". They are intentionally separate.
 
 | Type | Package | Role |
 |------|---------|------|
-| `workspace.Workspace` | `internal/workspace` | Frontend interface (TUI, web, WeChat) |
-| `backend.Workspace` | `internal/backend` | Running in-process workspace instance |
-| `proto.Workspace` | `internal/proto` | Wire DTO for client/server RPC |
+| `workspace.Workspace` | `internal/workspace` | Frontend interface (TUI, WeChat) |
+| `proto.Workspace` | `internal/proto` | Wire DTO for admin JSON APIs |
 
 ## Data flow
 
 ```
-TUI / Web / Gateway
+TUI / Gateway
        │
        ▼
-workspace.Workspace  (AppWorkspace or ClientWorkspace)
+workspace.Workspace  (AppWorkspace)
        │
-       ├── AppWorkspace ──► app.App ──► store
-       │
-       └── ClientWorkspace ──► client.Client ──► server ──► backend.Workspace
+       └── AppWorkspace ──► app.App ──► store
 ```
 
 ## When editing
 
 - Add a user-facing capability → extend `workspace.Workspace` interface first.
 - Implement locally → `AppWorkspace` delegates to `app.App`.
-- Implement remotely → `ClientWorkspace` maps to proto calls.
 
 ## Related
 

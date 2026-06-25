@@ -10,8 +10,8 @@
 | agent | Core | LLM agents, coordinator, tools |
 | app | Core | In-process composition root |
 | authhandler | Integrations | OAuth login handlers |
-| backend | Transport | Transport-agnostic RPC business layer |
-| client | Transport | Remote workspace SDK |
+| backend | Transport | Removed — was RPC business layer for daemon |
+| client | Transport | Removed — was remote workspace SDK |
 | cmd | Transport | Cobra CLI (not slash commands) |
 | commands | UI | TUI `/` slash commands (rename target: slash) |
 | config | Core | Mocode.json loading |
@@ -21,7 +21,7 @@
 | diff | Utils | Diff utilities |
 | errcoll | Observability | Tool error JSONL collector |
 | evolution | Agent | `.mocode/patches` learning |
-| filepathext | Utils | Path helpers |
+| ext | Utils | Stdlib extensions (string + path helpers; merged from stringext + filepathext) |
 | filetracker | Domain | File touch tracking interface |
 | fsext | Utils | Filesystem extensions |
 | gateway | Integrations | WeChat long-running entry (merge into wechat) |
@@ -31,22 +31,20 @@
 | knowledge | Domain | Memory + kngs templates |
 | log | Observability | slog setup |
 | lsp | Core | LSP client manager |
-| minimax | Integrations | MiniMax provider helpers |
-| orchestration | Agent | Swarm orchestration |
 | permission | Core | Tool permission checks |
 | proto | Transport | API DTOs |
 | pubsub | Core | Internal event bus |
-| server | Transport | Unix socket / named pipe RPC |
+| server | Transport | Removed — was Unix socket / named pipe RPC |
 | session | Domain | Session + message models |
 | skills | Core | Agent skills discovery |
 | store | Persistence | JSONL file storage |
-| stringext | Utils | String helpers |
-| swagger | Transport | Generated OpenAPI docs |
+| stringext | Utils | Merged into `ext` (2026-06-26) |
+| swagger | Transport | Removed — was generated OpenAPI docs |
 | tools | Runtime | Shell/screencap engine (rename target: shellruntime) |
 | types | Domain | Shared DTO aliases |
 | ui | UI | Bubble Tea TUI |
 | version | Utils | Build version |
-| web | Transport | Go HTTP+WS web chat server |
+| web | Transport | Removed — was browser chat HTTP+WS server |
 | wechat | Integrations | WeChat bot + butler |
 | workspace | Facade | Frontend workspace interface |
 
@@ -58,14 +56,12 @@
 - [ ] Memory tools wired via storeMemoryService.Tools()
 - [ ] MemoryStore persists to `memory/entries.jsonl`
 - [ ] Legacy session/store.go paths migrated or removed
-- [ ] Web server defaults to localhost with auth scaffold
 - [ ] Admin HTTP requires token
 - [ ] Agent core tests re-enabled (no `//go:build ignore`)
 
 ## Multi-Review P1 Checklist
 
 - [ ] HTTP control plane documented (`docs/architecture/control-plane.md`)
-- [ ] Shared httputil middleware (logging, auth)
 - [ ] gateway merged into wechat
 - [ ] tools vs agent/tools naming resolved
 - [ ] commands renamed to slash

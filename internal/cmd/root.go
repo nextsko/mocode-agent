@@ -7,16 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"log/slog"
-	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	fang "charm.land/fang/v2"
@@ -28,12 +22,9 @@ import (
 	xstrings "github.com/charmbracelet/x/exp/strings"
 	"github.com/charmbracelet/x/term"
 	"github.com/package-register/mocode/internal/app"
-	"github.com/package-register/mocode/internal/client"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/config/projects"
 	mocodelog "github.com/package-register/mocode/internal/log"
-	"github.com/package-register/mocode/internal/proto"
-	"github.com/package-register/mocode/internal/server"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/ui/common"
 	ui "github.com/package-register/mocode/internal/ui/model"
@@ -42,15 +33,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var clientHost string
-
 func init() {
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 	rootCmd.SetHelpFunc(printHelp)
 	rootCmd.PersistentFlags().StringP("cwd", "c", "", "Current working directory")
 	rootCmd.PersistentFlags().StringP("data-dir", "D", "", "Custom mocode data directory")
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Debug")
-	rootCmd.PersistentFlags().StringVarP(&clientHost, "host", "H", server.DefaultHost(), "Connect to a specific mocode server host (for advanced users)")
 	rootCmd.Flags().BoolP("help", "h", false, "Help")
 	rootCmd.Flags().StringP("session", "s", "", "Continue a previous session by ID")
 	rootCmd.Flags().BoolP("continue", "C", false, "Continue the most recent session")
@@ -167,9 +155,8 @@ START
 
 COMMANDS
   run        Run a non-interactive prompt
-  auth       Authenticate wechat or minimax
+  auth       Authenticate wechat
   gateway    Run the WeChat bot gateway
-  quota      Show MiniMax quota usage
   doctor     Run local environment diagnostics
   session    List, show, rename, or delete sessions
   models     List configured models
@@ -366,13 +353,6 @@ func supportsProgressBar() bool {
 	return isWindowsTerminal || xstrings.ContainsAnyOf(strings.ToLower(termProg), "ghostty", "iterm2", "rio")
 }
 
-// useClientServer returns true when the client/server architecture is
-// enabled via the MOCODE_CLIENT_SERVER environment variable.
-func useClientServer() bool {
-	v, _ := strconv.ParseBool(os.Getenv("MOCODE_CLIENT_SERVER"))
-	return v
-}
-
 // setupWorkspaceWithProgressBar wraps setupWorkspace with an optional
 // terminal progress bar shown during initialization.
 func setupWorkspaceWithProgressBar(cmd *cobra.Command) (workspace.Workspace, func(), error) {
@@ -390,14 +370,8 @@ func setupWorkspaceWithProgressBar(cmd *cobra.Command) (workspace.Workspace, fun
 	return ws, cleanup, err
 }
 
-// setupWorkspace returns a Workspace and cleanup function. When
-// MOCODE_CLIENT_SERVER=1, it connects to a server process and returns a
-// ClientWorkspace. Otherwise it creates an in-process app.App and
-// returns an AppWorkspace.
+// setupWorkspace creates an in-process app.App and returns an AppWorkspace.
 func setupWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error) {
-	if useClientServer() {
-		return setupClientServerWorkspace(cmd)
-	}
 	return setupLocalWorkspace(cmd)
 }
 
@@ -451,219 +425,6 @@ func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error
 	return ws, cleanup, nil
 }
 
-// setupClientServerWorkspace connects to a server process and wraps the
-// result in a ClientWorkspace.
-func setupClientServerWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error) {
-	c, protoWs, cleanupServer, err := connectToServer(cmd)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	clientWs := workspace.NewClientWorkspace(c, *protoWs)
-
-	if protoWs.Config.IsConfigured() {
-		if err := clientWs.InitCoderAgent(cmd.Context()); err != nil {
-			slog.Error("Failed to initialize coder agent", "error", err)
-		}
-	}
-
-	return clientWs, cleanupServer, nil
-}
-
-// connectToServer ensures the server is running, creates a client and
-// workspace, and returns a cleanup function that deletes the workspace.
-func connectToServer(cmd *cobra.Command) (*client.Client, *proto.Workspace, func(), error) {
-	hostURL, err := server.ParseHostURL(clientHost)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("invalid host URL: %v", err)
-	}
-
-	if err := ensureServer(cmd, hostURL); err != nil {
-		return nil, nil, nil, err
-	}
-
-	debug, _ := cmd.Flags().GetBool("debug")
-	yolo, _ := cmd.Flags().GetBool("yolo")
-	dataDir, _ := cmd.Flags().GetString("data-dir")
-	ctx := cmd.Context()
-
-	cwd, err := ResolveCwd(cmd)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	c, err := client.NewClient(cwd, hostURL.Scheme, hostURL.Host)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	wsReq := proto.Workspace{
-		Path:    cwd,
-		DataDir: dataDir,
-		Debug:   debug,
-		YOLO:    yolo,
-		Version: version.Version,
-		Env:     os.Environ(),
-	}
-
-	ws, err := c.CreateWorkspace(ctx, wsReq)
-	if err != nil {
-		// The server socket may exist before the HTTP handler is ready.
-		// Retry a few times with a short backoff.
-		for range 5 {
-			select {
-			case <-ctx.Done():
-				return nil, nil, nil, ctx.Err()
-			case <-time.After(200 * time.Millisecond):
-			}
-			ws, err = c.CreateWorkspace(ctx, wsReq)
-			if err == nil {
-				break
-			}
-		}
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to create workspace: %v", err)
-		}
-	}
-
-	if ws.Config != nil {
-		logFile := mocodelog.MainLogPath(ws.Config.Options.DataDirectory)
-		mocodelog.Setup(logFile, debug)
-	}
-
-	cleanup := func() { _ = c.DeleteWorkspace(context.Background(), ws.ID) }
-	return c, ws, cleanup, nil
-}
-
-// ensureServer auto-starts a detached server if the socket file does not
-// exist. When the socket exists, it verifies that the running server
-// version matches the client; on mismatch it shuts down the old server
-// and starts a fresh one.
-func ensureServer(cmd *cobra.Command, hostURL *url.URL) error {
-	switch hostURL.Scheme {
-	case "unix", "npipe":
-		needsStart := false
-		if _, err := os.Stat(hostURL.Host); err != nil && errors.Is(err, fs.ErrNotExist) { //nolint:gosec // User-selected local socket path is intentional.
-			needsStart = true
-		} else if err == nil {
-			if err := restartIfStale(cmd, hostURL); err != nil {
-				slog.Warn("Failed to check server version, restarting", "error", err)
-				needsStart = true
-			}
-		}
-
-		if needsStart {
-			if err := startDetachedServer(cmd); err != nil {
-				return err
-			}
-		}
-
-		var err error
-		for range 10 {
-			_, err = os.Stat(hostURL.Host) //nolint:gosec // User-selected local socket path is intentional.
-			if err == nil {
-				break
-			}
-			select {
-			case <-cmd.Context().Done():
-				return cmd.Context().Err()
-			case <-time.After(100 * time.Millisecond):
-			}
-		}
-		if err != nil {
-			return fmt.Errorf("failed to initialize mocode server: %v", err)
-		}
-	}
-
-	return nil
-}
-
-// restartIfStale checks whether the running server matches the current
-// client version. When they differ, it sends a shutdown command and
-// removes the stale socket so the caller can start a fresh server.
-func restartIfStale(cmd *cobra.Command, hostURL *url.URL) error {
-	c, err := client.NewClient("", hostURL.Scheme, hostURL.Host)
-	if err != nil {
-		return err
-	}
-	vi, err := c.VersionInfo(cmd.Context())
-	if err != nil {
-		return err
-	}
-	if vi.Version == version.Version {
-		return nil
-	}
-	slog.Info(
-		"Server version mismatch, restarting",
-		"server", vi.Version,
-		"client", version.Version,
-	)
-	_ = c.ShutdownServer(cmd.Context())
-	// Give the old process a moment to release the socket.
-	for range 20 {
-		if _, err := os.Stat(hostURL.Host); errors.Is(err, fs.ErrNotExist) { //nolint:gosec // User-selected local socket path is intentional.
-			break
-		}
-		select {
-		case <-cmd.Context().Done():
-			return cmd.Context().Err()
-		case <-time.After(100 * time.Millisecond):
-		}
-	}
-	// Force-remove if the socket is still lingering.
-	_ = os.Remove(hostURL.Host) //nolint:gosec // User-selected local socket path is intentional.
-	return nil
-}
-
-var safeNameRegexp = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
-
-func startDetachedServer(cmd *cobra.Command) error {
-	exe, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("failed to get executable path: %v", err)
-	}
-
-	safeClientHost := safeNameRegexp.ReplaceAllString(clientHost, "_")
-	chDir := filepath.Join(config.GlobalCacheDir(), "server-"+safeClientHost)
-	if err := os.MkdirAll(chDir, 0o700); err != nil {
-		return fmt.Errorf("failed to create server working directory: %v", err)
-	}
-
-	cmdArgs := []string{"server"}
-	if clientHost != server.DefaultHost() {
-		cmdArgs = append(cmdArgs, "--host", clientHost)
-	}
-
-	c := exec.CommandContext(cmd.Context(), exe, cmdArgs...)
-	stdoutPath := filepath.Join(chDir, "stdout.log")
-	stderrPath := filepath.Join(chDir, "stderr.log")
-	detachProcess(c)
-
-	stdout, err := os.Create(stdoutPath)
-	if err != nil {
-		return fmt.Errorf("failed to create stdout log file: %v", err)
-	}
-	defer stdout.Close()
-	c.Stdout = stdout
-
-	stderr, err := os.Create(stderrPath)
-	if err != nil {
-		return fmt.Errorf("failed to create stderr log file: %v", err)
-	}
-	defer stderr.Close()
-	c.Stderr = stderr
-
-	if err := c.Start(); err != nil {
-		return fmt.Errorf("failed to start mocode server: %v", err)
-	}
-
-	if err := c.Process.Release(); err != nil {
-		return fmt.Errorf("failed to detach mocode server process: %v", err)
-	}
-
-	return nil
-}
-
 func MaybePrependStdin(prompt string) (string, error) {
 	if term.IsTerminal(os.Stdin.Fd()) {
 		return prompt, nil
@@ -684,9 +445,7 @@ func MaybePrependStdin(prompt string) (string, error) {
 }
 
 // resolveWorkspaceSessionID resolves a session ID that may be a full
-// UUID, full hash, or hash prefix. Works against the Workspace
-// interface so both local and client/server paths get hash prefix
-// support.
+// UUID, full hash, or hash prefix.
 func resolveWorkspaceSessionID(ctx context.Context, ws workspace.Workspace, id string) (session.Session, error) {
 	if sess, err := ws.GetSession(ctx, id); err == nil {
 		return sess, nil
