@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/package-register/mocode/internal/config"
+	"github.com/package-register/mocode/internal/httputil"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
 	"github.com/package-register/mocode/internal/store"
@@ -208,6 +209,10 @@ func (s *Server) handlePatchConfig(w http.ResponseWriter, r *http.Request) {
 	}
 done:
 	if req.Yolo != nil {
+		if !httputil.IsLoopbackRequest(r) {
+			writeError(w, http.StatusForbidden, "yolo mode can only be changed from localhost")
+			return
+		}
 		s.workspace.PermissionSetSkipRequests(*req.Yolo)
 	}
 

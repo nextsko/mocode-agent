@@ -1,3 +1,4 @@
+// Package gateway runs the long-lived WeChat bot entrypoint without import cycles.
 package gateway
 
 import (
@@ -12,6 +13,7 @@ import (
 
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/knowledge/memory"
+	"github.com/package-register/mocode/internal/log"
 	"github.com/package-register/mocode/internal/wechat"
 	"github.com/package-register/mocode/internal/workspace"
 )
@@ -41,8 +43,7 @@ func NewWeChatGateway(opts Options) *WeChatGateway {
 	}
 }
 
-// Start authenticates if needed, prints startup details, and blocks in the
-// WeChat long-poll loop until ctx is cancelled.
+// Start authenticates if needed, prints startup details, and blocks until cancelled.
 func (g *WeChatGateway) Start(ctx context.Context) error {
 	if g.ws == nil {
 		return fmt.Errorf("workspace is required")
@@ -78,7 +79,6 @@ func (g *WeChatGateway) Start(ctx context.Context) error {
 }
 
 func (g *WeChatGateway) installAgentHandler() {
-	// Inject SlashConfig so /model, /test model, /status etc. read real data.
 	g.wc.SetSlashConfig(wechat.SlashConfig{
 		CurrentModel: func() string {
 			cfg := g.ws.Config()
@@ -110,18 +110,13 @@ func (g *WeChatGateway) installAgentHandler() {
 				Model:    model,
 			})
 		},
-		TestModel: func(provider, model string) error {
-			// TODO: actual API call to test model connectivity
-			return nil
-		},
+		TestModel: func(provider, model string) error { return nil },
 	})
 
-	// Init butler with real workspace integration.
 	g.wc.InitButler(&gatewayButlerWorkspace{g.ws})
 
-	// Keep legacy agentFn as fallback.
 	g.wc.SetAgentHandler(func(ctx context.Context, userID, text string, _ *wechat.IncomingMessage) (string, error) {
-		ctx = memory.WithAppUserInContext(ctx, "mocode", "wx:"+userID)
+		ctx = memory.WithAppUserInContext(ctx, "mocode", wechat.SessionKey(userID))
 		stopTyping := g.wc.StartTyping(ctx, userID)
 		defer stopTyping()
 
@@ -156,7 +151,6 @@ func (g *WeChatGateway) installAgentHandler() {
 	})
 }
 
-// gatewayButlerWorkspace adapts workspace.Workspace to wechat.ButlerWorkspace.
 type gatewayButlerWorkspace struct {
 	ws workspace.Workspace
 }
@@ -248,7 +242,7 @@ func lastAssistantReply(ctx context.Context, ws workspace.Workspace, sessionID s
 	return "处理完成。", nil
 }
 
-// PrintStartupSummary writes the gateway runtime summary requested for ops.
+// PrintStartupSummary writes the gateway runtime summary.
 func (g *WeChatGateway) PrintStartupSummary() {
 	cfg := g.ws.Config()
 	fmt.Fprintln(g.stdout)
@@ -257,7 +251,7 @@ func (g *WeChatGateway) PrintStartupSummary() {
 	fmt.Fprintln(g.stdout, "Workspace")
 	fmt.Fprintf(g.stdout, "  Path:              %s\n", g.ws.WorkingDir())
 	fmt.Fprintf(g.stdout, "  Data directory:    %s\n", cfg.Options.DataDirectory)
-	fmt.Fprintf(g.stdout, "  Log path:          %s\n", filepath.Join(cfg.Options.DataDirectory, "logs", "mocode.log"))
+	fmt.Fprintf(g.stdout, "  Log path:          %s\n", log.MainLogPath(cfg.Options.DataDirectory))
 	fmt.Fprintln(g.stdout)
 
 	selected := cfg.Models[config.SelectedModelTypeLarge]
@@ -280,11 +274,11 @@ func (g *WeChatGateway) PrintStartupSummary() {
 	fmt.Fprintln(g.stdout)
 
 	fmt.Fprintln(g.stdout, "MCP")
-	fmt.Fprintf(g.stdout, "  Enabled servers:   %s\n", strings.Join(enabledMCP(g.ws), ", "))
+	fmt.Fprintf(g.stdout, "  Enabled servers:   %s\n", strings.Join(enabledMCPNames(g.ws), ", "))
 	fmt.Fprintln(g.stdout)
 
 	fmt.Fprintln(g.stdout, "Tools")
-	fmt.Fprintf(g.stdout, "  Enabled tools:     %s\n", enabledTools(cfg))
+	fmt.Fprintf(g.stdout, "  Enabled tools:     %s\n", enabledGatewayTools(cfg))
 	fmt.Fprintln(g.stdout)
 
 	account := "unknown"
@@ -299,7 +293,7 @@ func (g *WeChatGateway) PrintStartupSummary() {
 	fmt.Fprintln(g.stdout)
 }
 
-func enabledMCP(ws workspace.Workspace) []string {
+func enabledMCPNames(ws workspace.Workspace) []string {
 	states := ws.MCPGetStates()
 	if len(states) == 0 {
 		return []string{"none"}
@@ -312,7 +306,7 @@ func enabledMCP(ws workspace.Workspace) []string {
 	return names
 }
 
-func enabledTools(cfg *config.Config) string {
+func enabledGatewayTools(cfg *config.Config) string {
 	if agent, ok := cfg.Agents[config.AgentCoder]; ok && len(agent.AllowedTools) > 0 {
 		tools := append([]string(nil), agent.AllowedTools...)
 		sort.Strings(tools)
@@ -320,5 +314,3 @@ func enabledTools(cfg *config.Config) string {
 	}
 	return "all configured tools"
 }
-
-var _ = time.Second

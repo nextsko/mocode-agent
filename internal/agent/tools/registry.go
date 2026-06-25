@@ -22,6 +22,7 @@ import (
 	"github.com/package-register/mocode/internal/filetracker"
 	"github.com/package-register/mocode/internal/history"
 	"github.com/package-register/mocode/internal/knowledge/memory"
+	"github.com/package-register/mocode/internal/log"
 	"github.com/package-register/mocode/internal/lsp"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/session"
@@ -286,7 +287,7 @@ func (mocodePlugin) Descriptors() []ToolDescriptor {
 func (mocodePlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{
 		mocode.NewMocodeInfoTool(deps.Cfg, deps.LSPManager, deps.AllSkills, deps.ActiveSkills, deps.SkillTracker),
-		mocode.NewMocodeLogsTool(deps.Cfg.Config().Options.DataDirectory),
+		mocode.NewMocodeLogsTool(log.MainLogPath(deps.Cfg.Config().Options.DataDirectory)),
 	}
 }
 

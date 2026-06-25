@@ -11,7 +11,7 @@ import (
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/pubsub"
-	"github.com/package-register/mocode/internal/tools/shell"
+	"github.com/package-register/mocode/internal/shellruntime/shell"
 	"github.com/stretchr/testify/require"
 )
 

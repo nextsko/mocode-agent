@@ -18,6 +18,11 @@ const (
 	LoadToolName   = "memory_load"
 )
 
+// GenerateMemoryID returns a stable ID for a memory entry.
+func GenerateMemoryID(mem *Memory, appName, userID string) string {
+	return generateMemoryID(mem, appName, userID)
+}
+
 // Kind distinguishes between semantic facts and episodic memories.
 type Kind string
 

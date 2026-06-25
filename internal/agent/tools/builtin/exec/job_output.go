@@ -9,7 +9,7 @@ import (
 	"github.com/package-register/mocode/internal/agent/toolutil"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/tools/shell"
+	"github.com/package-register/mocode/internal/shellruntime/shell"
 )
 
 const (

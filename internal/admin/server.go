@@ -2,7 +2,9 @@ package admin
 
 import (
 	"context"
+	"crypto/rand"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +22,7 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/config"
+	"github.com/package-register/mocode/internal/httputil"
 	"github.com/package-register/mocode/internal/knowledge/memory"
 	"github.com/package-register/mocode/internal/minimax"
 	wechat "github.com/package-register/mocode/internal/wechat"
@@ -35,6 +38,7 @@ type Server struct {
 	server    *http.Server
 	listener  net.Listener
 	url       string
+	authToken string
 	wechat    wechatState
 }
 
@@ -155,15 +159,22 @@ func (s *Server) Start(ctx context.Context, port int) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	token, err := randomAdminToken()
+	if err != nil {
+		return "", fmt.Errorf("admin token: %w", err)
+	}
+	s.authToken = token
+
 	mux := http.NewServeMux()
 	s.routes(mux)
 	srv := &http.Server{
-		Handler:           mux,
+		Handler:           httputil.RequestLogging("admin", mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	s.server = srv
 	s.listener = ln
 	s.url = "http://" + ln.Addr().String()
+	slog.Info("Admin server started", "url", s.url, "token", token)
 	go func() {
 		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Warn("admin server stopped", "error", err)
@@ -202,26 +213,32 @@ func (s *Server) stopLocked(ctx context.Context) error {
 func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /", s.handleIndex)
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServer(http.FS(assetSubFS()))))
-	mux.HandleFunc("GET /api/status", s.handleStatus)
-	mux.HandleFunc("GET /api/config", s.handleConfig)
-	mux.HandleFunc("POST /api/config/set", s.handleSetConfig)
-	mux.HandleFunc("GET /api/config/export", s.handleConfigExport)
-	mux.HandleFunc("POST /api/config/import", s.handleConfigImport)
-	mux.HandleFunc("POST /api/proxy", s.handleProxy)
-	mux.HandleFunc("GET /api/providers", s.handleProviders)
-	mux.HandleFunc("GET /api/providers/catalog", s.handleProvidersCatalog)
-	mux.HandleFunc("POST /api/providers/save", s.handleProviderSave)
-	mux.HandleFunc("POST /api/providers/delete", s.handleProviderDelete)
-	mux.HandleFunc("GET /api/minimax/defaults", s.handleMiniMaxDefaults)
-	mux.HandleFunc("POST /api/minimax/provider", s.handleMiniMaxProvider)
-	mux.HandleFunc("POST /api/minimax/quota", s.handleMiniMaxQuota)
-	mux.HandleFunc("GET /api/mcp/servers", s.handleMCPServers)
-	mux.HandleFunc("POST /api/mcp/server", s.handleMCPServer)
-	mux.HandleFunc("POST /api/mcp/server/delete", s.handleMCPServerDelete)
-	mux.HandleFunc("POST /api/mcp/server/toggle", s.handleMCPServerToggle)
-	mux.HandleFunc("GET /api/mcp/tools", s.handleMCPTools)
-	mux.HandleFunc("POST /api/wechat/start", s.handleWeChatStart)
-	mux.HandleFunc("GET /api/wechat/status", s.handleWeChatStatus)
+	api := http.NewServeMux()
+	s.registerAPIRoutes(api)
+	mux.Handle("/api/", httputil.BearerAuth(s.authToken, api))
+}
+
+func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /status", s.handleStatus)
+	mux.HandleFunc("GET /config", s.handleConfig)
+	mux.HandleFunc("POST /config/set", s.handleSetConfig)
+	mux.HandleFunc("GET /config/export", s.handleConfigExport)
+	mux.HandleFunc("POST /config/import", s.handleConfigImport)
+	mux.HandleFunc("POST /proxy", s.handleProxy)
+	mux.HandleFunc("GET /providers", s.handleProviders)
+	mux.HandleFunc("GET /providers/catalog", s.handleProvidersCatalog)
+	mux.HandleFunc("POST /providers/save", s.handleProviderSave)
+	mux.HandleFunc("POST /providers/delete", s.handleProviderDelete)
+	mux.HandleFunc("GET /minimax/defaults", s.handleMiniMaxDefaults)
+	mux.HandleFunc("POST /minimax/provider", s.handleMiniMaxProvider)
+	mux.HandleFunc("POST /minimax/quota", s.handleMiniMaxQuota)
+	mux.HandleFunc("GET /mcp/servers", s.handleMCPServers)
+	mux.HandleFunc("POST /mcp/server", s.handleMCPServer)
+	mux.HandleFunc("POST /mcp/server/delete", s.handleMCPServerDelete)
+	mux.HandleFunc("POST /mcp/server/toggle", s.handleMCPServerToggle)
+	mux.HandleFunc("GET /mcp/tools", s.handleMCPTools)
+	mux.HandleFunc("POST /wechat/start", s.handleWeChatStart)
+	mux.HandleFunc("GET /wechat/status", s.handleWeChatStatus)
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -1104,4 +1121,12 @@ func (w *adminButlerWorkspace) UpdateModel(provider, model string) error {
 		Provider: provider,
 		Model:    model,
 	})
+}
+
+func randomAdminToken() (string, error) {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
 }

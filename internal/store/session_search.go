@@ -1,4 +1,4 @@
-﻿package store
+package store
 
 import (
 	"context"
@@ -482,4 +482,3 @@ func truncateContent(s string, maxLen int) string {
 	}
 	return s[:maxLen] + "..."
 }
-

@@ -10,7 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	execbuiltin "github.com/package-register/mocode/internal/agent/tools/builtin/exec"
 	"github.com/package-register/mocode/internal/session/message"
-	"github.com/package-register/mocode/internal/tools/shell"
+	"github.com/package-register/mocode/internal/shellruntime/shell"
 	"github.com/package-register/mocode/internal/ui/chat"
 )
 

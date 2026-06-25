@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"time"
 
 	"github.com/charmbracelet/x/term"
@@ -42,7 +41,7 @@ var serverCmd = &cobra.Command{
 			return fmt.Errorf("failed to load configuration: %v", err)
 		}
 
-		logFile := filepath.Join(config.GlobalCacheDir(), "server-"+safeNameRegexp.ReplaceAllString(serverHost, "_"), "Mocode.log")
+		logFile := Mocodelog.ServerLogPath(config.GlobalCacheDir(), serverHost)
 
 		if term.IsTerminal(os.Stderr.Fd()) {
 			Mocodelog.Setup(logFile, debug, os.Stderr)

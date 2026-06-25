@@ -1,4 +1,4 @@
-package commands
+package slash
 
 type CommandCategory string
 

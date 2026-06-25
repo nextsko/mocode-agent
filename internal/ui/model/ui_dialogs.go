@@ -11,12 +11,12 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/catwalk/pkg/catwalk"
-	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
 	"github.com/package-register/mocode/internal/session/sessionexport"
+	"github.com/package-register/mocode/internal/slash"
 	"github.com/package-register/mocode/internal/ui/dialog"
 	fimage "github.com/package-register/mocode/internal/ui/image"
 	"github.com/package-register/mocode/internal/ui/styles"
@@ -215,7 +215,7 @@ func (m *UI) handleDialogAction(action tea.Msg) tea.Cmd {
 				m.com,
 				"Network Proxy",
 				"Configure a local proxy for provider tests, fetch/download, web search, MCP HTTP/SSE, and admin APIs.",
-				[]commands.Argument{
+				[]slash.Argument{
 					{ID: "PROXY_URL", Title: "Proxy URL", Description: proxyURL, Required: true},
 					{ID: "NO_PROXY", Title: "No Proxy", Description: noProxy},
 				},

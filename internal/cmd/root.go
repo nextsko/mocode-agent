@@ -437,7 +437,7 @@ func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error
 		slog.Warn("Failed to register project", "error", err)
 	}
 
-	logFile := filepath.Join(cfg.Options.DataDirectory, "logs", "mocode.log")
+	logFile := mocodelog.MainLogPath(cfg.Options.DataDirectory)
 	mocodelog.Setup(logFile, debug)
 
 	appInstance, err := app.New(ctx, store)
@@ -527,7 +527,7 @@ func connectToServer(cmd *cobra.Command) (*client.Client, *proto.Workspace, func
 	}
 
 	if ws.Config != nil {
-		logFile := filepath.Join(ws.Config.Options.DataDirectory, "logs", "mocode.log")
+		logFile := mocodelog.MainLogPath(ws.Config.Options.DataDirectory)
 		mocodelog.Setup(logFile, debug)
 	}
 

@@ -16,103 +16,71 @@ The module path is `github.com/package-register/mocode`.
 ```
 main.go                            CLI entry point (cobra via internal/cmd)
 internal/
-  app/app.go                       Top-level wiring: DB, config, agents, LSP, MCP, events
-  cmd/                             CLI commands (root, run, login, models, stats, sessions)
-  config/
-    config.go                      Config struct, context file paths, agent definitions
-    load.go                        Mocode.json loading and validation
-    provider.go                    Provider configuration and model resolution
-  agent/
-    agent.go                       SessionAgent: runs LLM conversations per session
-    coordinator.go                 Coordinator: manages named agents ("coder", "task")
-    roundtable/                    Multi-agent roundtable team mode engine
-    roundtable_tool.go             Coordinator-owned roundtable tool
-    hooked_tool.go                 Decorator that runs PreToolUse hooks before tool execution
-    prompts.go                     Loads Go-template system prompts
-    templates/                     System prompt templates (coder.md.tpl, task.md.tpl, etc.)
-    tools/                         Tool system façade + central registry
-      registry.go                  Registry type, ToolPlugin interface, all standard plugins
-      compat.go                    Backward-compat re-exports (constants, types, funcs)
-      builtin/exec/                Core exec tools (bash, job_output, job_kill)
-      builtin/file/                Core file tools (edit, multiedit, view, write, ls)
-      plugins/                     Optional/role-specific tool plugins
-        search/                    glob, grep, sourcegraph
-        network/                   fetch, crawl, download, download_docs
-        lsp/                       lsp_diagnostics, lsp_references, lsp_restart
-        mocode/                    mocode_info, mocode_logs
-        session/                   todos, session_export, session_summary
-        mcp/                       list_mcp_resources, read_mcp_resource
-        memory/                    delegates to memory.Service.Tools()
-        think/                     think
-        gitea/                     gitea_issues, gitea_pulls, gitea_notifications
-      internal/                    Shared helpers (retry, context keys, toolctx, etc.)
-      mcp/                         MCP client: connection pool, tool execution
-  hooks/                           Hook engine: runs user shell commands on hook events
-    hooks.go                       Decision types, aggregation logic, event constants
-    runner.go                      Parallel hook execution, timeout, dedup
-    input.go                       Stdin payload builder, env vars, stdout parsing (Mocode + Claude Code compat)
-  session/session.go               Session CRUD backed by SQLite
-  message/                         Message model and content types
-  db/                              SQLite via sqlc, with migrations
-    sql/                           Raw SQL queries (consumed by sqlc)
-    migrations/                    Schema migrations
-  lsp/                             LSP client manager, auto-discovery, on-demand startup
-  ui/                              Bubble Tea v2 TUI (see internal/ui/AGENTS.md)
-  permission/                      Tool permission checking and allow-lists
-  skills/                          Skill file discovery and loading
-  shell/                           Bash command execution with background job support
-  metadata/                        Machine fingerprint and system metadata (privacy-safe)
-  pubsub/                          Internal pub/sub for cross-component messaging
-  filetracker/                     Tracks files touched per session
-  history/                         Prompt history
+  app/                             In-process composition root (store, agents, LSP, MCP)
+  workspace/                       Frontend facade (AppWorkspace / ClientWorkspace)
+  backend/                         Transport-agnostic RPC business layer
+  server/ + client/ + proto/       Remote daemon + SDK + DTOs
+  store/                           JSONL file persistence (+ sidecar indexes)
+  session/                         Session + message domain models
+  agent/                           LLM agents, coordinator, tools, roundtable
+    tools/                         LLM tool registry (builtin + plugins + mcp)
+    toolutil/                      Shared tool helpers
+  config/                          Mocode.json loading and providers
+  hooks/                           PreToolUse shell hooks (see HOOKS.md)
+  lsp/                             LSP client manager
+  ui/                              Bubble Tea TUI (see internal/ui/AGENTS.md)
+  web/                             Go HTTP+WS web chat server (embeds dist/)
+  admin/                           Local admin HTTP settings UI
+  wechat/                          WeChat bot + butler
+    gateway/                       Long-running WeChat gateway entry
+  slash/                           TUI `/` slash commands (not CLI cmd/)
+  shellruntime/                    Bash/screencap execution engine
+    shell/                         Shell job runner used by bash tool
+  knowledge/                       Memory service + kngs templates
+  httputil/                        Shared HTTP logging and auth middleware
+web/                               React frontend source (builds to internal/web/dist)
 ```
+
+### Transport layer
+
+| Entry | Package | Role |
+|-------|---------|------|
+| TUI | `cmd` + `ui` | Default interactive experience |
+| Web chat | `internal/web` | Browser UI at `/api/*` |
+| Admin | `internal/admin` | Local settings at `127.0.0.1` |
+| RPC | `internal/server` | Unix socket / named pipe API |
+| Gateway | `internal/wechat/gateway` | Persistent WeChat bot |
+
+See [docs/architecture/control-plane.md](docs/architecture/control-plane.md).
 
 ### Key Dependency Roles
 
-- **`charm.land/fantasy`**: LLM provider abstraction layer. Handles protocol
-  differences between Anthropic, OpenAI, Gemini, etc. Used in `internal/app`
-  and `internal/agent`.
-- **`charm.land/bubbletea/v2`**: TUI framework powering the interactive UI.
+- **`charm.land/fantasy`**: LLM provider abstraction layer.
+- **`charm.land/bubbletea/v2`**: TUI framework.
 - **`charm.land/lipgloss/v2`**: Terminal styling.
-- **`charm.land/glamour/v2`**: Markdown rendering in the terminal.
-- **`charm.land/catwalk`**: Snapshot/golden-file testing for TUI components.
-- **`sqlc`**: Generates Go code from SQL queries in `internal/db/sql/`.
+- **`charm.land/glamour/v2`**: Markdown rendering.
+- **`charm.land/catwalk`**: Golden-file testing for TUI.
 
 ### Key Patterns
 
 - **Config is a Service**: accessed via `config.Service`, not global state.
-- **Tools are self-documenting**: each tool has a `.go` implementation and a
-  `.md` description file in `internal/agent/tools/`.
-- **System prompts are Go templates**: `internal/agent/templates/*.md.tpl`
-  with runtime data injected.
-- **Context files**: Mocode reads AGENTS.md, Mocode.md, CLAUDE.md, GEMINI.md
-  (and `.local` variants) from the working directory for project-specific
-  instructions.
-- **Persistence**: SQLite + sqlc. All queries live in `internal/db/sql/`,
-  generated code in `internal/db/`. Migrations in `internal/db/migrations/`.
-- **Pub/sub**: `internal/pubsub` for decoupled communication between agent,
-  UI, and services.
-- **Hooks**: User-defined shell commands in `Mocode.json` that fire before
-  tool execution. The engine (`internal/hooks/`) is independent of fantasy
-  and agent 鈥?it takes inputs, runs commands, returns decisions. The
-  `hookedTool` decorator in `internal/agent/hooked_tool.go` wraps tools at
-  the coordinator level. Hooks run before permission checks. See
-  `HOOKS.md` for the user-facing protocol.
-- **CGO disabled**: builds with `CGO_ENABLED=0` and
-  `GOEXPERIMENT=greenteagc`.
+- **Tools are self-documenting**: each tool has `.go` + `.md` in `internal/agent/tools/`.
+- **System prompts are Go templates**: `internal/agent/templates/*.md.tpl`.
+- **Context files**: AGENTS.md, Mocode.md, CLAUDE.md, GEMINI.md from working directory.
+- **Persistence**: JSONL via `internal/store/` under `%LOCALAPPDATA%/mocode/` or `~/.local/share/mocode/`.
+- **Pub/sub**: `internal/pubsub` for agent, UI, and services.
+- **Hooks**: User shell commands in Mocode.json; engine in `internal/hooks/`. See `HOOKS.md`.
+- **CGO disabled**: `CGO_ENABLED=0`, `GOEXPERIMENT=greenteagc`.
 
 ## Build/Test/Lint Commands
 
 - **Version bump**: Use `task version:show` to inspect the current internal version and next semver tag, use `task version:bump` to automatically bump `internal/version/version.go`, use `task version:set VERSION=x.y.z` to set a specific version manually, and use `task release` to bump the version, create the release commit, tag it, and push it in one flow.
 
-- **Build**: `go build -buildvcs=false .` or `go run -buildvcs=false .`
-- **Test**: `task test` or `go test ./...` (run single test:
-  `go test ./internal/llm/prompt -run TestGetContextFromPaths`)
-- **Update Golden Files**: `go test ./... -update` (regenerates `.golden`
-  files when test output changes)
-  - Update specific package:
-    `go test ./internal/tui/components/core -update` (in this case,
-    we're updating "core")
+- **Build**: `go build -buildvcs=false -o bin/mocode .` or `task build`
+- **Test**: `task test` or `go test ./...` (single package:
+  `go test ./internal/agent/prompt -run TestGetContextFromPaths`)
+- **Update Golden Files**: `go test ./... -update`
+  - Example: `go test ./internal/ui/diffview -update`
 - **Lint**: `task lint:fix`
 - **Format**: `task fmt` (`gofumpt -w .`)
 - **Modernize**: `task modernize` (runs `modernize` which makes code
@@ -450,13 +418,6 @@ or tool descriptions:
 
 ## Active Refactor Plan
 
-A comprehensive TUI refactor plan is in progress. Before making any non-trivial
-changes to `internal/ui/`, read the plan at:
-
-```
-.mocode/plans/tui-refactor/
-```
-
-Start with `00-readme.md`, then `01-requirements.md`, `02-architecture.md`, and
-`03-roadmap.md`. Implementation tasks are in `tasks/` and are designed to be
-picked up by parallel agents. Domain analysis reports are in `reviews/`.
+Before non-trivial TUI changes, read `internal/ui/AGENTS.md`. Optional local
+plans may live under `.mocode/plans/` (gitignored). Structure governance
+baseline: `docs/dev-notes/structure-governance-baseline.md`.

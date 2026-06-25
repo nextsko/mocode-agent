@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"charm.land/fantasy"
-	"github.com/package-register/mocode/internal/tools/screencap"
+	"github.com/package-register/mocode/internal/shellruntime/screencap"
 	wechat "github.com/package-register/mocode/internal/wechat"
 )
 

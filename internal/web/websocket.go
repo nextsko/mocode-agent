@@ -21,7 +21,7 @@ import (
 	"github.com/package-register/mocode/internal/pubsub"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
-	"github.com/package-register/mocode/internal/tools/shell"
+	"github.com/package-register/mocode/internal/shellruntime/shell"
 	"github.com/package-register/mocode/internal/workspace"
 )
 

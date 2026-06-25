@@ -14,8 +14,8 @@ import (
 
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/infra"
+	"github.com/package-register/mocode/internal/shellruntime/shell"
 	"github.com/package-register/mocode/internal/skills"
-	"github.com/package-register/mocode/internal/tools/shell"
 )
 
 // Prompt represents a template-based prompt generator.

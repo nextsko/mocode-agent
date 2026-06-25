@@ -1,4 +1,4 @@
-package model
+﻿package model
 
 import (
 	"bytes"
@@ -34,7 +34,6 @@ import (
 	agenttools "github.com/package-register/mocode/internal/agent/tools"
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/app"
-	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/fsext"
 	"github.com/package-register/mocode/internal/history"
@@ -44,6 +43,7 @@ import (
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
 	"github.com/package-register/mocode/internal/skills"
+	"github.com/package-register/mocode/internal/slash"
 	"github.com/package-register/mocode/internal/ui/anim"
 	"github.com/package-register/mocode/internal/ui/attachments"
 	"github.com/package-register/mocode/internal/ui/chat"
@@ -54,8 +54,6 @@ import (
 	"github.com/package-register/mocode/internal/ui/panel"
 	"github.com/package-register/mocode/internal/ui/util"
 	"github.com/package-register/mocode/internal/version"
-	wechat "github.com/package-register/mocode/internal/wechat"
-	"github.com/package-register/mocode/internal/workspace"
 )
 
 // MouseScrollThreshold defines how many lines to scroll the chat when a mouse
@@ -116,14 +114,14 @@ type (
 	cancelTimerExpiredMsg struct{}
 	// userCommandsLoadedMsg is sent when user commands are loaded.
 	userCommandsLoadedMsg struct {
-		Commands []commands.CustomCommand
+		Commands []slash.CustomCommand
 	}
 	// breathTickMsg is sent periodically while the agent is busy to animate
 	// the editor prompt with a pulsing breathing effect.
 	breathTickMsg struct{}
 	// mcpPromptsLoadedMsg is sent when mcp prompts are loaded.
 	mcpPromptsLoadedMsg struct {
-		Prompts []commands.MCPPrompt
+		Prompts []slash.MCPPrompt
 	}
 	// mcpStateChangedMsg is sent when there is a change in MCP client states.
 	mcpStateChangedMsg struct {
@@ -251,8 +249,8 @@ type UI struct {
 	notifyBackend       notification.Backend
 	notifyWindowFocused bool
 	// custom commands & mcp commands
-	customCommands []commands.CustomCommand
-	mcpPrompts     []commands.MCPPrompt
+	customCommands []slash.CustomCommand
+	mcpPrompts     []slash.MCPPrompt
 
 	// forceCompactMode tracks whether compact mode is forced by user toggle
 	forceCompactMode bool
@@ -523,7 +521,7 @@ func (m *UI) setState(state uiState, focus uiFocusState) {
 // loadCustomCommands loads the custom commands asynchronously.
 func (m *UI) loadCustomCommands() tea.Cmd {
 	return func() tea.Msg {
-		customCommands, err := commands.LoadCustomCommands(m.com.Config())
+		customCommands, err := slash.LoadCustomCommands(m.com.Config())
 		if err != nil {
 			slog.Error("Failed to load custom commands", "error", err)
 		}
@@ -533,13 +531,13 @@ func (m *UI) loadCustomCommands() tea.Cmd {
 
 // loadMCPrompts loads the MCP prompts asynchronously.
 func (m *UI) loadMCPrompts() tea.Msg {
-	prompts, err := commands.LoadMCPPrompts()
+	prompts, err := slash.LoadMCPPrompts()
 	if err != nil {
 		slog.Error("Failed to load MCP prompts", "error", err)
 	}
 	if prompts == nil {
 		// flag them as loaded even if there is none or an error
-		prompts = []commands.MCPPrompt{}
+		prompts = []slash.MCPPrompt{}
 	}
 	return mcpPromptsLoadedMsg{Prompts: prompts}
 }
@@ -3014,65 +3012,6 @@ func (m *UI) drawSessionDetails(scr uv.Screen, area uv.Rectangle) {
 	).Draw(scr, area)
 }
 
-func (m *UI) runMCPPrompt(clientID, promptID string, arguments map[string]string) tea.Cmd {
-	load := func() tea.Msg {
-		prompt, err := m.com.Workspace.GetMCPPrompt(clientID, promptID, arguments)
-		if err != nil {
-			// TODO: make this better
-			return util.ReportError(err)()
-		}
-
-		if prompt == "" {
-			return nil
-		}
-		return sendMessageMsg{
-			Content: prompt,
-		}
-	}
-
-	var cmds []tea.Cmd
-	if cmd := m.dialog.StartLoading(); cmd != nil {
-		cmds = append(cmds, cmd)
-	}
-	cmds = append(cmds, load, func() tea.Msg {
-		return closeDialogMsg{}
-	})
-
-	return tea.Sequence(cmds...)
-}
-
-func (m *UI) handleStateChanged() tea.Cmd {
-	return func() tea.Msg {
-		if err := m.com.Workspace.UpdateAgentModel(context.Background()); err != nil {
-			return util.ReportError(err)()
-		}
-		return mcpStateChangedMsg{
-			states: m.com.Workspace.MCPGetStates(),
-		}
-	}
-}
-
-func handleMCPPromptsEvent(ws workspace.Workspace, name string) tea.Cmd {
-	return func() tea.Msg {
-		ws.MCPRefreshPrompts(context.Background(), name)
-		return nil
-	}
-}
-
-func handleMCPToolsEvent(ws workspace.Workspace, name string) tea.Cmd {
-	return func() tea.Msg {
-		ws.RefreshMCPTools(context.Background(), name)
-		return nil
-	}
-}
-
-func handleMCPResourcesEvent(ws workspace.Workspace, name string) tea.Cmd {
-	return func() tea.Msg {
-		ws.MCPRefreshResources(context.Background(), name)
-		return nil
-	}
-}
-
 func (m *UI) copyChatHighlight() tea.Cmd {
 	text := m.chat.HighlightContent()
 	return common.CopyToClipboardWithCallback(
@@ -3083,204 +3022,6 @@ func (m *UI) copyChatHighlight() tea.Cmd {
 			return nil
 		},
 	)
-}
-
-func (m *UI) enableDockerMCP() tea.Msg {
-	ctx := context.Background()
-	if err := m.com.Workspace.EnableDockerMCP(ctx); err != nil {
-		return util.ReportError(err)()
-	}
-
-	return util.NewInfoMsg("Docker MCP enabled and started successfully")
-}
-
-func (m *UI) disableDockerMCP() tea.Msg {
-	if err := m.com.Workspace.DisableDockerMCP(); err != nil {
-		return util.ReportError(err)()
-	}
-
-	return util.NewInfoMsg("Docker MCP disabled successfully")
-}
-
-func (m *UI) toggleMCP(name string, enable bool) tea.Cmd {
-	return func() tea.Msg {
-		if name == "" {
-			return nil
-		}
-		ctx := context.Background()
-		if enable {
-			if err := m.com.Workspace.EnableMCP(ctx, name); err != nil {
-				return util.ReportError(err)()
-			}
-			return util.NewInfoMsg("MCP " + name + " enabled")
-		}
-		if err := m.com.Workspace.DisableMCP(name); err != nil {
-			return util.ReportError(err)()
-		}
-		return util.NewInfoMsg("MCP " + name + " disabled")
-	}
-}
-
-// injectWeChatButler initializes the butler routing and slash config on a channel.
-// Called both on initial login and on account switch.
-func injectWeChatButler(ch *wechat.Channel, ws workspace.Workspace) {
-	ch.SetSlashConfig(wechat.SlashConfig{
-		CurrentModel: func() string {
-			cfg := ws.Config()
-			if large, ok := cfg.Models[config.SelectedModelTypeLarge]; ok {
-				return large.Provider + "/" + large.Model
-			}
-			return ""
-		},
-		SmallModel: func() string {
-			cfg := ws.Config()
-			if small, ok := cfg.Models[config.SelectedModelTypeSmall]; ok {
-				return small.Provider + "/" + small.Model
-			}
-			return ""
-		},
-		ListModels: func() []string {
-			cfg := ws.Config()
-			var result []string
-			for id, item := range cfg.Providers.Seq2() {
-				for _, m := range item.Models {
-					result = append(result, id+"/"+m.ID)
-				}
-			}
-			return result
-		},
-		SwitchModel: func(provider, model string) error {
-			return ws.UpdatePreferredModel(config.ScopeGlobal, config.SelectedModelTypeLarge, config.SelectedModel{
-				Provider: provider,
-				Model:    model,
-			})
-		},
-		TestModel: func(provider, model string) error {
-			return nil
-		},
-	})
-	ch.InitButler(&tuiButlerWorkspace{ws})
-}
-
-// tuiButlerWorkspace adapts workspace.Workspace to wechat.ButlerWorkspace for TUI mode.
-type tuiButlerWorkspace struct {
-	ws workspace.Workspace
-}
-
-func (w *tuiButlerWorkspace) CreateSession(ctx context.Context, title string) (string, error) {
-	sess, err := w.ws.CreateSession(ctx, title)
-	if err != nil {
-		return "", err
-	}
-	return sess.ID, nil
-}
-
-func (w *tuiButlerWorkspace) GetSession(ctx context.Context, id string) (string, error) {
-	sess, err := w.ws.GetSession(ctx, id)
-	if err != nil {
-		return "", err
-	}
-	return sess.Title, nil
-}
-
-func (w *tuiButlerWorkspace) ListSessions(ctx context.Context) ([]wechat.SessionInfo, error) {
-	sessions, err := w.ws.ListSessions(ctx)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]wechat.SessionInfo, len(sessions))
-	for i, s := range sessions {
-		result[i] = wechat.SessionInfo{
-			ID:        s.ID,
-			Title:     s.Title,
-			CreatedAt: time.Unix(s.CreatedAt, 0).Format("2006-01-02 15:04"),
-		}
-	}
-	return result, nil
-}
-
-func (w *tuiButlerWorkspace) DeleteSession(ctx context.Context, id string) error {
-	return w.ws.DeleteSession(ctx, id)
-}
-
-func (w *tuiButlerWorkspace) AgentRun(ctx context.Context, id, prompt string) error {
-	return w.ws.AgentRun(ctx, id, prompt)
-}
-
-func (w *tuiButlerWorkspace) ListMessages(ctx context.Context, id string) ([]wechat.MsgInfo, error) {
-	msgs, err := w.ws.ListMessages(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]wechat.MsgInfo, 0, len(msgs))
-	for _, m := range msgs {
-		result = append(result, wechat.MsgInfo{Role: string(m.Role), Content: m.Content().Text})
-	}
-	return result, nil
-}
-
-func (w *tuiButlerWorkspace) AgentIsSessionBusy(_ context.Context, sessionID string) bool {
-	return w.ws.AgentIsSessionBusy(sessionID)
-}
-
-func (w *tuiButlerWorkspace) CurrentModel() string {
-	cfg := w.ws.Config()
-	if large, ok := cfg.Models[config.SelectedModelTypeLarge]; ok {
-		return large.Provider + "/" + large.Model
-	}
-	return ""
-}
-
-func (w *tuiButlerWorkspace) UpdateModel(provider, model string) error {
-	return w.ws.UpdatePreferredModel(config.ScopeGlobal, config.SelectedModelTypeLarge, config.SelectedModel{
-		Provider: provider,
-		Model:    model,
-	})
-}
-
-// handleWeChatLogin starts the WeChat QR login flow via AccountManager.
-func (m *UI) handleWeChatLogin() tea.Cmd {
-	return func() tea.Msg {
-		ctx := context.Background()
-		mgr := wechat.GetManager()
-		qrCh := make(chan string, 1)
-
-		go func() {
-			info, err := mgr.Login(ctx, true, wechat.LoginCallbacks{
-				OnQRURL: func(qrURL string) {
-					select {
-					case qrCh <- qrURL:
-					default:
-					}
-				},
-			}, m.com.Config().HTTPClient(m.com.Workspace.Resolver(), 45*time.Second))
-			if err != nil {
-				slog.Error("WeChat login failed", "error", err)
-				return
-			}
-			if info != nil {
-				slog.Info("WeChat account registered", "userID", info.UserID, "accountID", info.ID)
-				if ch := mgr.GetActive(); ch != nil {
-					injectWeChatButler(ch, m.com.Workspace)
-				}
-			}
-		}()
-
-		select {
-		case qrURL := <-qrCh:
-			return util.NewInfoMsg("WeChat QR: " + qrURL)
-		case <-time.After(5 * time.Second):
-			return util.NewInfoMsg("WeChat login: waiting for QR code...")
-		}
-	}
-}
-
-// handleWeChatLogout stops all WeChat channels.
-func (m *UI) handleWeChatLogout() tea.Cmd {
-	return func() tea.Msg {
-		wechat.GetManager().StopAll()
-		return util.NewInfoMsg("WeChat disconnected")
-	}
 }
 
 func randomIntn(max int) int {

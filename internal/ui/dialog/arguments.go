@@ -15,7 +15,7 @@ import (
 	"golang.org/x/text/language"
 
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/package-register/mocode/internal/commands"
+	"github.com/package-register/mocode/internal/slash"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/util"
 )
@@ -35,7 +35,7 @@ const (
 type Arguments struct {
 	com       *common.Common
 	title     string
-	arguments []commands.Argument
+	arguments []slash.Argument
 	inputs    []textinput.Model
 	focused   int
 	spinner   spinner.Model
@@ -60,7 +60,7 @@ type Arguments struct {
 var _ Dialog = (*Arguments)(nil)
 
 // NewArguments creates a new arguments dialog.
-func NewArguments(com *common.Common, title, description string, arguments []commands.Argument, resultAction Action) *Arguments {
+func NewArguments(com *common.Common, title, description string, arguments []slash.Argument, resultAction Action) *Arguments {
 	a := &Arguments{
 		com:          com,
 		title:        title,

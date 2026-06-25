@@ -39,9 +39,9 @@ import (
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
 	"github.com/package-register/mocode/internal/session/sessionlog"
+	"github.com/package-register/mocode/internal/shellruntime/screencap"
 	"github.com/package-register/mocode/internal/skills"
 	"github.com/package-register/mocode/internal/store"
-	"github.com/package-register/mocode/internal/tools/screencap"
 	"golang.org/x/sync/errgroup"
 
 	"charm.land/fantasy/providers/anthropic"
@@ -114,7 +114,7 @@ type coordinator struct {
 	subagentIndex  *csync.Map[string, string]
 	summaryQueue   *sessionSummaryQueue
 	swarmWF        *orchestration.WorkflowRuntime // nil if swarm mode not active
-	sessionLogDir  string                 // base dir for session logs
+	sessionLogDir  string                         // base dir for session logs
 	errorLearner   *evolution.ErrorLearner
 	errorCollector *errcoll.Collector
 	sessionSearch  *store.SessionSearch
@@ -172,7 +172,7 @@ func NewCoordinator(
 		sessionLogDir:  filepath.Join(dataDir, "sessions"),
 		errorCollector: errorCollector,
 		sessionSearch:  sessionSearch,
-}
+	}
 
 	// Initialize error learner for provider-specific mistake tracking.
 	if learner, learnerErr := evolution.NewErrorLearner(filepath.Join(cfg.WorkingDir(), ".mocode", "evolution", "patterns")); learnerErr == nil {
@@ -585,11 +585,11 @@ func (c *coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 		SkillTracker: c.skillTracker,
 		ModelName:    modelName,
 		SummarySchedule: func(ctx context.Context, sessionID string) error {
-				c.summaryQueue.Add(sessionID)
+			c.summaryQueue.Add(sessionID)
 			return nil
 		},
-		SessionSearch:   c.sessionSearch,
-}
+		SessionSearch: c.sessionSearch,
+	}
 	allTools = append(allTools, tools.NewRegistry().Build(ctx, deps)...)
 
 	// ── transfer_to_agent (coordinator-owned, config-driven) ─────────────────

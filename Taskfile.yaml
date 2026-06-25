@@ -55,14 +55,14 @@ tasks:
     vars:
       LDFLAGS: '{{if .VERSION}}-ldflags="-X github.com/package-register/mocode/internal/version.Version={{.VERSION}}"{{end}}'
     cmds:
-      - "go build {{.BUILDVCS_FLAG}} -v {{if .RACE}}-race{{end}} {{.LDFLAGS}} ."
+      - "go build {{.BUILDVCS_FLAG}} -o bin/mocode{{exeExt}} -v {{if .RACE}}-race{{end}} {{.LDFLAGS}} ."
     sources:
       - ./**/*.go
       - go.mod
       - internal/agent/**/*.md
       - internal/agent/**/*.md.tpl
     generates:
-      - mocode{{exeExt}}
+      - bin/mocode{{exeExt}}
 
   run:
     desc: Run build

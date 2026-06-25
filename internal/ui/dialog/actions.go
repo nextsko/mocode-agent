@@ -8,11 +8,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/catwalk/pkg/catwalk"
-	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
+	"github.com/package-register/mocode/internal/slash"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/util"
 )
@@ -76,7 +76,7 @@ type (
 	// ActionRunCustomCommand is a message to run a custom command.
 	ActionRunCustomCommand struct {
 		Content   string
-		Arguments []commands.Argument
+		Arguments []slash.Argument
 		Args      map[string]string // Actual argument values
 	}
 	// ActionRunMCPPrompt is a message to run a custom command.
@@ -85,7 +85,7 @@ type (
 		Description string
 		PromptID    string
 		ClientID    string
-		Arguments   []commands.Argument
+		Arguments   []slash.Argument
 		Args        map[string]string // Actual argument values
 	}
 	// ActionEnableDockerMCP is a message to enable Docker MCP.

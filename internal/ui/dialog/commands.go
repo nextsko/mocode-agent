@@ -8,8 +8,8 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/config"
+	"github.com/package-register/mocode/internal/slash"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/list"
 )
@@ -36,7 +36,7 @@ const (
 	MCPPrompts
 )
 
-// Commands represents a dialog that shows available commands.
+// Commands represents a dialog that shows available slash.
 type dockerMCPAvailabilityCheckedMsg struct {
 	available bool
 }
@@ -81,9 +81,9 @@ type Commands struct {
 	lastArea     image.Rectangle
 	lastListArea image.Rectangle
 
-	customCommands []commands.CustomCommand
-	mcpPrompts     []commands.MCPPrompt
-	registry       *commands.CommandRegistry
+	customCommands []slash.CustomCommand
+	mcpPrompts     []slash.MCPPrompt
+	registry       *slash.CommandRegistry
 
 	dockerMCPAvailable     *bool
 	dockerMCPCheckInFlight bool
@@ -92,7 +92,7 @@ type Commands struct {
 var _ Dialog = (*Commands)(nil)
 
 // NewCommands creates a new commands dialog.
-func NewCommands(com *common.Common, sessionID string, hasSession, hasTodos, hasQueue bool, customCommands []commands.CustomCommand, mcpPrompts []commands.MCPPrompt) (*Commands, error) {
+func NewCommands(com *common.Common, sessionID string, hasSession, hasTodos, hasQueue bool, customCommands []slash.CustomCommand, mcpPrompts []slash.MCPPrompt) (*Commands, error) {
 	c := &Commands{
 		com:            com,
 		selected:       SystemCommands,
@@ -228,7 +228,7 @@ func (c *Commands) Cursor() *tea.Cursor {
 // into hierarchical parent/child groups for the top-level command palette.
 
 // SetCustomCommands sets the custom commands and refreshes the view if user commands are currently displayed.
-func (c *Commands) SetCustomCommands(customCommands []commands.CustomCommand) {
+func (c *Commands) SetCustomCommands(customCommands []slash.CustomCommand) {
 	c.customCommands = customCommands
 	if c.selected == UserCommands {
 		c.setCommandItems(c.selected)
@@ -236,7 +236,7 @@ func (c *Commands) SetCustomCommands(customCommands []commands.CustomCommand) {
 }
 
 // SetMCPPrompts sets the MCP prompts and refreshes the view if MCP prompts are currently displayed.
-func (c *Commands) SetMCPPrompts(mcpPrompts []commands.MCPPrompt) {
+func (c *Commands) SetMCPPrompts(mcpPrompts []slash.MCPPrompt) {
 	c.mcpPrompts = mcpPrompts
 	if c.selected == MCPPrompts {
 		c.setCommandItems(c.selected)

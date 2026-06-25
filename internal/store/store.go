@@ -39,8 +39,8 @@ type Store struct {
 	memories *MemoryStore
 	stats    *StatsEngine
 
-	search   *SessionSearch
-	mu sync.RWMutex
+	search *SessionSearch
+	mu     sync.RWMutex
 }
 
 // New creates a new Store for the given project path.

@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/package-register/mocode/internal/httputil"
 	"github.com/package-register/mocode/internal/workspace"
 )
 
@@ -26,9 +27,7 @@ var webFS embed.FS
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for local dev
-	},
+	CheckOrigin:     httputil.AllowLocalOrigin,
 }
 
 // Server serves the web UI with REST API + WebSocket.
@@ -126,7 +125,7 @@ func (s *Server) Start(ctx context.Context, host string, port int) (string, erro
 	s.routes(mux)
 
 	srv := &http.Server{
-		Handler:           loggedHandler(mux),
+		Handler:           httputil.RequestLogging("web", mux),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

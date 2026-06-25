@@ -19,7 +19,7 @@ import (
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/fsext"
 	"github.com/package-register/mocode/internal/permission"
-	"github.com/package-register/mocode/internal/tools/shell"
+	"github.com/package-register/mocode/internal/shellruntime/shell"
 )
 
 type BashParams struct {

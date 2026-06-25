@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/package-register/mocode/internal/gateway"
+	"github.com/package-register/mocode/internal/wechat/gateway"
 	"github.com/spf13/cobra"
 )
 

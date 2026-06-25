@@ -10,11 +10,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/package-register/mocode/internal/agent/tools/mcp"
-	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/fsext"
 	"github.com/package-register/mocode/internal/infra"
 	"github.com/package-register/mocode/internal/session/message"
 	"github.com/package-register/mocode/internal/skills"
+	"github.com/package-register/mocode/internal/slash"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/completions"
 )
@@ -87,7 +87,7 @@ func (m *UI) atMCPItems() []completions.AtCompletionValue {
 }
 
 func (m *UI) mcpPromptItems() []completions.AtCompletionValue {
-	prompts, err := commands.LoadMCPPrompts()
+	prompts, err := slash.LoadMCPPrompts()
 	if err != nil {
 		return nil
 	}
@@ -170,7 +170,7 @@ func (m *UI) atWorkflowItems() []completions.AtCompletionValue {
 	var items []completions.AtCompletionValue
 	items = append(items, windsurfWorkflowItems()...)
 
-	if cmds, err := commands.LoadCustomCommands(m.com.Config()); err == nil {
+	if cmds, err := slash.LoadCustomCommands(m.com.Config()); err == nil {
 		for _, cmd := range cmds {
 			items = append(items, completions.AtCompletionValue{
 				Kind:    completions.AtCompletionWorkflow,

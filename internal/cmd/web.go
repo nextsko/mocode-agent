@@ -22,7 +22,7 @@ var (
 
 func init() {
 	webCmd.Flags().IntVarP(&webPort, "port", "p", 5494, "Web server port")
-	webCmd.Flags().StringVarP(&webHost, "host", "H", "0.0.0.0", "Web server host")
+	webCmd.Flags().StringVarP(&webHost, "host", "H", "127.0.0.1", "Web server host")
 	rootCmd.AddCommand(webCmd)
 }
 

@@ -1,4 +1,6 @@
-package commands
+// Package slash implements TUI `/` slash commands and MCP prompt loading.
+// Prefer CommandRegistry (command_registry.go) for new command definitions.
+package slash
 
 import (
 	"context"

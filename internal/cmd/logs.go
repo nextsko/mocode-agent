@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"slices"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/nxadm/tail"
 	"github.com/package-register/mocode/internal/config"
+	mocodelog "github.com/package-register/mocode/internal/log"
 	"github.com/spf13/cobra"
 )
 
@@ -55,7 +55,7 @@ var logsCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to load configuration: %v", err)
 		}
-		logsFile := filepath.Join(cfg.Config().Options.DataDirectory, "logs", "Mocode.log")
+		logsFile := mocodelog.MainLogPath(cfg.Config().Options.DataDirectory)
 		_, err = os.Stat(logsFile)
 		if os.IsNotExist(err) {
 			log.Warn("Looks like you are not in a Mocode project. No logs found.")

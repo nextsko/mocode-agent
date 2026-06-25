@@ -11,13 +11,13 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/catwalk/pkg/catwalk"
 	mcptools "github.com/package-register/mocode/internal/agent/tools/mcp"
-	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/config"
 	"github.com/package-register/mocode/internal/history"
 	"github.com/package-register/mocode/internal/lsp"
 	"github.com/package-register/mocode/internal/permission"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
+	"github.com/package-register/mocode/internal/slash"
 )
 
 // LSPClientInfo holds information about an LSP client's state. This is
@@ -171,7 +171,7 @@ type Workspace interface {
 	// CommandRegistry returns a single unified registry built from all
 	// registered providers. This is the single source of truth for both
 	// the Slash Completions (input float layer) and Command Palette.
-	BuildCommandRegistry() []commands.CommandDescriptor
+	BuildCommandRegistry() []slash.CommandDescriptor
 }
 
 // MCPResourceContents holds the contents of an MCP resource.

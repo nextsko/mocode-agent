@@ -11,6 +11,10 @@ const shouldAnalyze = process.env.ANALYZE === "true";
 export default defineConfig({
   // Use relative paths so assets work under any base path.
   base: "./",
+  build: {
+    outDir: "../internal/web/dist",
+    emptyOutDir: true,
+  },
   plugins: [
     nodePolyfills({
       include: ["path", "url"],

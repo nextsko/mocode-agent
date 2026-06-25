@@ -7,7 +7,7 @@
 | 文件 | 主题 | 适用场景 |
 |---|---|---|
 | [go-verification-pipeline.md](./go-verification-pipeline.md) | Go 5 步验证流水线 + 6 个行为测试 | 每次代码变更后必跑 |
-| [agent-cooperation.md](./agent-cooperation.md) | 子代理协作的 7 条铁律 | 派子代理做发现任务时 |
+| [structure-governance-baseline.md](./structure-governance-baseline.md) | Structure governance baseline (multi-review) |
 | [gfw-workarounds.md](./gfw-workarounds.md) | GFW 环境下网络工具 + Go 临时程序模板 | 拉取 Gitea/GitHub API 时 |
 | [dependency-upgrade-procedure.md](./dependency-upgrade-procedure.md) | 依赖升级 SOP（含 dependabot 解读） | dependabot PR 或手动升级时 |
 

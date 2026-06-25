@@ -1,4 +1,4 @@
-﻿// Package app wires together services, coordinates agents, and manages
+// Package app wires together services, coordinates agents, and manages
 // application lifecycle.
 package app
 
@@ -36,9 +36,9 @@ import (
 	"github.com/package-register/mocode/internal/pubsub"
 	"github.com/package-register/mocode/internal/session"
 	"github.com/package-register/mocode/internal/session/message"
+	"github.com/package-register/mocode/internal/shellruntime/shell"
 	"github.com/package-register/mocode/internal/skills"
 	"github.com/package-register/mocode/internal/store"
-	"github.com/package-register/mocode/internal/tools/shell"
 	"github.com/package-register/mocode/internal/ui/anim"
 	"github.com/package-register/mocode/internal/ui/styles"
 )
@@ -70,7 +70,6 @@ type App struct {
 	// database dependencies exposed for snapshot/backup services
 	store *store.Store
 
-	sessionRoot     string
 	sessionStoreID  string
 	currentServices *SessionServices
 
@@ -113,7 +112,6 @@ func New(ctx context.Context, storeCfg *config.ConfigStore) (*App, error) {
 		serviceEventsWG:    &sync.WaitGroup{},
 		tuiWG:              &sync.WaitGroup{},
 		agentNotifications: pubsub.NewBroker[notify.Notification](),
-		sessionRoot:        session.DefaultStoreRoot(),
 	}
 
 	// Initialize the project-local error collector.
@@ -176,63 +174,6 @@ func New(ctx context.Context, storeCfg *config.ConfigStore) (*App, error) {
 	go app.LSPManager.TrackConfigured()
 
 	return app, nil
-}
-
-func (app *App) useStoreServices() error {
-	app.Sessions = newStoreSessionService(app.store)
-	app.Messages = newStoreMessageService(app.store)
-	app.History = newStoreHistoryService(app.store)
-	app.FileTracker = newStoreFileTrackerService(app.store)
-	app.Memory = newStoreMemoryService(app.store)
-	if app.eventsCtx != nil {
-		app.subscribeSessionServices(app.eventsCtx)
-	}
-	return nil
-}
-
-func (app *App) useSessionStore(ctx context.Context, sess session.Session) error {
-	// File-based store: no per-session DB switching needed.
-	// Just track the current session ID.
-	app.sessionStoreID = sess.ID
-	return nil
-}
-
-func (app *App) CreateSession(ctx context.Context, title string) (session.Session, error) {
-	sess, err := app.databaseSessionService().Create(ctx, title)
-	if err != nil {
-		return session.Session{}, err
-	}
-	if err := app.useSessionStore(ctx, sess); err != nil {
-		return session.Session{}, err
-	}
-	return sess, nil
-}
-
-func (app *App) GetSession(ctx context.Context, id string) (session.Session, error) {
-	sess, err := app.databaseSessionService().Get(ctx, id)
-	if err != nil {
-		return session.Session{}, err
-	}
-	if err := app.useSessionStore(ctx, sess); err != nil {
-		return session.Session{}, err
-	}
-	return sess, nil
-}
-
-func (app *App) ListSessions(ctx context.Context) ([]session.Session, error) {
-	return app.databaseSessionService().List(ctx)
-}
-
-func (app *App) SaveSession(ctx context.Context, sess session.Session) (session.Session, error) {
-	return app.databaseSessionService().Save(ctx, sess)
-}
-
-func (app *App) DeleteSession(ctx context.Context, id string) error {
-	return app.databaseSessionService().Delete(ctx, id)
-}
-
-func (app *App) databaseSessionService() session.Service {
-	return app.Sessions
 }
 
 // Config returns the pure-data configuration.
@@ -843,14 +784,17 @@ func (s *storeSessionService) IncrementCost(ctx context.Context, id string, delt
 // storeMessageService wraps *store.MessageStore.
 type storeMessageService struct {
 	*pubsub.Broker[message.Message]
-	store *store.MessageStore
+	store     *store.MessageStore
+	debouncer *messageUpdateDebouncer
 }
 
 func newStoreMessageService(st *store.Store) *storeMessageService {
-	return &storeMessageService{
+	svc := &storeMessageService{
 		Broker: pubsub.NewBroker[message.Message](),
 		store:  st.Messages(),
 	}
+	svc.debouncer = newMessageUpdateDebouncer(svc)
+	return svc
 }
 
 func (s *storeMessageService) Create(ctx context.Context, sid string, params message.CreateMessageParams) (message.Message, error) {
@@ -863,11 +807,7 @@ func (s *storeMessageService) Create(ctx context.Context, sid string, params mes
 }
 
 func (s *storeMessageService) Update(ctx context.Context, msg message.Message) error {
-	if err := s.store.Update(ctx, msg); err != nil {
-		return err
-	}
-	s.Publish(pubsub.UpdatedEvent, msg.Clone())
-	return nil
+	return s.debouncer.Update(ctx, msg)
 }
 
 func (s *storeMessageService) Get(ctx context.Context, id string) (message.Message, error) {
@@ -1020,5 +960,7 @@ func (s *storeMemoryService) ReadMemories(ctx context.Context, app, user string,
 func (s *storeMemoryService) SearchMemories(ctx context.Context, app, user, query string, limit int) ([]*memory.Entry, error) {
 	return s.store.SearchMemories(ctx, app, user, query, limit)
 }
-func (s *storeMemoryService) Tools() []fantasy.AgentTool { return nil }
-func (s *storeMemoryService) Close() error               { return s.store.Close() }
+func (s *storeMemoryService) Tools() []fantasy.AgentTool {
+	return memory.ToolsFor(s, memory.DefaultToolOptions())
+}
+func (s *storeMemoryService) Close() error { return s.store.Close() }

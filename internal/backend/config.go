@@ -7,8 +7,8 @@ import (
 
 	"github.com/package-register/mocode/internal/agent"
 	mcptools "github.com/package-register/mocode/internal/agent/tools/mcp"
-	"github.com/package-register/mocode/internal/commands"
 	"github.com/package-register/mocode/internal/config"
+	"github.com/package-register/mocode/internal/slash"
 )
 
 // MCPResourceContents holds the contents of an MCP resource returned
@@ -190,7 +190,7 @@ func (b *Backend) GetMCPPrompt(workspaceID, clientID, promptID string, args map[
 	if err != nil {
 		return "", err
 	}
-	return commands.GetMCPPrompt(ws.Cfg, clientID, promptID, args)
+	return slash.GetMCPPrompt(ws.Cfg, clientID, promptID, args)
 }
 
 // GetWorkingDir returns the working directory for a workspace.
