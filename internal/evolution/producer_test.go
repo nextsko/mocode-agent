@@ -1,10 +1,12 @@
- package evolution
+package evolution
 
- import (
- 	"os"
- 	"path/filepath"
- 	"testing"
- )
+import (
+	"fmt"
+	"strings"
+	"os"
+	"path/filepath"
+	"testing"
+)
 
  // writeBugLog writes a sessionlog-style bug.md with the given JSON entries.
  func writeBugLog(t *testing.T, sessionsDir, sessionID string, entries []string) {
@@ -249,5 +251,142 @@ func TestProducerMergesSessionAndErrcollSources(t *testing.T) {
 	}
 	if len(created) != 1 {
 		t.Fatalf("expected 1 merged patch (count 3), got %d", len(created))
+	}
+}
+
+func writeInfoLog(t *testing.T, sessionsDir, sessionID string, entries []string) {
+	t.Helper()
+	dir := filepath.Join(sessionsDir, sessionID)
+	os.MkdirAll(dir, 0o755)
+	var content string
+	for _, e := range entries {
+		content += "```json\n" + e + "\n```\n\n"
+	}
+	os.WriteFile(filepath.Join(dir, "info.md"), []byte(content), 0o644)
+}
+
+func turnScoreEntry(score float64, reason string) string {
+	return `{"event":"turn_score","data":"score=` + fmtScore(score) + ` reason=` + reason + `"}`
+}
+
+func fmtScore(f float64) string {
+	return fmt.Sprintf("%.2f", f)
+}
+
+func TestProducerQualityPatchOnLowScores(t *testing.T) {
+	tmp := t.TempDir()
+	sessionsDir := filepath.Join(tmp, "sessions")
+	store, _ := NewPatchStore(tmp)
+	prod, _ := NewProducer(store, sessionsDir)
+
+	// Three low-scoring turns across sessions.
+	writeInfoLog(t, sessionsDir, "s1", []string{turnScoreEntry(0.2, "incomplete")})
+	writeInfoLog(t, sessionsDir, "s2", []string{turnScoreEntry(0.3, "vague")})
+	writeInfoLog(t, sessionsDir, "s3", []string{turnScoreEntry(0.25, "wrong")})
+
+	created, err := prod.Produce()
+	if err != nil {
+		t.Fatalf("Produce: %v", err)
+	}
+	// Expect exactly the quality patch (no error patches since no bug logs).
+	found := false
+	for _, id := range created {
+		patches, _ := store.List()
+		for _, p := range patches {
+			if p.ID == id && strings.Contains(p.Title, "response quality") {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected a quality patch, created=%v", created)
+	}
+}
+
+func TestProducerNoQualityPatchOnHighScores(t *testing.T) {
+	tmp := t.TempDir()
+	sessionsDir := filepath.Join(tmp, "sessions")
+	store, _ := NewPatchStore(tmp)
+	prod, _ := NewProducer(store, sessionsDir)
+
+	writeInfoLog(t, sessionsDir, "s1", []string{turnScoreEntry(0.9, "good")})
+	writeInfoLog(t, sessionsDir, "s2", []string{turnScoreEntry(0.85, "great")})
+	writeInfoLog(t, sessionsDir, "s3", []string{turnScoreEntry(0.8, "solid")})
+
+	created, err := prod.Produce()
+	if err != nil {
+		t.Fatalf("Produce: %v", err)
+	}
+	if len(created) != 0 {
+		t.Fatalf("expected no patch for high scores, got %v", created)
+	}
+}
+
+func TestProducerNoQualityPatchTooFewSamples(t *testing.T) {
+	tmp := t.TempDir()
+	sessionsDir := filepath.Join(tmp, "sessions")
+	store, _ := NewPatchStore(tmp)
+	prod, _ := NewProducer(store, sessionsDir)
+
+	// Only two low scores — below qualityMinSamples.
+	writeInfoLog(t, sessionsDir, "s1", []string{turnScoreEntry(0.1, "bad")})
+	writeInfoLog(t, sessionsDir, "s2", []string{turnScoreEntry(0.2, "bad")})
+
+	created, _ := prod.Produce()
+	if len(created) != 0 {
+		t.Fatalf("expected no patch with too few samples, got %v", created)
+	}
+}
+
+func TestParseScoreField(t *testing.T) {
+	tests := []struct {
+		in   string
+		want float64
+		ok   bool
+	}{
+		{"score=0.42 reason=vague", 0.42, true},
+		{"score=1.00 reason=", 1.0, true},
+		{"no score here", 0, false},
+		{"score=0.5", 0.5, true},
+	}
+	for _, tt := range tests {
+		got, ok := parseScoreField(tt.in)
+		if ok != tt.ok {
+			t.Errorf("parseScoreField(%q) ok=%v want %v", tt.in, ok, tt.ok)
+			continue
+		}
+		if ok && (got < tt.want-0.001 || got > tt.want+0.001) {
+			t.Errorf("parseScoreField(%q) = %v, want %v", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestScanQualityReadsScores(t *testing.T) {
+	tmp := t.TempDir()
+	sessionsDir := filepath.Join(tmp, "sessions")
+	store, _ := NewPatchStore(tmp)
+	prod, _ := NewProducer(store, sessionsDir)
+
+	writeInfoLog(t, sessionsDir, "s1", []string{turnScoreEntry(0.2, "x")})
+	writeInfoLog(t, sessionsDir, "s2", []string{turnScoreEntry(0.3, "y")})
+	writeInfoLog(t, sessionsDir, "s3", []string{turnScoreEntry(0.25, "z")})
+
+	scores := prod.scanQuality()
+	if len(scores) != 3 {
+		t.Fatalf("expected 3 scores, got %d: %v", len(scores), scores)
+	}
+	// Also exercise the patch emission directly to isolate Produce's wiring.
+	id, ok, err := prod.produceQualityPatch(map[string]bool{})
+	if err != nil {
+		t.Fatalf("produceQualityPatch: %v", err)
+	}
+	if !ok || id == "" {
+		t.Fatalf("expected quality patch emitted, got id=%q ok=%v", id, ok)
+	}
+	want := []float64{0.2, 0.3, 0.25}
+	for i, s := range scores {
+		if s < want[i]-0.01 || s > want[i]+0.01 {
+			t.Errorf("score[%d] = %v, want ~%v", i, s, want[i])
+		}
 	}
 }

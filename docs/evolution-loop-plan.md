@@ -84,3 +84,30 @@ sessionlog bug.md → Producer.Produce() → CreatePatch(KindRule) → injectEvo
 按 (tool, error fragment) 聚类,跨两个源合并计数,达阈值即产 patch。这打通了 errcoll 的回读路径——它不再是单向漏斗。
 
 测试覆盖:errcoll 单独产 patch、sessionlog+errcoll 合并计数达阈值。2 个新测试全绿。
+
+## 已完成:效果进化环(evaluation 在线化)
+
+之前 evaluation 包完全游离在运行时之外(只在 `mocode eval` 离线用)。现在 `coordinator.Run` 在每次成功 turn 后异步 `go c.scoreTurn()`:
+
+- 用 small model 作 LLM judge(`llmjudge.Judge`),按通用 helpfulness rubric 打分
+- 分数落到 sessionlog 的 `turn_score` 记录
+- 完全 best-effort、非阻塞:失败静默,不影响返回结果
+
+这把"效果→进化"的正例环接上了:高质量 turn 是正信号,低质量 turn 进 sessionlog 可被 producer/分析工具消费。同一套判分能力离线(evaluation)和在线(scoreTurn)复用。
+
+## 闭环总览(三环全闭合)
+
+```
+反例环(已通):    工具错误 → ErrorLearner → 3次 → PrepareStep 纠正注入
+错误进化环(已通): sessionlog bug + errcoll → Producer 聚类 → KindRule patch → 注入(MaxInjects 收敛)
+效果环(已通):     成功 turn → scoreTurn(LLM judge) → turn_score 落 sessionlog
+Patch 环(已通):   Producer.Produce(读 bug/errors) → CreatePatch → injectEvolutionContext(BuildContext 注入,MaxInjects 自动 Applied)
+```
+
+触发:`mocode evolve` 扫描错误源产 patch;`scoreTurn` 在每个成功 turn 后自动跑。
+
+## 已完成:正反馈环消费者(turn_score → quality patch)
+
+之前 turn_score 只是单向写入 sessionlog,无消费者。现在 Producer 读 info.md 的 turn_score 记录,当平均分持续低于阈值(<0.5,且样本数 >=3)时,产出一个 quality-improvement rule patch,提醒 agent 提高响应质量。正反馈环(效果→进化)现在端到端闭合:scoreTurn 写分 → Producer 消费低分 → quality patch → 注入。
+
+顺带修了一个隐藏 bug:emitRulePatch/produceQualityPatch 之前返回 `patch.ID`,但 CreatePatch 按值传递不会回填 ID,导致返回空串。改用 `filepath.Base(patchDir)`。新增 6 个测试覆盖。

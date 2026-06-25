@@ -104,6 +104,15 @@ func (p *Producer) Produce() ([]string, error) {
 		created = append(created, id)
 		seen[title] = true
 	}
+
+	// Effect loop: if turns are consistently low-scoring, emit a quality rule.
+	// This consumes the turn_score signals written by coordinator.scoreTurn,
+	// closing the positive (effect) side of the evolution loop.
+	if qID, ok, err := p.produceQualityPatch(seen); err != nil {
+		return created, err
+	} else if ok {
+		created = append(created, qID)
+	}
 	return created, nil
 }
 
@@ -237,7 +246,9 @@ func (p *Producer) emitRulePatch(c errorSignature, title string) (string, error)
 	if err := p.store.WriteFile(patchDir, "rules", "rule.md", rule); err != nil {
 		return "", err
 	}
-	return patch.ID, nil
+	// CreatePatch generates the ID internally (pass-by-value), so derive it
+	// from the returned patch directory name.
+	return filepath.Base(patchDir), nil
 }
 
 // buildRuleText renders the human-readable rule that gets injected.
@@ -285,6 +296,118 @@ func appendUnique(slice []string, v string) []string {
 		}
 	}
 	return append(slice, v)
+}
+
+// qualityThreshold is the average turn_score below which a quality-improvement
+// rule patch is produced (when enough samples exist).
+const qualityThreshold = 0.5
+
+// qualityMinSamples is the minimum number of scored turns required before
+// producing a quality patch, to avoid acting on noise.
+const qualityMinSamples = 3
+
+// produceQualityPatch reads turn_score entries from session info logs and, if
+// the average score is consistently low, emits a KindRule patch nudging the
+// agent toward higher-quality responses. Returns (id, produced, err).
+func (p *Producer) produceQualityPatch(seen map[string]bool) (string, bool, error) {
+	scores := p.scanQuality()
+	if len(scores) < qualityMinSamples {
+		return "", false, nil
+	}
+	var sum float64
+	for _, s := range scores {
+		sum += s
+	}
+	avg := sum / float64(len(scores))
+	if avg >= qualityThreshold {
+		return "", false, nil
+	}
+
+	title := "rule: improve response quality (low average turn score)"
+	if seen[title] {
+		return "", false, nil
+	}
+	patch := Patch{
+		Kind:        KindRule,
+		Title:       title,
+		Description: fmt.Sprintf("Average turn quality score %.2f across %d turns is below threshold %.2f. Reinforce accurate, complete, helpful responses.", avg, len(scores), qualityThreshold),
+		Priority:    2,
+		Source:      "turn_scores",
+		CreatedAt:   time.Now(),
+		MaxInjects:  10,
+	}
+	patchDir, err := p.store.CreatePatch(patch)
+	if err != nil {
+		return "", false, err
+	}
+	rule := fmt.Sprintf("<!-- evolution: quality rule (avg score %.2f) -->\n"+
+		"**Response quality has been consistently low** (average judge score %.2f over %d turns).\n\n"+
+		"Before finalizing a response, verify it:\n"+
+		"- Directly and accurately addresses the user's request\n"+
+		"- Is complete, with no missing steps or hand-waving\n"+
+		"- Is clear and free of factual errors\n", avg, avg, len(scores))
+	if err := p.store.WriteFile(patchDir, "rules", "rule.md", rule); err != nil {
+		return "", false, err
+	}
+	return filepath.Base(patchDir), true, nil
+}
+
+// scanQuality reads each session's info.md, extracts turn_score entries, and
+// returns the parsed scores. Each turn_score entry's data looks like
+// "score=0.42 reason=...".
+func (p *Producer) scanQuality() []float64 {
+	entries, err := os.ReadDir(p.sessionsDir)
+	if err != nil {
+		return nil
+	}
+	var scores []float64
+	for _, sess := range entries {
+		if !sess.IsDir() {
+			continue
+		}
+		infoPath := filepath.Join(p.sessionsDir, sess.Name(), "info.md")
+		raw, err := os.ReadFile(infoPath)
+		if err != nil {
+			continue
+		}
+		for _, block := range splitJSONBlocks(string(raw)) {
+			var entry struct {
+				Event string `json:"event"`
+				Data  string `json:"data"`
+			}
+			if err := json.Unmarshal([]byte(block), &entry); err != nil {
+				continue
+			}
+			if entry.Event != "turn_score" {
+				continue
+			}
+			if s, ok := parseScoreField(entry.Data); ok {
+				scores = append(scores, s)
+			}
+		}
+	}
+	return scores
+}
+
+// parseScoreField extracts the float from a "score=0.42 reason=..." string.
+func parseScoreField(data string) (float64, bool) {
+	const prefix = "score="
+	idx := strings.Index(data, prefix)
+	if idx < 0 {
+		return 0, false
+	}
+	rest := data[idx+len(prefix):]
+	// Read up to the next space.
+	end := strings.Index(rest, " ")
+	if end < 0 {
+		end = len(rest)
+	}
+	numStr := strings.TrimSpace(rest[:end])
+	var f float64
+	if _, err := fmt.Sscanf(numStr, "%f", &f); err != nil {
+		return 0, false
+	}
+	return f, true
 }
 
 // scanErrcollErrors reads the errcoll JSONL files (sibling `errors/` dir) and
