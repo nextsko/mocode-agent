@@ -1395,6 +1395,12 @@ func (c *coordinator) runSubAgentWithMeta(ctx context.Context, params subAgentPa
 		defer c.subagentIndex.Del(params.AgentID)
 	}
 
+	// Extension lifecycle for the sub-agent run, mirroring the main Run path
+	// so the /evo observability loop sees delegated runs too.
+	c.fireExtensions(ctx, extension.EventBeforeRun, &extension.Context{
+		SessionID: session.ID, AgentName: params.AgentID, Prompt: params.Prompt,
+	})
+
 	// Run the agent
 	result, err := params.Agent.Run(ctx, SessionAgentCall{
 		SessionID:        session.ID,
@@ -1409,6 +1415,16 @@ func (c *coordinator) runSubAgentWithMeta(ctx context.Context, params subAgentPa
 		NonInteractive:   true,
 	})
 	duration := time.Since(startTime)
+
+	// Extension lifecycle: AfterRun or OnError for the sub-agent.
+	subEvt := extension.EventAfterRun
+	if err != nil {
+		subEvt = extension.EventOnError
+	}
+	c.fireExtensions(ctx, subEvt, &extension.Context{
+		SessionID: session.ID, AgentName: params.AgentID, Prompt: params.Prompt,
+		Err: err,
+	})
 
 	if err != nil {
 		// Distinguish user-initiated cancellation from a real error so
