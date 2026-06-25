@@ -40,6 +40,10 @@ type Context struct {
 	Prompt string
 	// Messages is the message trace, available to observers.
 	Messages []message.Message
+	// Response is the agent's final textual response for AfterRun/AfterRun
+	// observers (e.g. the evo distiller that turns a successful turn into a
+	// generalized principle). May be empty for non-text responses.
+	Response string
 	// ToolCall is the tool call for BeforeToolCall/AfterToolCall.
 	ToolCall *fantasy.ToolCall
 	// ToolResult is the tool result for AfterToolCall.

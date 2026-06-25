@@ -45,6 +45,37 @@ type State struct {
 	CapturedSkills []string
 }
 
+// LessonDistiller reduces a successful turn (its prompt and last response) to
+// a generalized, reusable principle — the unit of emergence. The default
+// distiller keeps the trimmed prompt; an LLM-backed distiller can be injected
+// via the ObservabilityExtension to produce abstracted principles (the
+// hermes GEPA insight: read the trace, propose a targeted improvement). The
+// State itself stays model-free so it can be unit-tested without a provider.
+type LessonDistiller func(prompt, response string) string
+
+// defaultDistiller keeps the trimmed successful prompt as the lesson. It is
+// the zero-overhead baseline; callers wanting genuine emergence inject a
+// model-backed distiller.
+var defaultDistiller LessonDistiller = func(prompt, _ string) string {
+	return strings.TrimSpace(prompt)
+}
+
+// distiller is the active lesson-distillation strategy. Overridable via
+// SetDistiller; defaults to defaultDistiller.
+var distiller LessonDistiller = defaultDistiller
+
+// SetDistiller replaces the global lesson-distillation strategy. The /evo
+// wiring calls this once at startup to install a model-backed distiller when
+// a judge model is available, and leaves the default (trim) otherwise. This
+// is a process-global strategy because the State is value-typed and copied
+// (e.g. into the ConfirmExit revision), so a per-State field would not survive.
+func SetDistiller(d LessonDistiller) {
+	if d == nil {
+		d = defaultDistiller
+	}
+	distiller = d
+}
+
 // IsActive reports whether an evo session is running (Active or ConfirmExit).
 func (s *State) IsActive() bool {
 	return s.Mode == ModeActive || s.Mode == ModeConfirmExit
@@ -68,9 +99,9 @@ func (s *State) Enter(agentName, baseSystemPrompt string) {
 // principle the turn demonstrates) and accumulated; the optimal-theory prompt
 // is then reconstructed as base + lessons. newSkills extend the captured set
 // (deduplicated).
-func (s *State) RecordIteration(successfulPrompt string, newSkills []string) {
+func (s *State) RecordIteration(successfulPrompt, response string, newSkills []string) {
 	s.Iterations++
-	lesson := distillLesson(successfulPrompt)
+	lesson := distiller(successfulPrompt, response)
 	if lesson != "" {
 		seen := false
 		for _, existing := range s.lessons {
@@ -129,13 +160,6 @@ func (s *State) ReconstructTheory() string {
 	return strings.TrimSpace(b.String())
 }
 
-// distillLesson reduces a successful turn's prompt to the principle it
-// demonstrates. The baseline keeps the trimmed prompt as the lesson; a future
-// LLM-backed distillation can replace this to extract a generalized principle
-// rather than the literal task.
-func distillLesson(prompt string) string {
-	return strings.TrimSpace(prompt)
-}
 
 // itoa is a dependency-free int->string for the reconstruction header.
 func itoa(n int) string {

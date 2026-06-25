@@ -51,7 +51,7 @@ func (o *ObservabilityExtension) onEvent(ctx context.Context, ev extension.Event
 		// reconstructed optimal theory. A real implementation would distill
 		// the prompt + response into a refined principle; the baseline keeps
 		// the latest successful prompt as the working theory.
-		o.state.RecordIteration(ec.Prompt, nil)
+		o.state.RecordIteration(ec.Prompt, ec.Response, nil)
 		slog.Debug("evo: recorded iteration",
 			"agent", ec.AgentName, "iterations", o.state.Iterations)
 	case extension.EventOnError:

@@ -102,6 +102,10 @@ type Coordinator interface {
 	Summarize(context.Context, string) error
 	Model() Model
 	ActiveAgentID() string
+	// ActiveAgentSystemPrompt returns the proven system prompt of the active
+	// agent. The /evo mode captures it at enter time so the reconstructed
+	// optimal theory preserves what already worked as a stable base.
+	ActiveAgentSystemPrompt() string
 	UpdateModels(ctx context.Context) error
 }
 
@@ -240,9 +244,15 @@ func (c *coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 	// Extension lifecycle: BeforeRun lets extensions observe (or abort via a
 	// Decision) every agent run. Dispatched before any work so observers see
 	// the prompt that drives the turn.
-	c.fireExtensions(ctx, extension.EventBeforeRun, &extension.Context{
+	if dec := c.fireExtensions(ctx, extension.EventBeforeRun, &extension.Context{
 		SessionID: sessionID, AgentName: c.activeAgentID, Prompt: prompt,
-	})
+	}); dec != nil && dec.AbortRun {
+		// Honor the guardrail: a BeforeRun abort stops the run before any work
+		// begins. This is the only safe abort point — after work starts the
+		// agent owns the turn. Surfaced as a typed error so callers can tell a
+		// guardrail stop from a real failure.
+		return nil, fmt.Errorf("run aborted by extension: %s", dec.AbortReason)
+	}
 
 	// ── session logging (self-evolution data) ───────────────────────────────
 	sl, _ := sessionlog.NewLogger(c.sessionLogDir, sessionID)
@@ -342,7 +352,7 @@ func (c *coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 	}
 	c.fireExtensions(ctx, runEvt, &extension.Context{
 		SessionID: sessionID, AgentName: c.activeAgentID, Prompt: prompt,
-		Messages: resultMessages(result), Err: originalErr,
+		Messages: resultMessages(result), Response: resultResponseText(result), Err: originalErr,
 	})
 
 	// Effect loop: after a successful turn, asynchronously score it via an LLM
@@ -684,7 +694,8 @@ func (c *coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 	if messengerPort == nil {
 		messengerPort = messenger.NoopMessenger{}
 	}
-	allTools = append(allTools,
+	allTools = append(
+		allTools,
 		tools.NewWeChatSendImageTool(messengerPort),
 		tools.NewWeChatSendFileTool(messengerPort),
 		tools.NewWeChatScreenshotTool(messengerPort, screenshotDir),
@@ -888,12 +899,15 @@ type sessionLogSink struct{ l *sessionlog.Logger }
 func (s sessionLogSink) LogToolCall(event, data string, m toolutil.SessionLogMeta) {
 	s.l.LogToolCall(event, data, toSessionLogMeta(m))
 }
+
 func (s sessionLogSink) LogThink(event, data string, m toolutil.SessionLogMeta) {
 	s.l.LogThink(event, data, toSessionLogMeta(m))
 }
+
 func (s sessionLogSink) LogBug(event, data string, m toolutil.SessionLogMeta) {
 	s.l.LogBug(event, data, toSessionLogMeta(m))
 }
+
 func (s sessionLogSink) LogInfo(event, data string, m toolutil.SessionLogMeta) {
 	s.l.LogInfo(event, data, toSessionLogMeta(m))
 }
@@ -1053,6 +1067,7 @@ func truncateForLogScore(s string) string {
 	}
 	return s[:max] + "..."
 }
+
 func isExactoSupported(modelID string) bool {
 	supportedModels := []string{
 		"moonshotai/kimi-k2-0905",
@@ -1089,7 +1104,12 @@ func (c *coordinator) RegisterExtension(ext extension.Extension) {
 	if c.extensions == nil {
 		c.extensions = extension.NewManager()
 	}
-	c.extensions.Register(ext)
+	// Reject shadowing duplicates rather than silently replacing: two extensions
+	// sharing a Name would silently shadow each other, which is a wiring bug.
+	// Log best-effort; the run continues unaffected (see extension.Dispatch recover).
+	if err := c.extensions.RegisterOrError(ext); err != nil {
+		slog.Warn("extension register rejected", "err", err)
+	}
 }
 
 // UnregisterExtension removes an extension by name (e.g. on /evo exit).
@@ -1101,13 +1121,20 @@ func (c *coordinator) UnregisterExtension(name string) {
 
 // fireExtensions dispatches an event to every enabled extension. Safe to call
 // before SetExtensions (a nil manager is a no-op).
-func (c *coordinator) fireExtensions(ctx context.Context, ev extension.Event, ec *extension.Context) {
+// fireExtensions dispatches a lifecycle event and returns the aggregated
+// Decision. A non-nil Decision with AbortRun set means an extension requested
+// the run stop; the caller (Run) honors it at BeforeRun by returning early
+// before any work begins. At AfterRun the run is already complete, so the
+// decision is only logged.
+func (c *coordinator) fireExtensions(ctx context.Context, ev extension.Event, ec *extension.Context) *extension.Decision {
 	if c.extensions == nil {
-		return
+		return nil
 	}
-	if dec := c.extensions.Dispatch(ctx, ev, ec); dec != nil && dec.AbortRun {
+	dec := c.extensions.Dispatch(ctx, ev, ec)
+	if dec != nil && dec.AbortRun {
 		slog.Warn("Run aborted by extension", "event", string(ev), "reason", dec.AbortReason)
 	}
+	return dec
 }
 
 // resultMessages is a placeholder for extracting a message trace from a run
@@ -1117,6 +1144,15 @@ func (c *coordinator) fireExtensions(ctx context.Context, ev extension.Event, ec
 // need the prompt + outcome still fire correctly.
 func resultMessages(_ *fantasy.AgentResult) []message.Message {
 	return nil
+}
+
+// resultResponseText extracts the agent's final textual response, nil-safe.
+// Used to feed the evo lesson-distiller (prompt + response -> principle).
+func resultResponseText(r *fantasy.AgentResult) string {
+	if r == nil {
+		return ""
+	}
+	return r.Response.Content.Text()
 }
 
 // SetMainAgent switches the active agent to the given agent/mode ID.
@@ -1214,6 +1250,16 @@ func (c *coordinator) Model() Model {
 
 func (c *coordinator) ActiveAgentID() string {
 	return c.activeAgentID
+}
+
+// ActiveAgentSystemPrompt returns the proven system prompt of the active
+// agent, or "" when no agent is active. The /evo mode captures this at enter
+// time as the stable base for optimal-theory reconstruction.
+func (c *coordinator) ActiveAgentSystemPrompt() string {
+	if c.currentAgent == nil {
+		return ""
+	}
+	return c.currentAgent.SystemPrompt()
 }
 
 func (c *coordinator) UpdateModels(ctx context.Context) error {
@@ -1437,7 +1483,8 @@ func (c *coordinator) runSubAgentWithMeta(ctx context.Context, params subAgentPa
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			status = notify.SubagentStatusCancelled
 		}
-		slog.Warn("Sub-agent failed",
+		slog.Warn(
+			"Sub-agent failed",
 			"sub_session", session.ID,
 			"tool_call_id", params.ToolCallID,
 			"duration_ms", duration.Milliseconds(),
@@ -1620,7 +1667,8 @@ func logTurnSkillUsage(
 		}
 	}
 
-	slog.Info("Skill turn summary",
+	slog.Info(
+		"Skill turn summary",
 		"component", "skills",
 		"session_id", sessionID,
 		"prompt_len", len(prompt),
@@ -1664,7 +1712,8 @@ func logDiscoveryStats(
 
 	xml := skills.ToPromptXML(activeSkills)
 
-	slog.Info("Skill discovery complete",
+	slog.Info(
+		"Skill discovery complete",
 		"component", "skills",
 		"builtin_ok", len(builtin),
 		"builtin_errors", countErrors(builtinStates),

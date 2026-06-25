@@ -116,8 +116,8 @@ func TestState_Lifecycle(t *testing.T) {
 	require.Equal(t, ModeActive, st.Mode)
 
 	// Iterations accumulate; pending prompt and skills fold in.
-	st.RecordIteration("optimal theory v1", []string{"s1"})
-	st.RecordIteration("optimal theory v2", []string{"s2", "s1"}) // s1 deduped
+	st.RecordIteration("optimal theory v1", "refactored auth", []string{"s1"})
+	st.RecordIteration("optimal theory v2", "added tests", []string{"s2", "s1"}) // s1 deduped
 	require.Equal(t, 2, st.Iterations)
 	// The reconstructed theory keeps the proven base and layers both lessons.
 	require.Contains(t, st.PendingPrompt, "You are a careful engineer.")

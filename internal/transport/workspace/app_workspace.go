@@ -502,6 +502,14 @@ func (w *AppWorkspace) CurrentAgentID() string {
 	return w.app.AgentCoordinator.ActiveAgentID()
 }
 
+// AgentSystemPrompt returns the proven system prompt of the active agent.
+func (w *AppWorkspace) AgentSystemPrompt() string {
+	if w.app.AgentCoordinator == nil {
+		return ""
+	}
+	return w.app.AgentCoordinator.ActiveAgentSystemPrompt()
+}
+
 func (w *AppWorkspace) SwitchAgent(ctx context.Context, agentID string) error {
 	if w.app.AgentCoordinator == nil {
 		return fmt.Errorf("agent coordinator not initialized")

@@ -132,11 +132,10 @@ func (m *UI) handleEvoCommand(args string) (tea.Cmd, bool) {
 func (m *UI) enterEvoMode(name string) {
 	m.evoPrevTheme = *m.com.Styles
 	m.applyTheme(styles.EvoCrimson())
-	// Empty base: the proven system prompt isn't surfaced through the
-	// workspace facade yet, so the optimal theory is reconstructed purely
-	// from the distilled lessons of successful runs. Capturing the base
-	// prompt is a documented refinement.
-	m.evo.Enter(name, "")
+	// Capture the active agent's proven system prompt as the stable core of
+	// the reconstructed optimal theory, so fixation preserves what already
+	// worked and layers the distilled lessons on top ("maintain optimal theory").
+	m.evo.Enter(name, m.com.Workspace.AgentSystemPrompt())
 	m.com.Workspace.AgentRegisterExtension(evo.NewObservabilityExtension(&m.evo))
 }
 

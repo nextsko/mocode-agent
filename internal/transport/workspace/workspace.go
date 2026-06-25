@@ -11,8 +11,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/catwalk/pkg/catwalk"
 
-	"github.com/package-register/mocode/internal/core/agent/tools/lsp"
 	"github.com/package-register/mocode/internal/core/agent/extension"
+	"github.com/package-register/mocode/internal/core/agent/tools/lsp"
 	mcptools "github.com/package-register/mocode/internal/core/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/core/permission"
@@ -113,6 +113,10 @@ type Workspace interface {
 	AvailableAgents() []AgentInfo
 	CurrentAgentID() string
 	SwitchAgent(ctx context.Context, agentID string) error
+	// AgentSystemPrompt returns the proven system prompt of the active agent.
+	// The /evo mode captures it at enter time as the stable base for
+	// optimal-theory reconstruction ("maintain optimal theory").
+	AgentSystemPrompt() string
 
 	// Permissions
 	PermissionGrant(perm permission.PermissionRequest)
