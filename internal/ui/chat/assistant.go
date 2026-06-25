@@ -7,10 +7,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/package-register/mocode/internal/session/message"
-	"github.com/package-register/mocode/internal/ui/anim"
+
+	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/package-register/mocode/internal/util/anim"
 )
 
 // assistantMessageTruncateFormat is the text shown when an assistant message is

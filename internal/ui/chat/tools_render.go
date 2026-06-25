@@ -6,12 +6,13 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/package-register/mocode/internal/agent/tools"
-	"github.com/package-register/mocode/internal/session/message"
-	"github.com/package-register/mocode/internal/ext"
-	"github.com/package-register/mocode/internal/ui/anim"
+
+	"github.com/package-register/mocode/internal/core/agent/tools"
+	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/package-register/mocode/internal/util/anim"
+	"github.com/package-register/mocode/internal/util/ext"
 )
 
 func toolOutputPlainContent(sty *styles.Styles, content string, width int, expanded bool) string {

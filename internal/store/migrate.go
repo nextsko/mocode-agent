@@ -9,11 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/infra"
-	"github.com/package-register/mocode/internal/session"
-	"github.com/package-register/mocode/internal/session/message"
 	_ "modernc.org/sqlite"
+
+	"github.com/package-register/mocode/internal/core/config"
+	"github.com/package-register/mocode/internal/domain/session"
+	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/package-register/mocode/internal/util/infra"
 )
 
 // MigrateFromSQLite exports all data from an old SQLite database into the

@@ -5,10 +5,11 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/package-register/mocode/internal/ui/list"
-	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/rivo/uniseg"
 	"github.com/sahilm/fuzzy"
+
+	"github.com/package-register/mocode/internal/ui/list"
+	"github.com/package-register/mocode/internal/ui/styles"
 )
 
 // FileCompletionValue represents a file path completion value.

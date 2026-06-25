@@ -81,7 +81,31 @@
 ## Known Exceptions
 
 - Windows: some `internal/fsext` tests may fail on path separators (pre-existing).
-- `internal/session/session_snapshot.go`: stub until file-based snapshots ship.
+
+## Multi-Review R2 (2026-06-26) - core/domain/util landed
+
+Status: restructuring applied + ui/anim -> util/anim; `go build ./...` green;
+`go test ./...` green except the Windows `util/fsext` path-separator caveat.
+`gofmt -l .` clean. Zero stale old-path imports remain repo-wide.
+
+Findings:
+
+- P0: none blocking. `main.go` import updated correctly to
+  `internal/transport/cmd` (verified minimal diff).
+- P1 (partially addressed): layer invariants documented but NOT lint-enforced.
+  Upward deps from `core/` (pre-existing, exposed by the move):
+  - `core/app` -> `ui/styles` (styles depends on `ui/diffview`; invert via DI).
+    FIXED: `core/app` -> `ui/anim` removed by moving `ui/anim` -> `util/anim`
+    (anim was a pure spinner, only dep `util/csync`).
+  - `core/agent/tools/plugins/{screenshot_to_wechat,send_wechat_image,
+    send_wechat_file}` -> `integration/wechat` (legit integration boundary).
+  Fix options: invert app->ui via DI; add a `depguard` lint rule to lock the
+  layer boundaries going forward (no depguard in `.golangci.yml` yet).
+- P2: `core/agent` is aggregating many concerns (agent + candidate + failover
+  + evolution + tools + roundtable + subagent_cards). Watch for god-package drift.
+- P2: 333 files in one logical change; prefer layered commits
+  (util -> domain -> store -> core -> transport) for reviewability.
+- P2: `util/fsext` path-separator tests remain a permanent Windows CI hazard.
 
 ## Related Docs
 

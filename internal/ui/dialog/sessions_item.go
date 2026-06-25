@@ -10,11 +10,12 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/dustin/go-humanize"
-	"github.com/package-register/mocode/internal/session"
-	"github.com/package-register/mocode/internal/ui/list"
-	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/rivo/uniseg"
 	"github.com/sahilm/fuzzy"
+
+	"github.com/package-register/mocode/internal/domain/session"
+	"github.com/package-register/mocode/internal/ui/list"
+	"github.com/package-register/mocode/internal/ui/styles"
 )
 
 // ListItem represents a selectable and searchable item in a dialog list.

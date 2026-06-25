@@ -3,8 +3,8 @@ package chat
 import (
 	"encoding/json"
 
-	"github.com/package-register/mocode/internal/agent/tools"
-	"github.com/package-register/mocode/internal/session/message"
+	"github.com/package-register/mocode/internal/core/agent/tools"
+	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/styles"
 )
 

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/package-register/mocode/internal/session/message"
+	"github.com/package-register/mocode/internal/domain/session/message"
 )
 
 func TestMessageStore_DeleteAfter(t *testing.T) {

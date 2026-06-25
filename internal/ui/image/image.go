@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/x/ansi/kitty"
 	"github.com/disintegration/imaging"
 	paintbrush "github.com/jordanella/go-ansi-paintbrush"
+
 	"github.com/package-register/mocode/internal/ui/util"
 )
 

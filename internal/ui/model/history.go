@@ -6,7 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/package-register/mocode/internal/session/message"
+	"github.com/package-register/mocode/internal/domain/session/message"
 )
 
 // promptHistoryLoadedMsg is sent when prompt history is loaded.

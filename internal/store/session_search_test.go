@@ -3,8 +3,9 @@ package store
 import (
 	"testing"
 
-	"github.com/package-register/mocode/internal/config"
 	"github.com/stretchr/testify/require"
+
+	"github.com/package-register/mocode/internal/core/config"
 )
 
 func TestSessionSearch_New(t *testing.T) {

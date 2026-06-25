@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/package-register/mocode/internal/filetracker"
+	"github.com/package-register/mocode/internal/domain/filetracker"
 )
 
 // FileTrackerStore provides file-based read-tracking persistence.

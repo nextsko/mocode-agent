@@ -4,9 +4,10 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
-	"github.com/package-register/mocode/internal/session/message"
-	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/stretchr/testify/require"
+
+	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/package-register/mocode/internal/ui/styles"
 )
 
 func TestTodoDialogSelectionIndexPrefersInProgress(t *testing.T) {

@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/package-register/mocode/internal/session"
+
+	"github.com/package-register/mocode/internal/domain/session"
 )
 
 // SessionStore provides file-based session persistence.

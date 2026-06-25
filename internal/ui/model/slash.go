@@ -6,8 +6,9 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+
+	wechat "github.com/package-register/mocode/internal/integration/wechat"
 	"github.com/package-register/mocode/internal/ui/util"
-	wechat "github.com/package-register/mocode/internal/wechat"
 )
 
 const (

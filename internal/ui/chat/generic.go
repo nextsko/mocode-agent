@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/package-register/mocode/internal/session/message"
+	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/styles"
 )
 

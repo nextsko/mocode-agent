@@ -11,17 +11,18 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/catwalk/pkg/catwalk"
-	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/permission"
-	"github.com/package-register/mocode/internal/session"
-	"github.com/package-register/mocode/internal/session/message"
-	"github.com/package-register/mocode/internal/session/sessionexport"
-	"github.com/package-register/mocode/internal/slash"
+
+	"github.com/package-register/mocode/internal/core/config"
+	"github.com/package-register/mocode/internal/core/permission"
+	"github.com/package-register/mocode/internal/domain/session"
+	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/package-register/mocode/internal/domain/session/sessionexport"
+	"github.com/package-register/mocode/internal/integration/wechat"
 	"github.com/package-register/mocode/internal/ui/dialog"
 	fimage "github.com/package-register/mocode/internal/ui/image"
+	"github.com/package-register/mocode/internal/ui/slash"
 	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/package-register/mocode/internal/ui/util"
-	"github.com/package-register/mocode/internal/wechat"
 )
 
 func (m *UI) handleDialogMsg(msg tea.Msg) tea.Cmd {

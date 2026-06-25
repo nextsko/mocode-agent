@@ -8,12 +8,13 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/catwalk/pkg/catwalk"
-	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/permission"
-	"github.com/package-register/mocode/internal/session"
-	"github.com/package-register/mocode/internal/session/message"
-	"github.com/package-register/mocode/internal/slash"
+
+	"github.com/package-register/mocode/internal/core/config"
+	"github.com/package-register/mocode/internal/core/permission"
+	"github.com/package-register/mocode/internal/domain/session"
+	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/common"
+	"github.com/package-register/mocode/internal/ui/slash"
 	"github.com/package-register/mocode/internal/ui/util"
 )
 

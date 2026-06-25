@@ -4,9 +4,10 @@ import (
 	"os"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/slash"
+
+	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/ui/list"
+	"github.com/package-register/mocode/internal/ui/slash"
 )
 
 func (c *Commands) nextCommandType() CommandType {

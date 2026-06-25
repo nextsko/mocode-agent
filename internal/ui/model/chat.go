@@ -11,10 +11,11 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/clipperhouse/displaywidth"
 	"github.com/clipperhouse/uax29/v2/words"
-	"github.com/package-register/mocode/internal/ui/anim"
+
 	"github.com/package-register/mocode/internal/ui/chat"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/list"
+	"github.com/package-register/mocode/internal/util/anim"
 )
 
 // Constants for multi-click detection.

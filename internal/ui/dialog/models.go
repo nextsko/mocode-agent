@@ -11,7 +11,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/catwalk/pkg/catwalk"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/package-register/mocode/internal/config"
+
+	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/util"
 )

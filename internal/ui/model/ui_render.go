@@ -11,11 +11,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/package-register/mocode/internal/config"
+	"github.com/pkg/browser"
+
+	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/ui/dialog"
 	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/package-register/mocode/internal/ui/util"
-	"github.com/pkg/browser"
 )
 
 func (m *UI) drawHeader(scr uv.Screen, area uv.Rectangle) {

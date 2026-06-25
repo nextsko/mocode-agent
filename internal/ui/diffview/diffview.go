@@ -11,8 +11,9 @@ import (
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/aymanbagabas/go-udiff"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/package-register/mocode/internal/ui/xchroma"
 	"github.com/zeebo/xxh3"
+
+	"github.com/package-register/mocode/internal/ui/xchroma"
 )
 
 const (

@@ -6,10 +6,11 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/package-register/mocode/internal/config"
+
+	"github.com/package-register/mocode/internal/core/config"
+	"github.com/package-register/mocode/internal/transport/workspace"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/package-register/mocode/internal/workspace"
 )
 
 // selectedLargeModel returns the currently selected large language model from

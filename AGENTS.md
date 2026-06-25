@@ -13,36 +13,51 @@ The module path is `github.com/package-register/mocode`.
 
 ## Architecture
 
-```
-main.go                            CLI entry point (cobra via internal/cmd)
+main.go                            CLI entry point (cobra via internal/transport/cmd)
 internal/
-  app/                             In-process composition root (store, agents, LSP, MCP)
-  workspace/                       Frontend facade (AppWorkspace)
+  core/                            Core domain logic
+    agent/                         LLM agents, coordinator, tools, roundtable
+      candidate/ failover/         Eval selection, model failover (agent capabilities)
+      evolution/                   Self-evolution patch system (.mocode/patches)
+      ctxcompress/ notify/         Context compression, notifications
+      tools/                       LLM tool registry (builtin + plugins + mcp)
+      toolutil/                    Shared tool helpers
+    app/                           In-process composition root (store, agents, LSP, MCP)
+    config/                        Mocode.json loading and providers
+    crawler/                       Network fetch/scrape used by plugins
+    evaluation/                    LLM-judge evaluation harness
+    hooks/                         PreToolUse shell hooks (see HOOKS.md)
+    knowledge/                     Memory service + kngs templates
+    permission/                    Tool permission checks
+    shellruntime/                  Bash/screencap execution engine
+      shell/                       Shell job runner used by bash tool
+      screencap/                   Screen capture
+    skills/                        Agent skills discovery + builtin skills
+  domain/                          Domain models
+    session/                       Session + message models (message/, sessionlog/)
+    types/ history/ filetracker/   Shared DTOs, prompt history, file tracking
+  util/                            Standard-library-style helpers
+    csync/ diff/ errcoll/ ext/     Concurrency, diff, error collection, str/path
+    fsext/ infra/ log/ pubsub/     FS helpers, home/data paths, logging, event bus
+    version/                       Build version
+  integration/                     External integrations
+    authhandler/                   OAuth login handlers
+    wechat/                        WeChat bot + butler (gateway entry)
+  transport/                       Entry surfaces
+    cmd/                           Cobra CLI (not slash commands)
+    admin/                         Local admin HTTP settings UI (127.0.0.1)
+    workspace/                     Frontend facade (AppWorkspace)
   store/                           JSONL file persistence (+ sidecar indexes)
-  session/                         Session + message domain models
-  agent/                           LLM agents, coordinator, tools, roundtable
-    tools/                         LLM tool registry (builtin + plugins + mcp)
-    toolutil/                      Shared tool helpers
-  config/                          Mocode.json loading and providers
-  hooks/                           PreToolUse shell hooks (see HOOKS.md)
-  lsp/                             LSP client manager
   ui/                              Bubble Tea TUI (see internal/ui/AGENTS.md)
-  admin/                           Local admin HTTP settings UI
-  wechat/                          WeChat bot + butler
-    gateway/                       Long-running WeChat gateway entry
-  slash/                           TUI `/` slash commands (not CLI cmd/)
-  shellruntime/                    Bash/screencap execution engine
-    shell/                         Shell job runner used by bash tool
-  knowledge/                       Memory service + kngs templates
 ```
 
 ### Transport layer
 
 | Entry | Package | Role |
 |-------|---------|------|
-| TUI | `cmd` + `ui` | Default interactive experience |
-| Admin | `internal/admin` | Local settings at `127.0.0.1` |
-| Gateway | `internal/wechat/gateway` | Persistent WeChat bot |
+| TUI | `transport/cmd` + `ui` | Default interactive experience |
+| Admin | `internal/transport/admin` | Local settings at `127.0.0.1` |
+| Gateway | `internal/integration/wechat/gateway` | Persistent WeChat bot |
 
 See [docs/architecture/control-plane.md](docs/architecture/control-plane.md).
 
@@ -57,11 +72,11 @@ See [docs/architecture/control-plane.md](docs/architecture/control-plane.md).
 ### Key Patterns
 
 - **Config is a Service**: accessed via `config.Service`, not global state.
-- **Tools are self-documenting**: each tool has `.go` + `.md` in `internal/agent/tools/`.
-- **System prompts are Go templates**: `internal/agent/templates/*.md.tpl`.
+- **Tools are self-documenting**: each tool has `.go` + `.md` in `internal/core/agent/tools/`.
+- **System prompts are Go templates**: `internal/core/agent/templates/*.md.tpl`.
 - **Context files**: AGENTS.md, Mocode.md, CLAUDE.md, GEMINI.md from working directory.
 - **Persistence**: JSONL via `internal/store/` under `%LOCALAPPDATA%/mocode/` or `~/.local/share/mocode/`.
-- **Pub/sub**: `internal/pubsub` for agent, UI, and services.
+- **Pub/sub**: `internal/util/pubsub` for agent, UI, and services.
 - **Hooks**: User shell commands in Mocode.json; engine in `internal/hooks/`. See `HOOKS.md`.
 - **CGO disabled**: `CGO_ENABLED=0`, `GOEXPERIMENT=greenteagc`.
 
@@ -71,7 +86,7 @@ See [docs/architecture/control-plane.md](docs/architecture/control-plane.md).
 
 - **Build**: `go build -buildvcs=false -o bin/mocode .` or `task build`
 - **Test**: `task test` or `go test ./...` (single package:
-  `go test ./internal/agent/prompt -run TestGetContextFromPaths`)
+  `go test ./internal/core/agent/prompt -run TestGetContextFromPaths`)
 - **Update Golden Files**: `go test ./... -update`
   - Example: `go test ./internal/ui/diffview -update`
 - **Lint**: `task lint:fix`
@@ -97,7 +112,7 @@ so the repository stays green for the next contributor.
    go test ./path/to/package/...
    ```
    Prefer targeted tests first; run `go test ./...` when the change is broad
-   or touches shared packages. On Windows, some `internal/fsext` tests may
+   or touches shared packages. On Windows, some `internal/util/fsext` tests may
    fail due to path-separator assumptions; those are pre-existing and should
    not block unrelated work.
 
@@ -239,10 +254,10 @@ new packages or files instead.
   feature should be implemented in a dedicated sub-package or model file, not
   by expanding this file.
 
-- **`internal/agent/coordinator.go`** (~1,430 lines, 41 methods) — coordinates
+- **`internal/core/agent/coordinator.go`** (~1,430 lines, 41 methods) — coordinates
   named agents and their lifecycle.
 
-- **`internal/app/app.go`** (~1,020 lines, 74 methods) — wires together nearly
+- **`internal/core/app/app.go`** (~1,020 lines, 74 methods) — wires together nearly
   every service (sessions, messages, history, permissions, LSP, memory,
   pub/sub, agent coordinator, error collector).
 

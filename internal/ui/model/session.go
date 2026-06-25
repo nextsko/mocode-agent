@@ -11,13 +11,14 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/package-register/mocode/internal/diff"
-	"github.com/package-register/mocode/internal/fsext"
-	"github.com/package-register/mocode/internal/history"
-	"github.com/package-register/mocode/internal/session"
+
+	"github.com/package-register/mocode/internal/domain/history"
+	"github.com/package-register/mocode/internal/domain/session"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/package-register/mocode/internal/ui/util"
+	"github.com/package-register/mocode/internal/util/diff"
+	"github.com/package-register/mocode/internal/util/fsext"
 )
 
 // loadSessionMsg is a message indicating that a session and its files have

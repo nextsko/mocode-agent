@@ -3,9 +3,10 @@ package chat
 import (
 	"testing"
 
-	"github.com/package-register/mocode/internal/agent"
-	"github.com/package-register/mocode/internal/session/message"
 	"github.com/stretchr/testify/require"
+
+	"github.com/package-register/mocode/internal/core/agent"
+	"github.com/package-register/mocode/internal/domain/session/message"
 )
 
 type fakeToolMessageItem struct {

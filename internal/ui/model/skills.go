@@ -8,7 +8,8 @@ import (
 	"sync"
 
 	"charm.land/lipgloss/v2"
-	"github.com/package-register/mocode/internal/skills"
+
+	"github.com/package-register/mocode/internal/core/skills"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/styles"
 )

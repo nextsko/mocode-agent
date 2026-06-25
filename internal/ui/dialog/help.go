@@ -9,10 +9,11 @@ import (
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/sahilm/fuzzy"
+
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/list"
 	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/sahilm/fuzzy"
 )
 
 const (

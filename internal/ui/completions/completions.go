@@ -12,10 +12,11 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/exp/ordered"
-	"github.com/package-register/mocode/internal/agent/tools/mcp"
-	"github.com/package-register/mocode/internal/fsext"
+
+	"github.com/package-register/mocode/internal/core/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/ui/list"
 	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/package-register/mocode/internal/util/fsext"
 )
 
 const (

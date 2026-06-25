@@ -1,11 +1,11 @@
 # Workspace Types
 
-Two layers share the name "Workspace". They are intentionally separate.
+`workspace.Workspace` is the single frontend facade. (The legacy
+`proto.Workspace` wire DTO was removed with the in-process HTTP transport.)
 
 | Type | Package | Role |
 |------|---------|------|
 | `workspace.Workspace` | `internal/workspace` | Frontend interface (TUI, WeChat) |
-| `proto.Workspace` | `internal/proto` | Wire DTO for admin JSON APIs |
 
 ## Data flow
 

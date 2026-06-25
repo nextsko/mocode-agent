@@ -6,9 +6,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/sahilm/fuzzy"
+
 	"github.com/package-register/mocode/internal/ui/list"
 	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/sahilm/fuzzy"
 )
 
 // ModelsList is a list specifically for model items and groups.

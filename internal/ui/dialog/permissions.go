@@ -11,12 +11,13 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/package-register/mocode/internal/agent/tools"
-	"github.com/package-register/mocode/internal/fsext"
-	"github.com/package-register/mocode/internal/permission"
-	"github.com/package-register/mocode/internal/ext"
+
+	"github.com/package-register/mocode/internal/core/agent/tools"
+	"github.com/package-register/mocode/internal/core/permission"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/package-register/mocode/internal/util/ext"
+	"github.com/package-register/mocode/internal/util/fsext"
 )
 
 // PermissionsID is the identifier for the permissions dialog.

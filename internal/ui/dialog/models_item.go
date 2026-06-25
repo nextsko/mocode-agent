@@ -4,10 +4,11 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/package-register/mocode/internal/config"
+	"github.com/sahilm/fuzzy"
+
+	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/sahilm/fuzzy"
 )
 
 // ModelGroup represents a group of model items.

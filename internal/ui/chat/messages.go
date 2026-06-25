@@ -12,13 +12,14 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/lipgloss/v2"
-	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/session/message"
-	"github.com/package-register/mocode/internal/ui/anim"
+
+	"github.com/package-register/mocode/internal/core/config"
+	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/attachments"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/list"
 	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/package-register/mocode/internal/util/anim"
 )
 
 // renderCacheDebug controls whether cache hit/miss logging is enabled.
@@ -43,7 +44,8 @@ func LogCacheStats() {
 		return
 	}
 	hitRate := float64(hits) / float64(total) * 100
-	slog.Debug("render cache stats",
+	slog.Debug(
+		"render cache stats",
 		"hits", hits,
 		"misses", misses,
 		"total", total,

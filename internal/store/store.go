@@ -13,9 +13,10 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/session"
 	"github.com/zeebo/xxh3"
+
+	"github.com/package-register/mocode/internal/core/config"
+	"github.com/package-register/mocode/internal/domain/session"
 )
 
 // Store is the top-level file-based persistence layer.

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"charm.land/bubbles/v2/textarea"
+
 	"github.com/package-register/mocode/internal/ui/chat"
 	"github.com/package-register/mocode/internal/ui/common"
 )

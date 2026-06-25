@@ -6,6 +6,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
+
 	"github.com/package-register/mocode/internal/ui/styles"
 )
 

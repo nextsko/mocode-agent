@@ -7,8 +7,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
+
+	wechat "github.com/package-register/mocode/internal/integration/wechat"
 	"github.com/package-register/mocode/internal/ui/common"
-	wechat "github.com/package-register/mocode/internal/wechat"
 )
 
 const (

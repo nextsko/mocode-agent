@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/package-register/mocode/internal/session/message"
+
+	"github.com/package-register/mocode/internal/domain/session/message"
 )
 
 // MessageStore provides file-based message persistence via JSONL.

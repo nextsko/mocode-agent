@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/package-register/mocode/internal/session"
-	"github.com/package-register/mocode/internal/session/message"
+	"github.com/stretchr/testify/require"
+
+	"github.com/package-register/mocode/internal/domain/session"
+	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/stretchr/testify/require"
 )
 
 func TestQuitMessageStats(t *testing.T) {

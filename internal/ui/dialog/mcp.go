@@ -12,8 +12,9 @@ import (
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
-	mcptools "github.com/package-register/mocode/internal/agent/tools/mcp"
-	"github.com/package-register/mocode/internal/config"
+
+	mcptools "github.com/package-register/mocode/internal/core/agent/tools/mcp"
+	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/ui/common"
 )
 

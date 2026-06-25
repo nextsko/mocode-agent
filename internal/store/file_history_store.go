@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/package-register/mocode/internal/history"
+
+	"github.com/package-register/mocode/internal/domain/history"
 )
 
 // FileHistoryStore provides file-based file version history persistence.

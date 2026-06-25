@@ -3,8 +3,9 @@ package model
 import (
 	"testing"
 
-	"github.com/package-register/mocode/internal/ui/components"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/package-register/mocode/internal/ui/components"
 )
 
 func TestQueueStatusBar_View_Empty(t *testing.T) {

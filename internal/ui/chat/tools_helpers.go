@@ -5,8 +5,9 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2/tree"
-	"github.com/package-register/mocode/internal/agent"
-	"github.com/package-register/mocode/internal/agent/tools"
+
+	"github.com/package-register/mocode/internal/core/agent"
+	"github.com/package-register/mocode/internal/core/agent/tools"
 )
 
 func getDigits(n int) int {

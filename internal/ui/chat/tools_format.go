@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/agent"
-	"github.com/package-register/mocode/internal/agent/tools"
-	"github.com/package-register/mocode/internal/diff"
-	"github.com/package-register/mocode/internal/fsext"
+	"github.com/package-register/mocode/internal/core/agent"
+	"github.com/package-register/mocode/internal/core/agent/tools"
+	"github.com/package-register/mocode/internal/util/diff"
+	"github.com/package-register/mocode/internal/util/fsext"
 )
 
 func (t *baseToolMessageItem) formatToolForCopy() string {

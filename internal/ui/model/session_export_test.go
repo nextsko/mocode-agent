@@ -5,9 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/package-register/mocode/internal/session/message"
-	"github.com/package-register/mocode/internal/session/sessionexport"
 	"github.com/stretchr/testify/require"
+
+	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/package-register/mocode/internal/domain/session/sessionexport"
 )
 
 func TestExportExtension(t *testing.T) {

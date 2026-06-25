@@ -13,8 +13,9 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/session/message"
+
+	"github.com/package-register/mocode/internal/core/config"
+	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/completions"
 	"github.com/package-register/mocode/internal/ui/dialog"
 )

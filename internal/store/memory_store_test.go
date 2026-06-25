@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/knowledge/memory"
 	"github.com/stretchr/testify/require"
+
+	"github.com/package-register/mocode/internal/core/config"
+	"github.com/package-register/mocode/internal/core/knowledge/memory"
 )
 
 func TestMemoryStore_PersistAndSearch(t *testing.T) {

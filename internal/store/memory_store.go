@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/package-register/mocode/internal/knowledge/memory"
+	"github.com/package-register/mocode/internal/core/knowledge/memory"
 )
 
 // MemoryStore provides file-based memory persistence via JSONL.

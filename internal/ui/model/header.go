@@ -8,11 +8,12 @@ import (
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/fsext"
-	"github.com/package-register/mocode/internal/session"
+
+	"github.com/package-register/mocode/internal/core/config"
+	"github.com/package-register/mocode/internal/domain/session"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/package-register/mocode/internal/util/fsext"
 )
 
 const (

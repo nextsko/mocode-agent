@@ -4,9 +4,10 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/sahilm/fuzzy"
+
+	"github.com/package-register/mocode/internal/core/config"
+	"github.com/package-register/mocode/internal/ui/styles"
 )
 
 // ModeItem wraps an agent mode for the modes selection list.

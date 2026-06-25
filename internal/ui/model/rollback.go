@@ -14,11 +14,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/package-register/mocode/internal/history"
-	"github.com/package-register/mocode/internal/infra"
-	sessionpkg "github.com/package-register/mocode/internal/session"
-	"github.com/package-register/mocode/internal/session/message"
+
+	"github.com/package-register/mocode/internal/domain/history"
+	sessionpkg "github.com/package-register/mocode/internal/domain/session"
+	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/util"
+	"github.com/package-register/mocode/internal/util/infra"
 )
 
 type rollbackTarget struct {

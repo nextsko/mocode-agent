@@ -53,7 +53,7 @@ tasks:
   build:
     desc: Run build
     vars:
-      LDFLAGS: '{{if .VERSION}}-ldflags="-X github.com/package-register/mocode/internal/version.Version={{.VERSION}}"{{end}}'
+      LDFLAGS: '{{if .VERSION}}-ldflags="-X github.com/package-register/mocode/internal/util/version.Version={{.VERSION}}"{{end}}'
     cmds:
       - "go build {{.BUILDVCS_FLAG}} -o bin/mocode{{exeExt}} -v {{if .RACE}}-race{{end}} {{.LDFLAGS}} ."
     sources:
@@ -159,7 +159,7 @@ tasks:
   install:
     desc: Install the application
     vars:
-      LDFLAGS: '{{if .VERSION}}-ldflags="-X github.com/package-register/mocode/internal/version.Version={{.VERSION}}"{{end}}'
+      LDFLAGS: '{{if .VERSION}}-ldflags="-X github.com/package-register/mocode/internal/util/version.Version={{.VERSION}}"{{end}}'
     cmds:
       - task: fetch-tags
       - go install {{.BUILDVCS_FLAG}} {{.LDFLAGS}} -v .

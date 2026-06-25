@@ -15,8 +15,9 @@ import (
 	"golang.org/x/text/language"
 
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/package-register/mocode/internal/slash"
+
 	"github.com/package-register/mocode/internal/ui/common"
+	"github.com/package-register/mocode/internal/ui/slash"
 	"github.com/package-register/mocode/internal/ui/util"
 )
 

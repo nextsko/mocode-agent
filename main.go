@@ -8,7 +8,8 @@ import (
 	"os"
 
 	_ "github.com/joho/godotenv/autoload"
-	"github.com/package-register/mocode/internal/cmd"
+
+	"github.com/package-register/mocode/internal/transport/cmd"
 )
 
 func main() {

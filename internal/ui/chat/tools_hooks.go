@@ -8,7 +8,8 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/package-register/mocode/internal/hooks"
+
+	"github.com/package-register/mocode/internal/core/hooks"
 	"github.com/package-register/mocode/internal/ui/styles"
 )
 

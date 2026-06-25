@@ -6,7 +6,8 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
-	"github.com/package-register/mocode/internal/session/message"
+
+	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/completions"
 	"github.com/package-register/mocode/internal/ui/dialog"
 	"github.com/package-register/mocode/internal/ui/util"

@@ -10,9 +10,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/session"
-	"github.com/package-register/mocode/internal/session/message"
+
+	"github.com/package-register/mocode/internal/core/config"
+	"github.com/package-register/mocode/internal/domain/session"
+	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/styles"
 )
 

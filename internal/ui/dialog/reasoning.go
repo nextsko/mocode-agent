@@ -8,11 +8,12 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/package-register/mocode/internal/config"
+	"github.com/sahilm/fuzzy"
+
+	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/list"
 	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/sahilm/fuzzy"
 )
 
 const (

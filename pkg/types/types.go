@@ -41,7 +41,7 @@
 //	}
 package types
 
-import internal "github.com/package-register/mocode/internal/types"
+import internal "github.com/package-register/mocode/internal/domain/types"
 
 // ToolResult is the public, cross-module DTO for tool execution results.
 // See internal/types.ToolResult for field documentation.

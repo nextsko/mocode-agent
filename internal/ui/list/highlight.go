@@ -6,7 +6,8 @@ import (
 
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/package-register/mocode/internal/ext"
+
+	"github.com/package-register/mocode/internal/util/ext"
 )
 
 // DefaultHighlighter is the default highlighter function that applies inverse style.

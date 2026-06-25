@@ -6,7 +6,8 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/package-register/mocode/internal/session/sessionexport"
+
+	"github.com/package-register/mocode/internal/domain/session/sessionexport"
 	"github.com/package-register/mocode/internal/ui/dialog"
 	"github.com/package-register/mocode/internal/ui/util"
 )

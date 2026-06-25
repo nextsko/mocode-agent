@@ -10,9 +10,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/package-register/mocode/internal/session"
-	"github.com/package-register/mocode/internal/session/message"
 	"github.com/zeebo/xxh3"
+
+	"github.com/package-register/mocode/internal/domain/session"
+	"github.com/package-register/mocode/internal/domain/session/message"
 )
 
 func tempDir(t *testing.T) string {

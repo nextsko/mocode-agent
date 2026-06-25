@@ -8,10 +8,11 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
-	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/session/message"
-	"github.com/package-register/mocode/internal/ext"
+
+	"github.com/package-register/mocode/internal/core/config"
+	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/package-register/mocode/internal/util/ext"
 )
 
 // DockerMCPToolMessageItem is a message item that represents a Docker MCP tool call.

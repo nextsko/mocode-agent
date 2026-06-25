@@ -3,11 +3,12 @@ package model
 import (
 	"testing"
 
-	"github.com/package-register/mocode/internal/config"
-	"github.com/package-register/mocode/internal/skills"
+	"github.com/stretchr/testify/require"
+
+	"github.com/package-register/mocode/internal/core/config"
+	"github.com/package-register/mocode/internal/core/skills"
 	"github.com/package-register/mocode/internal/ui/common"
 	uistyles "github.com/package-register/mocode/internal/ui/styles"
-	"github.com/stretchr/testify/require"
 )
 
 // TestSkillStatusItemsIncludesBuiltinSkills verifies sidebar skills include

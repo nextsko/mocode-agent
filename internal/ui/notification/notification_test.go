@@ -3,8 +3,9 @@ package notification_test
 import (
 	"testing"
 
-	"github.com/package-register/mocode/internal/ui/notification"
 	"github.com/stretchr/testify/require"
+
+	"github.com/package-register/mocode/internal/ui/notification"
 )
 
 func TestNoopBackend_Send(t *testing.T) {
