@@ -3,18 +3,23 @@ package model
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/package-register/mocode/internal/core/agent/evo"
 	wechat "github.com/package-register/mocode/internal/integration/wechat"
+	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/package-register/mocode/internal/ui/util"
+	"github.com/package-register/mocode/internal/util/infra"
 )
 
 const (
 	slashCmdWeChat   = "/wechat"
 	slashCmdContext  = "/context"
 	slashCmdRollback = "/rollback"
+	slashCmdEvo      = "/evo"
 )
 
 // handleSlashCommand dispatches a slash command typed in the input box.
@@ -48,6 +53,8 @@ func (m *UI) handleSlashCommand(value string) (tea.Cmd, bool) {
 			return m.openRollbackDialog(), true
 		}
 		return m.rollbackSession(args), true
+	case slashCmdEvo:
+		return m.handleEvoCommand(args)
 	}
 
 	// ── Unified lookup: search completion groups by label ──
@@ -86,6 +93,76 @@ func splitSlashCommand(value string) (cmd, args string) {
 }
 
 // handleWeChatCommand handles legacy /wechat sub-commands for power users.
+//
+// handleEvoCommand drives the /evo self-evolution session. /evo (no args)
+// enters the mode and swaps to the EvoCrimson theme. "/evo exit" requests
+// leaving; because a fixation may be in progress, the first request only
+// arms a second confirmation — the user must run /evo exit again to confirm.
+func (m *UI) handleEvoCommand(args string) (tea.Cmd, bool) {
+	args = strings.TrimSpace(args)
+	switch args {
+	case "", "start", "enter":
+		if m.evo.IsActive() {
+			return infoCmd("already in /evo mode"), true
+		}
+		m.evoPrevTheme = *m.com.Styles
+		m.applyTheme(styles.EvoCrimson())
+		m.evo.Enter(evoSessionName(args))
+		return infoCmd("entered /evo — self-evolution active (red/purple)"), true
+	case "exit", "quit", "leave":
+		if !m.evo.IsActive() {
+			return infoCmd("not in /evo mode"), true
+		}
+		if m.evo.Mode == evo.ModeConfirmExit {
+			return m.confirmEvoExit()
+		}
+		m.evo.RequestExit()
+		return infoCmd("run /evo exit again to confirm and fix the agent"), true
+	default:
+		// A bare name is treated as the agent to tame.
+		if !m.evo.IsActive() {
+			m.evoPrevTheme = *m.com.Styles
+			m.applyTheme(styles.EvoCrimson())
+			m.evo.Enter(evoSessionName(args))
+			return infoCmd("entered /evo as " + args), true
+		}
+		return infoCmd("unknown /evo subcommand: " + args), true
+	}
+}
+
+// evoSessionName resolves the agent name for a new evo session.
+func evoSessionName(arg string) string {
+	if arg != "" && arg != "start" && arg != "enter" {
+		return arg
+	}
+	return "evo-agent"
+}
+
+// confirmEvoExit completes the second-confirmation exit: restores the prior
+// theme and, if a pending optimal-theory prompt was reconstructed, fixes it
+// as a revision via the fixation store.
+func (m *UI) confirmEvoExit() (tea.Cmd, bool) {
+	rev := m.evo.ConfirmExit()
+	m.applyTheme(m.evoPrevTheme)
+	if strings.TrimSpace(rev.SystemPrompt) == "" {
+		return infoCmd("left /evo (no fixation)"), true
+	}
+	store := evo.NewFixationStore(evoRoot())
+	if _, err := store.Fix(context.Background(), rev.AgentName, rev.AgentName, "fixed via /evo exit", rev); err != nil {
+		return infoCmd("left /evo but fixation failed: " + err.Error()), true
+	}
+	return infoCmd("left /evo — agent fixed as " + rev.AgentName), true
+}
+
+// infoCmd returns a command that surfaces a transient info toast.
+func infoCmd(msg string) tea.Cmd {
+	return func() tea.Msg { return util.InfoMsg{Type: util.InfoTypeInfo, Msg: msg} }
+}
+
+// evoRoot returns the directory under which fixed evo agents are persisted.
+func evoRoot() string {
+	return filepath.Join(infra.DataDir(), "evo")
+}
 // The recommended path is to use the modal via "/wechat" (no args) or the
 // command palette, but these sub-commands remain for scripting.
 func (m *UI) handleWeChatCommand(args string) tea.Cmd {
