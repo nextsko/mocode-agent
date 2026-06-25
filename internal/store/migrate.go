@@ -11,7 +11,6 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/domain/session"
 	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/util/infra"
@@ -28,13 +27,8 @@ func MigrateFromSQLite(ctx context.Context, dbPath string, projectPath string) (
 	}
 	defer sqlDB.Close()
 
-	// Create the global config needed by store.New
-	cfg, err := config.Init(projectPath, "", false)
-	if err != nil {
-		return nil, fmt.Errorf("init config: %w", err)
-	}
-
-	st, err := New(projectPath, cfg)
+	// store.New resolves the data dir via infra.DataDir itself; no config needed.
+	st, err := New(projectPath, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create store: %w", err)
 	}

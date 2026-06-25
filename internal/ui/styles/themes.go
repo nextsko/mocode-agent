@@ -9,6 +9,8 @@ func ThemeForProvider(providerID string) Styles {
 	switch providerID {
 	case "hyper":
 		return HypermocodeObsidiana()
+	case "evo":
+		return EvoCrimson()
 	default:
 		return FromskoPantera()
 	}
@@ -44,6 +46,46 @@ func FromskoPantera() Styles {
 		busy:              charmtone.Citron,
 		info:              charmtone.Malibu,
 		infoMoreSubtle:    charmtone.Sardine,
+		infoMostSubtle:    charmtone.Damson,
+		success:           charmtone.Julep,
+		successMoreSubtle: charmtone.Bok,
+		successMostSubtle: charmtone.Guac,
+	})
+}
+
+// EvoCrimson returns the self-evolution (/evo) theme. It uses a deep purple
+// primary (Plum) with red accents (Cherry/Sriracha) so the evolution mode is
+// visually distinct from the default blue-green theme while staying readable
+// on the same dark background. Backgrounds stay neutral (Pepper/Charcoal) to
+// keep contrast stable; only the brand + status colors shift.
+func EvoCrimson() Styles {
+	return quickStyle(quickStyleOpts{
+		primary:   charmtone.Plum,
+		secondary: charmtone.Violet,
+		accent:    charmtone.Orchid,
+		keyword:   charmtone.Cherry,
+
+		fgBase:       charmtone.Ash,
+		fgMoreSubtle: charmtone.Squid,
+		fgSubtle:     charmtone.Smoke,
+		fgMostSubtle: charmtone.Oyster,
+
+		onPrimary: charmtone.Butter,
+
+		bgBase:         charmtone.Pepper,
+		bgLeastVisible: charmtone.BBQ,
+		bgLessVisible:  charmtone.Charcoal,
+		bgMostVisible:  charmtone.Iron,
+
+		separator: charmtone.Charcoal,
+
+		destructive:       charmtone.Coral,
+		error:             charmtone.Sriracha,
+		warningSubtle:     charmtone.Zest,
+		warning:           charmtone.Paprika,
+		busy:              charmtone.Grape,
+		info:              charmtone.Violet,
+		infoMoreSubtle:    charmtone.Mauve,
 		infoMostSubtle:    charmtone.Damson,
 		success:           charmtone.Julep,
 		successMoreSubtle: charmtone.Bok,

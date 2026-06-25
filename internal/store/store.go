@@ -15,8 +15,8 @@ import (
 
 	"github.com/zeebo/xxh3"
 
-	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/domain/session"
+	"github.com/package-register/mocode/internal/util/infra"
 )
 
 // Store is the top-level file-based persistence layer.
@@ -45,8 +45,9 @@ type Store struct {
 }
 
 // New creates a new Store for the given project path.
-// cfg is used to locate the global data directory.
-func New(projectPath string, cfg *config.ConfigStore) (*Store, error) {
+// storeCfg is retained for call-site compatibility; the data directory is now
+// resolved via infra.DataDir so this package no longer depends on core/config.
+func New(projectPath string, _ any) (*Store, error) {
 	if projectPath == "" {
 		return nil, fmt.Errorf("projectPath is required")
 	}
@@ -55,7 +56,7 @@ func New(projectPath string, cfg *config.ConfigStore) (*Store, error) {
 		return nil, fmt.Errorf("resolve project path: %w", err)
 	}
 
-	dataDir := globalStoreDir(cfg)
+	dataDir := globalStoreDir()
 	projDir := projectDirPath(dataDir, absPath)
 
 	if err := os.MkdirAll(projDir, 0o700); err != nil {
@@ -125,9 +126,10 @@ func (s *Store) sessionsIndexPath() string {
 }
 
 // globalStoreDir returns the global data directory where all projects live.
-func globalStoreDir(cfg *config.ConfigStore) string {
-	// Use the same directory that holds the global mocode.json
-	return filepath.Dir(config.GlobalConfigData())
+// It resolves the data dir at the util layer (infra.DataDir) rather than
+// through core/config, so the store package stays downward-only.
+func globalStoreDir() string {
+	return infra.DataDir()
 }
 
 // projectDirName returns the directory-safe project identifier.

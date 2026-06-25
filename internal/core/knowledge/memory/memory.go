@@ -1,4 +1,11 @@
-// Package memory provides memory service for Mocode agent.
+// Package memory implements the agent memory service and its LLM tools.
+//
+// Pure value types (Kind, Memory, Entry, the request/response DTOs, sentinel
+// errors, and the deterministic ID generator) live in
+// internal/domain/memory, which has no upward dependencies. This package
+// holds the Service interface and its implementation plus the tool wiring.
+// The domain types are re-exported here as type aliases so existing callers
+// keep importing a single "memory" package without churn.
 package memory
 
 import (
@@ -6,7 +13,68 @@ import (
 	"time"
 
 	"charm.land/fantasy"
+
+	dmem "github.com/package-register/mocode/internal/domain/memory"
 )
+
+// Re-exported domain types. Callers use memory.Entry / memory.Memory / etc.
+// unchanged; the definitions live in internal/domain/memory.
+type (
+	// Kind distinguishes between semantic facts and episodic memories.
+	Kind = dmem.Kind
+	// Memory represents a memory entry with content and metadata.
+	Memory = dmem.Memory
+	// Entry represents a memory entry stored in the system.
+	Entry = dmem.Entry
+	// Result represents a single memory result for tool responses.
+	Result = dmem.Result
+	// AddMemoryRequest is the input for the add memory tool.
+	AddMemoryRequest = dmem.AddMemoryRequest
+	// AddMemoryResponse is the response from the add memory tool.
+	AddMemoryResponse = dmem.AddMemoryResponse
+	// UpdateMemoryRequest is the input for the update memory tool.
+	UpdateMemoryRequest = dmem.UpdateMemoryRequest
+	// UpdateMemoryResponse is the response from the update memory tool.
+	UpdateMemoryResponse = dmem.UpdateMemoryResponse
+	// DeleteMemoryRequest is the input for the delete memory tool.
+	DeleteMemoryRequest = dmem.DeleteMemoryRequest
+	// DeleteMemoryResponse is the response from the delete memory tool.
+	DeleteMemoryResponse = dmem.DeleteMemoryResponse
+	// ClearMemoryRequest is the input for the clear memory tool.
+	ClearMemoryRequest = dmem.ClearMemoryRequest
+	// ClearMemoryResponse is the response from the clear memory tool.
+	ClearMemoryResponse = dmem.ClearMemoryResponse
+	// SearchMemoryRequest is the input for the search memory tool.
+	SearchMemoryRequest = dmem.SearchMemoryRequest
+	// SearchMemoryResponse is the response from the search memory tool.
+	SearchMemoryResponse = dmem.SearchMemoryResponse
+	// LoadMemoryRequest is the input for the load memory tool.
+	LoadMemoryRequest = dmem.LoadMemoryRequest
+	// LoadMemoryResponse is the response from the load memory tool.
+	LoadMemoryResponse = dmem.LoadMemoryResponse
+)
+
+// Re-exported sentinel errors.
+var (
+	ErrAppNameRequired  = dmem.ErrAppNameRequired
+	ErrUserIDRequired   = dmem.ErrUserIDRequired
+	ErrMemoryIDRequired = dmem.ErrMemoryIDRequired
+	ErrMemoryRequired   = dmem.ErrMemoryRequired
+	ErrMemoryNotFound   = dmem.ErrMemoryNotFound
+	ErrUserNotFound     = dmem.ErrUserNotFound
+)
+
+// Re-exported domain constants.
+const (
+	KindFact    = dmem.KindFact
+	KindEpisode = dmem.KindEpisode
+)
+
+// GenerateMemoryID delegates to the domain implementation so generated IDs
+// stay stable and are shared with the persistence layer.
+func GenerateMemoryID(mem *Memory, appName, userID string) string {
+	return dmem.GenerateMemoryID(mem, appName, userID)
+}
 
 // Tool names for memory tools.
 const (
@@ -17,47 +85,6 @@ const (
 	SearchToolName = "memory_search"
 	LoadToolName   = "memory_load"
 )
-
-// GenerateMemoryID returns a stable ID for a memory entry.
-func GenerateMemoryID(mem *Memory, appName, userID string) string {
-	return generateMemoryID(mem, appName, userID)
-}
-
-// Kind distinguishes between semantic facts and episodic memories.
-type Kind string
-
-const (
-	// KindFact represents stable personal attributes, preferences, or background.
-	// Example: "User is a software engineer."
-	KindFact Kind = "fact"
-	// KindEpisode represents a specific event that happened at a particular time.
-	// Example: "On 2024-05-07, User went hiking at Mt. Fuji with Alice."
-	KindEpisode Kind = "episode"
-)
-
-// Memory represents a memory entry with content and metadata.
-type Memory struct {
-	Memory      string     `json:"memory"`                 // Memory content.
-	Topics      []string   `json:"topics,omitempty"`       // Memory topics (array).
-	LastUpdated *time.Time `json:"last_updated,omitempty"` // Last update time.
-
-	// Episodic memory fields.
-	Kind         Kind       `json:"kind,omitempty"`         // Memory kind: "fact" or "episode".
-	EventTime    *time.Time `json:"event_time,omitempty"`   // When the event occurred.
-	Participants []string   `json:"participants,omitempty"` // People involved in the event.
-	Location     string     `json:"location,omitempty"`     // Where the event took place.
-}
-
-// Entry represents a memory entry stored in the system.
-type Entry struct {
-	ID        string    `json:"id"`              // ID is the unique identifier of the memory.
-	AppName   string    `json:"app_name"`        // App name is the name of the application.
-	UserID    string    `json:"user_id"`         // User ID is the unique identifier of the user.
-	Memory    *Memory   `json:"memory"`          // Memory is the memory content.
-	CreatedAt time.Time `json:"created_at"`      // CreatedAt is the creation time.
-	UpdatedAt time.Time `json:"updated_at"`      // UpdatedAt is the last update time.
-	Score     float64   `json:"score,omitempty"` // Score is the similarity score from search (0-1).
-}
 
 // Service defines the interface for memory service operations.
 type Service interface {

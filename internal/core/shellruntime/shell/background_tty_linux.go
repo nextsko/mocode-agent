@@ -109,6 +109,15 @@ func (p *ttyBackgroundProcess) Terminate(force bool) error {
 	return syscall.Kill(-p.cmd.Process.Pid, sig)
 }
 
+// WriteStdin feeds the child process through the PTY master, so interactive
+// programs receive the bytes on their controlling terminal's stdin.
+func (p *ttyBackgroundProcess) WriteStdin(b []byte) (int, error) {
+	if p.ptm == nil {
+		return 0, fmt.Errorf("tty is closed")
+	}
+	return p.ptm.Write(b)
+}
+
 func openBackgroundPTY() (*os.File, *os.File, error) {
 	ptm, err := os.OpenFile("/dev/ptmx", os.O_RDWR, 0)
 	if err != nil {

@@ -6,6 +6,7 @@ package tools
 import (
 	"github.com/package-register/mocode/internal/core/agent/tools/builtin/bash"
 	"github.com/package-register/mocode/internal/core/agent/tools/builtin/edit"
+	"github.com/package-register/mocode/internal/core/agent/tools/builtin/job_input"
 	"github.com/package-register/mocode/internal/core/agent/tools/builtin/job_kill"
 	"github.com/package-register/mocode/internal/core/agent/tools/builtin/job_output"
 	"github.com/package-register/mocode/internal/core/agent/tools/builtin/ls"
@@ -54,6 +55,7 @@ import (
 const (
 	BashToolName      = bash.BashToolName
 	JobOutputToolName = job_output.JobOutputToolName
+	JobInputToolName  = job_input.JobInputToolName
 	JobKillToolName   = job_kill.JobKillToolName
 	BashNoOutput      = bash.BashNoOutput
 )

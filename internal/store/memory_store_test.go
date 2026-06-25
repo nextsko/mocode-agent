@@ -6,17 +6,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/knowledge/memory"
+	"github.com/package-register/mocode/internal/domain/memory"
 )
 
 func TestMemoryStore_PersistAndSearch(t *testing.T) {
 	t.Parallel()
 
-	cfg, err := config.Load(t.TempDir(), t.TempDir(), false)
-	require.NoError(t, err)
-
-	st, err := New(t.TempDir(), cfg)
+	st, err := New(t.TempDir(), nil)
 	require.NoError(t, err)
 
 	ms := st.Memories()
@@ -29,7 +25,7 @@ func TestMemoryStore_PersistAndSearch(t *testing.T) {
 	require.Len(t, results, 1)
 	require.Contains(t, results[0].Memory.Memory, "Go")
 
-	st2, err := New(st.ProjectPath, cfg)
+	st2, err := New(st.ProjectPath, nil)
 	require.NoError(t, err)
 	results2, err := st2.Memories().SearchMemories(ctx, "app", "user1", "Go", 10)
 	require.NoError(t, err)

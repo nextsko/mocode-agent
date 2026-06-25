@@ -31,6 +31,10 @@ type JobOutputResponseMetadata struct {
 	Command          string `json:"command"`
 	Description      string `json:"description"`
 	Done             bool   `json:"done"`
+	State            string `json:"state"`
+	ExitCode         int    `json:"exit_code,omitempty"`
+	ElapsedMs        int64  `json:"elapsed_ms"`
+	Interactive      bool   `json:"interactive,omitempty"`
 	WorkingDirectory string `json:"working_directory"`
 }
 
@@ -54,6 +58,7 @@ func NewJobOutputTool() fantasy.AgentTool {
 			}
 
 			stdout, stderr, done, err := bgShell.GetOutput()
+			jobStatus := bgShell.Status()
 
 			var outputParts []string
 			if stdout != "" {
@@ -63,14 +68,9 @@ func NewJobOutputTool() fantasy.AgentTool {
 				outputParts = append(outputParts, stderr)
 			}
 
-			status := "running"
 			if done {
-				status = "completed"
-				if err != nil {
-					exitCode := shell.ExitCode(err)
-					if exitCode != 0 {
-						outputParts = append(outputParts, fmt.Sprintf("Exit code %d", exitCode))
-					}
+				if ec := shell.ExitCode(err); ec != 0 {
+					outputParts = append(outputParts, fmt.Sprintf("Exit code %d", ec))
 				}
 			}
 
@@ -81,6 +81,10 @@ func NewJobOutputTool() fantasy.AgentTool {
 				Command:          bgShell.Command,
 				Description:      bgShell.Description,
 				Done:             done,
+				State:            string(jobStatus.State),
+				ExitCode:         jobStatus.ExitCode,
+				ElapsedMs:        jobStatus.ElapsedMs,
+				Interactive:      jobStatus.Interactive,
 				WorkingDirectory: bgShell.WorkingDir,
 			}
 
@@ -88,7 +92,13 @@ func NewJobOutputTool() fantasy.AgentTool {
 				output = bash.BashNoOutput
 			}
 
-			result := fmt.Sprintf("Status: %s\n\n%s", status, output)
+			// Lead with the structured state so the model can observe the job at
+			// a glance; hint at the interaction path when the job is still live.
+			summary := fmt.Sprintf("Status: %s (elapsed %.1fs)", jobStatus.State, float64(jobStatus.ElapsedMs)/1000)
+			if !done && jobStatus.Interactive {
+				summary += " - interactive: use the job_input tool to send stdin"
+			}
+			result := fmt.Sprintf("%s\n\n%s", summary, output)
 			return fantasy.WithResponseMetadata(fantasy.NewTextResponse(result), metadata), nil
 		})
 }

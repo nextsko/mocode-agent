@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -48,6 +50,13 @@ func (sb *syncBuffer) String() string {
 	return sb.buf.String()
 }
 
+// Len returns the number of buffered bytes without copying.
+func (sb *syncBuffer) Len() int {
+	sb.mu.RLock()
+	defer sb.mu.RUnlock()
+	return sb.buf.Len()
+}
+
 // BackgroundShell represents a shell running in the background.
 type BackgroundShell struct {
 	ID          string
@@ -64,6 +73,15 @@ type BackgroundShell struct {
 	exitErr     error
 	runner      backgroundRunner
 	completedAt atomic.Int64 // Unix timestamp when job completed (0 if still running)
+	startedAt   atomic.Int64 // Unix timestamp when job started (0 if never started)
+	exitCode    atomic.Int32 // captured exit code (0 before completion)
+	// stdinWriter feeds the non-TTY interpreter's stdin pipe; nil for TTY jobs
+	// where input flows through the runner (the PTY master).
+	stdinWriter io.Writer
+	// stdinReader is the interpreter-facing end of the stdin pipe; closed when
+	// the job finishes to signal EOF.
+	stdinReader *os.File
+	stdinMu     sync.Mutex
 }
 
 type BackgroundShellOptions struct {
@@ -73,6 +91,42 @@ type BackgroundShellOptions struct {
 type backgroundRunner interface {
 	Wait() error
 	Terminate(force bool) error
+	// WriteStdin sends bytes to the process stdin. For TTY jobs this writes to
+	// the PTY master. Implementations that cannot accept input return an error.
+	WriteStdin(p []byte) (int, error)
+}
+
+// JobState is the lifecycle state of a background job.
+type JobState string
+
+const (
+	// JobStateRunning means the command has not finished yet.
+	JobStateRunning JobState = "running"
+	// JobStateCompleted means the command exited successfully (exit code 0).
+	JobStateCompleted JobState = "completed"
+	// JobStateFailed means the command exited with a non-zero code or errored.
+	JobStateFailed JobState = "failed"
+	// JobStateKilled means the command was cancelled/interrupted.
+	JobStateKilled JobState = "killed"
+)
+
+// JobStatus is a structured, copy-free snapshot of a background job's state.
+// It is surfaced to the agent so it can observe task progress and decide
+// whether to send more input, wait, or kill the job.
+type JobStatus struct {
+	ID          string   `json:"id"`
+	State       JobState `json:"state"`
+	Command     string   `json:"command"`
+	Description string   `json:"description,omitempty"`
+	WorkingDir  string   `json:"working_dir,omitempty"`
+	TTY         bool     `json:"tty,omitempty"`
+	Interactive bool     `json:"interactive,omitempty"`
+	StartedAtMs int64    `json:"started_at_ms"`
+	ElapsedMs   int64    `json:"elapsed_ms"`
+	Done        bool     `json:"done"`
+	ExitCode    int      `json:"exit_code,omitempty"`
+	StdoutBytes int      `json:"stdout_bytes"`
+	StderrBytes int      `json:"stderr_bytes"`
 }
 
 // BackgroundShellManager manages background shell instances.
@@ -137,8 +191,25 @@ func (m *BackgroundShellManager) Start(ctx context.Context, workingDir string, b
 
 	m.shells.Set(id, bgShell)
 
+	bgShell.startedAt.Store(time.Now().Unix())
+
+	// For non-TTY jobs, open a stdin pipe so the agent can answer prompts or
+	// feed a long-running interactive process via WriteInput. TTY jobs receive
+	// input through the PTY master inside their runner instead.
+	if !options.TTY {
+		stdinR, stdinW, err := os.Pipe()
+		if err != nil {
+			return nil, fmt.Errorf("create stdin pipe: %w", err)
+		}
+		bgShell.stdinReader = stdinR
+		bgShell.stdinWriter = stdinW
+	}
+
 	go func() {
 		defer close(bgShell.done)
+		// Closing the pipe ends signals EOF to the interpreter and unblocks any
+		// WriteInput stuck on a full buffer.
+		defer closeStdinPipe(bgShell.stdinReader, bgShell.stdinWriter)
 		var err error
 		if options.TTY {
 			var runner backgroundRunner
@@ -148,15 +219,31 @@ func (m *BackgroundShellManager) Start(ctx context.Context, workingDir string, b
 				err = runner.Wait()
 			}
 		} else {
-			err = shell.ExecStream(shellCtx, command, bgShell.stdout, bgShell.stderr)
+			err = shell.ExecStreamWithStdin(shellCtx, command, bgShell.stdinReader, bgShell.stdout, bgShell.stderr)
 		}
 
 		bgShell.exitErr = err
+		bgShell.exitCode.Store(int32(ExitCode(err)))
 		bgShell.completedAt.Store(time.Now().Unix())
 	}()
 
 	return bgShell, nil
 }
+
+func closeStdinPipe(r *os.File, w io.Writer) {
+	if cw, ok := w.(io.Closer); ok {
+		_ = cw.Close()
+	}
+	if r != nil {
+		_ = r.Close()
+	}
+}
+
+// stdinRunnerWriter adapts a backgroundRunner to io.Writer so the bounded
+// write helper can treat the pipe path and the TTY path uniformly.
+type stdinRunnerWriter struct{ r backgroundRunner }
+
+func (w stdinRunnerWriter) Write(p []byte) (int, error) { return w.r.WriteStdin(p) }
 
 // Get retrieves a background shell by ID.
 func (m *BackgroundShellManager) Get(id string) (*BackgroundShell, bool) {
@@ -212,6 +299,15 @@ func (m *BackgroundShellManager) List() []string {
 	return ids
 }
 
+// Statuses returns structured status snapshots for every tracked job.
+func (m *BackgroundShellManager) Statuses() []JobStatus {
+	out := make([]JobStatus, 0, m.shells.Len())
+	for shell := range m.shells.Seq() {
+		out = append(out, shell.Status())
+	}
+	return out
+}
+
 // Cleanup removes completed jobs that have been finished for more than the retention period
 func (m *BackgroundShellManager) Cleanup() int {
 	now := time.Now().Unix()
@@ -261,6 +357,96 @@ func (bs *BackgroundShell) GetOutput() (stdout string, stderr string, done bool,
 		return bs.stdout.String(), bs.stderr.String(), true, bs.exitErr
 	default:
 		return bs.stdout.String(), bs.stderr.String(), false, nil
+	}
+}
+
+// WriteInput sends bytes to the running command's stdin (pipe for non-TTY
+// jobs, PTY master for TTY jobs). The write is bounded in size and duration so
+// a process that never reads stdin cannot block the agent indefinitely.
+func (bs *BackgroundShell) WriteInput(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	const maxInput = 1 << 16 // 64 KiB
+	if len(p) > maxInput {
+		p = p[:maxInput]
+	}
+
+	bs.stdinMu.Lock()
+	defer bs.stdinMu.Unlock()
+
+	var w io.Writer
+	switch {
+	case bs.stdinWriter != nil:
+		w = bs.stdinWriter
+	case bs.runner != nil:
+		w = stdinRunnerWriter{bs.runner}
+	default:
+		return 0, fmt.Errorf("background shell %s does not accept stdin input", bs.ID)
+	}
+
+	type writeResult struct {
+		n   int
+		err error
+	}
+	done := make(chan writeResult, 1)
+	go func() {
+		n, err := w.Write(p)
+		done <- writeResult{n, err}
+	}()
+
+	select {
+	case r := <-done:
+		return r.n, r.err
+	case <-time.After(5 * time.Second):
+		// Buffer full and the command is not draining it. The deferred close
+		// in the runner goroutine unblocks this writer when the job ends.
+		return 0, fmt.Errorf("timed out writing to background shell %s (input buffer full or command not reading stdin)", bs.ID)
+	}
+}
+
+// Status returns a structured snapshot of the job's lifecycle state.
+func (bs *BackgroundShell) Status() JobStatus {
+	done := bs.IsDone()
+	exitCode := int(bs.exitCode.Load())
+
+	state := JobStateRunning
+	if done {
+		switch {
+		case IsInterrupt(bs.exitErr):
+			state = JobStateKilled
+		case exitCode == 0 && bs.exitErr == nil:
+			state = JobStateCompleted
+		default:
+			// Non-zero exit code, or a non-exit error (parse/permission/TTY).
+			state = JobStateFailed
+		}
+	}
+
+	started := bs.startedAt.Load()
+	end := bs.completedAt.Load()
+	if end == 0 && started > 0 {
+		end = time.Now().Unix()
+	}
+	var elapsedMs int64
+	if started > 0 && end >= started {
+		elapsedMs = (end - started) * 1000
+	}
+
+	return JobStatus{
+		ID:          bs.ID,
+		State:       state,
+		Command:     bs.Command,
+		Description: bs.Description,
+		WorkingDir:  bs.WorkingDir,
+		TTY:         bs.TTY,
+		Interactive: bs.stdinWriter != nil || bs.runner != nil,
+		StartedAtMs: started * 1000,
+		ElapsedMs:   elapsedMs,
+		Done:        done,
+		ExitCode:    exitCode,
+		StdoutBytes: bs.stdout.Len(),
+		StderrBytes: bs.stderr.Len(),
 	}
 }
 

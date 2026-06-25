@@ -1,8 +1,6 @@
 package memory
 
-import (
-	"time"
-)
+import "time"
 
 // Result represents a single memory result for tool responses.
 type Result struct {

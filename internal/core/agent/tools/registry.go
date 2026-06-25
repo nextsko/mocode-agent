@@ -8,6 +8,7 @@ import (
 
 	"github.com/package-register/mocode/internal/core/agent/tools/builtin/bash"
 	"github.com/package-register/mocode/internal/core/agent/tools/builtin/edit"
+	"github.com/package-register/mocode/internal/core/agent/tools/builtin/job_input"
 	"github.com/package-register/mocode/internal/core/agent/tools/builtin/job_kill"
 	"github.com/package-register/mocode/internal/core/agent/tools/builtin/job_output"
 	"github.com/package-register/mocode/internal/core/agent/tools/builtin/ls"
@@ -185,6 +186,7 @@ func (execPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
 		{Name: BashToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
 		{Name: JobOutputToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
+		{Name: JobInputToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
 		{Name: JobKillToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
 	}
 }
@@ -193,6 +195,7 @@ func (execPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{
 		bash.NewBashTool(deps.Permissions, deps.Cfg.WorkingDir(), deps.Cfg.Config().Options.Attribution, deps.ModelName),
 		job_output.NewJobOutputTool(),
+		job_input.NewJobInputTool(),
 		job_kill.NewJobKillTool(),
 	}
 }

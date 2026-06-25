@@ -332,3 +332,120 @@ func TestBackgroundShell_WaitContext_Canceled(t *testing.T) {
 
 	require.False(t, bgShell.WaitContext(ctx))
 }
+
+func TestBackgroundShell_Status_Completed(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	workingDir := t.TempDir()
+	manager := newBackgroundShellManager()
+
+	bgShell, err := manager.Start(ctx, workingDir, nil, "echo done", "")
+	require.NoError(t, err)
+	bgShell.Wait()
+
+	status := bgShell.Status()
+	require.True(t, status.Done)
+	require.Equal(t, JobStateCompleted, status.State)
+	require.Equal(t, 0, status.ExitCode)
+	require.NotZero(t, status.StartedAtMs)
+	require.Contains(t, status.Command, "echo done")
+	// Non-TTY jobs expose a stdin pipe so they are interactive.
+	require.True(t, status.Interactive)
+	require.Greater(t, status.StdoutBytes, 0)
+}
+
+func TestBackgroundShell_Status_Failed(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	workingDir := t.TempDir()
+	manager := newBackgroundShellManager()
+
+	bgShell, err := manager.Start(ctx, workingDir, nil, "exit 7", "")
+	require.NoError(t, err)
+	bgShell.Wait()
+
+	status := bgShell.Status()
+	require.True(t, status.Done)
+	require.Equal(t, JobStateFailed, status.State)
+	require.Equal(t, 7, status.ExitCode)
+}
+
+func TestBackgroundShell_Status_Killed(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	workingDir := t.TempDir()
+	manager := newBackgroundShellManager()
+
+	bgShell, err := manager.Start(ctx, workingDir, nil, "sleep 30", "")
+	require.NoError(t, err)
+
+	require.NoError(t, manager.Kill(bgShell.ID))
+	bgShell.Wait()
+
+	status := bgShell.Status()
+	require.True(t, status.Done)
+	require.Equal(t, JobStateKilled, status.State)
+}
+
+func TestBackgroundShellManager_Statuses(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	workingDir := t.TempDir()
+	manager := newBackgroundShellManager()
+
+	bg, err := manager.Start(ctx, workingDir, nil, "sleep 5", "")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = manager.Kill(bg.ID) })
+
+	statuses := manager.Statuses()
+	require.Len(t, statuses, 1)
+	require.Equal(t, bg.ID, statuses[0].ID)
+	require.False(t, statuses[0].Done)
+}
+
+func TestBackgroundShell_WriteInput(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	workingDir := t.TempDir()
+	manager := newBackgroundShellManager()
+
+	// `cat` echoes stdin to stdout until EOF; the background pipe keeps stdin
+	// open so we can feed it, then read what came back.
+	bgShell, err := manager.Start(ctx, workingDir, nil, "cat", "")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = manager.Kill(bgShell.ID) })
+
+	// Give the interpreter a moment to start reading.
+	require.Eventually(t, func() bool {
+		return bgShell.Status().Interactive
+	}, time.Second, 20*time.Millisecond)
+
+	n, err := bgShell.WriteInput([]byte("hello-stdin\n"))
+	require.NoError(t, err)
+	require.Greater(t, n, 0)
+
+	require.Eventually(t, func() bool {
+		out, _, _, _ := bgShell.GetOutput()
+		return strings.Contains(out, "hello-stdin")
+	}, 2*time.Second, 20*time.Millisecond)
+}
+
+func TestBackgroundShell_WriteInput_DoneRejected(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	workingDir := t.TempDir()
+	manager := newBackgroundShellManager()
+
+	bgShell, err := manager.Start(ctx, workingDir, nil, "true", "")
+	require.NoError(t, err)
+	bgShell.Wait()
+
+	_, err = bgShell.WriteInput([]byte("too late\n"))
+	require.Error(t, err)
+}
