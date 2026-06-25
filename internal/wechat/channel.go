@@ -103,6 +103,8 @@ type Channel struct {
 	butler   *llmButlerHandler // butler routing handler (initialized via InitButler)
 	butlerMu sync.Mutex
 
+	userLocks sync.Map // WeChat userID -> *sync.Mutex
+
 	Credentials *Credentials
 }
 
@@ -296,27 +298,59 @@ func (c *Channel) SendFile(ctx context.Context, userID, path string) error {
 
 // GetSession returns the stored session ID for a WeChat user.
 func (c *Channel) GetSession(userID string) (string, bool) {
-	v, ok := c.sessions.Load(userID)
-	if !ok {
-		return "", false
+	key := SessionKey(userID)
+	if v, ok := c.sessions.Load(key); ok {
+		return v.(string), true
 	}
-	return v.(string), true
+	// Backward compat for legacy bindings stored under raw userID.
+	if v, ok := c.sessions.Load(userID); ok {
+		return v.(string), true
+	}
+	return "", false
 }
 
 // SetSession stores the session ID for a WeChat user.
 func (c *Channel) SetSession(userID, sessionID string) {
-	c.sessions.Store(userID, sessionID)
+	key := SessionKey(userID)
+	c.sessions.Store(key, sessionID)
+	c.sessions.Delete(userID)
 	if err := c.saveSessions(); err != nil {
-		slog.Warn("failed to save WeChat session bindings", "error", err)
+		slog.Warn("Failed to save WeChat session bindings", "error", err)
 	}
 }
 
 // DelSession removes the stored session ID for a WeChat user.
 func (c *Channel) DelSession(userID string) {
+	c.sessions.Delete(SessionKey(userID))
 	c.sessions.Delete(userID)
 	if err := c.saveSessions(); err != nil {
-		slog.Warn("failed to save WeChat session bindings after delete", "error", err)
+		slog.Warn("Failed to save WeChat session bindings after delete", "error", err)
 	}
+}
+
+func (c *Channel) userLock(userID string) *sync.Mutex {
+	v, _ := c.userLocks.LoadOrStore(userID, &sync.Mutex{})
+	return v.(*sync.Mutex)
+}
+
+const (
+	replyRetryAttempts = 3
+	replyRetryDelay    = 500 * time.Millisecond
+)
+
+func (c *Channel) replyWithRetry(ctx context.Context, msg *wechatbot.IncomingMessage, text string) error {
+	var lastErr error
+	for attempt := 0; attempt < replyRetryAttempts; attempt++ {
+		if err := c.bot.Reply(ctx, msg, text); err != nil {
+			lastErr = err
+			if attempt < replyRetryAttempts-1 {
+				time.Sleep(replyRetryDelay)
+			}
+			continue
+		}
+		return nil
+	}
+	return lastErr
 }
 
 func (c *Channel) loadSessions() error {
@@ -478,6 +512,10 @@ func (c *Channel) SetMediaDir(dir string) {
 }
 
 func (c *Channel) handleMessage(ctx context.Context, msg *wechatbot.IncomingMessage) {
+	mu := c.userLock(msg.UserID)
+	mu.Lock()
+	defer mu.Unlock()
+
 	startTime := time.Now()
 	slog.Debug("WeChat msg", "userID", msg.UserID, "type", msg.Type, "textLen", len(msg.Text))
 
@@ -545,8 +583,12 @@ func (c *Channel) handleMessage(ctx context.Context, msg *wechatbot.IncomingMess
 		"elapsed", elapsed.Truncate(time.Millisecond), "replyLen", len(reply))
 
 	if reply != "" {
-		if err := c.bot.Reply(ctx, msg, reply); err != nil {
-			slog.Error("WeChat reply failed", "error", err)
+		if err := c.replyWithRetry(ctx, msg, reply); err != nil {
+			slog.Error("WeChat reply failed", "userID", msg.UserID, "error", err)
+			fallback := "消息已处理，但发送失败，请稍后重试。"
+			if retryErr := c.replyWithRetry(ctx, msg, fallback); retryErr != nil {
+				slog.Error("WeChat fallback reply failed", "userID", msg.UserID, "error", retryErr)
+			}
 		}
 	}
 }

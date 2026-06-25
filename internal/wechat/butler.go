@@ -3,6 +3,7 @@ package wechat
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -23,6 +24,7 @@ type ButlerWorkspace interface {
 	DeleteSession(ctx context.Context, sessionID string) error
 	AgentRun(ctx context.Context, sessionID, prompt string) error
 	ListMessages(ctx context.Context, sessionID string) ([]MsgInfo, error)
+	AgentIsSessionBusy(ctx context.Context, sessionID string) bool
 }
 
 // SessionInfo is a lightweight session summary.
@@ -38,12 +40,25 @@ type MsgInfo struct {
 	Content string
 }
 
+const (
+	butlerAgentTimeout  = 5 * time.Minute
+	butlerErrorReply    = "抱歉，处理出错了，请稍后重试。"
+	butlerInitFailReply = "抱歉，系统正在初始化，请稍后再试。"
+	butlerTimeoutReply  = "抱歉，处理超时，请稍后再试。"
+	busyPollInterval    = 250 * time.Millisecond
+)
+
+type userButlerState struct {
+	sessID      string
+	initialized bool
+}
+
 // llmButlerHandler is the LLM-powered butler.
 type llmButlerHandler struct {
-	ctx         *ButlerContext
-	mu          sync.Mutex
-	sessID      string // butler's own agent session ID
-	initialized bool   // true after first system prompt sent
+	ctx    *ButlerContext
+	mu     sync.Mutex
+	states map[string]*userButlerState
+	userMu sync.Map
 }
 
 // newButlerHandler creates the LLM butler handler.
@@ -51,7 +66,33 @@ func newButlerHandler(butlerCtx *ButlerContext) *llmButlerHandler {
 	return &llmButlerHandler{ctx: butlerCtx}
 }
 
-const butlerAgentTimeout = 5 * time.Minute
+func (h *llmButlerHandler) userState(userID string) *userButlerState {
+	key := SessionKey(userID)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.states == nil {
+		h.states = make(map[string]*userButlerState)
+	}
+	st, ok := h.states[key]
+	if !ok {
+		st = &userButlerState{}
+		h.states[key] = st
+	}
+	return st
+}
+
+func (h *llmButlerHandler) userLock(userID string) *sync.Mutex {
+	key := SessionKey(userID)
+	v, _ := h.userMu.LoadOrStore(key, &sync.Mutex{})
+	return v.(*sync.Mutex)
+}
+
+func (h *llmButlerHandler) butlerSessionID(userID string) string {
+	st := h.userState(userID)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return st.sessID
+}
 
 // Handle processes a user message through the LLM butler.
 func (h *llmButlerHandler) Handle(pollCtx context.Context, userID, text string) string {
@@ -60,94 +101,175 @@ func (h *llmButlerHandler) Handle(pollCtx context.Context, userID, text string) 
 		return ""
 	}
 
-	// Slash commands handled fast (no LLM).
 	if strings.HasPrefix(text, "/") {
 		return h.handleButlerSlash(pollCtx, userID, text)
 	}
 
-	// Ensure butler session exists and is primed.
-	if err := h.ensureSession(pollCtx, userID, text); err != nil {
-		slog.Error("Butler session init failed", "error", err)
-		return "抱歉，系统正在初始化，请稍后再试。"
+	mu := h.userLock(userID)
+	mu.Lock()
+	defer mu.Unlock()
+
+	if err := h.ensureSession(pollCtx, userID); err != nil {
+		slog.Error("Butler session init failed", "userID", userID, "error", err)
+		return butlerInitFailReply
 	}
 
-	// Send typing indicator while butler thinks.
+	sessID := h.butlerSessionID(userID)
+	if sessID == "" {
+		slog.Error("Butler session missing after init", "userID", userID)
+		return butlerInitFailReply
+	}
+
 	stopTyping := h.ctx.Channel.StartTyping(pollCtx, userID)
 	defer stopTyping()
 
-	// G5: Add timeout.
 	ctx, cancel := context.WithTimeout(pollCtx, butlerAgentTimeout)
 	defer cancel()
 
-	// G4+G8: Discover and include existing sessions in the prompt.
-	userPrompt := h.buildUserPrompt(ctx, userID, text)
-
-	// Run the butler agent. Blocks until LLM finishes.
-	if err := h.ctx.Workspace.AgentRun(ctx, h.sessID, userPrompt); err != nil {
-		slog.Error("Butler AgentRun failed", "error", err)
-		return "抱歉，处理出错了。" + err.Error()
+	beforeCount, err := h.messageCount(ctx, sessID)
+	if err != nil {
+		slog.Error("Butler ListMessages failed", "userID", userID, "error", err)
+		return butlerErrorReply
 	}
 
-	// Extract the last assistant reply.
-	msgs, err := h.ctx.Workspace.ListMessages(ctx, h.sessID)
-	if err != nil || len(msgs) == 0 {
+	userPrompt := h.buildUserPrompt(ctx, userID, text, sessID)
+	if err := h.ctx.Workspace.AgentRun(ctx, sessID, userPrompt); err != nil {
+		slog.Error("Butler AgentRun failed", "userID", userID, "sessionID", sessID, "error", err)
+		return butlerErrorReply
+	}
+
+	reply, err := h.waitForAssistantReply(ctx, sessID, beforeCount)
+	if err != nil {
+		slog.Error("Butler wait for reply failed", "userID", userID, "sessionID", sessID, "error", err)
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return butlerTimeoutReply
+		}
+		return butlerErrorReply
+	}
+	if reply == "" {
 		return "处理完成。"
 	}
-	for i := len(msgs) - 1; i >= 0; i-- {
-		if msgs[i].Role == "assistant" {
+	return reply
+}
+
+func (h *llmButlerHandler) messageCount(ctx context.Context, sessID string) (int, error) {
+	msgs, err := h.ctx.Workspace.ListMessages(ctx, sessID)
+	if err != nil {
+		return 0, err
+	}
+	return len(msgs), nil
+}
+
+func (h *llmButlerHandler) waitForAssistantReply(ctx context.Context, sessID string, beforeCount int) (string, error) {
+	for {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+
+		busy := h.ctx.Workspace.AgentIsSessionBusy(ctx, sessID)
+		msgs, err := h.ctx.Workspace.ListMessages(ctx, sessID)
+		if err != nil {
+			return "", err
+		}
+
+		reply := extractAssistantAfter(msgs, beforeCount)
+		if reply != "" && !busy {
+			return reply, nil
+		}
+		if !busy && len(msgs) > beforeCount {
+			return reply, nil
+		}
+
+		time.Sleep(busyPollInterval)
+	}
+}
+
+// extractAssistantAfter returns the latest non-empty assistant message after beforeCount.
+func extractAssistantAfter(msgs []MsgInfo, beforeCount int) string {
+	for i := len(msgs) - 1; i >= beforeCount; i-- {
+		if msgs[i].Role == "assistant" && strings.TrimSpace(msgs[i].Content) != "" {
 			return msgs[i].Content
 		}
 	}
-	return "处理完成。"
+	return ""
 }
 
-// ensureSession initializes the butler session. On first call, creates the
-// session and injects the system prompt. On subsequent calls, no-op.
-func (h *llmButlerHandler) ensureSession(ctx context.Context, userID, _ string) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	if h.initialized {
-		return nil
-	}
+func (h *llmButlerHandler) ensureSession(ctx context.Context, userID string) error {
 	if h.ctx.Workspace == nil {
 		return fmt.Errorf("workspace not available")
 	}
 
-	// G1: Create session once.
-	sid, err := h.ctx.Workspace.CreateSession(ctx, "Butler")
-	if err != nil {
-		return err
-	}
-	h.sessID = sid
-	slog.Info("Butler session created", "sessionID", sid)
+	st := h.userState(userID)
 
-	// G1: Inject system prompt as first message (only once).
+	h.mu.Lock()
+	if st.initialized {
+		h.mu.Unlock()
+		return nil
+	}
+	needsCreate := st.sessID == ""
+	h.mu.Unlock()
+
+	if needsCreate {
+		sid, err := h.ctx.Workspace.CreateSession(ctx, "Butler: "+userID)
+		if err != nil {
+			return err
+		}
+
+		h.mu.Lock()
+		if st.sessID == "" {
+			st.sessID = sid
+			slog.Info("Butler session created", "userID", userID, "sessionID", sid)
+		} else {
+			orphan := sid
+			h.mu.Unlock()
+			if delErr := h.ctx.Workspace.DeleteSession(ctx, orphan); delErr != nil {
+				slog.Warn("Failed to delete orphan butler session", "sessionID", orphan, "error", delErr)
+			}
+			h.mu.Lock()
+		}
+		h.mu.Unlock()
+	}
+
+	h.mu.Lock()
+	sessID := st.sessID
+	initialized := st.initialized
+	h.mu.Unlock()
+
+	if initialized || sessID == "" {
+		return nil
+	}
+
+	beforeCount, err := h.messageCount(ctx, sessID)
+	if err != nil {
+		return fmt.Errorf("list messages before init: %w", err)
+	}
+
 	prompt := "系统指令:\n\n" + ButlerSystemPrompt + "\n\n请确认你已理解以上指令，回复OK。"
-	if err := h.ctx.Workspace.AgentRun(ctx, h.sessID, prompt); err != nil {
+	if err := h.ctx.Workspace.AgentRun(ctx, sessID, prompt); err != nil {
 		return fmt.Errorf("system prompt injection: %w", err)
 	}
-	h.initialized = true
-	slog.Info("Butler system prompt injected", "sessionID", sid)
+	if _, err := h.waitForAssistantReply(ctx, sessID, beforeCount); err != nil {
+		return fmt.Errorf("system prompt injection wait: %w", err)
+	}
+
+	h.mu.Lock()
+	st.initialized = true
+	h.mu.Unlock()
+	slog.Info("Butler system prompt injected", "userID", userID, "sessionID", sessID)
 	return nil
 }
 
-// buildUserPrompt builds the prompt with session context.
-func (h *llmButlerHandler) buildUserPrompt(ctx context.Context, userID, text string) string {
-	// G4+G8: Include session list so butler knows available sessions.
+func (h *llmButlerHandler) buildUserPrompt(ctx context.Context, userID, text, butlerSessID string) string {
 	var b strings.Builder
 
-	// Discover sessions.
 	sessions, err := h.ctx.Workspace.ListSessions(ctx)
 	if err == nil && len(sessions) > 0 {
-		// Filter out butler's own session.
-		h.mu.Lock()
-		butlerSID := h.sessID
-		h.mu.Unlock()
-
 		b.WriteString("当前可用会话:\n")
 		for _, s := range sessions {
-			if s.ID == butlerSID {
+			if s.ID == butlerSessID {
+				continue
+			}
+			if strings.HasPrefix(s.Title, "Butler:") {
 				continue
 			}
 			b.WriteString(fmt.Sprintf("- ID: %s  标题: %s  (%s)\n", s.ID, s.Title, s.CreatedAt))
@@ -155,7 +277,6 @@ func (h *llmButlerHandler) buildUserPrompt(ctx context.Context, userID, text str
 		b.WriteString("\n")
 	}
 
-	// User's session binding.
 	sessID, ok := h.ctx.Channel.GetSession(userID)
 	if ok && sessID != "" {
 		b.WriteString(fmt.Sprintf("用户 %s 的绑定会话 ID 是: %s\n\n", userID, sessID))
@@ -165,7 +286,6 @@ func (h *llmButlerHandler) buildUserPrompt(ctx context.Context, userID, text str
 	return b.String()
 }
 
-// handleButlerSlash handles slash commands at the butler level.
 func (h *llmButlerHandler) handleButlerSlash(ctx context.Context, userID, text string) string {
 	parts := strings.SplitN(text, " ", 2)
 	cmd := parts[0]
@@ -181,10 +301,7 @@ func (h *llmButlerHandler) handleButlerSlash(ctx context.Context, userID, text s
 		if args == "" {
 			return "用法: /switch <会话ID>"
 		}
-		h.ctx.Channel.mu.Lock()
-		h.ctx.Channel.activeSession = args
-		h.ctx.Channel.mu.Unlock()
-		return fmt.Sprintf("✅ 已切换到: %s", args)
+		return h.switchSession(ctx, userID, args)
 	case "/delete":
 		if args == "" {
 			return "用法: /delete <会话ID>"
@@ -193,6 +310,28 @@ func (h *llmButlerHandler) handleButlerSlash(ctx context.Context, userID, text s
 	default:
 		return fmt.Sprintf("未知命令: %s", cmd)
 	}
+}
+
+func (h *llmButlerHandler) switchSession(ctx context.Context, userID, sessionID string) string {
+	if h.ctx.Workspace == nil {
+		return "❌ 系统未就绪"
+	}
+	sessions, err := h.ctx.Workspace.ListSessions(ctx)
+	if err != nil {
+		return "❌ 无法列出会话"
+	}
+	found := false
+	for _, s := range sessions {
+		if s.ID == sessionID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Sprintf("❌ 会话不存在: %s", sessionID)
+	}
+	h.ctx.Channel.SetSession(userID, sessionID)
+	return fmt.Sprintf("✅ 已切换到: %s", sessionID)
 }
 
 func (h *llmButlerHandler) createSession(ctx context.Context, userID, name string) string {
@@ -208,9 +347,6 @@ func (h *llmButlerHandler) createSession(ctx context.Context, userID, name strin
 		return fmt.Sprintf("❌ 创建失败: %v", err)
 	}
 	h.ctx.Channel.SetSession(userID, sessionID)
-	h.ctx.Channel.mu.Lock()
-	h.ctx.Channel.activeSession = userID
-	h.ctx.Channel.mu.Unlock()
 	return fmt.Sprintf("✅ 会话已创建\n  ID: %s\n  标题: %s", sessionID, title)
 }
 
@@ -221,5 +357,6 @@ func (h *llmButlerHandler) deleteSession(ctx context.Context, sessionID string) 
 	if err := h.ctx.Workspace.DeleteSession(ctx, sessionID); err != nil {
 		return fmt.Sprintf("❌ 删除失败: %v", err)
 	}
+	h.ctx.Channel.ClearBindingsForSessionID(sessionID)
 	return "✅ 会话已删除"
 }

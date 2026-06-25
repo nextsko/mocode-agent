@@ -61,8 +61,8 @@ func (c *Channel) handleSlashCommand(ctx context.Context, msg *wechatbot.Incomin
 			slog.Debug("WeChat slash command", "cmd", cmdName, "args", args)
 			reply := cmd.handler(ctx, c, msg, args)
 			if reply != "" {
-				if err := c.bot.Reply(ctx, msg, reply); err != nil {
-					slog.Error("WeChat slash reply failed", "error", err)
+				if err := c.replyWithRetry(ctx, msg, reply); err != nil {
+					slog.Error("WeChat slash reply failed", "cmd", cmdName, "error", err)
 				}
 			}
 			return true
@@ -125,7 +125,8 @@ func cmdList(_ context.Context, ch *Channel, _ *wechatbot.IncomingMessage, _ str
 	}
 	sort.Slice(es, func(i, j int) bool { return es[i].u < es[j].u })
 	for i, e := range es {
-		b.WriteString(fmt.Sprintf("  #%d 👤 %s → %s\n", i+1, e.u, shortSessionID(e.s)))
+		displayUser := stripSessionKeyPrefix(e.u)
+		b.WriteString(fmt.Sprintf("  #%d 👤 %s → %s\n", i+1, displayUser, shortSessionID(e.s)))
 	}
 	return b.String()
 }
@@ -197,16 +198,16 @@ func cmdTestModel(_ context.Context, ch *Channel, _ *wechatbot.IncomingMessage, 
 
 // ─── /screenshot ─────────────────────────────────────────────────────────────
 
-func cmdScreenshot(_ context.Context, ch *Channel, _ *wechatbot.IncomingMessage, _ string) string {
+func cmdScreenshot(_ context.Context, ch *Channel, msg *wechatbot.IncomingMessage, _ string) string {
 	path, err := takeScreenshot()
 	if err != nil {
 		return fmt.Sprintf("❌ %v", err)
 	}
 	defer os.Remove(path)
-	if ch.Credentials == nil {
-		return "❌ 未登录"
+	if msg == nil || msg.UserID == "" {
+		return "❌ 无法确定收件人"
 	}
-	if err := ch.SendFile(context.Background(), ch.Credentials.UserID, path); err != nil {
+	if err := ch.SendFile(context.Background(), msg.UserID, path); err != nil {
 		return fmt.Sprintf("❌ 发送失败: %v", err)
 	}
 	return "📸 截图已发送"
@@ -214,7 +215,7 @@ func cmdScreenshot(_ context.Context, ch *Channel, _ *wechatbot.IncomingMessage,
 
 // ─── /send ───────────────────────────────────────────────────────────────────
 
-func cmdSendFile(_ context.Context, ch *Channel, _ *wechatbot.IncomingMessage, args string) string {
+func cmdSendFile(_ context.Context, ch *Channel, msg *wechatbot.IncomingMessage, args string) string {
 	if args == "" {
 		return "用法: /send <文件路径>"
 	}
@@ -231,10 +232,10 @@ func cmdSendFile(_ context.Context, ch *Channel, _ *wechatbot.IncomingMessage, a
 		defer os.Remove(compressed)
 		path = compressed
 	}
-	if ch.Credentials == nil {
-		return "❌ 未登录"
+	if msg == nil || msg.UserID == "" {
+		return "❌ 无法确定收件人"
 	}
-	if err := ch.SendFile(context.Background(), ch.Credentials.UserID, path); err != nil {
+	if err := ch.SendFile(context.Background(), msg.UserID, path); err != nil {
 		return fmt.Sprintf("❌ 发送失败: %v", err)
 	}
 	return fmt.Sprintf("📎 已发送: %s", filepath.Base(path))

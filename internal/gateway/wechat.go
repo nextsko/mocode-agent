@@ -131,14 +131,13 @@ func (g *WeChatGateway) installAgentHandler() {
 			}
 		}
 
-		sessKey := "wx:" + userID
 		var sessionID string
-		if v, ok := g.wc.GetSession(sessKey); ok {
+		if v, ok := g.wc.GetSession(userID); ok {
 			sessionID = v
 			if _, err := g.ws.GetSession(ctx, sessionID); err != nil {
 				slog.Warn("WeChat cached session not found, creating new session", "sessionID", sessionID, "userID", userID)
 				sessionID = ""
-				g.wc.DelSession(sessKey)
+				g.wc.DelSession(userID)
 			}
 		}
 		if sessionID == "" {
@@ -147,7 +146,7 @@ func (g *WeChatGateway) installAgentHandler() {
 				return "", fmt.Errorf("create session: %w", err)
 			}
 			sessionID = sess.ID
-			g.wc.SetSession(sessKey, sessionID)
+			g.wc.SetSession(userID, sessionID)
 		}
 
 		if err := g.ws.AgentRun(ctx, sessionID, text); err != nil {
@@ -215,6 +214,10 @@ func (w *gatewayButlerWorkspace) ListMessages(ctx context.Context, sessionID str
 		})
 	}
 	return result, nil
+}
+
+func (w *gatewayButlerWorkspace) AgentIsSessionBusy(_ context.Context, sessionID string) bool {
+	return w.ws.AgentIsSessionBusy(sessionID)
 }
 
 func (w *gatewayButlerWorkspace) CurrentModel() string {

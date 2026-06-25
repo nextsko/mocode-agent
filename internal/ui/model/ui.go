@@ -3219,6 +3219,10 @@ func (w *tuiButlerWorkspace) ListMessages(ctx context.Context, id string) ([]wec
 	return result, nil
 }
 
+func (w *tuiButlerWorkspace) AgentIsSessionBusy(_ context.Context, sessionID string) bool {
+	return w.ws.AgentIsSessionBusy(sessionID)
+}
+
 func (w *tuiButlerWorkspace) CurrentModel() string {
 	cfg := w.ws.Config()
 	if large, ok := cfg.Models[config.SelectedModelTypeLarge]; ok {

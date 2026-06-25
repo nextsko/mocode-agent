@@ -1087,6 +1087,10 @@ func (w *adminButlerWorkspace) ListMessages(ctx context.Context, id string) ([]w
 	return result, nil
 }
 
+func (w *adminButlerWorkspace) AgentIsSessionBusy(_ context.Context, sessionID string) bool {
+	return w.ws.AgentIsSessionBusy(sessionID)
+}
+
 func (w *adminButlerWorkspace) CurrentModel() string {
 	cfg := w.ws.Config()
 	if large, ok := cfg.Models[config.SelectedModelTypeLarge]; ok {
