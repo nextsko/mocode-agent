@@ -1,4 +1,5 @@
-package stringext
+// Package ext provides small extensions to the Go standard library.
+package ext
 
 import (
 	"encoding/base64"

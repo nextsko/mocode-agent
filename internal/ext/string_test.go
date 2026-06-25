@@ -1,4 +1,4 @@
-package stringext
+package ext
 
 import (
 	"encoding/base64"

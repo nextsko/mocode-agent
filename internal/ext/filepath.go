@@ -1,4 +1,4 @@
-package filepathext
+package ext
 
 import (
 	"path/filepath"
