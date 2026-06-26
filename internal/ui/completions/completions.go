@@ -325,7 +325,19 @@ func (c *Completions) SetAtItems(items []AtCompletionValue, t *styles.Styles, ou
 	c.list.SetReverse(false)
 
 	allItems := make([]list.FilterableItem, 0, len(items))
+	// Group @ items into titled sections. Each category marker (IsCategory)
+	// becomes a non-selectable SlashGroupItem header, so typing a bare "@"
+	// shows MCP / Skills / Files / Dirs / Workflows as distinct sections
+	// instead of one undifferentiated list. The category row itself is dropped
+	// (its text is redundant with the header).
 	for _, item := range items {
+		if item.IsCategory {
+			label := sectionLabel(item.Category, item.Token)
+			if label != "" {
+				allItems = append(allItems, NewSlashGroupItem(label, t.Dialog.NormalItem))
+			}
+			continue
+		}
 		allItems = append(allItems, NewAtCompletionItem(item, t))
 	}
 
@@ -697,4 +709,25 @@ func loadMCPResources() []ResourceCompletionValue {
 		}
 	}
 	return resources
+}
+
+// sectionLabel maps an @ category to a human-readable section header. The
+// header prefixes the items in that category when a bare "@" is typed, so the
+// popup reads as grouped sections (MCP, Skills, Files, ...) rather than one
+// flat list. Returns "" for unknown categories to suppress a header.
+func sectionLabel(category, token string) string {
+	switch category {
+	case "mcp":
+		return "MCP"
+	case "skill":
+		return "Skills"
+	case "file":
+		return "Files"
+	case "dir":
+		return "Directories"
+	case "workflow":
+		return "Workflows"
+	default:
+		return strings.TrimSuffix(strings.TrimPrefix(token, "@"), ":")
+	}
 }
