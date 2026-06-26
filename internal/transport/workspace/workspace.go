@@ -189,6 +189,15 @@ type Workspace interface {
 	AgentRegisterExtension(ext extension.Extension)
 	// AgentUnregisterExtension detaches a lifecycle extension by name.
 	AgentUnregisterExtension(name string)
+
+	// AgentDir returns the directory the config loader scans for agent .md
+	// files. The /evo loop materializes fixed agents here so they become
+	// selectable, runnable modes.
+	AgentDir() string
+	// AgentReload re-reads a single agent .md by id+path and merges it into the
+	// live config so it appears in the mode picker without a restart. Used by
+	// the /evo loop right after materializing a fixed agent.
+	AgentReload(id, path string) error
 }
 
 // MCPResourceContents holds the contents of an MCP resource.

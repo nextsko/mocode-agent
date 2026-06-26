@@ -168,7 +168,19 @@ func (m *UI) confirmEvoExit() (tea.Cmd, bool) {
 	if _, err := store.Fix(context.Background(), rev.AgentName, rev.AgentName, "fixed via /evo exit", rev); err != nil {
 		return infoCmd("left /evo but fixation failed: " + err.Error()), true
 	}
-	return infoCmd("left /evo — agent fixed as " + rev.AgentName), true
+	// Close the loop: materialize the fixed agent as a config-loadable .md so
+	// it appears in the mode picker and becomes runnable via SwitchAgent.
+	if entry, err := evo.LoadAgent(context.Background(), evoRoot(), rev.AgentName); err == nil {
+		dir := m.com.Workspace.AgentDir()
+		id := evo.ModeAgentID(rev.AgentName)
+		if mErr := evo.MaterializeAgent(entry, dir); mErr != nil {
+			return infoCmd("left /evo — fixed " + rev.AgentName + " but materialization failed: " + mErr.Error()), true
+		}
+		// Hot-reload the materialized .md into the live config so the agent is
+		// selectable now, without restarting.
+		_ = m.com.Workspace.AgentReload(id, filepath.Join(dir, id+".md"))
+	}
+	return infoCmd("left /evo — agent fixed, available as /" + evo.ModeAgentID(rev.AgentName)), true
 }
 
 // infoCmd returns a command that surfaces a transient info toast.

@@ -545,6 +545,16 @@ func (w *AppWorkspace) AgentUnregisterExtension(name string) {
 	}
 }
 
+// AgentDir returns the agents directory the config loader scans.
+func (w *AppWorkspace) AgentDir() string {
+	return config.ResolveAgentsDir(w.Config())
+}
+
+// AgentReload re-reads a single agent .md and merges it into the live config.
+func (w *AppWorkspace) AgentReload(id, path string) error {
+	return w.app.Store().ReloadAgent(id, path)
+}
+
 // BuildCommandRegistry returns a flat list of all command descriptors from all registered
 // providers. Action is nil — UI layer maps ID to Action to avoid circular deps.
 func (w *AppWorkspace) BuildCommandRegistry() []slash.CommandDescriptor {
