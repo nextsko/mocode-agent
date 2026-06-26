@@ -1,12 +1,16 @@
 package evolution
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/package-register/mocode/internal/core/agent/evolution/gates"
 )
 
 // Producer turns session-log observations into evolution patches. It is the
@@ -21,9 +25,10 @@ import (
 // than an in-memory correction.
 type Producer struct {
 	store        *PatchStore
-	sessionsDir  string // .mocode/sessions/
-	minRepeats   int    // errors of the same tool+signature before a patch is produced
-	signatureLen int    // chars of error content used as the dedup signature
+	sessionsDir  string          // .mocode/sessions/
+	minRepeats   int             // errors of the same tool+signature before a patch is produced
+	signatureLen int             // chars of error content used as the dedup signature
+	gates        *gates.Pipeline // optional quality-gate pipeline; nil = direct publish
 }
 
 // ProducerOption configures a Producer.
@@ -37,6 +42,40 @@ func WithMinRepeats(n int) ProducerOption {
 			p.minRepeats = n
 		}
 	}
+}
+
+// WithGates configures a quality-gate pipeline. When set, every candidate
+// patch is validated through the gate chain (spec -> safety -> effectiveness
+// -> human) before persistence. Candidates that fail any gate are skipped
+// rather than persisted, so they never reach the system-prompt injection
+// path. Absorbed from trpc-agent-go's evolution gate design.
+func WithGates(pipeline *gates.Pipeline) ProducerOption {
+	return func(p *Producer) {
+		p.gates = pipeline
+	}
+}
+
+// gateCandidate runs a candidate patch through the configured gate pipeline.
+// When no pipeline is configured it is a no-op (legacy direct-publish). A
+// rejection is returned as an error whose message names the rejecting gate;
+// callers treat it as a skip rather than a hard failure.
+func (p *Producer) gateCandidate(title, description, body string) error {
+	if p.gates == nil {
+		return nil
+	}
+	verdict, err := p.gates.Run(context.Background(), &gates.Candidate{
+		Action:      gates.ActionCreate,
+		Title:       title,
+		Description: description,
+		Body:        body,
+	})
+	if err != nil {
+		return err
+	}
+	if !verdict.Passed {
+		return fmt.Errorf("gate %s rejected: %v", verdict.RejectingGate, verdict.Reasons)
+	}
+	return nil
 }
 
 // NewProducer builds a Producer reading session logs from sessionsDir and
@@ -101,8 +140,12 @@ func (p *Producer) Produce() ([]string, error) {
 		if err != nil {
 			return created, err
 		}
-		created = append(created, id)
-		seen[title] = true
+		// Skip empty IDs: a gate rejection returns ("", nil) to soft-skip
+		// rather than abort the run. Don't track it as created or seen.
+		if id != "" {
+			created = append(created, id)
+			seen[title] = true
+		}
 	}
 
 	// Effect loop: if turns are consistently low-scoring, emit a quality rule.
@@ -177,9 +220,9 @@ func parseBugEntries(path string) []bugObservation {
 	var observations []bugObservation
 	for _, block := range splitJSONBlocks(string(raw)) {
 		var entry struct {
-			Event    string `json:"event"`
-			Data     string `json:"data"`
-			Meta     struct {
+			Event string `json:"event"`
+			Data  string `json:"data"`
+			Meta  struct {
 				ToolName  string `json:"tool_name"`
 				ErrorType string `json:"error_type"`
 			} `json:"meta"`
@@ -238,6 +281,13 @@ func (p *Producer) emitRulePatch(c errorSignature, title string) (string, error)
 		// learned and drops out of the unapplied set (prevents unbounded
 		// context growth). Tuned for repeated exposure without permanence.
 		MaxInjects: 10,
+	}
+	if err := p.gateCandidate(patch.Title, patch.Description, rule); err != nil {
+		// Gate rejection is a soft skip: the gate is doing its job by
+		// blocking a secret/dangerous/malformed patch. Log and continue to
+		// the next cluster instead of aborting the whole Produce run.
+		slog.Warn("Evolution patch gated", "title", patch.Title, "reason", err)
+		return "", nil
 	}
 	patchDir, err := p.store.CreatePatch(patch)
 	if err != nil {
@@ -336,16 +386,20 @@ func (p *Producer) produceQualityPatch(seen map[string]bool) (string, bool, erro
 		CreatedAt:   time.Now(),
 		MaxInjects:  10,
 	}
-	patchDir, err := p.store.CreatePatch(patch)
-	if err != nil {
-		return "", false, err
-	}
 	rule := fmt.Sprintf("<!-- evolution: quality rule (avg score %.2f) -->\n"+
 		"**Response quality has been consistently low** (average judge score %.2f over %d turns).\n\n"+
 		"Before finalizing a response, verify it:\n"+
 		"- Directly and accurately addresses the user's request\n"+
 		"- Is complete, with no missing steps or hand-waving\n"+
 		"- Is clear and free of factual errors\n", avg, avg, len(scores))
+	if err := p.gateCandidate(patch.Title, patch.Description, rule); err != nil {
+		slog.Warn("Evolution patch gated", "title", patch.Title, "reason", err)
+		return "", false, nil
+	}
+	patchDir, err := p.store.CreatePatch(patch)
+	if err != nil {
+		return "", false, err
+	}
 	if err := p.store.WriteFile(patchDir, "rules", "rule.md", rule); err != nil {
 		return "", false, err
 	}

@@ -58,7 +58,14 @@ var secretPatterns = []namedPattern{
 // dangerousShellPatterns detect destructive recipes that should never appear
 // in a skill body the agent is told to follow.
 var dangerousShellPatterns = []namedPattern{
-	{"rm_rf_root", regexp.MustCompile(`(?i)\brm\s+-rf\s+/`)},
+	// rm -rf against the filesystem root is always destructive. We split this
+	// into two precise patterns rather than one broad one: a bare `rm -rf /`
+	// (with nothing after the slash) and `rm -rf /<system-dir>` (usr, etc, bin,
+	// ...). This avoids false-positives on legitimate cleanups like
+	// `rm -rf /tmp/build` or `rm -rf /home/user/dist`, which the broad pattern
+	// incorrectly caught. Adapted from trpc-agent-go, refined for precision.
+	{"rm_rf_root", regexp.MustCompile(`(?i)\brm\s+-rf\s+/(?:\s|$)`)},
+	{"rm_rf_sysdir", regexp.MustCompile(`(?i)\brm\s+-rf\s+/(?:usr|etc|bin|sbin|var|root|lib|boot|proc|sys|dev)(?:\b|/)`)},
 	{"rm_rf_home", regexp.MustCompile(`(?i)\brm\s+-rf\s+\$HOME\b`)},
 	{"dd_raw_disk", regexp.MustCompile(`(?i)\bdd\s+[^\n]*of=/dev/[sh]d`)},
 	{"curl_pipe_shell", regexp.MustCompile(`(?i)curl\s+[^\n]*\|\s*(sh|bash|zsh)\b`)},

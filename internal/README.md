@@ -28,7 +28,7 @@ in `ui/slash/`.
 | Container | Layer | Packages |
 |-----------|-------|----------|
 | `util/` | 0 — cross-cutting primitives | `ext`, `csync`, `infra`, `fsext`, `diff`, `log`, `errcoll`, `version`, `pubsub`, `anim` |
-| `domain/` | 1 — pure models | `session`, `types`, `history`, `filetracker` |
+| `domain/` | 1 — pure models | `session`, `types`, `history`, `filetracker`, `messenger` (send port), `theme` (color port), `memory` |
 | `store/` | 2 — persistence | (JSONL repository) |
 | `core/` | 3 — application core | `agent`, `app`, `config`, `permission`, `hooks`, `skills`, `knowledge`, `evolution`, `crawler`, `evaluation`, `shellruntime` |
 | `transport/` | 4 — entry points | `cmd`, `admin`, `workspace` |

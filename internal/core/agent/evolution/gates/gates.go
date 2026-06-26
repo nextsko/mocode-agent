@@ -57,7 +57,7 @@ type Outcome struct {
 	Status OutcomeStatus `json:"status,omitempty"`
 	// Score is a normalized metric on a 0..1 scale. nil means "no score".
 	Score *float64 `json:"score,omitempty"`
-	Notes string    `json:"notes,omitempty"`
+	Notes string   `json:"notes,omitempty"`
 }
 
 // Candidate is a proposed evolution patch awaiting gate validation. The

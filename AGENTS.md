@@ -80,6 +80,11 @@ See [docs/architecture/control-plane.md](docs/architecture/control-plane.md).
 - **Hooks**: User shell commands in Mocode.json; engine in `internal/hooks/`. See `HOOKS.md`.
 - **CGO disabled**: `CGO_ENABLED=0`, `GOEXPERIMENT=greenteagc`.
 
+- **Layer boundaries**: verified by `go run ./scripts/layercheck` (zero upward violations). Dependency direction is strictly `transport/integration/ui -> core -> store/domain -> util`.
+- **Dependency inversion via domain ports**: cross-layer needs go through interfaces in `internal/domain/` (e.g. `messenger.Messenger`, `theme.SpinnerThemer`); integration/UI provide adapters. See docs/dev-notes/structure-governance-baseline.md.
+- **Agent extensions**: lifecycle hooks via `internal/core/agent/extension`; panic-recovered, duplicate-name-rejecting, AbortRun-honoring. The coordinator fires `before_run`/`after_run` events.
+- **Self-evolution with quality gates**: `internal/core/agent/evolution` produces patches from session logs; candidates pass through `evolution/gates` (SpecGate -> SafetyGate) before persistence via `cmd evolve`.
+- **Web search provider chain**: `netcommon.Provider` interface with fallback (DuckDuckGo HTML -> Instant Answer API); inject custom chains via `NewWebSearchToolWithProvider`.
 ## Build/Test/Lint Commands
 
 - **Version bump**: Use `task version:show` to inspect the current internal version and next semver tag, use `task version:bump` to automatically bump `internal/version/version.go`, use `task version:set VERSION=x.y.z` to set a specific version manually, and use `task release` to bump the version, create the release commit, tag it, and push it in one flow.

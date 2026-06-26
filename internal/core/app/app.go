@@ -36,8 +36,8 @@ import (
 	"github.com/package-register/mocode/internal/domain/history"
 	"github.com/package-register/mocode/internal/domain/session"
 	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/package-register/mocode/internal/domain/theme"
 	"github.com/package-register/mocode/internal/store"
-	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/package-register/mocode/internal/util/anim"
 	"github.com/package-register/mocode/internal/util/errcoll"
 	"github.com/package-register/mocode/internal/util/log"
@@ -57,6 +57,8 @@ type App struct {
 	Memory     memory.Service
 
 	config *config.ConfigStore
+
+	theme theme.SpinnerThemer // resolves spinner colors; defaults to NoopThemer, wired from the UI layer
 
 	serviceEventsWG *sync.WaitGroup
 	eventsCtx       context.Context
@@ -283,7 +285,11 @@ func (app *App) RunNonInteractive(ctx context.Context, output io.Writer, prompt,
 	progress = app.config.Config().Options.Progress == nil || *app.config.Config().Options.Progress
 
 	if !hideSpinner && stderrTTY {
-		t := styles.ThemeForProvider(app.config.Config().Models[config.SelectedModelTypeLarge].Provider)
+		themer := app.theme
+		if themer == nil {
+			themer = theme.NoopThemer{}
+		}
+		sc := themer.SpinnerColorsForProvider(app.config.Config().Models[config.SelectedModelTypeLarge].Provider)
 
 		// Detect background color to set the appropriate color for the
 		// spinner's 'Generating...' text. Without this, that text would be
@@ -292,14 +298,14 @@ func (app *App) RunNonInteractive(ctx context.Context, output io.Writer, prompt,
 		if f, ok := output.(*os.File); ok && stdinTTY && stdoutTTY {
 			hasDarkBG = lipgloss.HasDarkBackground(os.Stdin, f)
 		}
-		defaultFG := lipgloss.LightDark(hasDarkBG)(charmtone.Pepper, t.WorkingLabelColor)
+		defaultFG := lipgloss.LightDark(hasDarkBG)(charmtone.Pepper, sc.LabelColor)
 
 		spinner = anim.NewSpinner(ctx, cancel, anim.Settings{
 			Size:        10,
 			Label:       "Generating",
 			LabelColor:  defaultFG,
-			GradColorA:  t.WorkingGradFromColor,
-			GradColorB:  t.WorkingGradToColor,
+			GradColorA:  sc.GradFrom,
+			GradColorB:  sc.GradTo,
 			CycleColors: true,
 		})
 		spinner.Start()
@@ -514,6 +520,16 @@ func (app *App) GetDefaultSmallModel(providerID string) config.SelectedModel {
 		MaxTokens:       model.DefaultMaxTokens,
 		ReasoningEffort: model.DefaultReasoningEffort,
 	}
+}
+
+// SetSpinnerThemer wires the spinner color resolver. Called from the UI/transport
+// layer after construction; core/app never imports ui/styles. Defaults to
+// NoopThemer when unset, so non-TUI builds render black spinner colors.
+func (app *App) SetSpinnerThemer(t theme.SpinnerThemer) {
+	if t == nil {
+		t = theme.NoopThemer{}
+	}
+	app.theme = t
 }
 
 func (app *App) setupEvents() {

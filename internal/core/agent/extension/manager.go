@@ -12,7 +12,7 @@ import (
 // a no-op until extensions are registered, so the coordinator can always hold
 // one without nil checks.
 type Manager struct {
-	mu         sync.RWMutex
+	mu sync.RWMutex
 	// order preserves registration order so dispatch is deterministic.
 	order []string
 	// extensions maps name -> extension for lookup.
@@ -45,6 +45,45 @@ func (m *Manager) Register(ext Extension) *Manager {
 		m.enabled[name] = true
 	}
 	return m
+}
+
+// RegisterOrError adds an extension, rejecting a shadowing re-registration:
+// if name is already in use by a different extension instance, it returns an
+// error instead of silently replacing it. An exact re-registration (same
+// extension) is idempotent and succeeds. This mirrors trpc-agent-go's
+// extension.Collect duplicate-name rejection as a construction-time safety
+// check: two extensions sharing a Name would silently shadow each other,
+// which is almost always a wiring bug.
+func (m *Manager) RegisterOrError(ext Extension) error {
+	if ext == nil {
+		return fmt.Errorf("extension: register nil extension")
+	}
+	name := ext.Name()
+	if name == "" {
+		return fmt.Errorf("extension: register extension with empty name")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if existing, ok := m.extensions[name]; ok && existing != ext {
+		return fmt.Errorf("extension: duplicate name %q (already registered as %T)", name, existing)
+	}
+	_, existed := m.extensions[name]
+	m.extensions[name] = ext
+	if !existed {
+		m.order = append(m.order, name)
+		m.enabled[name] = true
+	}
+	return nil
+}
+
+// MustRegister is RegisterOrError for construction-time wiring: a shadowing
+// duplicate is a programming error and panics rather than silently dropping a
+// registration. Use this when extensions are registered at startup where a
+// duplicate is a bug you want to fail loudly.
+func (m *Manager) MustRegister(ext Extension) {
+	if err := m.RegisterOrError(ext); err != nil {
+		panic(err)
+	}
 }
 
 // Unregister removes an extension by name. Missing names are a no-op.
@@ -137,7 +176,8 @@ func (m *Manager) runCallback(
 ) (dec *Decision, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			slog.Error("Extension callback panicked",
+			slog.Error(
+				"Extension callback panicked",
 				"extension", extName,
 				"event", string(ev),
 				"panic", fmt.Sprint(r),
@@ -148,7 +188,8 @@ func (m *Manager) runCallback(
 	}()
 	dec, err = cb(ctx, ev, ec)
 	if err != nil {
-		slog.Warn("Extension callback returned error",
+		slog.Warn(
+			"Extension callback returned error",
 			"extension", extName,
 			"event", string(ev),
 			"error", err,

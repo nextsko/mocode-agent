@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/package-register/mocode/internal/core/agent/tools/plugins/netcommon"
 	"github.com/package-register/mocode/internal/core/agent/toolutil"
 
 	"charm.land/fantasy"
@@ -35,15 +36,7 @@ var sourcegraphDescription []byte
 
 func NewSourcegraphTool(client *http.Client) fantasy.AgentTool {
 	if client == nil {
-		transport := http.DefaultTransport.(*http.Transport).Clone()
-		transport.MaxIdleConns = 100
-		transport.MaxIdleConnsPerHost = 10
-		transport.IdleConnTimeout = 90 * time.Second
-
-		client = &http.Client{
-			Timeout:   30 * time.Second,
-			Transport: transport,
-		}
+		client = netcommon.DefaultHTTPClient()
 	}
 	return fantasy.NewParallelAgentTool(
 		SourcegraphToolName,
@@ -136,7 +129,8 @@ func NewSourcegraphTool(client *http.Client) fantasy.AgentTool {
 			}
 
 			return fantasy.NewTextResponse(formattedResults), nil
-		})
+		},
+	)
 }
 
 func formatSourcegraphResults(result map[string]any, contextWindow int) (string, error) {

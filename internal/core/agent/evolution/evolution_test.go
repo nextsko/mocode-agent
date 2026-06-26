@@ -29,7 +29,8 @@ func TestCreateAndListPatch(t *testing.T) {
 	}
 
 	// Write a rule file into the patch.
-	err = store.WriteFile(patchDir, "rules", "path-guard.md",
+	err = store.WriteFile(
+		patchDir, "rules", "path-guard.md",
 		"## Rule: Path Validation\n\nMUST: Verify file path is within working directory before writing.",
 	)
 	if err != nil {

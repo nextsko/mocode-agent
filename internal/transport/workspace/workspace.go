@@ -9,8 +9,8 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/fantasy"
 	"charm.land/catwalk/pkg/catwalk"
+	"charm.land/fantasy"
 
 	"github.com/package-register/mocode/internal/core/agent/extension"
 	"github.com/package-register/mocode/internal/core/agent/tools/lsp"

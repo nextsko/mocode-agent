@@ -53,9 +53,9 @@ func TestSpecGateRejectsEmptyDescription(t *testing.T) {
 func TestSpecGateRejectsDuplicateCreate(t *testing.T) {
 	p := &Pipeline{Spec: NewDefaultSpecGate()}
 	c := &Candidate{
-		Action:        ActionCreate,
-		Title:         "Rule: Avoid Bash Error",
-		Description:   "d",
+		Action:         ActionCreate,
+		Title:          "Rule: Avoid Bash Error",
+		Description:    "d",
 		ExistingTitles: []string{"rule: avoid bash error"},
 	}
 	v, err := p.Run(context.Background(), c)
@@ -70,9 +70,9 @@ func TestSpecGateAllowsUpdateOfExisting(t *testing.T) {
 	// as duplicates.
 	p := &Pipeline{Spec: NewDefaultSpecGate()}
 	c := &Candidate{
-		Action:        ActionUpdate,
-		Title:         "Rule: Avoid Bash Error",
-		Description:   "d",
+		Action:         ActionUpdate,
+		Title:          "Rule: Avoid Bash Error",
+		Description:    "d",
 		ExistingTitles: []string{"rule: avoid bash error"},
 	}
 	v, err := p.Run(context.Background(), c)
@@ -110,6 +110,30 @@ func TestSafetyRejectsRmRfRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	rejectFrom(t, v, "safety")
+}
+
+// TestSafetyAllowsLegitTmpCleanup confirms the refined rm_rf regex does NOT
+// false-positive on legitimate cleanup commands like `rm -rf /tmp/build`. This
+// is the precision fix: the broad pattern caught any /-prefixed path; the
+// refined one only catches bare root and destructive system directories.
+func TestSafetyAllowsLegitTmpCleanup(t *testing.T) {
+	p := &Pipeline{Safety: NewDefaultSafetyGate()}
+	cases := []string{
+		"rm -rf /tmp/build",
+		"rm -rf /home/user/dist",
+		"rm -rf ./node_modules",
+		"rm -rf build/",
+	}
+	for _, body := range cases {
+		c := &Candidate{Action: ActionCreate, Title: "clean build", Description: "d", Body: body}
+		v, err := p.Run(context.Background(), c)
+		if err != nil {
+			t.Fatalf("Run error for %q: %v", body, err)
+		}
+		if !v.Passed {
+			t.Errorf("expected %q to PASS safety (legit cleanup), got reject from %s: %v", body, v.RejectingGate, v.Reasons)
+		}
+	}
 }
 
 func TestSafetyRejectsCurlPipeShell(t *testing.T) {

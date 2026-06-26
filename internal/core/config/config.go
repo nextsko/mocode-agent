@@ -544,6 +544,7 @@ func allToolNames() []string {
 		"mocode_info",
 		"mocode_logs",
 		"job_output",
+		"job_input",
 		"job_kill",
 		"download",
 		"edit",

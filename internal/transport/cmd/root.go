@@ -23,13 +23,16 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
+	"github.com/package-register/mocode/internal/core/agent/extension"
 	"github.com/package-register/mocode/internal/core/app"
 	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/core/config/projects"
 	"github.com/package-register/mocode/internal/domain/session"
+	"github.com/package-register/mocode/internal/integration/wechat"
 	"github.com/package-register/mocode/internal/transport/workspace"
 	"github.com/package-register/mocode/internal/ui/common"
 	ui "github.com/package-register/mocode/internal/ui/model"
+	"github.com/package-register/mocode/internal/ui/styles"
 	mocodelog "github.com/package-register/mocode/internal/util/log"
 	"github.com/package-register/mocode/internal/util/version"
 )
@@ -419,6 +422,23 @@ func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error
 	if err != nil {
 		slog.Error("Failed to create app instance", "error", err)
 		return nil, nil, err
+	}
+
+	// Wire the WeChat messenger port into the agent coordinator. This keeps the
+	// dependency direction transport -> integration -> (core port) clean; the
+	// core tool layer only knows the domain messenger.Messenger interface.
+	if appInstance.AgentCoordinator != nil {
+		appInstance.AgentCoordinator.SetMessenger(wechat.AsMessenger(wechat.GetManager()))
+	}
+
+	// Wire the spinner themer port: transport -> ui/styles adapter -> domain.theme port.
+	// core/app never imports ui/styles, so its spinner colors are injected here.
+	appInstance.SetSpinnerThemer(styles.SpinnerThemer{})
+
+	// Wire the extension/callback manager (on_xxx lifecycle hooks). An empty
+	// manager is still valid: dispatch is a no-op until extensions register.
+	if appInstance.AgentCoordinator != nil {
+		appInstance.AgentCoordinator.SetExtensions(extension.NewManager())
 	}
 
 	ws := workspace.NewAppWorkspace(appInstance, store)

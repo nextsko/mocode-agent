@@ -69,13 +69,13 @@ type PatchStore struct {
 	dir string // .mocode/patches/
 }
 
-// NewPatchStore creates a store rooted at the given directory.
+// NewPatchStore creates a store rooted at the given directory. It does NOT
+// create the directory: the read path (List) tolerates a missing dir (returns
+// no patches), and the write path (CreatePatch) creates the tree on demand.
+// This avoids a needless MkdirAll syscall on every Run when the store is only
+// used to read patches on the hot path.
 func NewPatchStore(baseDir string) (*PatchStore, error) {
-	dir := filepath.Join(baseDir, "patches")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, fmt.Errorf("create patches dir: %w", err)
-	}
-	return &PatchStore{dir: dir}, nil
+	return &PatchStore{dir: filepath.Join(baseDir, "patches")}, nil
 }
 
 // CreatePatch creates a new patch directory and writes patch.json.

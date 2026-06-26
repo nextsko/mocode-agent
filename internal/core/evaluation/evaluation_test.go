@@ -109,3 +109,5 @@ func (nilAgent) Summarize(context.Context, string, fantasy.ProviderOptions) (str
 	return "", nil
 }
 func (nilAgent) Model() agent.Model { return agent.Model{} }
+
+func (nilAgent) SmallModel() agent.Model { return agent.Model{} }

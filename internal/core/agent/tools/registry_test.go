@@ -23,6 +23,7 @@ var knownAllToolNames = []string{
 	MocodeInfoToolName,
 	MocodeLogsToolName,
 	JobOutputToolName,
+	JobInputToolName,
 	JobKillToolName,
 	DownloadToolName,
 	EditToolName,

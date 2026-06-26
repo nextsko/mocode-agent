@@ -540,7 +540,8 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 			return nil, updateErr
 		}
 		if ctxTooLarge {
-			slog.Warn("Context window exceeded; summarizing and retrying",
+			slog.Warn(
+				"Context window exceeded; summarizing and retrying",
 				"session_id", call.SessionID,
 				"max_tokens", providerErr.ContextMaxTokens,
 				"used_tokens", providerErr.ContextUsedTokens,
@@ -637,7 +638,8 @@ func (a *sessionAgent) Summarize(ctx context.Context, sessionID string, opts fan
 	defer a.activeRequests.Del(sessionID)
 	defer cancel()
 
-	agent := fantasy.NewAgent(largeModel.Model,
+	agent := fantasy.NewAgent(
+		largeModel.Model,
 		fantasy.WithSystemPrompt(string(summaryPrompt)),
 		fantasy.WithUserAgent(userAgent),
 	)

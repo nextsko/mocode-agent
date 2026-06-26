@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/package-register/mocode/internal/core/agent/evolution"
+	"github.com/package-register/mocode/internal/core/agent/evolution/gates"
 	"github.com/package-register/mocode/internal/core/config"
 )
 
@@ -16,8 +17,8 @@ var evolveCmd = &cobra.Command{
 	Use:   "evolve",
 	Short: "Produce evolution patches from session error logs",
 	Long: `Scan session bug logs for recurring tool errors and produce rule patches
- into .mocode/patches/. Produced patches are injected into future agent runs
- via injectEvolutionContext. Safe to re-run: existing patches are not duplicated.`,
+into .mocode/patches/. Produced patches are injected into future agent runs
+via injectEvolutionContext. Safe to re-run: existing patches are not duplicated.`,
 	RunE: runEvolve,
 }
 
@@ -46,7 +47,18 @@ func runEvolve(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("open patch store: %w", err)
 	}
 	sessionsDir := filepath.Join(dataDir, "sessions")
-	prod, err := evolution.NewProducer(store, sessionsDir, evolution.WithMinRepeats(evolveMinRepeats))
+	prod, err := evolution.NewProducer(
+		store, sessionsDir,
+		evolution.WithMinRepeats(evolveMinRepeats),
+		// Gate candidate patches before persistence so secrets, dangerous
+		// shell patterns, and malformed patches never reach the system-prompt
+		// injection path. The effectiveness gate is omitted here because the
+		// offline producer has no Outcome signal.
+		evolution.WithGates(&gates.Pipeline{
+			Spec:   gates.NewDefaultSpecGate(),
+			Safety: gates.NewDefaultSafetyGate(),
+		}),
+	)
 	if err != nil {
 		return fmt.Errorf("build producer: %w", err)
 	}

@@ -58,7 +58,8 @@ func filterEmptyContentMessages(msgs []fantasy.Message) []fantasy.Message {
 	filtered := msgs[:0]
 	for _, msg := range msgs {
 		if msg.Role != fantasy.MessageRoleSystem && len(msg.Content) == 0 {
-			slog.Warn("Dropping message with empty content in PrepareStep",
+			slog.Warn(
+				"Dropping message with empty content in PrepareStep",
 				"role", msg.Role,
 			)
 			continue
@@ -83,7 +84,8 @@ func filterOrphanedToolResults(m message.Message, knownToolCallIDs map[string]st
 		if _, known := knownToolCallIDs[tr.ToolCallID]; known {
 			validParts = append(validParts, part)
 		} else {
-			slog.Warn("Dropping orphaned tool result with no matching tool call",
+			slog.Warn(
+				"Dropping orphaned tool result with no matching tool call",
 				"tool_call_id", tr.ToolCallID,
 			)
 		}
@@ -102,7 +104,8 @@ func syntheticToolResultsForOrphanedCalls(m message.Message, knownToolResultIDs 
 		if _, hasResult := knownToolResultIDs[tc.ID]; hasResult {
 			continue
 		}
-		slog.Warn("Injecting synthetic tool result for orphaned tool call",
+		slog.Warn(
+			"Injecting synthetic tool result for orphaned tool call",
 			"tool_call_id", tc.ID,
 			"tool_name", tc.Name,
 		)
@@ -169,4 +172,40 @@ func providerRetryLogFields(err *fantasy.ProviderError, delay time.Duration) []a
 		fields = append(fields, "message", err.Message)
 	}
 	return fields
+}
+
+// buildTodoNudge produces a system-message reminder of open todos, injected at
+// each model step (PrepareStep) to nudge the agent toward finishing pending or
+// in-progress items before declaring itself done. This is the soft variant of
+// trpc-agent-go's todoenforcer: it cannot hard-block "Done" (that needs
+// model-step Done-flipping inside the fantasy loop), but surfacing open work at
+// every step empirically reduces early-exit failures. Returns "" when there is
+// nothing open, so the caller injects nothing.
+func buildTodoNudge(todos []session.Todo) string {
+	var open []session.Todo
+	for _, t := range todos {
+		if t.Status != session.TodoStatusCompleted {
+			open = append(open, t)
+		}
+	}
+	if len(open) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("Reminder: the following todos are still open. Complete them (or use the todos tool to mark progress) before producing a final answer.")
+	for _, t := range open {
+		marker := "[pending]"
+		if t.Status == session.TodoStatusInProgress {
+			marker = "[in_progress]"
+		}
+		text := t.Content
+		if t.ActiveForm != "" {
+			text = t.ActiveForm
+		}
+		sb.WriteString("\n- ")
+		sb.WriteString(marker)
+		sb.WriteString(" ")
+		sb.WriteString(text)
+	}
+	return sb.String()
 }

@@ -1143,11 +1143,13 @@ func (c *coordinator) fireExtensions(ctx context.Context, ev extension.Event, ec
 	return dec
 }
 
-// resultMessages is a placeholder for extracting a message trace from a run
-// result. fantasy.AgentResult exposes Steps/Response rather than a flat
-// message slice; the /evo loop fills this from the session service when it
-// needs the full trace. Returning nil is safe: extension observers that only
-// need the prompt + outcome still fire correctly.
+// resultMessages returns the message trace from a run result. Currently nil:
+// fantasy.AgentResult exposes []fantasy.Message (per-step), but the extension
+// Context.Messages is []message.Message (the domain type). These are distinct
+// structs, not aliases, so flattening requires a conversion the evo loop does
+// not need — extension consumers use Prompt + Response + ToolNames instead.
+// When a future extension needs the full trace, add a fantasy->domain Message
+// converter here.
 func resultMessages(_ *fantasy.AgentResult) []message.Message {
 	return nil
 }

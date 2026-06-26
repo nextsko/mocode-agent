@@ -9,8 +9,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/package-register/mocode/internal/core/agent"
 	"charm.land/fantasy"
+	"github.com/package-register/mocode/internal/core/agent"
 	"github.com/package-register/mocode/internal/core/agent/extension"
 	"github.com/package-register/mocode/internal/core/agent/tools/lsp"
 	mcptools "github.com/package-register/mocode/internal/core/agent/tools/mcp"
