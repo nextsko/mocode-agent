@@ -10,6 +10,7 @@ import (
 
 	"github.com/package-register/mocode/internal/core/agent/evo"
 	wechat "github.com/package-register/mocode/internal/integration/wechat"
+	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/package-register/mocode/internal/ui/util"
 	"github.com/package-register/mocode/internal/util/infra"
@@ -20,6 +21,7 @@ const (
 	slashCmdContext  = "/context"
 	slashCmdRollback = "/rollback"
 	slashCmdEvo      = "/evo"
+	slashCmdCopy     = "/copy"
 )
 
 // handleSlashCommand dispatches a slash command typed in the input box.
@@ -55,6 +57,9 @@ func (m *UI) handleSlashCommand(value string) (tea.Cmd, bool) {
 		return m.rollbackSession(args), true
 	case slashCmdEvo:
 		return m.handleEvoCommand(args)
+	case slashCmdCopy:
+		// "/copy" and "/copy recent" both copy the last assistant reply.
+		return m.handleCopyCommand(args)
 	}
 
 	// ── Unified lookup: search completion groups by label ──
@@ -186,6 +191,25 @@ func (m *UI) confirmEvoExit() (tea.Cmd, bool) {
 // infoCmd returns a command that surfaces a transient info toast.
 func infoCmd(msg string) tea.Cmd {
 	return func() tea.Msg { return util.InfoMsg{Type: util.InfoTypeInfo, Msg: msg} }
+}
+
+// handleCopyCommand implements "/copy" and "/copy recent": it copies the most
+// recent assistant reply text to the system clipboard. "/copy" defaults to
+// "recent" since that is the only mode for now. The reply text is tracked on
+// the model as finalized assistant messages arrive (no IO here).
+func (m *UI) handleCopyCommand(args string) (tea.Cmd, bool) {
+	args = strings.TrimSpace(args)
+	if args != "" && args != "recent" {
+		return infoCmd("unknown /copy target: " + args + " (try /copy recent)"), true
+	}
+	if strings.TrimSpace(m.lastAssistantReplyText) == "" {
+		return infoCmd("no recent assistant reply to copy"), true
+	}
+	return common.CopyToClipboardWithCallback(
+		m.lastAssistantReplyText,
+		"Copied recent reply to clipboard",
+		nil,
+	), true
 }
 
 // evoRoot returns the directory under which fixed evo agents are persisted.

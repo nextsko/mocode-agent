@@ -177,7 +177,8 @@ func (m *UI) slashCompletionGroups() []completions.SlashGroup {
 
 	// ── Help ──────────────────────────────────────────────────────────────
 	helpItems := []completions.SlashCompletionValue{
-		v("/help", "Show help & key bindings", nil),
+		v("/help", "Show help & key bindings", dialog.ActionOpenDialog{DialogID: dialog.HelpID}),
+		v("/copy", "Copy the last assistant reply to clipboard", nil),
 	}
 
 	// ── Admin ─────────────────────────────────────────────────────────────

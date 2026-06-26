@@ -181,6 +181,9 @@ type UI struct {
 	continueLastSession bool
 
 	lastUserMessageTime int64
+	// lastAssistantReplyText is the text of the most recent assistant message,
+	// maintained on message append so /copy-recent can copy it without IO.
+	lastAssistantReplyText string
 
 	// The width and height of the terminal in cells.
 	width  int
@@ -1154,6 +1157,13 @@ func (m *UI) appendSessionMessage(msg message.Message) tea.Cmd {
 			cmds = append(cmds, cmd)
 		}
 	case message.Assistant:
+		// Track the latest assistant reply text for /copy-recent. We capture on
+		// the finalized end-turn message so streaming deltas don't overwrite it.
+		if fp := msg.FinishPart(); fp != nil && fp.Reason == message.FinishReasonEndTurn {
+			if t := strings.TrimSpace(msg.Content().Text); t != "" {
+				m.lastAssistantReplyText = t
+			}
+		}
 		for _, tc := range msg.ToolCalls() {
 			m.registerAgentToolTopology(msg.ID, msg.SessionID, tc)
 		}
