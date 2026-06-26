@@ -389,7 +389,7 @@ Today's date: {{.Date}}
 {{if eq .Platform "windows"}}
 
 Platform notes (windows):
-- The `bash` tool runs a POSIX-compatible shell (mvdan/sh) on ALL platforms. Shell builtins and core utils (ls, cat, grep, sort, head, tail, find, sed, awk) are available even on Windows via a Go-based compatibility layer.
+- The `bash` tool runs a POSIX-compatible shell (mvdan/sh) on ALL platforms. Core utils work on Windows, but PREFER the dedicated tools for file operations: use `grep` tool for searching, `view`/`read_files` for reading, `ls`/`glob` for listing. Reserve `bash` for actual command execution (build, test, git, install). The dedicated tools are faster, give structured output, and work identically across platforms.
 - Use forward slashes in paths inside shell commands: `ls C:/foo/bar`, never `C:\foo\bar`. Backslashes are escape characters in the shell.
 - For tool parameters that take filesystem paths (view, edit, write), use the real native path: a Windows drive letter with backslashes or forward slashes (e.g. `C:\coding\src\main.go` or `C:/coding/src/main.go`).
 - Never invent Unix-style paths (`/home/user/...`, `/usr/local/...`, `/etc/...`). Windows has no such locations. If unsure a path exists, verify it with `ls` or `view` before using it.

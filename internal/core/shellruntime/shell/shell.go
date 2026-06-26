@@ -29,14 +29,13 @@ import (
 	"github.com/package-register/mocode/internal/util/errcoll"
 )
 
-// ShellType represents the type of shell to use
-type ShellType int
-
-const (
-	ShellTypePOSIX ShellType = iota
-	ShellTypeCmd
-	ShellTypePowerShell
-)
+// The shell engine is always mvdan/sh (a Go-implemented POSIX-compatible
+// interpreter), which makes core utils (ls, cat, grep, head, tail, find, sed,
+// awk) available on every platform including Windows — no system shell is
+// invoked. This is intentional: it keeps tool behavior identical across
+// platforms. If Windows-native capabilities (registry, WMI, services) are
+// needed later, add a separate PowerShell tool rather than a ShellType switch
+// here; the current design deliberately has a single execution backend.
 
 // shellErrorToolName is the tool name used when recording shell execution
 // failures from this package.

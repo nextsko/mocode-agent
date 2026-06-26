@@ -17,7 +17,12 @@ Common shell builtins and core utils available on Windows.
 
 <usage_notes>
 - Command required, working_dir optional (defaults to current directory)
-- IMPORTANT: Use Grep/Glob/Agent tools instead of 'find'/'grep'. Use View/LS tools instead of 'cat'/'head'/'tail'/'ls'
+Tool selection (don't reflexively reach for bash):
+- SEARCHING code: use the `grep` tool (faster, structured output, respects ignore patterns). Don't `bash grep` or `bash rg`.
+- READING files: use `view` or `read_files`. Don't `bash cat`, `bash head`, or `bash tail` — they hide line numbers and don't count as "read" for editing.
+- LISTING files: use `ls` or `glob` tools. Don't `bash ls` or `bash find`.
+- EXECUTING commands (build, test, git, install, run scripts): use `bash` — that's what it's for.
+The dedicated tools give better results and work identically across platforms. Bash is for command execution, not file inspection.
 - Chain with ';' or '&&', avoid newlines except in quoted strings
 - Each command runs in independent shell (no state persistence between calls)
 - Prefer absolute paths over 'cd' (use 'cd' only if user explicitly requests)
