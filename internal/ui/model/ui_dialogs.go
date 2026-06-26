@@ -64,6 +64,16 @@ func (m *UI) handleDialogAction(action tea.Msg) tea.Cmd {
 			cmds = append(cmds, msg.Cmd)
 		}
 
+	// /evo self-evolution mode toggle.
+	case dialog.ActionEvo:
+		var args string
+		if !msg.Enter {
+			args = "exit"
+		}
+		if cmd, handled := m.handleEvoCommand(args); handled && cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
 	// Session dialog messages.
 	case dialog.ActionSelectSession:
 		m.dialog.CloseDialog(dialog.SessionsID)

@@ -88,6 +88,7 @@ func (m *UI) slashCompletionGroups() []completions.SlashGroup {
 	agentItems := []completions.SlashCompletionValue{
 		v("/plan", "Switch to SK Plan mode", dialog.ActionSelectMode{ModeID: "plan"}),
 		v("/code", "Switch to Code mode", dialog.ActionSelectMode{ModeID: "coder"}),
+		v("/evo", "Enter self-evolution mode (red/purple)", dialog.ActionEvo{Enter: true}),
 		v("/agents", "Switch agent mode", dialog.ActionOpenDialog{DialogID: dialog.ModesID}),
 		v("/models", "Switch model", dialog.ActionOpenDialog{DialogID: dialog.ModelsID}),
 	}
