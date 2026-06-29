@@ -57,3 +57,13 @@ completions/crush.*sh
 vendor/
 .workflow-confirmations.json
 .crew/
+
+/.crew/
+/.crew
+!.crew/artifacts/
+!.crew/graphs/
+!.crew/artifacts/.gitkeep
+!.crew/graphs/.gitkeep
+
+# Isolated worktrees created by /comet-build
+/.worktrees/
