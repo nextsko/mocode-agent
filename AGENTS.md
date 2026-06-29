@@ -296,6 +296,59 @@ If the variable regresses, the correct value is:
 KIMI_SHELL_PATH=C:\Program Files\software\envs\Git\bin\bash.exe
 ```
 
+### Go toolchain version mismatch on Windows
+
+**Symptom.** `go build` and `go test` fail with errors like:
+
+```
+compile: version "go1.26.3" does not match go tool version "go1.26.4"
+# crypto/internal/boring/sig
+# sync/atomic
+# internal/cpu
+```
+
+`go version` and `go env GOVERSION` report `go1.26.4` (which is what
+`go.mod` requires), but the standard library compile target is 1.26.3.
+
+**Root cause.** The default `GOROOT` on this host points to
+`C:\Users\16143\.g\go`, which is an old `go1.26.3` install whose
+`bin\go.exe` was replaced with the `go1.26.4` binary. The stdlib under
+`GOROOT\pkg` and `GOROOT\src` is still 1.26.3, so the 1.26.4 binary
+detects the mismatch at compile time. The real `go1.26.4` toolchain
+lives at
+`C:\Users\16143\go\pkg\mod\golang.org\toolchain@v0.0.1-go1.26.4.windows-amd64\`
+(Go's `GOTOOLCHAIN=auto` downloaded it there).
+
+**Canonical fix.** Use the real `go1.26.4` toolchain by setting
+`GOROOT` to the toolchain path before any `go` command:
+
+```bash
+export GOROOT="C:\\Users\\16143\\go\\pkg\\mod\\golang.org\\toolchain@v0.0.1-go1.26.4.windows-amd64"
+# Optional but explicit:
+export PATH="C:\\Users\\16143\\go\\pkg\\mod\\golang.org\\toolchain@v0.0.1-go1.26.4.windows-amd64\\bin:$PATH"
+go version
+# go1.26.4 windows/amd64
+go env GOROOT
+# C:\Users\16143\go\pkg\mod\golang.org\toolchain@v0.0.1-go1.26.4.windows-amd64
+go build -buildvcs=false ./...   # PASS
+```
+
+**Verification.** After exporting `GOROOT` as above:
+- `go version` → `go1.26.4 windows/amd64`
+- `go env GOROOT` → `C:\Users\16143\go\pkg\mod\...toolchain@v0.0.1-go1.26.4...`
+- `go build -buildvcs=false ./...` → no output (success)
+- `go test -count=1 -short -p=2 -timeout 120s ./...` → packages PASS
+
+**Parallel test limit.** `go test ./...` on the full repo can hit
+Windows file-handle / memory limits and surface as `compile: version
+does not match` errors. Use `-p=2` (or `-p=1` for very large packages)
+to keep parallel compilation manageable on this host.
+
+**Remaining workaround.** Until the default `GOROOT` (`C:\Users\16143\.g\go`)
+is re-installed as a clean `go1.26.4`, every shell session that needs
+`go build` / `go test` must export the toolchain `GOROOT` first. A
+`scripts/go-env.sh` (not yet added) would wrap this for convenience.
+
 ## Troubleshooting Methodology
 
 When a tool behaves unexpectedly, follow this playbook before guessing at code
