@@ -56,3 +56,4 @@ completions/crush.*sh
 .superpowers/
 vendor/
 .workflow-confirmations.json
+.crew/
