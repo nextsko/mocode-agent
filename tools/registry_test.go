@@ -469,6 +469,36 @@ func TestLoader_DefaultReturnsSameInstance(t *testing.T) {
 	require.Same(t, second, third)
 }
 
+func TestLoader_PackageLevelConcurrentSafe(t *testing.T) {
+	t.Parallel()
+	const n = 100
+
+	var wg sync.WaitGroup
+	wg.Add(n + n)
+	for i := 0; i < n; i++ {
+		go func(i int) {
+			defer wg.Done()
+			name := "loader-" + toolName(i)
+			tools.Register(name, &stubTool{name: name})
+		}(i)
+	}
+	for i := 0; i < n; i++ {
+		go func(i int) {
+			defer wg.Done()
+			_, _ = tools.Get("loader-" + toolName(i))
+		}(i)
+	}
+	wg.Wait()
+
+	for i := 0; i < n; i++ {
+		name := "loader-" + toolName(i)
+		got, ok := tools.Get(name)
+		require.True(t, ok)
+		require.NotNil(t, got)
+		require.Equal(t, name, got.Name())
+	}
+}
+
 // TestLoader_InitTimeRegistration verifies the contract advertised in
 // doc.go: tools register themselves from init() via tools.Register, and
 // the agent runtime reads them out of Default() at startup. The stub

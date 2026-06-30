@@ -23,12 +23,16 @@ func Default() *Registry { return defaultRegistry }
 // caller's import path (the init() in the tool's package) is recorded
 // as the tool's source package.
 func Register(name string, tool Tool) {
+	defaultRegistry.mu.Lock()
+	defer defaultRegistry.mu.Unlock()
 	defaultRegistry.registerLocked(name, tool, callerPackage(1))
 }
 
 // RegisterProvider registers every tool from p on the default registry.
 // All tools share the caller's import path as their source package.
 func RegisterProvider(p ToolProvider) {
+	defaultRegistry.mu.Lock()
+	defer defaultRegistry.mu.Unlock()
 	defaultRegistry.registerProviderLocked(p, callerPackage(1))
 }
 
