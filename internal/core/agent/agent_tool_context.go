@@ -45,6 +45,7 @@ type agentToolContext struct {
 	perms      permissionChecker
 	mcp        mcpStates
 	cbs        *Callbacks
+	deps       tools.RuntimeDependencies
 }
 
 // NewToolContext builds a fresh tool context for one Execute call. The
@@ -61,13 +62,19 @@ func NewToolContext(
 	perms permissionChecker,
 	mcp mcpStates,
 	cbs *Callbacks,
+	runtimeDeps ...tools.RuntimeDependencies,
 ) (tools.ToolContext, func()) {
+	var deps tools.RuntimeDependencies
+	if len(runtimeDeps) > 0 {
+		deps = runtimeDeps[0]
+	}
 	return &agentToolContext{
 		sessionID:  sessionID,
 		workingDir: workingDir,
 		perms:      perms,
 		mcp:        mcp,
 		cbs:        cbs,
+		deps:       deps,
 	}, func() {}
 }
 
@@ -106,6 +113,10 @@ func (c *agentToolContext) Callbacks() tools.ToolCallbacks {
 		return cbAdapter{}
 	}
 	return cbAdapter{inner: c.cbs}
+}
+
+func (c *agentToolContext) RuntimeDependencies() tools.RuntimeDependencies {
+	return c.deps
 }
 
 // permissionChecker is the minimal contract the adapter needs from the

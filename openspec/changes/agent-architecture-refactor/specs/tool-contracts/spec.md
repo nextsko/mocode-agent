@@ -53,6 +53,22 @@ The toolkit SHALL define a `ToolContext` interface that tools receive on each `E
 - **WHEN** a test author writes a struct that implements all `ToolContext` methods
 - **THEN** the struct satisfies `ToolContext` and can be passed to `Execute` without standing up an agent
 
+### Requirement: Runtime dependency provider
+
+The toolkit SHALL define an optional `RuntimeDependencyProvider` interface for `ToolContext` implementations that carry agent-owned runtime services. The interface SHALL expose `RuntimeDependencies() RuntimeDependencies`; tools SHALL retrieve values by `RuntimeDependencyKey` and type assertion through `RuntimeDependency[T](tctx, key)`.
+
+Runtime dependency keys SHALL stay framework-agnostic string identifiers. Values MAY be concrete agent-side services, but the toolkit contract SHALL NOT import those concrete packages.
+
+#### Scenario: Tool reads an agent-owned dependency
+
+- **WHEN** a tool calls `RuntimeDependency[*ConfigStore](tctx, RuntimeDependencyConfigStore)` and the context implements `RuntimeDependencyProvider`
+- **THEN** the helper returns the typed value and `true`
+
+#### Scenario: Tool tolerates missing runtime dependency
+
+- **WHEN** a tool calls `RuntimeDependency[T](tctx, key)` and the context does not implement `RuntimeDependencyProvider`, the key is missing, or the stored value has the wrong type
+- **THEN** the helper returns the zero value and `false`
+
 ### Requirement: ToolResult structured output
 
 The toolkit SHALL define a `ToolResult` struct returned by `Execute`. The struct SHALL expose: `Content string`, `Error error`, `Attachments []Attachment`, and `Metadata map[string]any`.
