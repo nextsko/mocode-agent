@@ -1,18 +1,19 @@
 ## 1. Scaffold the toolkit package
 
-- [ ] 1.1 Create `tools/` directory at module root with `doc.go` describing the toolkit's purpose and import policy
-- [ ] 1.2 Add `tools/contracts.go` defining `Tool`, `ToolProvider`, `ToolContext`, `ToolResult`, `Schema`, `Capability`, `PermissionChecker`, `MCPHandles`, `ToolCallbacks`, and `Attachment` types per the `tool-contracts` spec
-- [ ] 1.3 Add `tools/registry.go` with the default `Registry` singleton, `Register`, `RegisterProvider`, `Get`, `Names`, `All`, and a constructor `NewRegistry`
-- [ ] 1.4 Add `tools/loader.go` (or extend registry) implementing the init-time `Register` pattern with duplicate-name warning via `slog.Warn`
-- [ ] 1.5 Add `tools/filter/filter.go` (moved from `internal/core/agent/tools/filter/filter.go`) wired to the new `Capability` and registry types
-- [ ] 1.6 Add `tools/registry_test.go` covering init-time registration, duplicate-name behavior, concurrent `Register`/`Get`, and `NewRegistry` isolation
-- [ ] 1.7 Verify `go build ./tools/...` and `go test ./tools/...` pass with no other consumers yet
+- [x] 1.1 Create `tools/` directory at module root with `doc.go` describing the toolkit's purpose and import policy
+- [x] 1.2 Add `tools/contracts.go` defining `Tool`, `ToolProvider`, `ToolContext`, `ToolResult`, `Schema`, `Capability`, `PermissionChecker`, `MCPHandles`, `ToolCallbacks`, and `Attachment` types per the `tool-contracts` spec
+- [x] 1.3 Add `tools/registry.go` with the default `Registry` singleton, `Register`, `RegisterProvider`, `Get`, `Names`, `All`, and a constructor `NewRegistry`
+- [x] 1.4 Add `tools/loader.go` (or extend registry) implementing the init-time `Register` pattern with duplicate-name warning via `slog.Warn`
+- [x] 1.5 Add `tools/filter/filter.go` (moved from `internal/core/agent/tools/filter/filter.go`) wired to the new `Capability` and registry types
+- [x] 1.6 Add `tools/registry_test.go` covering init-time registration, duplicate-name behavior, concurrent `Register`/`Get`, and `NewRegistry` isolation
+- [x] 1.7 Verify `go build ./tools/...` and `go test ./tools/...` pass with no other consumers yet
 
 ## 2. Build the agent-side adapter
 
-- [ ] 2.1 Add `agentToolContext` struct in `internal/core/agent/` that implements `tools.ToolContext` by wrapping the existing helpers (`*toolutil.Callbacks`, permission checker, MCP handles, working dir, session id)
-- [ ] 2.2 Add a `NewToolContext(...)` constructor on the agent package that builds the adapter from the existing agent wiring
-- [ ] 2.3 Add a test that constructs a fake `tools.ToolContext` and verifies the agent adapter exposes the expected values (session id, working dir, permissions, callbacks, MCP handles)
+- [x] 2.1 Add `agentToolContext` struct in `internal/core/agent/` that implements `tools.ToolContext` by wrapping the existing helpers (`*toolutil.Callbacks`, permission checker, MCP handles, working dir, session id)
+- [x] 2.2 Add a `NewToolContext(...)` constructor on the agent package that builds the adapter from the existing agent wiring
+- [x] 2.3 Add a test that constructs a fake `tools.ToolContext` and verifies the agent adapter exposes the expected values (session id, working dir, permissions, callbacks, MCP handles)
+- [x] 2.4 Add optional runtime dependency carrier support so migrated tools can resolve agent-owned services through `ToolContext` without importing agent/config packages
 
 ## 3. Move built-in tools
 
@@ -23,17 +24,17 @@
 - [ ] 3.5 Create `tools/builtin/write/` and move `write.go` and `write.md`; add `init()`
 - [ ] 3.6 Create `tools/builtin/multiedit/` and move `multiedit.go` and `multiedit.md`; add `init()`
 - [ ] 3.7 Create `tools/builtin/read_files/` and move `read_files.go` and `read_files.md`; add `init()`
-- [ ] 3.8 Create `tools/builtin/job_input/`, `tools/builtin/job_kill/`, `tools/builtin/job_output/` and move their files; add `init()` to each
+- [x] 3.8 Create `tools/builtin/job_input/`, `tools/builtin/job_kill/`, `tools/builtin/job_output/` and move their files; add `init()` to each
 - [ ] 3.9 Create `tools/builtin/all/all.go` that blank-imports every builtin subpackage; verify `go build ./tools/builtin/all/...` registers all 10
 - [ ] 3.10 Update the legacy `internal/core/agent/tools/builtin/<name>/<name>.go` to re-export from the new path so the agent still builds during the cutover window
 - [ ] 3.11 Run `go test ./tools/builtin/...` and confirm every builtin test passes
 
 ## 4. Move plugin tools
 
-- [ ] 4.1 Move `tools/plugins/think/` (single tool); add `init()`
-- [ ] 4.2 Move `tools/plugins/todos/`; add `init()`
-- [ ] 4.3 Move `tools/plugins/glob/` and `tools/plugins/grep/` (search common); add `init()`
-- [ ] 4.4 Move `tools/plugins/web_search/` and `tools/plugins/web_fetch/`; add `init()`
+- [x] 4.1 Move `tools/plugins/think/` (single tool); add `init()`
+- [x] 4.2 Move `tools/plugins/todos/`; add `init()`
+- [x] 4.3 Move `tools/plugins/glob/` and `tools/plugins/grep/` (search common); add `init()`
+- [x] 4.4 Move `tools/plugins/web_search/` and `tools/plugins/web_fetch/`; add `init()`
 - [ ] 4.5 Move `tools/plugins/crawl/`, `tools/plugins/fetch/`, `tools/plugins/download/`, `tools/plugins/download_docs/`; add `init()`
 - [ ] 4.6 Move `tools/plugins/ssh_list_hosts/`, `tools/plugins/ssh_exec/`, `tools/plugins/ssh_download/`, `tools/plugins/ssh_upload/` (reuse the `sshcommon` helpers); add `init()` to each
 - [ ] 4.7 Move `tools/plugins/git_plan_commits/`, `tools/plugins/git_execute_commits/` (reuse `gitopscommon`); add `init()`
