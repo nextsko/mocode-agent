@@ -52,6 +52,25 @@ const (
 	LSPWarningIcon string = "W"
 	LSPInfoIcon    string = "I"
 	LSPHintIcon    string = "H"
+
+	SlashIcon     string = "/"
+	SlashSystem   string = "›"
+	SlashUser     string = "◆"
+	SlashMCP      string = "⬡"
+	SlashAdmin    string = "⚙"
+	SlashFile     string = "≡"
+	SlashModel    string = "◇"
+	SlashSession  string = "◰"
+	SlashWorkspace string = "◫"
+	SlashGetStarted string = "▶"
+	SlashHelp     string = "?"
+	SlashSettings string = "⌨"
+	SlashContext  string = "@"
+	SlashPlan     string = "☰"
+	SlashCode     string = "</>"
+	SlashTools    string = "⚒"
+	SlashCopy     string = "⎘"
+	SlashReload   string = "↻"
 )
 
 const (

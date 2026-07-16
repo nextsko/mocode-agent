@@ -117,6 +117,7 @@ func (t *Toast) Draw(scr uv.Screen, area uv.Rectangle) {
 	// Measure the rendered content
 	contentWidth := lipgloss.Width(content)
 	contentHeight := lipgloss.Height(content)
+	_ = contentHeight // no longer used directly, replaced by renderedHeight below
 
 	// Clamp width
 	maxW := min(ToastMaxWidth, area.Dx()/2)
@@ -144,24 +145,47 @@ func (t *Toast) Draw(scr uv.Screen, area uv.Rectangle) {
 		contentWidth = lipgloss.Width(content)
 	}
 
+	// Wrap content in a container with padding and rounded border.
+	st := t.com.Styles
+	var container lipgloss.Style
+	switch t.msg.Type {
+	case util.InfoTypeError:
+		container = st.Toast.ErrorMessage.Border(lipgloss.RoundedBorder()).BorderForeground(st.Toast.ErrorMessage.GetForeground())
+	case util.InfoTypeWarn:
+		container = st.Toast.WarnMessage.Border(lipgloss.RoundedBorder()).BorderForeground(st.Toast.WarnMessage.GetForeground())
+	case util.InfoTypeUpdate:
+		container = st.Toast.UpdateMessage.Border(lipgloss.RoundedBorder()).BorderForeground(st.Toast.UpdateMessage.GetForeground())
+	case util.InfoTypeSuccess:
+		container = st.Toast.SuccessMessage.Border(lipgloss.RoundedBorder()).BorderForeground(st.Toast.SuccessMessage.GetForeground())
+	case util.InfoTypeInfo:
+		container = st.Toast.InfoMessage.Border(lipgloss.RoundedBorder()).BorderForeground(st.Toast.InfoMessage.GetForeground())
+	default:
+		container = st.Toast.InfoMessage.Border(lipgloss.RoundedBorder()).BorderForeground(st.Toast.InfoMessage.GetForeground())
+	}
+
+	toastStyle := container.Width(contentWidth + 4).Padding(0, 1)
+	rendered := toastStyle.Render(content)
+	renderedWidth := lipgloss.Width(rendered)
+	renderedHeight := lipgloss.Height(rendered)
+
 	// Calculate position: bottom-right, offset from status bar
 	padX := 2 // right margin
 	padY := 1 // above the status bar
-	toastX := area.Max.X - contentWidth - padX
-	toastY := area.Max.Y - contentHeight - padY
+	toastX := area.Max.X - renderedWidth - padX
+	toastY := area.Max.Y - renderedHeight - padY
 
-	toastRect := image.Rect(toastX, toastY, toastX+contentWidth, toastY+contentHeight)
+	toastRect := image.Rect(toastX, toastY, toastX+renderedWidth, toastY+renderedHeight)
 
 	// Clamp to area bounds
 	if toastRect.Min.X < area.Min.X {
 		toastRect.Min.X = area.Min.X
-		toastRect.Max.X = toastRect.Min.X + contentWidth
+		toastRect.Max.X = toastRect.Min.X + renderedWidth
 	}
 	if toastRect.Min.Y < area.Min.Y {
 		toastRect.Min.Y = area.Min.Y
-		toastRect.Max.Y = toastRect.Min.Y + contentHeight
+		toastRect.Max.Y = toastRect.Min.Y + renderedHeight
 	}
 
 	// Draw toast
-	uv.NewStyledString(content).Draw(scr, toastRect)
+	uv.NewStyledString(rendered).Draw(scr, toastRect)
 }

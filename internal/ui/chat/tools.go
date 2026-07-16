@@ -323,8 +323,10 @@ func (t *baseToolMessageItem) RawRender(width int) string {
 	}
 
 	content, height, ok := t.getCachedRenderWithLog(toolItemWidth, "tool")
-	// if we are spinning or there is no cache rerender
-	if !ok || t.isSpinning() {
+	// For agent tools, content structure is stable during spinning;
+	// only re-render animation frames, not full tool output
+	useCache := !t.isSpinning() || !isAgentToolRenderer(t.toolRenderer)
+	if !ok || !useCache {
 		content = t.toolRenderer.RenderTool(t.sty, toolItemWidth, &ToolRenderOpts{
 			ToolCall:        t.toolCall,
 			Result:          t.result,
@@ -550,3 +552,11 @@ func (t *baseToolMessageItem) HandleKeyEvent(key tea.KeyMsg) (bool, tea.Cmd) {
 // formatAgentResultForCopy formats agent tool results for clipboard.
 
 // prettifyToolName returns a human-readable name for tool names.
+
+// isAgentToolRenderer reports whether r is the agent tool renderer.
+func isAgentToolRenderer(r ToolRenderer) bool {
+	if _, ok := r.(*AgentToolRenderContext); ok {
+		return true
+	}
+	return false
+}

@@ -30,7 +30,6 @@ import (
 	xstrings "github.com/charmbracelet/x/exp/strings"
 
 	agentcore "github.com/package-register/mocode/internal/core/agent"
-	"github.com/package-register/mocode/internal/core/agent/evo"
 	"github.com/package-register/mocode/internal/core/agent/notify"
 	agenttools "github.com/package-register/mocode/internal/core/agent/tools"
 	"github.com/package-register/mocode/internal/core/agent/tools/mcp"
@@ -50,7 +49,6 @@ import (
 	"github.com/package-register/mocode/internal/ui/notification"
 	"github.com/package-register/mocode/internal/ui/panel"
 	"github.com/package-register/mocode/internal/ui/slash"
-	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/package-register/mocode/internal/ui/util"
 	"github.com/package-register/mocode/internal/util/anim"
 	"github.com/package-register/mocode/internal/util/fsext"
@@ -257,13 +255,6 @@ type UI struct {
 	// custom commands & mcp commands
 	customCommands []slash.CustomCommand
 	mcpPrompts     []slash.MCPPrompt
-
-	// evo holds the /evo self-evolution session state. When active, the evo
-	// theme is applied and the agent iterates on itself; exiting requires a
-	// second confirmation. See internal/core/agent/evo.
-	evo evo.State
-	// evoPrevTheme is the theme active before entering /evo, restored on exit.
-	evoPrevTheme styles.Styles
 
 	// forceCompactMode tracks whether compact mode is forced by user toggle
 	forceCompactMode bool

@@ -3,25 +3,22 @@ package model
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/package-register/mocode/internal/core/agent/evo"
 	wechat "github.com/package-register/mocode/internal/integration/wechat"
 	"github.com/package-register/mocode/internal/ui/common"
-	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/package-register/mocode/internal/ui/util"
-	"github.com/package-register/mocode/internal/util/infra"
 )
 
 const (
-	slashCmdWeChat   = "/wechat"
-	slashCmdContext  = "/context"
-	slashCmdRollback = "/rollback"
-	slashCmdEvo      = "/evo"
-	slashCmdCopy     = "/copy"
+	slashCmdWeChat    = "/wechat"
+	slashCmdContext   = "/context"
+	slashCmdRollback  = "/rollback"
+	slashCmdCopy      = "/copy"
+	slashCmdReload    = "/reload"
+	slashCmdReloadMCP = "/reload-mcp"
 )
 
 // handleSlashCommand dispatches a slash command typed in the input box.
@@ -55,8 +52,10 @@ func (m *UI) handleSlashCommand(value string) (tea.Cmd, bool) {
 			return m.openRollbackDialog(), true
 		}
 		return m.rollbackSession(args), true
-	case slashCmdEvo:
-		return m.handleEvoCommand(args)
+	case slashCmdReload:
+		return m.handleReloadCommand(args)
+	case slashCmdReloadMCP:
+		return m.handleReloadMCPCommand(args)
 	case slashCmdCopy:
 		// "/copy" and "/copy recent" both copy the last assistant reply.
 		return m.handleCopyCommand(args)
@@ -98,127 +97,6 @@ func splitSlashCommand(value string) (cmd, args string) {
 }
 
 // handleWeChatCommand handles legacy /wechat sub-commands for power users.
-//
-// handleEvoCommand drives the /evo self-evolution session. /evo (no args)
-// enters the mode and swaps to the EvoCrimson theme. "/evo exit" requests
-// leaving; because a fixation may be in progress, the first request only
-// arms a second confirmation — the user must run /evo exit again to confirm.
-func (m *UI) handleEvoCommand(args string) (tea.Cmd, bool) {
-	args = strings.TrimSpace(args)
-	switch args {
-	case "", "start", "enter":
-		if m.evo.IsActive() {
-			return infoCmd("already in /evo mode"), true
-		}
-		m.enterEvoMode(evoSessionName(args))
-		return infoCmd("entered /evo — self-evolution active (red/purple)"), true
-	case "exit", "quit", "leave":
-		if !m.evo.IsActive() {
-			return infoCmd("not in /evo mode"), true
-		}
-		if m.evo.Mode == evo.ModeConfirmExit {
-			return m.confirmEvoExit()
-		}
-		m.evo.RequestExit()
-		return infoCmd("run /evo exit again to confirm and fix the agent"), true
-	default:
-		// A bare name is treated as the agent to tame.
-		if !m.evo.IsActive() {
-			m.enterEvoMode(evoSessionName(args))
-			return infoCmd("entered /evo as " + args), true
-		}
-		return infoCmd("unknown /evo subcommand: " + args), true
-	}
-}
-
-// enterEvoMode swaps to the EvoCrimson theme, enters the evo state, and
-// registers the observability extension so each run folds into the
-// optimal-theory prompt being reconstructed.
-func (m *UI) enterEvoMode(name string) {
-	m.evoPrevTheme = *m.com.Styles
-	m.applyTheme(styles.EvoCrimson())
-	// Capture the active agent's proven system prompt as the stable core of
-	// the reconstructed optimal theory, so fixation preserves what already
-	// worked and layers the distilled lessons on top ("maintain optimal theory").
-	m.evo.Enter(name, m.com.Workspace.AgentSystemPrompt())
-	m.com.Workspace.AgentRegisterExtension(evo.NewObservabilityExtension(&m.evo))
-	// Install an LLM-backed lesson distiller when a small model is available,
-	// so successful turns are distilled into generalized principles (genuine
-	// emergence) rather than kept verbatim. With no model, the distiller keeps
-	// its zero-overhead default (trimmed prompt).
-	if sm := m.com.Workspace.AgentSmallLanguageModel(context.Background()); sm != nil {
-		evo.SetDistiller(evo.LLMDistiller(context.Background(), sm))
-	}
-}
-
-// evoSessionName resolves the agent name for a new evo session.
-func evoSessionName(arg string) string {
-	if arg != "" && arg != "start" && arg != "enter" {
-		return arg
-	}
-	return "evo-agent"
-}
-
-// confirmEvoExit completes the second-confirmation exit: restores the prior
-// theme and, if a pending optimal-theory prompt was reconstructed, fixes it
-// as a revision via the fixation store.
-func (m *UI) confirmEvoExit() (tea.Cmd, bool) {
-	m.com.Workspace.AgentUnregisterExtension("evo.observability")
-	rev := m.evo.ConfirmExit()
-	m.applyTheme(m.evoPrevTheme)
-	if strings.TrimSpace(rev.SystemPrompt) == "" {
-		return infoCmd("left /evo (no fixation)"), true
-	}
-	store := evo.NewFixationStore(evoRoot())
-	if _, err := store.Fix(context.Background(), rev.AgentName, rev.AgentName, "fixed via /evo exit", rev); err != nil {
-		return infoCmd("left /evo but fixation failed: " + err.Error()), true
-	}
-	// Close the loop: materialize the fixed agent as a config-loadable .md so
-	// it appears in the mode picker and becomes runnable via SwitchAgent.
-	if entry, err := evo.LoadAgent(context.Background(), evoRoot(), rev.AgentName); err == nil {
-		dir := m.com.Workspace.AgentDir()
-		id := evo.ModeAgentID(rev.AgentName)
-		if mErr := evo.MaterializeAgent(entry, dir); mErr != nil {
-			return infoCmd("left /evo — fixed " + rev.AgentName + " but materialization failed: " + mErr.Error()), true
-		}
-		// Hot-reload the materialized .md into the live config so the agent is
-		// selectable now, without restarting.
-		_ = m.com.Workspace.AgentReload(id, filepath.Join(dir, id+".md"))
-	}
-	return infoCmd("left /evo — agent fixed, available as /" + evo.ModeAgentID(rev.AgentName)), true
-}
-
-// infoCmd returns a command that surfaces a transient info toast.
-func infoCmd(msg string) tea.Cmd {
-	return func() tea.Msg { return util.InfoMsg{Type: util.InfoTypeInfo, Msg: msg} }
-}
-
-// handleCopyCommand implements "/copy" and "/copy recent": it copies the most
-// recent assistant reply text to the system clipboard. "/copy" defaults to
-// "recent" since that is the only mode for now. The reply text is tracked on
-// the model as finalized assistant messages arrive (no IO here).
-func (m *UI) handleCopyCommand(args string) (tea.Cmd, bool) {
-	args = strings.TrimSpace(args)
-	if args != "" && args != "recent" {
-		return infoCmd("unknown /copy target: " + args + " (try /copy recent)"), true
-	}
-	if strings.TrimSpace(m.lastAssistantReplyText) == "" {
-		return infoCmd("no recent assistant reply to copy"), true
-	}
-	return common.CopyToClipboardWithCallback(
-		m.lastAssistantReplyText,
-		"Copied recent reply to clipboard",
-		nil,
-	), true
-}
-
-// evoRoot returns the directory under which fixed evo agents are persisted.
-func evoRoot() string {
-	return filepath.Join(infra.DataDir(), "evo")
-}
-
-// The recommended path is to use the modal via "/wechat" (no args) or the
-// command palette, but these sub-commands remain for scripting.
 func (m *UI) handleWeChatCommand(args string) tea.Cmd {
 	mgr := wechat.GetManager()
 	switch {
@@ -296,4 +174,57 @@ func (m *UI) handleWeChatCommand(args string) tea.Cmd {
 			"Usage: /wechat [list|switch <id>|reconnect <id>|start <id>|stop <id>|delete <id>]",
 		))
 	}
+}
+
+// infoCmd returns a command that surfaces a transient info toast.
+func infoCmd(msg string) tea.Cmd {
+	return func() tea.Msg { return util.InfoMsg{Type: util.InfoTypeInfo, Msg: msg} }
+}
+
+// handleReloadCommand triggers a config reload from disk.
+func (m *UI) handleReloadCommand(args string) (tea.Cmd, bool) {
+	args = strings.TrimSpace(args)
+	switch args {
+	case "config", "":
+		if err := m.com.Workspace.ReloadConfig(context.Background()); err != nil {
+			return infoCmd("reload failed: " + err.Error()), true
+		}
+		return infoCmd("config reloaded from disk"), true
+	default:
+		return infoCmd("Usage: /reload [config]"), true
+	}
+}
+
+// handleReloadMCPCommand reloads a specific MCP server or all MCP servers.
+func (m *UI) handleReloadMCPCommand(args string) (tea.Cmd, bool) {
+	args = strings.TrimSpace(args)
+	if args == "" || args == "all" {
+		for name := range m.com.Workspace.Config().MCP {
+			_ = m.com.Workspace.ReloadMCP(context.Background(), name)
+		}
+		return infoCmd("all MCP servers reloaded"), true
+	}
+	if err := m.com.Workspace.ReloadMCP(context.Background(), args); err != nil {
+		return infoCmd("reload-mcp failed: " + err.Error()), true
+	}
+	return infoCmd("MCP server reloaded: " + args), true
+}
+
+// handleCopyCommand implements "/copy" and "/copy recent": it copies the most
+// recent assistant reply text to the system clipboard. "/copy" defaults to
+// "recent" since that is the only mode for now. The reply text is tracked on
+// the model as finalized assistant messages arrive (no IO here).
+func (m *UI) handleCopyCommand(args string) (tea.Cmd, bool) {
+	args = strings.TrimSpace(args)
+	if args != "" && args != "recent" {
+		return infoCmd("unknown /copy target: " + args + " (try /copy recent)"), true
+	}
+	if strings.TrimSpace(m.lastAssistantReplyText) == "" {
+		return infoCmd("no recent assistant reply to copy"), true
+	}
+	return common.CopyToClipboardWithCallback(
+		m.lastAssistantReplyText,
+		"Copied recent reply to clipboard",
+		nil,
+	), true
 }

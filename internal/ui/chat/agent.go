@@ -117,7 +117,10 @@ func (r *AgentToolRenderContext) RenderTool(sty *styles.Styles, width int, opts 
 	cappedWidth := cappedMessageWidth(width)
 
 	var params agent.AgentParams
-	_ = json.Unmarshal([]byte(opts.ToolCall.Input), &params)
+	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
+		// Fallback to empty params; basic agent view will still render
+		params = agent.AgentParams{}
+	}
 
 	prompt := params.Prompt
 	prompt = strings.ReplaceAll(prompt, "\n", " ")
@@ -188,7 +191,7 @@ func (r *AgentToolRenderContext) RenderTool(sty *styles.Styles, width int, opts 
 	}
 
 	for _, nestedTool := range r.agent.nestedTools {
-		childView := nestedTool.Render(remainingWidth)
+		childView := nestedTool.Render(cappedWidth)
 		childTools.Child(childView)
 	}
 
@@ -205,7 +208,7 @@ func (r *AgentToolRenderContext) RenderTool(sty *styles.Styles, width int, opts 
 
 	// Build parts.
 	var parts []string
-	parts = append(parts, childTools.Enumerator(roundedEnumerator(2, taskTagWidth-5)).String())
+	parts = append(parts, childTools.Enumerator(roundedEnumerator(2, max(0, taskTagWidth-5))).String())
 
 	// Show animation if still running.
 	if !opts.HasResult() && !opts.IsCanceled() {
@@ -432,7 +435,10 @@ func (r *AgenticFetchToolRenderContext) RenderTool(sty *styles.Styles, width int
 	cappedWidth := cappedMessageWidth(width)
 
 	var params agenticFetchParams
-	_ = json.Unmarshal([]byte(opts.ToolCall.Input), &params)
+	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
+		// Fallback to empty params; basic agentic fetch view will still render
+		params = agenticFetchParams{}
+	}
 
 	prompt := params.Prompt
 	prompt = strings.ReplaceAll(prompt, "\n", " ")
@@ -485,13 +491,13 @@ func (r *AgenticFetchToolRenderContext) RenderTool(sty *styles.Styles, width int
 	childTools := tree.Root(header)
 
 	for _, nestedTool := range r.fetch.nestedTools {
-		childView := nestedTool.Render(remainingWidth)
+		childView := nestedTool.Render(cappedWidth)
 		childTools.Child(childView)
 	}
 
 	// Build parts.
 	var parts []string
-	parts = append(parts, childTools.Enumerator(roundedEnumerator(2, promptTagWidth-5)).String())
+	parts = append(parts, childTools.Enumerator(roundedEnumerator(2, max(0, promptTagWidth-5))).String())
 
 	// Show animation if still running.
 	if !opts.HasResult() && !opts.IsCanceled() {

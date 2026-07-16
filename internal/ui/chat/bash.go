@@ -128,14 +128,8 @@ type JobOutputToolRenderContext struct{}
 func (j *JobOutputToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
 	var params tools.JobOutputParams
-	_ = json.Unmarshal([]byte(opts.ToolCall.Input), &params)
-
-	if opts.IsPending() {
-		return pendingTool(sty, "Job", opts.Anim, opts.Compact, cappedWidth, params.ShellID)
-	}
-
-	if params.ShellID == "" {
-		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
+		params = tools.JobOutputParams{}
 	}
 
 	var description string
@@ -144,6 +138,12 @@ func (j *JobOutputToolRenderContext) RenderTool(sty *styles.Styles, width int, o
 		if err := json.Unmarshal([]byte(opts.Result.Metadata), &meta); err == nil {
 			description = cmp.Or(meta.Description, meta.Command)
 		}
+	}
+
+	if opts.IsPending() && params.ShellID != "" {
+		return renderJobPending(sty, opts, cappedWidth, "Output", params.ShellID, description)
+	} else if params.ShellID == "" {
+		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
 	}
 
 	content := ""
@@ -181,14 +181,8 @@ type JobKillToolRenderContext struct{}
 func (j *JobKillToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
 	var params tools.JobKillParams
-	_ = json.Unmarshal([]byte(opts.ToolCall.Input), &params)
-
-	if opts.IsPending() {
-		return pendingTool(sty, "Job", opts.Anim, opts.Compact, cappedWidth, params.ShellID)
-	}
-
-	if params.ShellID == "" {
-		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
+		params = tools.JobKillParams{}
 	}
 
 	var description string
@@ -197,6 +191,12 @@ func (j *JobKillToolRenderContext) RenderTool(sty *styles.Styles, width int, opt
 		if err := json.Unmarshal([]byte(opts.Result.Metadata), &meta); err == nil {
 			description = cmp.Or(meta.Description, meta.Command)
 		}
+	}
+
+	if opts.IsPending() && params.ShellID != "" {
+		return renderJobPending(sty, opts, cappedWidth, "Kill", params.ShellID, description)
+	} else if params.ShellID == "" {
+		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
 	}
 
 	content := ""
@@ -234,6 +234,18 @@ func renderJobTool(sty *styles.Styles, opts *ToolRenderOpts, width int, action, 
 	bodyWidth := width - toolBodyLeftPaddingTotal
 	body := sty.Tool.Body.Render(toolOutputPlainContent(sty, content, bodyWidth, opts.ExpandedContent))
 	return joinToolParts(header, body)
+}
+
+// renderJobPending renders a job tool in pending state with description.
+func renderJobPending(sty *styles.Styles, opts *ToolRenderOpts, width int, action, shellID, description string) string {
+	header := jobHeader(sty, ToolStatusRunning, action, shellID, description, width)
+	if opts.Compact {
+		return header
+	}
+	if earlyState, ok := toolEarlyStateContent(sty, opts, width); ok {
+		return joinToolParts(header, earlyState)
+	}
+	return header
 }
 
 // jobHeader builds a header for job-related tools.

@@ -182,16 +182,19 @@ func (v *View) RenderMain(width int) string {
 		if title == "" {
 			title = child.ID
 		}
-		b.WriteString(marker + title)
+		b.WriteString(marker)
+		b.WriteString(title)
 		if child.IsLeaf() {
 			content := child.GetContent()
 			if content != "" {
 				// Show first line of content
-				firstLine := strings.Split(content, "\n")[0]
-				if len(firstLine) > width-20 {
-					firstLine = firstLine[:width-20] + "…"
+				firstLine, _, _ := strings.Cut(content, "\n")
+				const panelTitleOverhead = 20 // marker("▸ ") + title + ": " ≈ 20 chars
+				if len(firstLine) > width-panelTitleOverhead {
+					firstLine = firstLine[:width-panelTitleOverhead] + "…"
 				}
-				b.WriteString(": " + firstLine)
+				b.WriteString(": ")
+				b.WriteString(firstLine)
 			}
 		}
 		b.WriteString("\n")

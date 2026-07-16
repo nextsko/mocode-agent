@@ -29,14 +29,6 @@ type ActionOpenDialog struct {
 	DialogID string
 }
 
-// ActionEvo toggles the self-evolution (/evo) session. When Enter is true it
-// enters the evo mode; when false it requests an exit (the second confirmation
-// is handled inside the /evo command). Surfaced in the slash completion list
-// so the command is discoverable.
-type ActionEvo struct {
-	Enter bool
-}
-
 // ActionSelectSession is a message indicating a session has been selected.
 type ActionSelectSession struct {
 	Session session.Session
@@ -108,6 +100,8 @@ type (
 	ActionStartAdmin   struct{}
 	ActionStopAdmin    struct{}
 	ActionOpenAdmin    struct{}
+	ActionReloadConfig struct{}
+	ActionReloadMCP    struct{}
 	ActionSetProxyURL  struct {
 		URL     string
 		Enabled bool

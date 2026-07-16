@@ -64,16 +64,6 @@ func (m *UI) handleDialogAction(action tea.Msg) tea.Cmd {
 			cmds = append(cmds, msg.Cmd)
 		}
 
-	// /evo self-evolution mode toggle.
-	case dialog.ActionEvo:
-		var args string
-		if !msg.Enter {
-			args = "exit"
-		}
-		if cmd, handled := m.handleEvoCommand(args); handled && cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-
 	// Session dialog messages.
 	case dialog.ActionSelectSession:
 		m.dialog.CloseDialog(dialog.SessionsID)
@@ -203,6 +193,30 @@ func (m *UI) handleDialogAction(action tea.Msg) tea.Cmd {
 		cmds = append(cmds, m.startAdminServer(true))
 	case dialog.ActionStopAdmin:
 		cmds = append(cmds, m.stopAdminServer())
+	case dialog.ActionReloadConfig:
+		cmds = append(cmds, func() tea.Msg {
+			if err := m.com.Workspace.ReloadConfig(context.Background()); err != nil {
+				return util.ReportError(err)()
+			}
+			return util.NewInfoMsg("Config reloaded from disk")
+		})
+	case dialog.ActionReloadMCP:
+		cmds = append(cmds, func() tea.Msg {
+			cfg := m.com.Config()
+			if cfg == nil {
+				return util.ReportError(errors.New("configuration not found"))()
+			}
+			var lastErr error
+			for name := range cfg.MCP {
+				if err := m.com.Workspace.ReloadMCP(context.Background(), name); err != nil {
+					lastErr = err
+				}
+			}
+			if lastErr != nil {
+				return util.ReportError(lastErr)()
+			}
+			return util.NewInfoMsg("All MCP servers reloaded")
+		})
 	case dialog.ActionSetProxyURL:
 		if !msg.Enabled {
 			cmds = append(cmds, m.setProxyURL(msg))
