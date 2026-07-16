@@ -147,6 +147,7 @@ type Workspace interface {
 	Config() *config.Config
 	WorkingDir() string
 	Resolver() config.VariableResolver
+	ReloadConfig(ctx context.Context) error
 
 	// Config mutations (proxied to server in client mode)
 	UpdatePreferredModel(scope config.Scope, modelType config.SelectedModelType, model config.SelectedModel) error
@@ -155,6 +156,7 @@ type Workspace interface {
 	SetConfigField(scope config.Scope, key string, value any) error
 	RemoveConfigField(scope config.Scope, key string) error
 	RefreshOAuthToken(ctx context.Context, scope config.Scope, providerID string) error
+	ReloadMCP(ctx context.Context, name string) error
 
 	// Project lifecycle
 	ProjectNeedsInitialization() (bool, error)

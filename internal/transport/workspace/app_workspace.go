@@ -333,6 +333,17 @@ func (w *AppWorkspace) RefreshOAuthToken(ctx context.Context, scope config.Scope
 	return w.store.RefreshOAuthToken(ctx, scope, providerID)
 }
 
+func (w *AppWorkspace) ReloadConfig(ctx context.Context) error {
+	return w.store.ReloadFromDisk(ctx)
+}
+
+func (w *AppWorkspace) ReloadMCP(ctx context.Context, name string) error {
+	if err := mcptools.DisableSingle(w.store, name); err != nil {
+		return err
+	}
+	return mcptools.InitializeSingle(ctx, name, w.store)
+}
+
 // -- Project lifecycle --
 
 func (w *AppWorkspace) ProjectNeedsInitialization() (bool, error) {
@@ -618,6 +629,8 @@ func (w *AppWorkspace) BuildCommandRegistry() []slash.CommandDescriptor {
 		{ID: "admin", Title: "Open Admin Panel", Shortcut: "/admin", Category: slash.CommandCategoryAdmin, Risk: slash.RiskLevelRead},
 		{ID: "admin_start", Title: "Start Admin Server", Shortcut: "/admin-start", Category: slash.CommandCategoryAdmin, Risk: slash.RiskLevelWrite},
 		{ID: "admin_stop", Title: "Stop Admin Server", Shortcut: "/admin-stop", Category: slash.CommandCategoryAdmin, Risk: slash.RiskLevelWrite},
+		{ID: "reload", Title: "Reload Config", Shortcut: "/reload", Category: slash.CommandCategoryAdmin, Risk: slash.RiskLevelWrite},
+		{ID: "reload_mcp", Title: "Reload MCP Servers", Shortcut: "/reload-mcp", Category: slash.CommandCategoryAdmin, Risk: slash.RiskLevelWrite},
 		{ID: "quit", Title: "Quit", Shortcut: "/quit", Category: slash.CommandCategoryAdmin, Risk: slash.RiskLevelDangerous},
 	}
 
