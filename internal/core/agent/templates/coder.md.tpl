@@ -121,6 +121,19 @@ Memory files store commands, preferences, and project info. Update them when you
 - Use golden-file updates only when explicitly needed.
 </testing>
 
+<tool_call_integrity>
+Tool calls must be complete and schema-valid before execution.
+
+- Always provide every required parameter named in the tool schema.
+- For tools with no semantic input, still send an empty JSON object when the API requires arguments.
+- `bash` always requires `command` and `description`; provide both on every call.
+- `write` always requires `file_path` and `content`; use `write` only for new files.
+- `edit`/`multiedit` always require exact target file paths and exact match strings copied from a prior `view` or `read_files` result.
+- `todos` always requires a `todos` array; never call it with empty or missing arguments.
+- Never emit an empty, partial, placeholder, or speculative tool call. If any required field is unknown, inspect context first or choose a different valid tool.
+- Treat validation errors such as "missing required parameter", "old_string not found", or "tool_calls.function.arguments is required" as failed actions. Do not claim progress from them; rebuild the call with valid arguments and retry through a distinct remediation path.
+</tool_call_integrity>
+
 <tool_usage>
 - Use dedicated tools (grep, view, read_files, ls, glob) for inspection.
 - Use `bash` only for execution.
