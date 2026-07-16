@@ -9,14 +9,17 @@
 
 ```
 docs/tui-spec/
-├── README.md                           # 本文件：总目录
-├── 01-coding-standards.md              # 编码规范 + 最小 MVP 路线
-├── 02-design-techniques.md             # 6 大优秀设计技巧拆解（mocode 原生）
-├── 03-state-and-layout.md              # 状态数据流转 + 配色 + 布局方法论
-├── 04-component-apis.md                # 组件 API 调用清单 + 优秀设计洞察
-├── 05-extending-and-testing.md         # 组件扩展/删除/测试方法论
-├── 06-html-to-tui-prototyping.md       # HTML→TUI 原型建模方法
-└── 07-claude-code-patterns.md          # Claude Code 优秀设计模式吸收（subagent/team/AskUserQuestion）
+├── README.md                            # 本文件：总目录
+├── 01-coding-standards.md               # 编码规范 + 最小 MVP 路线
+├── 02-design-techniques.md              # 6 大优秀设计技巧拆解（mocode 原生）
+├── 03-state-and-layout.md               # 状态数据流转 + 配色 + 布局方法论
+├── 04-component-apis.md                 # 组件 API 调用清单 + 优秀设计洞察
+├── 05-extending-and-testing.md          # 组件扩展/删除/测试方法论
+├── 06-html-to-tui-prototyping.md        # HTML→TUI 原型建模方法
+├── 07-claude-code-patterns.md           # Claude Code subagent/team/AskUserQuestion 吸收
+├── 08-team-mode-architecture.md         # Team 模式架构深度解析
+├── 09-hermes-and-claude-code-evolution.md  # Hermes 自进化 + CC 动态工作流 + Go 生态
+└── 10-tty-input-and-bg-tasks.md        # TTY 输入处理 + 后台任务观测追踪
 ```
 
 ---
@@ -52,4 +55,7 @@ docs/tui-spec/
 | 05 | ~7k | 25 min |
 | 06 | ~5k | 15 min |
 | 07 | ~13k | 45 min |
-| **合计** | **~60k** | **~3.5 h** |
+| 08 | ~14k | 50 min |
+| 09 | ~15k | 55 min |
+| 10 | ~13k | 45 min |
+| **合计** | **~102k** | **~5.7 h** |
