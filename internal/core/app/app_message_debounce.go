@@ -33,7 +33,7 @@ func newMessageUpdateDebouncer(svc *storeMessageService) *messageUpdateDebouncer
 }
 
 func (d *messageUpdateDebouncer) Update(ctx context.Context, msg message.Message) error {
-	if msg.FinishPart() != nil {
+	if msg.FinishPart() != nil || len(msg.ToolCalls()) > 0 {
 		d.flush(msg.ID)
 		return d.svc.updateImmediate(ctx, msg)
 	}

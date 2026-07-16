@@ -157,17 +157,23 @@ tasks:
       - go run {{.BUILDVCS_FLAG}} .
 
   install:
-    desc: Install the application
-    vars:
-      LDFLAGS: '{{if .VERSION}}-ldflags="-X github.com/package-register/mocode/internal/util/version.Version={{.VERSION}}"{{end}}'
+    desc: Install the application to GOBIN (or GOPATH/bin)
     cmds:
       - task: fetch-tags
-      - go install {{.BUILDVCS_FLAG}} {{.LDFLAGS}} -v .
+      - go build {{.BUILDVCS_FLAG}} -o "{{.INSTALL_DIR}}/{{.NAME}}{{exeExt}}" -v {{if .RACE}}-race{{end}} {{.LDFLAGS}} .
     sources:
       - ./**/*.go
       - go.mod
       - internal/agent/**/*.md
       - internal/agent/**/*.md.tpl
+    generates:
+      - "{{.INSTALL_DIR}}/{{.NAME}}{{exeExt}}"
+    vars:
+      NAME:
+        sh: 'echo {{.CLI_ARGS | default (env "NAME" | default "mocode")}}'
+      LDFLAGS: '{{if .VERSION}}-ldflags="-X github.com/package-register/mocode/internal/util/version.Version={{.VERSION}}"{{end}}'
+      INSTALL_DIR:
+        sh: 'echo {{.INSTALL_DIR | default (env "INSTALL_DIR" | default "C:/Users/16143/go/bin")}}'
 
   profile:cpu:
     desc: 10s CPU profile

@@ -21,7 +21,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/exp/charmtone"
 	"github.com/charmbracelet/x/term"
-	"github.com/google/uuid"
 
 	"github.com/package-register/mocode/internal/core/agent"
 	"github.com/package-register/mocode/internal/core/agent/notify"
@@ -759,16 +758,13 @@ func (s *storeSessionService) CreateTitleSession(ctx context.Context, pid string
 
 func (s *storeSessionService) CreateTaskSession(ctx context.Context, tool, pid, title string) (session.Session, error) {
 	now := time.Now().Unix()
-	// Generate a unique session ID using UUID, but keep the toolCallID as metadata
-	// for traceability. Using UUID prevents collisions when the same toolCallID
-	// is reused across retries or different messages.
 	sess := session.Session{
-		ID:              fmt.Sprintf("%s-%s", tool, uuid.New().String()),
+		ID:              tool,
 		ParentSessionID: pid,
 		Title:           title,
 		CreatedAt:       now,
 		UpdatedAt:       now,
-		AgentToolCallID: tool, // Store original toolCallID for traceability
+		AgentToolCallID: tool,
 	}
 	if err := s.store.Save(ctx, sess); err != nil {
 		return session.Session{}, err
