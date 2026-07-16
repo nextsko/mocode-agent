@@ -18,7 +18,6 @@ import (
 	"charm.land/fantasy"
 
 	"github.com/package-register/mocode/internal/core/agent/ctxcompress"
-	"github.com/package-register/mocode/internal/core/agent/evolution"
 	"github.com/package-register/mocode/internal/core/agent/notify"
 	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/core/knowledge/memory"
@@ -109,7 +108,6 @@ type sessionAgent struct {
 	notify               pubsub.Publisher[notify.Notification]
 	callbacks            *AgentCallbacks
 
-	errorLearner   *evolution.ErrorLearner
 	errorCollector *errcoll.Collector
 	compressor     *ctxcompress.Pipeline
 
@@ -132,7 +130,6 @@ type SessionAgentOptions struct {
 	WorkingDir           string
 	Notify               pubsub.Publisher[notify.Notification]
 	Callbacks            *AgentCallbacks
-	ErrorLearner         *evolution.ErrorLearner
 	ErrorCollector       *errcoll.Collector
 }
 
@@ -154,7 +151,6 @@ func NewSessionAgent(
 		workingDir:           opts.WorkingDir,
 		notify:               opts.Notify,
 		callbacks:            opts.Callbacks,
-		errorLearner:         opts.ErrorLearner,
 		errorCollector:       opts.ErrorCollector,
 		compressor:           ctxcompress.NewPipeline(ctxcompress.DefaultPolicy()),
 		messageQueue:         csync.NewMap[string, []SessionAgentCall](),

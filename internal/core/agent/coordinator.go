@@ -20,7 +20,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/package-register/mocode/internal/core/agent/candidate"
-	"github.com/package-register/mocode/internal/core/agent/evolution"
 	"github.com/package-register/mocode/internal/core/agent/extension"
 	"github.com/package-register/mocode/internal/core/agent/failover"
 	"github.com/package-register/mocode/internal/core/agent/notify"
@@ -137,7 +136,6 @@ type coordinator struct {
 	subagentIndex  *csync.Map[string, string]
 	summaryQueue   *sessionSummaryQueue
 	sessionLogDir  string // base dir for session logs
-	errorLearner   *evolution.ErrorLearner
 	errorCollector *errcoll.Collector
 	sessionSearch  *store.SessionSearch
 	// messenger is the external-account send port (e.g. WeChat). Defaults to
@@ -200,12 +198,7 @@ func NewCoordinator(
 		skillTracker:   skillTracker,
 		sessionLogDir:  filepath.Join(dataDir, "sessions"),
 		errorCollector: errorCollector,
-		sessionSearch:  sessionSearch,
-	}
-
-	// Initialize error learner for provider-specific mistake tracking.
-	if learner, learnerErr := evolution.NewErrorLearner(filepath.Join(cfg.WorkingDir(), ".mocode", "evolution", "patterns")); learnerErr == nil {
-		c.errorLearner = learner
+			sessionSearch:  sessionSearch,
 	}
 
 	// Resolve the active agent from config (supports mode switching).
@@ -319,9 +312,6 @@ func (c *coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 	if sessionCtx := getSessionContext(ctx, c.sessions, sessionID); sessionCtx != "" {
 		c.currentAgent.SetSystemPrompt(c.currentAgent.SystemPrompt() + "\n\n<session_context>\n" + sessionCtx + "\n</session_context>")
 	}
-
-	// Inject self-evolution patches into system prompt.
-	c.injectEvolutionContext(ctx)
 
 	run := func() (*fantasy.AgentResult, error) {
 		return c.currentAgent.Run(ctx, SessionAgentCall{
@@ -590,7 +580,6 @@ func (c *coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, age
 		Notify:               c.notify,
 		Memory:               c.memory,
 		WorkingDir:           c.cfg.WorkingDir(),
-		ErrorLearner:         c.errorLearner,
 		ErrorCollector:       c.errorCollector,
 	})
 
@@ -1220,22 +1209,6 @@ func (c *coordinator) SetMainAgent(agentID string) error {
 
 	slog.Info("Agent switched", "from", fromAgent, "to", agentID)
 	return nil
-}
-
-// injectEvolutionContext loads unapplied evolution patches and appends them
-// to the active agent's system prompt so the agent applies lessons learned.
-func (c *coordinator) injectEvolutionContext(ctx context.Context) {
-	patchDir := filepath.Join(c.cfg.WorkingDir(), ".mocode")
-	store, err := evolution.NewPatchStore(patchDir)
-	if err != nil {
-		return // not fatal
-	}
-	loader := evolution.NewPatchLoader(store)
-	ctxStr, err := loader.BuildContext()
-	if err != nil || ctxStr == "" {
-		return
-	}
-	c.currentAgent.SetSystemPrompt(c.currentAgent.SystemPrompt() + "\n\n<evolution_context>\n" + ctxStr + "\n</evolution_context>")
 }
 
 func (c *coordinator) Cancel(sessionID string) {

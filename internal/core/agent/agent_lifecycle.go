@@ -220,13 +220,6 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 				prepared.Messages = append([]fantasy.Message{fantasy.NewSystemMessage(promptPrefix)}, prepared.Messages...)
 			}
 
-			// Inject learned error corrections for the current provider/model.
-			if a.errorLearner != nil {
-				if corrections := a.errorLearner.CorrectionContext(largeModel.ModelCfg.Provider, largeModel.ModelCfg.Model); corrections != "" {
-					prepared.Messages = append([]fantasy.Message{fantasy.NewSystemMessage(corrections)}, prepared.Messages...)
-				}
-			}
-
 			// Todo nudge: surface open todos at each model step so the agent is
 			// reminded to finish pending/in-progress items before declaring done.
 			// Re-fetch the session for fresh todo state (the todos tool may have
@@ -353,17 +346,6 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 						ToolName: result.ToolName, ToolCallID: toolResult.ToolCallID,
 					})
 				}
-			}
-
-			// Record error patterns for evolution learning.
-			if toolResult.IsError && a.errorLearner != nil {
-				modelCfg := largeModel.ModelCfg
-				go a.errorLearner.Record(
-					modelCfg.Provider,
-					modelCfg.Model,
-					result.ToolName,
-					toolResult.Content,
-				)
 			}
 
 			// Use parent ctx instead of genCtx to ensure the message is created
