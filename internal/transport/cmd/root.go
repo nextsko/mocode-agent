@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
 	"errors"
@@ -14,11 +13,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	fang "charm.land/fang/v2"
-	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/colorprofile"
+
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/charmbracelet/x/exp/charmtone"
+
 	xstrings "github.com/charmbracelet/x/exp/strings"
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
@@ -221,16 +219,6 @@ func printCommandHelp(cmd *cobra.Command) {
 	}
 }
 
-var heartbit = lipgloss.NewStyle().Foreground(charmtone.Dolly).SetString(`
-    閳诲嫧鏉介埢鍕ㄦ澖閳诲嫧鏉介埢鍕ㄦ澖    閳诲嫧鏉介埢鍕ㄦ澖閳诲嫧鏉介埢鍕ㄦ澖
-  閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢? 閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢?閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰
-閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰
-閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鈧埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳烩偓閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋?閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋?閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋?閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋?閳烩偓閳烩偓閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍕ㄦ瀰閳诲牃鏋呴埢鍫氭澖閳诲嫧鏋呴埢鍫氭瀰閳诲牃鏉介埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳烩偓閳烩偓
-  閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰
-    閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰
-       閳烩偓閳烩偓閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鍫氭瀰閳诲牃鏋呴埢鈧埢鈧?           閳烩偓閳烩偓閳烩偓閳烩偓閳烩偓閳烩偓
-`)
-
 // copied from cobra:
 const defaultVersionTemplate = `{{with .DisplayName}}{{printf "%s " .}}{{end}}{{printf "version %s" .Version}}
 `
@@ -255,20 +243,6 @@ func Execute() {
 	// warnings/diagnostics instead of logging them as a side effect.
 	slog.SetDefault(slog.New(slog.DiscardHandler))
 
-	// NOTE: very hacky: we create a colorprofile writer with STDOUT, then make
-	// it forward to a bytes.Buffer, write the colored heartbit to it, and then
-	// finally prepend it in the version template.
-	// Unfortunately cobra doesn't give us a way to set a function to handle
-	// printing the version, and PreRunE runs after the version is already
-	// handled, so that doesn't work either.
-	// This is the only way I could find that works relatively well.
-	if term.IsTerminal(os.Stdout.Fd()) {
-		var b bytes.Buffer
-		w := colorprofile.NewWriter(os.Stdout, os.Environ())
-		w.Forward = &b
-		_, _ = w.WriteString(heartbit.String())
-		rootCmd.SetVersionTemplate(b.String() + "\n" + defaultVersionTemplate)
-	}
 	if err := fang.Execute(
 		context.Background(),
 		rootCmd,
