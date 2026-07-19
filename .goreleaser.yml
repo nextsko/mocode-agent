@@ -74,7 +74,6 @@ release:
   github:
     owner: nextsko
     name: mocode-agent
-</input>
   draft: false
   prerelease: auto
   name_template: "{{ .Tag }}"
