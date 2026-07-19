@@ -14,10 +14,15 @@ fi
 DIST="$(git rev-parse --show-toplevel)/dist"
 NPM_DIR="$(git rev-parse --show-toplevel)/npm"
 
-# Configure npm auth
 if [[ -n "${NPM_TOKEN:-}" ]]; then
-  echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+  cat > ~/.npmrc <<- NPMRC
+	registry=https://registry.npmjs.org/
+	//registry.npmjs.org/:_authToken=${NPM_TOKEN}
+	@fromsko:registry=https://registry.npmjs.org/
+	always-auth=true
+	NPMRC
 fi
+echo "==> npm whoami: $(npm whoami 2>&1 || echo 'not authenticated')"
 
 # Map: subdir → goreleaser archive content binary name
 declare -A BINS=(

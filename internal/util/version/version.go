@@ -5,7 +5,7 @@ import "runtime/debug"
 // Build-time parameters set via -ldflags.
 
 var (
-	Version = "0.7.3-fromsko"
+	Version = "0.7.4-fromsko"
 	Commit  = "unknown"
 )
 
