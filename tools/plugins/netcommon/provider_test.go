@@ -33,6 +33,7 @@ func TestDuckDuckGoInstantAnswerSearch(t *testing.T) {
 	if len(results) == 0 {
 		t.Fatal("expected at least one result")
 	}
+	// The abstract should be the first, highest-signal result.
 	if results[0].Snippet == "" {
 		t.Fatal("expected abstract snippet on first result")
 	}
@@ -61,7 +62,6 @@ type stubProvider struct {
 }
 
 func (s stubProvider) Name() string { return s.name }
-
 func (s stubProvider) Search(_ context.Context, _ *http.Client, _ string, _ int) ([]SearchResult, error) {
 	return s.results, s.err
 }
@@ -84,6 +84,7 @@ func TestMultiProviderFirstWins(t *testing.T) {
 }
 
 func TestMultiProviderFallsBackOnError(t *testing.T) {
+	// Primary errors, secondary returns results -> secondary wins.
 	want := []SearchResult{{Title: "fallback hit", Link: "https://b.example"}}
 	m := MultiProvider{
 		Providers: []Provider{
@@ -101,6 +102,7 @@ func TestMultiProviderFallsBackOnError(t *testing.T) {
 }
 
 func TestMultiProviderFallsBackOnEmpty(t *testing.T) {
+	// Primary returns empty (no error), secondary returns results -> secondary wins.
 	want := []SearchResult{{Title: "fallback hit"}}
 	m := MultiProvider{
 		Providers: []Provider{
@@ -131,12 +133,15 @@ func TestMultiProviderAllFailReturnsError(t *testing.T) {
 }
 
 func TestFirstSentence(t *testing.T) {
+	// A sentence terminator yields the leading sentence only.
 	if got := firstSentence("Go is a language. More text."); got != "Go is a language" {
 		t.Fatalf("expected leading sentence, got %q", got)
 	}
+	// A short string with no terminator is returned unchanged.
 	if got := firstSentence("short"); got != "short" {
 		t.Fatalf("expected unchanged short string, got %q", got)
 	}
+	// A long string with no terminator is truncated and suffixed.
 	long := strings.Repeat("word ", 40)
 	got := firstSentence(long)
 	if !strings.HasSuffix(got, "...") {

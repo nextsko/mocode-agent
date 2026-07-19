@@ -2,10 +2,9 @@ package netcommon
 
 import (
 	"context"
-	crand "crypto/rand"
 	"fmt"
 	"io"
-	"math/big"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"slices"
@@ -16,6 +15,7 @@ import (
 	"golang.org/x/net/html"
 )
 
+// SearchResult represents a single search result from DuckDuckGo.
 type SearchResult struct {
 	Title    string
 	Link     string
@@ -25,10 +25,16 @@ type SearchResult struct {
 
 var userAgents = []string{
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
 }
 
 var acceptLanguages = []string{
@@ -45,12 +51,14 @@ func SearchDuckDuckGo(ctx context.Context, client *http.Client, query string, ma
 	}
 
 	searchURL := "https://lite.duckduckgo.com/lite/?q=" + url.QueryEscape(query)
+
 	req, err := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	setRandomizedHeaders(req)
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute search: %w", err)
@@ -70,9 +78,9 @@ func SearchDuckDuckGo(ctx context.Context, client *http.Client, query string, ma
 }
 
 func setRandomizedHeaders(req *http.Request) {
-	req.Header.Set("User-Agent", userAgents[randomIntN(len(userAgents))])
+	req.Header.Set("User-Agent", userAgents[rand.IntN(len(userAgents))])
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-	req.Header.Set("Accept-Language", acceptLanguages[randomIntN(len(acceptLanguages))])
+	req.Header.Set("Accept-Language", acceptLanguages[rand.IntN(len(acceptLanguages))])
 	req.Header.Set("Accept-Encoding", "identity")
 	req.Header.Set("Connection", "keep-alive")
 	req.Header.Set("Upgrade-Insecure-Requests", "1")
@@ -81,20 +89,9 @@ func setRandomizedHeaders(req *http.Request) {
 	req.Header.Set("Sec-Fetch-Site", "none")
 	req.Header.Set("Sec-Fetch-User", "?1")
 	req.Header.Set("Cache-Control", "max-age=0")
-	if randomIntN(2) == 0 {
+	if rand.IntN(2) == 0 {
 		req.Header.Set("DNT", "1")
 	}
-}
-
-func randomIntN(n int) int {
-	if n <= 0 {
-		return 0
-	}
-	value, err := crand.Int(crand.Reader, big.NewInt(int64(n)))
-	if err != nil {
-		return 0
-	}
-	return int(value.Int64())
 }
 
 func parseLiteSearchResults(htmlContent string, maxResults int) ([]SearchResult, error) {
@@ -105,6 +102,7 @@ func parseLiteSearchResults(htmlContent string, maxResults int) ([]SearchResult,
 
 	var results []SearchResult
 	var currentResult *SearchResult
+
 	var traverse func(*html.Node)
 	traverse = func(n *html.Node) {
 		if n.Type == html.ElementNode {
@@ -135,19 +133,23 @@ func parseLiteSearchResults(htmlContent string, maxResults int) ([]SearchResult,
 			traverse(c)
 		}
 	}
+
 	traverse(doc)
 
 	if currentResult != nil && currentResult.Link != "" && len(results) < maxResults {
 		currentResult.Position = len(results) + 1
 		results = append(results, *currentResult)
 	}
+
 	return results, nil
 }
 
 func hasClass(n *html.Node, class string) bool {
 	for _, attr := range n.Attr {
-		if attr.Key == "class" && slices.Contains(strings.Fields(attr.Val), class) {
-			return true
+		if attr.Key == "class" {
+			if slices.Contains(strings.Fields(attr.Val), class) {
+				return true
+			}
 		}
 	}
 	return false
@@ -203,11 +205,12 @@ var (
 	lastSearchTime time.Time
 )
 
+// maybeDelaySearch adds a random delay if the last search was recent.
 func MaybeDelaySearch() {
 	lastSearchMu.Lock()
 	defer lastSearchMu.Unlock()
 
-	minGap := time.Duration(500+randomIntN(1500)) * time.Millisecond
+	minGap := time.Duration(500+rand.IntN(1500)) * time.Millisecond
 	elapsed := time.Since(lastSearchTime)
 	if elapsed < minGap {
 		time.Sleep(minGap - elapsed)

@@ -1,179 +1,502 @@
-// Package tools: registry.go — runtime core of the toolkit.
-//
-// This file is intentionally framework-agnostic: it imports nothing from
-// charm.land/fantasy, charm.land/catwalk, internal/core/agent, or
-// internal/core/config. The Registry is consumed by the agent runtime via
-// its public Tool interface only; the agent does not see these types
-// directly. See Design Doc §6 for the full rationale.
 package tools
 
 import (
-	"log/slog"
-	"runtime"
-	"sort"
-	"strings"
-	"sync"
-	"time"
+	"charm.land/fantasy"
+	"context"
+	"fmt"
+	"github.com/package-register/mocode/internal/core/agent/toolutil"
+	"github.com/package-register/mocode/internal/core/config"
+	"github.com/package-register/mocode/internal/core/knowledge/memory"
+	"github.com/package-register/mocode/internal/core/permission"
+	"github.com/package-register/mocode/internal/core/skills"
+	"github.com/package-register/mocode/internal/domain/filetracker"
+	"github.com/package-register/mocode/internal/domain/history"
+	"github.com/package-register/mocode/internal/domain/session"
+	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/package-register/mocode/internal/store"
+	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/package-register/mocode/internal/util/log"
+	"github.com/package-register/mocode/tools/lsp"
+	"github.com/package-register/mocode/tools/plugins/sshcommon"
 )
 
-// sourceMeta is metadata about a tool's registration source. Recorded
-// for diagnostics when duplicate names trigger slog.Warn.
-type sourceMeta struct {
-	Source       string // "builtin" | "plugin" | "mcp" | "lsp" | ...
-	Package      string // import path, e.g. "github.com/package-register/mocode/tools/builtin/bash"
-	RegisteredAt time.Time
+// ToolKind distinguishes builtin from plugin tools.
+type ToolKind string
+
+const (
+	// ToolKindBuiltin marks tools that every agent core relies on.
+	ToolKindBuiltin ToolKind = "builtin"
+	// ToolKindPlugin marks optional or role-specific tools.
+	ToolKindPlugin ToolKind = "plugin"
+)
+
+// ToolCategory groups tools by functional area.
+type ToolCategory string
+
+const (
+	CategoryFile      ToolCategory = "file"
+	CategoryExec      ToolCategory = "exec"
+	CategorySearch    ToolCategory = "search"
+	CategoryNetwork   ToolCategory = "network"
+	CategoryLSP       ToolCategory = "lsp"
+	CategoryMocode    ToolCategory = "mocode"
+	CategorySession   ToolCategory = "session"
+	CategoryMCPMeta   ToolCategory = "mcp_meta"
+	CategoryMemory    ToolCategory = "memory"
+	CategoryReasoning ToolCategory = "reasoning"
+	CategoryGitea     ToolCategory = "gitea"
+	CategoryGitOps    ToolCategory = "gitops"
+	CategorySSH       ToolCategory = "ssh"
+)
+
+// ToolDescriptor holds static metadata for a single tool.
+type ToolDescriptor struct {
+	Name     string
+	Kind     ToolKind
+	Category ToolCategory
 }
 
-// Registry is a thread-safe name -> Tool map. The default singleton
-// (Default()) is the typical entry point; NewRegistry() builds an
-// isolated instance for tests or alternative tool sets.
+// ToolPlugin builds a category of tools from dependencies.
+type ToolPlugin interface {
+	Descriptors() []ToolDescriptor
+	Build(ctx context.Context, deps ToolDeps) []fantasy.AgentTool
+}
+
+// ToolDeps holds all runtime dependencies needed to construct tools.
+type ToolDeps struct {
+	Cfg             *config.ConfigStore
+	Permissions     permission.Service
+	LSPManager      *lsp.Manager
+	History         history.Service
+	FileTracker     filetracker.Service
+	Sessions        session.Service
+	Messages        message.Service
+	Memory          memory.Service
+	AllSkills       []*skills.Skill
+	ActiveSkills    []*skills.Skill
+	SkillTracker    *skills.Tracker
+	ModelName       string
+	SummarySchedule SessionSummaryScheduler
+	SessionSearch   *store.SessionSearch
+}
+
+// AllToolDescriptors returns descriptors for every standard (non-coordinator) tool.
+func AllToolDescriptors() []ToolDescriptor {
+	var all []ToolDescriptor
+	for _, p := range standardPlugins() {
+		all = append(all, p.Descriptors()...)
+	}
+	return all
+}
+
+// AllToolNames returns the names of all standard (non-coordinator) tools.
+// This is the canonical source of truth; config.allToolNames mirrors this list.
+func AllToolNames() []string {
+	descs := AllToolDescriptors()
+	names := make([]string, len(descs))
+	for i, d := range descs {
+		names[i] = d.Name
+	}
+	return names
+}
+
+// Registry holds the ordered set of compiled-in tool plugins.
 type Registry struct {
-	mu    sync.RWMutex
-	tools map[string]Tool
-	meta  map[string]sourceMeta
+	plugins []ToolPlugin
 }
 
-// NewRegistry returns an empty Registry.
+// NewRegistry creates a Registry pre-loaded with all standard plugins.
 func NewRegistry() *Registry {
-	return &Registry{
-		tools: make(map[string]Tool),
-		meta:  make(map[string]sourceMeta),
+	return &Registry{plugins: standardPlugins()}
+}
+
+// Build runs every registered plugin and returns the combined tool list.
+func (r *Registry) Build(ctx context.Context, deps ToolDeps) []fantasy.AgentTool {
+	var all []fantasy.AgentTool
+	for _, p := range r.plugins {
+		all = append(all, p.Build(ctx, deps)...)
+	}
+	return all
+}
+
+// standardPlugins returns the ordered list of compiled-in plugins.
+func standardPlugins() []ToolPlugin {
+	return []ToolPlugin{
+		execPlugin{},
+		filePlugin{},
+		searchPlugin{},
+		networkPlugin{},
+		sessionPlugin{},
+		mocodePlugin{},
+		lspPlugin{},
+		mcpMetaPlugin{},
+		memoryPlugin{},
+		thinkPlugin{},
+		giteaPlugin{},
+		gitOpsPlugin{},
+		&sshPlugin{},
 	}
 }
 
-// Register adds tool under name, overwriting any existing entry with
-// the same name. On overwrite, logs a slog.Warn with the previous and
-// new source package paths. Safe to call from init() and concurrently
-// with Get/Names/All.
-//
-// The caller package is resolved from the immediate caller of Register.
-// Callers that go through a forwarding wrapper (e.g. the package-level
-// Register in loader.go) should resolve the package at the outer
-// boundary and call registerLocked directly, so the wrapper itself
-// never appears as the recorded source package.
-func (r *Registry) Register(name string, tool Tool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.registerLocked(name, tool, callerPackage(1))
-}
+// ─── builtin/exec ─────────────────────────────────────────────────────────────
 
-// RegisterProvider registers every tool returned by p.Tools() under
-// the tool's own Name(). Equivalent to calling Register on each.
-// On collision, the provider's later-registered tool wins.
-//
-// As with Register, the caller package is the immediate caller of
-// RegisterProvider. Forwarding wrappers that wish to attribute the
-// batch to the outer caller should call registerProviderLocked
-// directly with a pre-resolved package.
-func (r *Registry) RegisterProvider(p ToolProvider) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.registerProviderLocked(p, callerPackage(1))
-}
+type execPlugin struct{}
 
-// registerProviderLocked registers every tool from p under its own
-// Name(), attributing all entries to callerPkg. The caller must hold
-// r.mu. Empty callerPkg is allowed and means "unknown".
-func (r *Registry) registerProviderLocked(p ToolProvider, callerPkg string) {
-	for _, tool := range p.Tools() {
-		r.registerLocked(tool.Name(), tool, callerPkg)
+func (execPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: BashToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
+		{Name: JobOutputToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
+		{Name: JobInputToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
+		{Name: JobKillToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
 	}
 }
 
-// registerLocked inserts a tool under name. The caller must hold r.mu.
-// callerPkg is the import path of the package that triggered the
-// registration; an empty string means "unknown".
-func (r *Registry) registerLocked(name string, tool Tool, callerPkg string) {
-	if prevMeta, exists := r.meta[name]; exists {
-		slog.Warn(
-			"tool registration replaced existing entry",
-			"name", name,
-			"prev_package", prevMeta.Package,
-			"new_package", callerPkg,
-		)
-	}
-	r.tools[name] = tool
-	r.meta[name] = sourceMeta{
-		// Source is left empty for now; Task 2.1 introduces a helper
-		// init() that backfills it once tools are migrated.
-		Source:       "",
-		Package:      callerPkg,
-		RegisteredAt: time.Now(),
+func (execPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	return []fantasy.AgentTool{
+		NewBashTool(deps.Permissions, deps.Cfg.WorkingDir(), deps.Cfg.Config().Options.Attribution, deps.ModelName),
+		NewJobOutputTool(),
+		NewJobInputTool(),
+		NewJobKillTool(),
 	}
 }
 
-// Get returns the tool registered under name, or (nil, false) if absent.
-func (r *Registry) Get(name string) (Tool, bool) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	t, ok := r.tools[name]
-	return t, ok
+// ─── builtin/file ─────────────────────────────────────────────────────────────
+
+type filePlugin struct{}
+
+func (filePlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: EditToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
+		{Name: MultiEditToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
+		{Name: ViewToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
+		{Name: ReadFilesToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
+		{Name: WriteToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
+		{Name: LSToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
+	}
 }
 
-// Names returns all registered tool names in lexicographic order.
-func (r *Registry) Names() []string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	out := make([]string, 0, len(r.tools))
-	for name := range r.tools {
-		out = append(out, name)
+func (filePlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	wd := deps.Cfg.WorkingDir()
+	cfg := deps.Cfg.Config()
+	return []fantasy.AgentTool{
+		NewEditTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
+		NewMultiEditTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
+		NewViewTool(deps.LSPManager, deps.Permissions, deps.FileTracker, deps.SkillTracker, wd, cfg.Options.SkillsPaths...),
+		NewReadFilesTool(deps.Permissions, deps.FileTracker, wd),
+		NewWriteTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
+		NewLsTool(deps.Permissions, wd, cfg.Tools.Ls),
 	}
-	sort.Strings(out)
-	return out
 }
 
-// All returns a snapshot of all registered tools. The order is unspecified.
-func (r *Registry) All() []Tool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	out := make([]Tool, 0, len(r.tools))
-	for _, t := range r.tools {
-		out = append(out, t)
+// ─── plugin/search ────────────────────────────────────────────────────────────
+
+type searchPlugin struct{}
+
+func (searchPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: GlobToolName, Kind: ToolKindPlugin, Category: CategorySearch},
+		{Name: GrepToolName, Kind: ToolKindPlugin, Category: CategorySearch},
+		{Name: SourcegraphToolName, Kind: ToolKindPlugin, Category: CategorySearch},
 	}
-	return out
 }
 
-// callerPackage returns the import path of the function `skip` frames
-// above callerPackage's own call site. Callers should pass skip=1 to
-// mean "the function that called me". An empty string is returned when
-// the stack cannot be walked (e.g. the skip is too deep).
-func callerPackage(skip int) string {
-	// runtime.Caller(0) names the function that contains the
-	// runtime.Caller call, i.e. callerPackage itself. Add 1 so
-	// callerPackage(0) means "callerPackage" and callerPackage(1)
-	// means "caller of callerPackage".
-	pc, _, _, ok := runtime.Caller(skip + 1)
-	if !ok {
-		return ""
+func (searchPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	wd := deps.Cfg.WorkingDir()
+	webClient := deps.Cfg.Config().HTTPClient(deps.Cfg.Resolver(), 30)
+	return []fantasy.AgentTool{
+		NewGlobTool(wd),
+		NewGrepTool(wd, deps.Cfg.Config().Tools.Grep),
+		NewSourcegraphTool(webClient),
 	}
-	fn := runtime.FuncForPC(pc)
-	if fn == nil {
-		return ""
-	}
-	return packageFromFuncName(fn.Name())
 }
 
-// packageFromFuncName extracts the import path from a fully-qualified
-// runtime function name. The name has one of these shapes:
-//
-//	"github.com/foo/bar.Func"            — top-level function
-//	"github.com/foo/bar.(*Type).Method"  — method
-//	"github.com/foo/bar.init"            — package init
-//	"github.com/foo/bar.init.0"          — anonymous func inside init
-//	"github.com/foo/bar.init.func1"      — Go 1.21+ named sub-init
-//
-// In every case the package boundary is the first '.' after the last
-// '/'. If neither is present, the whole name is returned.
-func packageFromFuncName(name string) string {
-	lastSlash := strings.LastIndex(name, "/")
-	start := lastSlash + 1
-	if lastSlash < 0 {
-		start = 0
+// ─── plugin/network ───────────────────────────────────────────────────────────
+
+type networkPlugin struct{}
+
+func (networkPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: FetchToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
+		{Name: CrawlToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
+		{Name: DownloadToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
+		{Name: DownloadDocsToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
 	}
-	rest := name[start:]
-	dot := strings.Index(rest, ".")
-	if dot < 0 {
-		return name
+}
+
+func (networkPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	wd := deps.Cfg.WorkingDir()
+	cfg := deps.Cfg.Config()
+	webClient := cfg.HTTPClient(deps.Cfg.Resolver(), 30)
+	downloadClient := cfg.HTTPClient(deps.Cfg.Resolver(), 300)
+	retryPolicy := toolutil.DefaultRetryPolicy()
+	return []fantasy.AgentTool{
+		toolutil.WithRetry(NewFetchTool(deps.Permissions, wd, webClient), retryPolicy),
+		toolutil.WithRetry(NewCrawlTool(webClient), retryPolicy),
+		toolutil.WithRetry(NewDownloadTool(deps.Permissions, wd, downloadClient), retryPolicy),
+		NewDownloadDocsTool(cfg.ResolvedProxyURL(deps.Cfg.Resolver())),
 	}
-	return name[:start+dot]
+}
+
+// ─── plugin/session ───────────────────────────────────────────────────────────
+
+type sessionPlugin struct{}
+
+func (sessionPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: TodosToolName, Kind: ToolKindPlugin, Category: CategorySession},
+		{Name: SessionExportToolName, Kind: ToolKindPlugin, Category: CategorySession},
+		{Name: MessageExportToolName, Kind: ToolKindPlugin, Category: CategorySession},
+		{Name: SessionSummaryToolName, Kind: ToolKindPlugin, Category: CategorySession},
+		{Name: SessionSearchToolName, Kind: ToolKindPlugin, Category: CategorySession},
+	}
+}
+
+func (sessionPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	t := []fantasy.AgentTool{
+		NewTodosTool(deps.Sessions),
+		NewSessionExportTool(deps.Messages, deps.Cfg.WorkingDir()),
+		NewMessageExportTool(deps.Messages, deps.Cfg.WorkingDir()),
+		NewSessionSummaryTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), SessionSummaryScheduler(deps.SummarySchedule)),
+	}
+	if deps.SessionSearch != nil {
+		t = append(t, NewSessionSearchTool(deps.SessionSearch))
+	}
+	return t
+}
+
+// ─── plugin/mocode ────────────────────────────────────────────────────────────
+
+type mocodePlugin struct{}
+
+func (mocodePlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: MocodeInfoToolName, Kind: ToolKindPlugin, Category: CategoryMocode},
+		{Name: MocodeLogsToolName, Kind: ToolKindPlugin, Category: CategoryMocode},
+	}
+}
+
+func (mocodePlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	return []fantasy.AgentTool{
+		NewMocodeInfoTool(deps.Cfg, deps.LSPManager, deps.AllSkills, deps.ActiveSkills, deps.SkillTracker),
+		NewMocodeLogsTool(log.MainLogPath(infra.DataDir())),
+	}
+}
+
+// ─── plugin/lsp ───────────────────────────────────────────────────────────────
+
+type lspPlugin struct{}
+
+func (lspPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: DiagnosticsToolName, Kind: ToolKindPlugin, Category: CategoryLSP},
+		{Name: ReferencesToolName, Kind: ToolKindPlugin, Category: CategoryLSP},
+		{Name: LSPRestartToolName, Kind: ToolKindPlugin, Category: CategoryLSP},
+	}
+}
+
+func (lspPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	cfg := deps.Cfg.Config()
+	// Mirror coordinator condition: LSP tools appear when LSPs are configured
+	// or auto_lsp is nil (default enabled) or explicitly true.
+	if len(cfg.LSP) == 0 && cfg.Options.AutoLSP != nil && !*cfg.Options.AutoLSP {
+		return nil
+	}
+	return []fantasy.AgentTool{
+		NewDiagnosticsTool(deps.LSPManager),
+		NewReferencesTool(deps.LSPManager),
+		NewLSPRestartTool(deps.LSPManager),
+	}
+}
+
+// ─── plugin/mcp_meta ──────────────────────────────────────────────────────────
+
+type mcpMetaPlugin struct{}
+
+func (mcpMetaPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: ListMCPResourcesToolName, Kind: ToolKindPlugin, Category: CategoryMCPMeta},
+		{Name: ReadMCPResourceToolName, Kind: ToolKindPlugin, Category: CategoryMCPMeta},
+	}
+}
+
+func (mcpMetaPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	if len(deps.Cfg.Config().MCP) == 0 {
+		return nil
+	}
+	return []fantasy.AgentTool{
+		NewListMCPResourcesTool(deps.Cfg, deps.Permissions),
+		NewReadMCPResourceTool(deps.Cfg, deps.Permissions),
+	}
+}
+
+// ─── plugin/memory ────────────────────────────────────────────────────────────
+
+type memoryPlugin struct{}
+
+func (memoryPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: memory.AddToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
+		{Name: memory.UpdateToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
+		{Name: memory.DeleteToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
+		{Name: memory.ClearToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
+		{Name: memory.SearchToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
+		{Name: memory.LoadToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
+	}
+}
+
+func (memoryPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	if deps.Memory == nil {
+		return nil
+	}
+	return deps.Memory.Tools()
+}
+
+// ─── plugin/gitea ────────────────────────────────────────────────────────────
+
+type giteaPlugin struct{}
+
+func (giteaPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: IssuesToolName, Kind: ToolKindPlugin, Category: CategoryGitea},
+		{Name: PullsToolName, Kind: ToolKindPlugin, Category: CategoryGitea},
+		{Name: NotificationsToolName, Kind: ToolKindPlugin, Category: CategoryGitea},
+	}
+}
+
+func (giteaPlugin) Build(_ context.Context, _ ToolDeps) []fantasy.AgentTool {
+	return []fantasy.AgentTool{
+		NewIssuesTool(),
+		NewPullsTool(),
+		NewNotificationsTool(),
+	}
+}
+
+// ─── plugin/think ─────────────────────────────────────────────────────────────
+
+type thinkPlugin struct{}
+
+func (thinkPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: ThinkToolName, Kind: ToolKindPlugin, Category: CategoryReasoning},
+	}
+}
+
+func (thinkPlugin) Build(_ context.Context, _ ToolDeps) []fantasy.AgentTool {
+	return []fantasy.AgentTool{NewThinkTool()}
+}
+
+// ─── plugin/gitops ────────────────────────────────────────────────────────────
+
+type gitOpsPlugin struct{}
+
+func (gitOpsPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: PlanCommitsToolName, Kind: ToolKindPlugin, Category: CategoryGitOps},
+		{Name: ExecuteCommitsToolName, Kind: ToolKindPlugin, Category: CategoryGitOps},
+	}
+}
+
+func (gitOpsPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	wd := deps.Cfg.WorkingDir()
+	return []fantasy.AgentTool{
+		NewPlanCommitsTool(wd),
+		NewExecuteCommitsTool(wd),
+	}
+}
+
+// ─── plugin/ssh ──────────────────────────────────────────────────────────────
+
+// sshPlugin is a thin wrapper around the ssh package.  It owns a single
+// *ssh.Service (which itself owns the connection pool) so the four SSH
+// tools share state.  The Startable hooks let the registry close the
+// pool on shutdown.
+type sshPlugin struct {
+	svc *sshcommon.Service
+}
+
+func (p *sshPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: sshcommon.SshExecToolName, Kind: ToolKindPlugin, Category: CategorySSH},
+		{Name: sshcommon.SshUploadToolName, Kind: ToolKindPlugin, Category: CategorySSH},
+		{Name: sshcommon.SshDownloadToolName, Kind: ToolKindPlugin, Category: CategorySSH},
+		{Name: sshcommon.SshListHostsToolName, Kind: ToolKindPlugin, Category: CategorySSH},
+	}
+}
+
+func (p *sshPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	if p.svc == nil {
+		p.svc = sshcommon.NewService()
+	}
+	return []fantasy.AgentTool{
+		NewSshExecTool(p.svc, deps.Permissions),
+		NewSshUploadTool(p.svc, deps.Permissions),
+		NewSshDownloadTool(p.svc, deps.Permissions),
+		NewSshListHostsTool(p.svc),
+	}
+}
+
+func (p *sshPlugin) Start(_ context.Context) error { return nil }
+
+func (p *sshPlugin) Stop(_ context.Context) error {
+	if p.svc == nil {
+		return nil
+	}
+	return p.svc.Close()
+}
+
+// coordinatorToolNames returns names of tools owned by coordinator (agent,
+// agentic_fetch, transfer_to_agent) that are built outside the standard
+// registry due to back-references into coordinator state.
+func coordinatorToolNames() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: AgentToolName, Kind: ToolKindPlugin, Category: CategorySession},
+		{Name: AgenticFetchToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
+		{Name: TransferToolName, Kind: ToolKindPlugin, Category: CategorySession},
+	}
+}
+
+// AgentToolName is the name of the coordinator-owned agent delegation tool.
+const AgentToolName = "agent"
+
+// NewRegistryWithPlugins creates an empty Registry pre-loaded with the given
+// plugins.  Pass no plugins for an empty registry (useful in tests).
+func NewRegistryWithPlugins(plugins ...ToolPlugin) *Registry {
+	r := &Registry{}
+	r.plugins = append(r.plugins, plugins...)
+	return r
+}
+
+// AddPlugin appends p to the registry's plugin list.
+func (r *Registry) AddPlugin(p ToolPlugin) {
+	r.plugins = append(r.plugins, p)
+}
+
+// StartAll calls Start on every plugin that implements toolutil.Startable.
+// It stops on the first error and returns it wrapped with the plugin name.
+// Non-startable plugins are silently skipped.
+// Inspired by docker-agent/pkg/tools/startable.go.
+func (r *Registry) StartAll(ctx context.Context) error {
+	for _, p := range r.plugins {
+		if s, ok := p.(toolutil.Startable); ok {
+			if err := s.Start(ctx); err != nil {
+				return fmt.Errorf("StartAll: plugin start failed: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+// StopAll calls Stop on every plugin that implements toolutil.Startable.
+// It continues through all plugins on error, collecting the last error seen.
+// Non-startable plugins are silently skipped.
+func (r *Registry) StopAll(ctx context.Context) error {
+	var lastErr error
+	for _, p := range r.plugins {
+		if s, ok := p.(toolutil.Startable); ok {
+			if err := s.Stop(ctx); err != nil {
+				lastErr = fmt.Errorf("StopAll: plugin stop failed: %w", err)
+			}
+		}
+	}
+	return lastErr
 }

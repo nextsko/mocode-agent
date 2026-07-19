@@ -1,11 +1,8 @@
-package tools_test
+package tools
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/require"
-
-	"github.com/package-register/mocode/tools"
+	"testing"
 )
 
 type runtimeDependencyValue struct {
@@ -13,20 +10,20 @@ type runtimeDependencyValue struct {
 }
 
 type runtimeDependencyContext struct {
-	deps tools.RuntimeDependencies
+	deps RuntimeDependencies
 }
 
 func (c *runtimeDependencyContext) SessionID() string { return "session-1" }
 
 func (c *runtimeDependencyContext) WorkingDir() string { return "C:/work" }
 
-func (c *runtimeDependencyContext) Permissions() tools.PermissionChecker { return nil }
+func (c *runtimeDependencyContext) Permissions() PermissionChecker { return nil }
 
-func (c *runtimeDependencyContext) MCP() tools.MCPHandles { return nil }
+func (c *runtimeDependencyContext) MCP() MCPHandles { return nil }
 
-func (c *runtimeDependencyContext) Callbacks() tools.ToolCallbacks { return nil }
+func (c *runtimeDependencyContext) Callbacks() ToolCallbacks { return nil }
 
-func (c *runtimeDependencyContext) RuntimeDependencies() tools.RuntimeDependencies { return c.deps }
+func (c *runtimeDependencyContext) RuntimeDependencies() RuntimeDependencies { return c.deps }
 
 type runtimeDependencyBareContext struct{}
 
@@ -34,23 +31,23 @@ func (c runtimeDependencyBareContext) SessionID() string { return "session-1" }
 
 func (c runtimeDependencyBareContext) WorkingDir() string { return "C:/work" }
 
-func (c runtimeDependencyBareContext) Permissions() tools.PermissionChecker { return nil }
+func (c runtimeDependencyBareContext) Permissions() PermissionChecker { return nil }
 
-func (c runtimeDependencyBareContext) MCP() tools.MCPHandles { return nil }
+func (c runtimeDependencyBareContext) MCP() MCPHandles { return nil }
 
-func (c runtimeDependencyBareContext) Callbacks() tools.ToolCallbacks { return nil }
+func (c runtimeDependencyBareContext) Callbacks() ToolCallbacks { return nil }
 
 func TestRuntimeDependencySetCopiesInput(t *testing.T) {
 	t.Parallel()
 
 	want := &runtimeDependencyValue{value: "original"}
-	values := map[tools.RuntimeDependencyKey]any{
-		tools.RuntimeDependencyConfigStore: want,
+	values := map[RuntimeDependencyKey]any{
+		RuntimeDependencyConfigStore: want,
 	}
-	set := tools.NewRuntimeDependencySet(values)
-	values[tools.RuntimeDependencyConfigStore] = &runtimeDependencyValue{value: "mutated"}
+	set := NewRuntimeDependencySet(values)
+	values[RuntimeDependencyConfigStore] = &runtimeDependencyValue{value: "mutated"}
 
-	got, ok := set.Get(tools.RuntimeDependencyConfigStore)
+	got, ok := set.Get(RuntimeDependencyConfigStore)
 	require.True(t, ok)
 	require.Same(t, want, got)
 }
@@ -60,17 +57,17 @@ func TestRuntimeDependencyTypedLookup(t *testing.T) {
 
 	want := &runtimeDependencyValue{value: "config"}
 	tctx := &runtimeDependencyContext{
-		deps: tools.NewRuntimeDependencySet(map[tools.RuntimeDependencyKey]any{
-			tools.RuntimeDependencyConfigStore: want,
-			tools.RuntimeDependencyModelName:   "gpt-test",
+		deps: NewRuntimeDependencySet(map[RuntimeDependencyKey]any{
+			RuntimeDependencyConfigStore: want,
+			RuntimeDependencyModelName:   "gpt-test",
 		}),
 	}
 
-	got, ok := tools.RuntimeDependency[*runtimeDependencyValue](tctx, tools.RuntimeDependencyConfigStore)
+	got, ok := RuntimeDependency[*runtimeDependencyValue](tctx, RuntimeDependencyConfigStore)
 	require.True(t, ok)
 	require.Same(t, want, got)
 
-	model, ok := tools.RuntimeDependency[string](tctx, tools.RuntimeDependencyModelName)
+	model, ok := RuntimeDependency[string](tctx, RuntimeDependencyModelName)
 	require.True(t, ok)
 	require.Equal(t, "gpt-test", model)
 }
@@ -78,17 +75,17 @@ func TestRuntimeDependencyTypedLookup(t *testing.T) {
 func TestRuntimeDependencyTypedLookupRejectsMissingProviderOrWrongType(t *testing.T) {
 	t.Parallel()
 
-	_, ok := tools.RuntimeDependency[*runtimeDependencyValue](runtimeDependencyBareContext{}, tools.RuntimeDependencyConfigStore)
+	_, ok := RuntimeDependency[*runtimeDependencyValue](runtimeDependencyBareContext{}, RuntimeDependencyConfigStore)
 	require.False(t, ok)
 
 	tctx := &runtimeDependencyContext{
-		deps: tools.NewRuntimeDependencySet(map[tools.RuntimeDependencyKey]any{
-			tools.RuntimeDependencyConfigStore: "not-a-config-store",
+		deps: NewRuntimeDependencySet(map[RuntimeDependencyKey]any{
+			RuntimeDependencyConfigStore: "not-a-config-store",
 		}),
 	}
-	_, ok = tools.RuntimeDependency[*runtimeDependencyValue](tctx, tools.RuntimeDependencyConfigStore)
+	_, ok = RuntimeDependency[*runtimeDependencyValue](tctx, RuntimeDependencyConfigStore)
 	require.False(t, ok)
 
-	_, ok = tools.RuntimeDependency[string](tctx, tools.RuntimeDependencyLSPManager)
+	_, ok = RuntimeDependency[string](tctx, RuntimeDependencyLSPManager)
 	require.False(t, ok)
 }

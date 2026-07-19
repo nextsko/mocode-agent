@@ -15,6 +15,7 @@ import (
 	"github.com/package-register/mocode/internal/util/log"
 )
 
+// GetRg returns the path to ripgrep if available.
 func GetRg() string {
 	return getRg()
 }
@@ -30,6 +31,7 @@ var getRg = sync.OnceValue(func() string {
 	return path
 })
 
+// GetRgCmd builds an ripgrep --files command for glob matching.
 func GetRgCmd(ctx context.Context, globPattern string) *exec.Cmd {
 	name := getRg()
 	if name == "" {
@@ -45,6 +47,7 @@ func GetRgCmd(ctx context.Context, globPattern string) *exec.Cmd {
 	return exec.CommandContext(ctx, name, args...)
 }
 
+// GetRgSearchCmd builds an ripgrep search command for grep matching.
 func GetRgSearchCmd(ctx context.Context, pattern, path, include string) *exec.Cmd {
 	name := getRg()
 	if name == "" {
@@ -59,6 +62,7 @@ func GetRgSearchCmd(ctx context.Context, pattern, path, include string) *exec.Cm
 	return exec.CommandContext(ctx, name, args...)
 }
 
+// RunRipgrep executes a ripgrep --files command and returns matched paths.
 func RunRipgrep(cmd *exec.Cmd, searchRoot string, limit int) ([]string, error) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
