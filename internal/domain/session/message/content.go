@@ -14,7 +14,7 @@ import (
 	"charm.land/fantasy/providers/google"
 	"charm.land/fantasy/providers/openai"
 
-	"github.com/package-register/mocode/internal/util/ext"
+	"github.com/nextsko/mocode-agent/internal/util/ext"
 )
 
 type MessageRole string

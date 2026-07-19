@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/package-register/mocode/internal/integration/wechat"
-	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/integration/wechat"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 type wechatHandler struct{}

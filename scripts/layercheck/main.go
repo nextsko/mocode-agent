@@ -23,7 +23,7 @@ import (
 // layerOf returns the architectural layer number for an internal package path,
 // or -1 if it is not a layered internal package.
 func layerOf(importPath string) int {
-	const prefix = "github.com/package-register/mocode/internal/"
+	const prefix = "github.com/nextsko/mocode-agent/internal/"
 	if !strings.HasPrefix(importPath, prefix) {
 		return -1
 	}

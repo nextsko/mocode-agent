@@ -5,7 +5,7 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
 
 // Event marks a discrete point in the agent lifecycle. Extensions observe and

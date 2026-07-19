@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	wechatbot "github.com/package-register/mocode/internal/integration/wechat/sdk"
+	wechatbot "github.com/nextsko/mocode-agent/internal/integration/wechat/sdk"
 )
 
 // slashCommand represents a WeChat-specific command.

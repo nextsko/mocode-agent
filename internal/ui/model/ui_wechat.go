@@ -7,10 +7,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/integration/wechat"
-	"github.com/package-register/mocode/internal/transport/workspace"
-	"github.com/package-register/mocode/internal/ui/util"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/integration/wechat"
+	"github.com/nextsko/mocode-agent/internal/transport/workspace"
+	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
 
 func injectWeChatButler(ch *wechat.Channel, ws workspace.Workspace) {

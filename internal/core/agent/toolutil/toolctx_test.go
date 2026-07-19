@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 )
 
 // ─── WithToolCallID / ToolCallIDFromCtx ───────────────────────────────────────

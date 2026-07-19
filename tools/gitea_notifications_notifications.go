@@ -8,8 +8,8 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
-	"github.com/package-register/mocode/tools/plugins/giteacommon"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/tools/plugins/giteacommon"
 )
 
 // NotificationsToolName is the registered name of the gitea_notifications tool.

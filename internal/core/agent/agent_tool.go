@@ -13,11 +13,11 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/package-register/mocode/internal/core/agent/notify"
-	"github.com/package-register/mocode/internal/core/agent/prompt"
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/knowledge/memory"
-	"github.com/package-register/mocode/tools"
+	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
+	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
+	"github.com/nextsko/mocode-agent/tools"
 )
 
 //go:embed templates/agent_tool.md

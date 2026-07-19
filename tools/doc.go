@@ -49,7 +49,7 @@
 //		"context"
 //		"encoding/json"
 //
-//		"github.com/package-register/mocode/tools"
+//		"github.com/nextsko/mocode-agent/tools"
 //	)
 //
 //	type myTool struct{ /* unexported fields */ }
@@ -69,12 +69,12 @@
 // aggregate builtins, plugins, and bridges:
 //
 //	import (
-//		_ "github.com/package-register/mocode/tools/builtin/all"
-//		_ "github.com/package-register/mocode/tools/plugins/all"
+//		_ "github.com/nextsko/mocode-agent/tools/builtin/all"
+//		_ "github.com/nextsko/mocode-agent/tools/plugins/all"
 //	)
 //
 // # Module
 //
 // This package lives in the same Go module as the agent runtime;
 // the import path below is the only supported entry point.
-package tools // import "github.com/package-register/mocode/tools"
+package tools // import "github.com/nextsko/mocode-agent/tools"

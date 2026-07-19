@@ -1,10 +1,11 @@
 package lsp
 
 import (
-	"github.com/package-register/mocode/internal/util/csync"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/nextsko/mocode-agent/internal/util/csync"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnavailableBackoff(t *testing.T) {

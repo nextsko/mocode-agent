@@ -13,9 +13,9 @@ import (
 	"github.com/rivo/uniseg"
 	"github.com/sahilm/fuzzy"
 
-	"github.com/package-register/mocode/internal/domain/session"
-	"github.com/package-register/mocode/internal/ui/list"
-	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/ui/list"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
 )
 
 // ListItem represents a selectable and searchable item in a dialog list.

@@ -7,9 +7,9 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/permission"
-	"github.com/package-register/mocode/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/tools/mcp"
 )
 
 // whitelistDockerTools contains Docker MCP tools that don't require permission.

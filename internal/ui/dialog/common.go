@@ -8,8 +8,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/package-register/mocode/internal/ui/common"
-	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
 )
 
 // InputCursor adjusts the cursor position for an input field within a dialog.

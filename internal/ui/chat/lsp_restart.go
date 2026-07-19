@@ -3,9 +3,9 @@ package chat
 import (
 	"encoding/json"
 
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/package-register/mocode/tools"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/tools"
 )
 
 // LSPRestartToolMessageItem is a message item that represents a lsprestart tool call.

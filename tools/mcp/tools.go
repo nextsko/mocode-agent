@@ -12,8 +12,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/util/csync"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
 )
 
 type Tool = mcp.Tool

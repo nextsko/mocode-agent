@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/package-register/mocode/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
 )
 
 func (app *App) useStoreServices() error {

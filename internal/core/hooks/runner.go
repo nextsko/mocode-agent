@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/package-register/mocode/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/config"
 )
 
 // compiledHook pairs a HookConfig with its compiled matcher regex. A nil

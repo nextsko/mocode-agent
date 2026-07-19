@@ -1,23 +1,24 @@
 package tools
 
 import (
-	"charm.land/fantasy"
 	"context"
 	"fmt"
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/knowledge/memory"
-	"github.com/package-register/mocode/internal/core/permission"
-	"github.com/package-register/mocode/internal/core/skills"
-	"github.com/package-register/mocode/internal/domain/filetracker"
-	"github.com/package-register/mocode/internal/domain/history"
-	"github.com/package-register/mocode/internal/domain/session"
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/store"
-	"github.com/package-register/mocode/internal/util/infra"
-	"github.com/package-register/mocode/internal/util/log"
-	"github.com/package-register/mocode/tools/lsp"
-	"github.com/package-register/mocode/tools/plugins/sshcommon"
+
+	"charm.land/fantasy"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/core/skills"
+	"github.com/nextsko/mocode-agent/internal/domain/filetracker"
+	"github.com/nextsko/mocode-agent/internal/domain/history"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/store"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/util/log"
+	"github.com/nextsko/mocode-agent/tools/lsp"
+	"github.com/nextsko/mocode-agent/tools/plugins/sshcommon"
 )
 
 // ToolKind distinguishes builtin from plugin tools.

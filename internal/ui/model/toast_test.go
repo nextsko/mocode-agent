@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/package-register/mocode/internal/ui/common"
-	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/package-register/mocode/internal/ui/util"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
 
 func newTestToast() *Toast {

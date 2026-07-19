@@ -15,7 +15,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/lucasb-eyer/go-colorful"
 
-	"github.com/package-register/mocode/internal/util/csync"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
 )
 
 const (

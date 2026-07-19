@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/package-register/mocode/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/config"
 )
 
 const projectsFileName = "projects.json"

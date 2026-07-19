@@ -9,11 +9,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/tools/lsp"
+	"github.com/nextsko/mocode-agent/tools/lsp"
 )
 
 const LSPRestartToolName = "lsp_restart"

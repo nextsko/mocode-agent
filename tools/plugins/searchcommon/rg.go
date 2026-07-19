@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/package-register/mocode/internal/util/fsext"
-	"github.com/package-register/mocode/internal/util/log"
+	"github.com/nextsko/mocode-agent/internal/util/fsext"
+	"github.com/nextsko/mocode-agent/internal/util/log"
 )
 
 // GetRg returns the path to ripgrep if available.

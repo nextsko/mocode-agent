@@ -12,8 +12,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/zeebo/xxh3"
 
-	"github.com/package-register/mocode/internal/domain/session"
-	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
 
 func tempDir(t *testing.T) string {

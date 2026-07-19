@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/util/pubsub"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 )
 
 const messageUpdateDebounce = 300 * time.Millisecond

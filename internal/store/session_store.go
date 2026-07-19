@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/package-register/mocode/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
 )
 
 // SessionStore provides file-based session persistence.

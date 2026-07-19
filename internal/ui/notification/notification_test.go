@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/ui/notification"
+	"github.com/nextsko/mocode-agent/internal/ui/notification"
 )
 
 func TestNoopBackend_Send(t *testing.T) {

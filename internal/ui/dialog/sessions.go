@@ -11,10 +11,10 @@ import (
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 
-	"github.com/package-register/mocode/internal/domain/session"
-	"github.com/package-register/mocode/internal/ui/common"
-	"github.com/package-register/mocode/internal/ui/list"
-	"github.com/package-register/mocode/internal/ui/util"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/list"
+	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
 
 // SessionsID is the identifier for the session selector dialog.

@@ -3,8 +3,8 @@ package list
 import (
 	"strings"
 
-	"github.com/package-register/mocode/internal/ui/common"
-	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
 )
 
 // List represents a list of items that can be lazily rendered. A list is

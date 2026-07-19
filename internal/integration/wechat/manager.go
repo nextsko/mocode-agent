@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	wechatbot "github.com/package-register/mocode/internal/integration/wechat/sdk"
-	"github.com/package-register/mocode/internal/util/infra"
+	wechatbot "github.com/nextsko/mocode-agent/internal/integration/wechat/sdk"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 // AccountStatus represents the connection state of a WeChat account.

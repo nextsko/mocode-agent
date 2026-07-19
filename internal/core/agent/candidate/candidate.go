@@ -16,7 +16,7 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
 
 // Result is the outcome of one candidate attempt: the raw agent result, the

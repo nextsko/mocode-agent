@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 func TestLookupClosest(t *testing.T) {

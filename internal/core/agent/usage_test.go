@@ -5,7 +5,7 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
 )
 
 func TestUpdateSessionUsageIncludesAllInputTokenTypes(t *testing.T) {

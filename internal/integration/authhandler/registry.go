@@ -6,8 +6,8 @@ import (
 	"io"
 	"sort"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/transport/workspace"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/transport/workspace"
 )
 
 // Env carries shared dependencies for auth handlers.

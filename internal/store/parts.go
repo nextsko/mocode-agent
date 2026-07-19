@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
 
 // partWrapper wraps a ContentPart with its type discriminator for JSON

@@ -9,8 +9,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/package-register/mocode/internal/core/hooks"
-	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/core/hooks"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
 )
 
 func toolOutputHookIndicator(sty *styles.Styles, metadata string, width int) string {

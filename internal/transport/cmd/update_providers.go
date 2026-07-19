@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/x/exp/charmtone"
 	"github.com/spf13/cobra"
 
-	"github.com/package-register/mocode/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/config"
 )
 
 var updateProvidersSource string

@@ -6,10 +6,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/ui/attachments"
-	"github.com/package-register/mocode/internal/ui/common"
-	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/ui/attachments"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
 )
 
 // UserMessageItem represents a user message in the chat UI.

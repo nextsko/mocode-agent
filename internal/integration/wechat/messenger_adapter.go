@@ -3,7 +3,7 @@ package wechat
 import (
 	"context"
 
-	"github.com/package-register/mocode/internal/domain/messenger"
+	"github.com/nextsko/mocode-agent/internal/domain/messenger"
 )
 
 // messengerAccountManager adapts *AccountManager to the domain messenger port.

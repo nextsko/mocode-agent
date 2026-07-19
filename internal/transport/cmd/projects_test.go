@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/core/config/projects"
+	"github.com/nextsko/mocode-agent/internal/core/config/projects"
 )
 
 func TestProjectsEmpty(t *testing.T) {

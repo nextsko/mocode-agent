@@ -13,9 +13,9 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/ui/common"
-	mcptools "github.com/package-register/mocode/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	mcptools "github.com/nextsko/mocode-agent/tools/mcp"
 )
 
 const MCPID = "mcp"

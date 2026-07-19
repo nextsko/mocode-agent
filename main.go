@@ -9,7 +9,7 @@ import (
 
 	_ "github.com/joho/godotenv/autoload"
 
-	"github.com/package-register/mocode/internal/transport/cmd"
+	"github.com/nextsko/mocode-agent/internal/transport/cmd"
 )
 
 func main() {

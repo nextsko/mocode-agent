@@ -16,9 +16,9 @@ import (
 
 	uv "github.com/charmbracelet/ultraviolet"
 
-	"github.com/package-register/mocode/internal/ui/common"
-	"github.com/package-register/mocode/internal/ui/slash"
-	"github.com/package-register/mocode/internal/ui/util"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/slash"
+	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
 
 // ArgumentsID is the identifier for the arguments dialog.

@@ -3,7 +3,7 @@ package agent
 import (
 	"testing"
 
-	"github.com/package-register/mocode/internal/core/agent/notify"
+	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
 )
 
 // TestCoordinatorCancelSubagent_NoopOnEmpty 验证 CancelSubagent 对空 ID

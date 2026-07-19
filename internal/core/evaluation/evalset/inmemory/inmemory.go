@@ -5,7 +5,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/package-register/mocode/internal/core/evaluation/evalset"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/evalset"
 )
 
 // Manager is a concurrency-safe, in-memory evalset.Manager.

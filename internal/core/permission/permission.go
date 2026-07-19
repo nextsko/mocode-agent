@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/package-register/mocode/internal/util/csync"
-	"github.com/package-register/mocode/internal/util/pubsub"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
+	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 )
 
 // hookApprovalKey is the unexported context key used to mark a tool call as

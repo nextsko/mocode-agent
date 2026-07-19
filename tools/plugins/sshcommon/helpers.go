@@ -7,8 +7,8 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
-	"github.com/package-register/mocode/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
 )
 
 // DescribeFailure converts a transport error into a stable, user-friendly message.

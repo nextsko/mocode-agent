@@ -9,7 +9,7 @@ Gemini, Bedrock, MiniMax, Vercel, and more), integrates with
 LSPs for code intelligence, and supports extensibility via MCP servers and
 agent skills.
 
-The module path is `github.com/package-register/mocode`.
+The module path is `github.com/nextsko/mocode-agent`.
 
 ## Architecture
 

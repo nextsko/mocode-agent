@@ -5,7 +5,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/package-register/mocode/internal/core/evaluation/metric"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/metric"
 )
 
 // Manager is a concurrency-safe, in-memory metric.Manager.

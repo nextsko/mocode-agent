@@ -10,14 +10,14 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/package-register/mocode/internal/core/skills"
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/ui/common"
-	"github.com/package-register/mocode/internal/ui/completions"
-	"github.com/package-register/mocode/internal/ui/slash"
-	"github.com/package-register/mocode/internal/util/fsext"
-	"github.com/package-register/mocode/internal/util/infra"
-	"github.com/package-register/mocode/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/skills"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/completions"
+	"github.com/nextsko/mocode-agent/internal/ui/slash"
+	"github.com/nextsko/mocode-agent/internal/util/fsext"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
+	"github.com/nextsko/mocode-agent/tools/mcp"
 )
 
 func (m *UI) openAtCompletions(depth, limit int) tea.Cmd {

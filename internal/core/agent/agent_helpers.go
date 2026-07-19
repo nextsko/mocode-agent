@@ -9,8 +9,8 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/domain/session"
-	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
 
 func extractToolResultText(tr fantasy.ToolResultPart) string {

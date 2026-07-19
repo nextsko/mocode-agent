@@ -7,7 +7,7 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/domain/messenger"
+	"github.com/nextsko/mocode-agent/internal/domain/messenger"
 )
 
 // WeChatSendImageToolName is the tool name for sending images to WeChat.

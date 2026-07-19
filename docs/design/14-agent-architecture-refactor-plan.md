@@ -14,7 +14,7 @@ base-ref: a915455dfa1b56cd2046b8ac726cb6f5d4335e34
 
 ## Overview
 
-本计划将 `internal/core/agent/tools/` 下 40+ 工具搬迁到顶级包 `github.com/package-register/mocode/tools/`，并通过 `Tool` / `ToolProvider` / `ToolContext` 接口让工具集**框架无关**。`Coordinator` 与 `charm.land/fantasy` 的耦合点收敛到 `agenttool_adapter.go` 一个文件，为将来切换到 `trpc-agent-go` 或自研 kernel 留出一行式可改的接缝。迁移分三个 PR（契约脚手架 → 实现搬迁 → 切换删除），每个 PR 都保持 `go build ./...` 与 `go test ./...` 全绿。
+本计划将 `internal/core/agent/tools/` 下 40+ 工具搬迁到顶级包 `github.com/nextsko/mocode-agent/tools/`，并通过 `Tool` / `ToolProvider` / `ToolContext` 接口让工具集**框架无关**。`Coordinator` 与 `charm.land/fantasy` 的耦合点收敛到 `agenttool_adapter.go` 一个文件，为将来切换到 `trpc-agent-go` 或自研 kernel 留出一行式可改的接缝。迁移分三个 PR（契约脚手架 → 实现搬迁 → 切换删除），每个 PR 都保持 `go build ./...` 与 `go test ./...` 全绿。
 
 ---
 
@@ -35,7 +35,7 @@ base-ref: a915455dfa1b56cd2046b8ac726cb6f5d4335e34
 | Agent 消费点 | `coordinator.go`、`agent.go`、`agent_lifecycle.go`、`hooked_tool.go`、`agentic_fetch_tool.go`、`roundtable_tool.go` | 通过 `a.tools.Copy()` 拿 `[]fantasy.AgentTool` 切片运行时分发 |
 | 关键 god file | `internal/ui/model/ui.go` (~3240 行) | 未来可能调整，本计划不在其上改动；但其引用的 `tools.BashToolName` 等符号受 compat.go 重导出保护，PR3 后路径需一次性同步 |
 
-**新顶级包目标位置**：`tools/`（模块路径 `github.com/package-register/mocode/tools/`），与 `internal/core/agent/tools/` **同模块但不同包**——这是 PR2 期间出现两个 `tools` 导入路径并存的根本原因。
+**新顶级包目标位置**：`tools/`（模块路径 `github.com/nextsko/mocode-agent/tools/`），与 `internal/core/agent/tools/` **同模块但不同包**——这是 PR2 期间出现两个 `tools` 导入路径并存的根本原因。
 
 ---
 
@@ -80,7 +80,7 @@ go list -deps ./tools/... | grep -E "(fantasy|catwalk|internal/core/(agent|confi
 
 - 新建 `tools/doc.go`
 
-**验收**：`go doc github.com/package-register/mocode/tools` 可见包说明；`go build ./tools/...` 通过。
+**验收**：`go doc github.com/nextsko/mocode-agent/tools` 可见包说明；`go build ./tools/...` 通过。
 
 **依赖**：无。
 
@@ -383,7 +383,7 @@ go list -deps ./... | grep -E "(fantasy|catwalk|internal/core/(agent|config))"  
 **文件**：
 
 - 新建 `builtin/all/all.go`
-- 内容：`package all` + 10 个 `_ "github.com/package-register/mocode/builtin/<name>"` 空白导入
+- 内容：`package all` + 10 个 `_ "github.com/nextsko/mocode-agent/builtin/<name>"` 空白导入
 
 **验收**：
 
@@ -405,10 +405,10 @@ go list -deps ./... | grep -E "(fantasy|catwalk|internal/core/(agent|config))"  
 
   ```go
   // Package <name> is a compatibility re-export. New code should import
-  // github.com/package-register/mocode/builtin/<name> directly.
+  // github.com/nextsko/mocode-agent/builtin/<name> directly.
   package <name>
 
-  import "github.com/package-register/mocode/builtin/<name>"
+  import "github.com/nextsko/mocode-agent/builtin/<name>"
 
   type <Name>Params = <pkg>.<Name>Params
   // ... 所有导出符号逐个别名 ...
@@ -585,7 +585,7 @@ go list -deps ./... | grep -E "(fantasy|catwalk|internal/core/(agent|config))"  
 **文件**：
 
 - 新建 `plugins/all/all.go`
-- 内容：`package all` + 30+ `_ "github.com/package-register/mocode/plugins/<name>"` 空白导入
+- 内容：`package all` + 30+ `_ "github.com/nextsko/mocode-agent/plugins/<name>"` 空白导入
 
 **验收**：
 
@@ -700,11 +700,11 @@ go list -deps ./... | grep -E "(fantasy|catwalk|internal/core/(agent|config))"  
 **内容**：
 
 - 对所有 `internal/core/agent/**/*.go` 跑 `gofmt -r` 或 `sed`：
-  - `internal/core/agent/builtin/<n>` → `github.com/package-register/mocode/builtin/<n>`
-  - `internal/core/agent/plugins/<n>` → `github.com/package-register/mocode/plugins/<n>`
-  - `internal/core/agent/mcp` → `github.com/package-register/mocode/mcp`
-  - `internal/core/agent/lsp` → `github.com/package-register/mocode/lsp`
-  - `internal/core/agent/filter` → `github.com/package-register/mocode/filter`
+  - `internal/core/agent/builtin/<n>` → `github.com/nextsko/mocode-agent/builtin/<n>`
+  - `internal/core/agent/plugins/<n>` → `github.com/nextsko/mocode-agent/plugins/<n>`
+  - `internal/core/agent/mcp` → `github.com/nextsko/mocode-agent/mcp`
+  - `internal/core/agent/lsp` → `github.com/nextsko/mocode-agent/lsp`
+  - `internal/core/agent/filter` → `github.com/nextsko/mocode-agent/filter`
 - 跑完 `go build -buildvcs=false ./...` 确认全绿
 - 跑 `grep -r "internal/core/agent/tools" internal/core/agent/ internal/ui/ internal/store/ internal/integration/` 只剩 `internal/core/agent/*.go` 自身
 
@@ -862,8 +862,8 @@ grep -r "internal/core/agent/tools" --include="*.go" | grep -v "^internal/core/a
 **改动**：在 import 块加入：
 
 ```go
-_ "github.com/package-register/mocode/builtin/all"
-_ "github.com/package-register/mocode/plugins/all"
+_ "github.com/nextsko/mocode-agent/builtin/all"
+_ "github.com/nextsko/mocode-agent/plugins/all"
 ```
 
 **验收**：`go build ./...` PASS；`tools.Default().Names()` 在 main 启动后包含全部 40+ 名。
@@ -948,7 +948,7 @@ rm -rf internal/core/agent/
   ```go
   package mytool
 
-  import "github.com/package-register/mocode/tools"
+  import "github.com/nextsko/mocode-agent/tools"
 
   type myTool struct{}
   func (*myTool) Name() string { return "mytool" }

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/util/csync"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
 )
 
 func TestMain(m *testing.M) {

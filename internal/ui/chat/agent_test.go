@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/core/agent"
-	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/core/agent"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
 
 type fakeToolMessageItem struct {

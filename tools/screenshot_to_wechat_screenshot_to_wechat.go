@@ -7,8 +7,8 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/shellruntime/screencap"
-	"github.com/package-register/mocode/internal/domain/messenger"
+	"github.com/nextsko/mocode-agent/internal/core/shellruntime/screencap"
+	"github.com/nextsko/mocode-agent/internal/domain/messenger"
 )
 
 // WeChatScreenshotToolName is the combined screenshot→WeChat tool name.

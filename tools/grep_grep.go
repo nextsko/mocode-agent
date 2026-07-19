@@ -18,14 +18,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
-	"github.com/package-register/mocode/tools/plugins/searchcommon"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/tools/plugins/searchcommon"
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/util/csync"
-	"github.com/package-register/mocode/internal/util/fsext"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
+	"github.com/nextsko/mocode-agent/internal/util/fsext"
 )
 
 // regexCache provides thread-safe caching of compiled regex patterns

@@ -7,7 +7,7 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 )
 
 //go:embed think.md

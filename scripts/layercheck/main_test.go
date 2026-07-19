@@ -8,19 +8,19 @@ func TestLayerOf(t *testing.T) {
 		want int
 	}{
 		// Layered internal packages map to their container layer.
-		{"github.com/package-register/mocode/internal/util/csync", 0},
-		{"github.com/package-register/mocode/internal/util/fsext", 0},
-		{"github.com/package-register/mocode/internal/domain/session", 1},
-		{"github.com/package-register/mocode/internal/store", 2},
-		{"github.com/package-register/mocode/internal/core/agent", 3},
-		{"github.com/package-register/mocode/internal/core/app", 3},
-		{"github.com/package-register/mocode/internal/transport/cmd", 4},
-		{"github.com/package-register/mocode/internal/integration/wechat", 4},
-		{"github.com/package-register/mocode/internal/ui/model", 4},
+		{"github.com/nextsko/mocode-agent/internal/util/csync", 0},
+		{"github.com/nextsko/mocode-agent/internal/util/fsext", 0},
+		{"github.com/nextsko/mocode-agent/internal/domain/session", 1},
+		{"github.com/nextsko/mocode-agent/internal/store", 2},
+		{"github.com/nextsko/mocode-agent/internal/core/agent", 3},
+		{"github.com/nextsko/mocode-agent/internal/core/app", 3},
+		{"github.com/nextsko/mocode-agent/internal/transport/cmd", 4},
+		{"github.com/nextsko/mocode-agent/internal/integration/wechat", 4},
+		{"github.com/nextsko/mocode-agent/internal/ui/model", 4},
 		// Non-internal and unknown containers are not layered.
-		{"github.com/package-register/mocode/cmd", -1},
+		{"github.com/nextsko/mocode-agent/cmd", -1},
 		{"github.com/stretchr/testify/require", -1},
-		{"github.com/package-register/mocode/internal/somethingnew", -1},
+		{"github.com/nextsko/mocode-agent/internal/somethingnew", -1},
 	}
 	for _, c := range cases {
 		got := layerOf(c.path)
@@ -35,13 +35,13 @@ func TestExtractImports(t *testing.T) {
 	json := `{
 	"Dir": "/x",
 	"ImportPath": "example.com/p",
-	"Imports": ["fmt", "github.com/package-register/mocode/internal/util/csync"]
+	"Imports": ["fmt", "github.com/nextsko/mocode-agent/internal/util/csync"]
 }`
 	got := extractImports(json)
 	if len(got) != 2 {
 		t.Fatalf("expected 2 imports, got %d: %v", len(got), got)
 	}
-	if got[1] != "github.com/package-register/mocode/internal/util/csync" {
+	if got[1] != "github.com/nextsko/mocode-agent/internal/util/csync" {
 		t.Errorf("unexpected second import: %q", got[1])
 	}
 }

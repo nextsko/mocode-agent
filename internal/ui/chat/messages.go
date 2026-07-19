@@ -13,13 +13,13 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/lipgloss/v2"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/ui/attachments"
-	"github.com/package-register/mocode/internal/ui/common"
-	"github.com/package-register/mocode/internal/ui/list"
-	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/package-register/mocode/internal/util/anim"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/ui/attachments"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/list"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/util/anim"
 )
 
 // renderCacheDebug controls whether cache hit/miss logging is enabled.

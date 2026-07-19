@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/package-register/mocode/internal/util/csync"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
 )
 
 const (

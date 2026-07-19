@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/package-register/mocode/internal/ui/components"
+	"github.com/nextsko/mocode-agent/internal/ui/components"
 )
 
 // QueueStatusBar 队列状态栏

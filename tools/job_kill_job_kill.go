@@ -7,7 +7,7 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/shellruntime/shell"
+	"github.com/nextsko/mocode-agent/internal/core/shellruntime/shell"
 )
 
 const (

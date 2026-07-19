@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/package-register/mocode/internal/store"
+	"github.com/nextsko/mocode-agent/internal/store"
 )
 
 func init() {
@@ -17,7 +17,7 @@ func init() {
 var migrateCmd = &cobra.Command{
 	Use:   "migrate",
 	Short: "Migrate from old SQLite database to file-based storage",
-	Long: `Migrate all sessions, messages, and file history from the old 
+	Long: `Migrate all sessions, messages, and file history from the old
 SQLite database (.mocode/mocode.db) to the new file-based JSONL format.
 
 Usage:

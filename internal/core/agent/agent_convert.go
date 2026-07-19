@@ -14,10 +14,10 @@ import (
 	"charm.land/fantasy/providers/openrouter"
 	"charm.land/fantasy/providers/vercel"
 
-	"github.com/package-register/mocode/internal/core/agent/ctxcompress"
-	"github.com/package-register/mocode/internal/domain/session"
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/util/ext"
+	"github.com/nextsko/mocode-agent/internal/core/agent/ctxcompress"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/util/ext"
 )
 
 func (a *sessionAgent) convertToToolResult(result fantasy.ToolResultContent) message.ToolResult {

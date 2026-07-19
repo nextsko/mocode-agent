@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/package-register/mocode/internal/ui/common"
-	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/package-register/mocode/internal/util/diff"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/util/diff"
 )
 
 type parsedDiffFile struct {

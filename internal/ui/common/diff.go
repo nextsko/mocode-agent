@@ -3,8 +3,8 @@ package common
 import (
 	"github.com/alecthomas/chroma/v2"
 
-	"github.com/package-register/mocode/internal/ui/diffview"
-	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/ui/diffview"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
 )
 
 // DiffFormatter returns a diff formatter with the given styles that can be

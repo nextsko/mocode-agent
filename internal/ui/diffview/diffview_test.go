@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/exp/golden"
 
-	"github.com/package-register/mocode/internal/ui/diffview"
+	"github.com/nextsko/mocode-agent/internal/ui/diffview"
 )
 
 //go:embed testdata/TestDefault.before

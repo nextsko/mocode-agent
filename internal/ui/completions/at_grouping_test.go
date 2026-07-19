@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
 )
 
 func TestSetAtItems_GroupsByCategoryHeader(t *testing.T) {

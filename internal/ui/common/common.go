@@ -9,11 +9,11 @@ import (
 	"github.com/atotto/clipboard"
 	uv "github.com/charmbracelet/ultraviolet"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/transport/workspace"
-	"github.com/package-register/mocode/internal/ui/panel"
-	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/package-register/mocode/internal/ui/util"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/transport/workspace"
+	"github.com/nextsko/mocode-agent/internal/ui/panel"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
 
 // MaxAttachmentSize defines the maximum allowed size for file attachments (5 MB).

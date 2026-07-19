@@ -7,7 +7,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/package-register/mocode/internal/ui/list"
+	"github.com/nextsko/mocode-agent/internal/ui/list"
 )
 
 func (c *Commands) HandleMsg(msg tea.Msg) Action {

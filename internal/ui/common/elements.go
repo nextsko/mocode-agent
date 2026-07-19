@@ -12,8 +12,8 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 // PrettyPath formats a file path with home directory shortening and applies

@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/package-register/mocode/internal/core/knowledge/memory"
+	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
 )
 
 // Store manages knowledge entries backed by the memory service.

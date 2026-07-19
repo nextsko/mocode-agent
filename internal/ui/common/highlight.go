@@ -9,7 +9,7 @@ import (
 	"github.com/alecthomas/chroma/v2/lexers"
 	chromastyles "github.com/alecthomas/chroma/v2/styles"
 
-	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
 )
 
 // SyntaxHighlight applies syntax highlighting to the given source code based

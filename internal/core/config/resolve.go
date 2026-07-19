@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/core/shellruntime/shell"
+	"github.com/nextsko/mocode-agent/internal/core/shellruntime/shell"
 )
 
 type VariableResolver interface {

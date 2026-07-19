@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/package-register/mocode/internal/domain/history"
+	"github.com/nextsko/mocode-agent/internal/domain/history"
 )
 
 // FileHistoryStore provides file-based file version history persistence.

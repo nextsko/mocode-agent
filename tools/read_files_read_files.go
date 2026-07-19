@@ -11,14 +11,14 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/permission"
-	"github.com/package-register/mocode/internal/domain/filetracker"
-	"github.com/package-register/mocode/internal/util/ext"
-	"github.com/package-register/mocode/internal/util/fsext"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/domain/filetracker"
+	"github.com/nextsko/mocode-agent/internal/util/ext"
+	"github.com/nextsko/mocode-agent/internal/util/fsext"
 )
 
 //go:embed read_files.md

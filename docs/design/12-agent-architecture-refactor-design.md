@@ -34,7 +34,7 @@ This design turns the tool surface into a separately importable, framework-agnos
 
 **Goals**
 
-- Move all 40+ tools into `github.com/package-register/mocode/tools/` (top-level, same module).
+- Move all 40+ tools into `github.com/nextsko/mocode-agent/tools/` (top-level, same module).
 - Define `Tool`, `ToolProvider`, `ToolContext`, `ToolResult`, `Schema`, `Capability` as the public contract. All toolkits implement `Tool`; related tools group behind a `ToolProvider`.
 - Replace the imperative `Registry` with a declarative loader: each tool package calls `Register()` from its `init()`. The agent opts in via blank imports.
 - Make the toolkit **framework-agnostic**: `tools/` does not import `charm.land/fantasy`, `internal/core/agent`, or `internal/core/config` types. All framework coupling lives in `internal/core/agent/agenttool_adapter.go`.
@@ -74,7 +74,7 @@ This design turns the tool surface into a separately importable, framework-agnos
 │                              │ *tools.Registry, tools.ToolContext    │
 │                              │                                      │
 │  ┌────────────────────────────┴───────────────────────────┐          │
-│  │  github.com/package-register/mocode/tools/             │          │
+│  │  github.com/nextsko/mocode-agent/tools/             │          │
 │  │  ├── contracts.go        (Tool, ToolProvider, ...)     │          │
 │  │  ├── registry.go         (Default, Register, Get, ...)│          │
 │  │  ├── loader.go           (init() pattern, idempotent)  │          │
@@ -110,7 +110,7 @@ This design turns the tool surface into a separately importable, framework-agnos
 
 This is the single most important constraint. It is the load-bearing principle for the future kernel swap.
 
-**Rule.** The `github.com/package-register/mocode/tools/` package, including all its subpackages (`builtin/`, `plugins/`, `mcp/`, `lsp/`, `filter/`), MUST NOT import:
+**Rule.** The `github.com/nextsko/mocode-agent/tools/` package, including all its subpackages (`builtin/`, `plugins/`, `mcp/`, `lsp/`, `filter/`), MUST NOT import:
 
 - `charm.land/fantasy` or any subpath thereof
 - `charm.land/catwalk`
@@ -264,7 +264,7 @@ Each tool subpackage ends with:
 ```go
 package bash
 
-import "github.com/package-register/mocode/tools"
+import "github.com/nextsko/mocode-agent/tools"
 
 func New() tools.Tool { return &bashTool{} }
 
@@ -277,8 +277,8 @@ A consumer opts in with a blank import:
 
 ```go
 import (
-    _ "github.com/package-register/mocode/tools/builtin/all"
-    _ "github.com/package-register/mocode/tools/plugins/all"
+    _ "github.com/nextsko/mocode-agent/tools/builtin/all"
+    _ "github.com/nextsko/mocode-agent/tools/plugins/all"
 )
 ```
 

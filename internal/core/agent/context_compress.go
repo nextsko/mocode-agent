@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
 
 // ContextCompressor automatically compresses long conversations by summarizing

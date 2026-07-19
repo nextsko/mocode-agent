@@ -9,9 +9,9 @@ import (
 	"charm.land/fantasy"
 	"github.com/tidwall/sjson"
 
-	"github.com/package-register/mocode/internal/core/hooks"
-	"github.com/package-register/mocode/internal/core/permission"
-	"github.com/package-register/mocode/tools"
+	"github.com/nextsko/mocode-agent/internal/core/hooks"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/tools"
 )
 
 // hookedTool wraps a fantasy.AgentTool to run PreToolUse hooks before

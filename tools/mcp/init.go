@@ -18,12 +18,12 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/permission"
-	"github.com/package-register/mocode/internal/util/csync"
-	"github.com/package-register/mocode/internal/util/infra"
-	"github.com/package-register/mocode/internal/util/pubsub"
-	"github.com/package-register/mocode/internal/util/version"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/util/pubsub"
+	"github.com/nextsko/mocode-agent/internal/util/version"
 )
 
 func parseLevel(level mcp.LoggingLevel) slog.Level {

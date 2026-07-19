@@ -8,8 +8,8 @@ import (
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 
-	wechat "github.com/package-register/mocode/internal/integration/wechat"
-	"github.com/package-register/mocode/internal/ui/common"
+	wechat "github.com/nextsko/mocode-agent/internal/integration/wechat"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
 )
 
 const (

@@ -1,7 +1,7 @@
 package dialog
 
 import (
-	"github.com/package-register/mocode/internal/ui/list"
+	"github.com/nextsko/mocode-agent/internal/ui/list"
 )
 
 func (c *Commands) isInSubmenu() bool {

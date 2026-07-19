@@ -12,17 +12,17 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/catwalk/pkg/catwalk"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/permission"
-	"github.com/package-register/mocode/internal/domain/session"
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/domain/session/sessionexport"
-	"github.com/package-register/mocode/internal/integration/wechat"
-	"github.com/package-register/mocode/internal/ui/dialog"
-	fimage "github.com/package-register/mocode/internal/ui/image"
-	"github.com/package-register/mocode/internal/ui/slash"
-	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/package-register/mocode/internal/ui/util"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/domain/session/sessionexport"
+	"github.com/nextsko/mocode-agent/internal/integration/wechat"
+	"github.com/nextsko/mocode-agent/internal/ui/dialog"
+	fimage "github.com/nextsko/mocode-agent/internal/ui/image"
+	"github.com/nextsko/mocode-agent/internal/ui/slash"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
 
 func (m *UI) handleDialogMsg(msg tea.Msg) tea.Cmd {

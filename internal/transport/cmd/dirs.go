@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
-	"github.com/package-register/mocode/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/config"
 )
 
 var dirsCmd = &cobra.Command{

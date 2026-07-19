@@ -1,7 +1,7 @@
 package styles
 
 import (
-	"github.com/package-register/mocode/internal/domain/theme"
+	"github.com/nextsko/mocode-agent/internal/domain/theme"
 )
 
 // SpinnerThemer adapts the styles theme system to the domain.theme port so

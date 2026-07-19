@@ -8,8 +8,8 @@ import (
 	"charm.land/glamour/v2"
 	"github.com/alecthomas/chroma/v2/formatters"
 
-	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/package-register/mocode/internal/ui/xchroma"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/ui/xchroma"
 )
 
 const formatterName = "mocode"

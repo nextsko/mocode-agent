@@ -17,7 +17,7 @@ import (
 	"github.com/disintegration/imaging"
 	paintbrush "github.com/jordanella/go-ansi-paintbrush"
 
-	"github.com/package-register/mocode/internal/ui/util"
+	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
 
 // TransmittedMsg is a message indicating that an image has been transmitted to

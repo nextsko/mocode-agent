@@ -95,9 +95,9 @@ package chat
 
 import (
     "charm.land/lipgloss/v2"
-    "github.com/package-register/mocode/internal/ui/styles"
-    "github.com/package-register/mocode/internal/ui/anim"
-    "github.com/package-register/mocode/internal/message"
+    "github.com/nextsko/mocode-agent/internal/ui/styles"
+    "github.com/nextsko/mocode-agent/internal/ui/anim"
+    "github.com/nextsko/mocode-agent/internal/message"
 )
 
 type PDFToolMessageItem struct {
@@ -345,9 +345,9 @@ func TestAssistantMessageItem_Render(t *testing.T) {
     }
     sty := styles.Default()
     com := &common.Common{Styles: sty}
-    
+
     item := NewAssistantMessageItem(com, msg)
-    
+
     // 渲染并比对 golden
     output := item.Render(80)
     assert.Contains(t, output, "Hello")
@@ -364,14 +364,14 @@ func TestPermissionsDialog_Flow(t *testing.T) {
     sty := styles.Default()
     com := &common.Common{Styles: sty}
     perm := NewPermissionsDialog(com, mockPermissionRequest())
-    
+
     // 2. 模拟用户操作
     perm.Update(tea.KeyMsg{Type: tea.KeyRight})  // 选项切换
     assert.Equal(t, AllowForSession, perm.selected)
-    
+
     perm.Update(tea.KeyMsg{Type: tea.KeyEnter})  // 确认
     action := perm.HandleMsg(tea.KeyMsg{Type: tea.KeyEnter})
-    
+
     // 3. 验证返回的 Action
     allowAction, ok := action.(ActionPermissionAllow)
     require.True(t, ok)
@@ -387,19 +387,19 @@ func TestUI_OnboardingFlow(t *testing.T) {
     // 1. 构造 UI
     com := setupCommon(t)
     ui := New(com)
-    
+
     // 2. 用 teatest 启动
     tm := teatest.NewTestModel(t, ui, teatest.WithInitialTermSize(120, 40))
-    
+
     // 3. 模拟操作
     tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
     tm.Type("/provider openai")
     tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-    
+
     // 4. 获取最终状态
     tm.Quit()
     final := tm.FinalModel(t, teatest.WithFinalTimeout(2*time.Second)).(*UI)
-    
+
     // 5. 验证状态
     assert.Equal(t, uiLanding, final.state)
 }
@@ -415,9 +415,9 @@ func TestDialog_RenderGolden(t *testing.T) {
     com := &common.Common{Styles: sty}
     d := NewCommandsDialog(com)
     d.SetSize(image.Rect(0, 0, 84, 24))
-    
+
     got := d.Render(84)
-    
+
     autogold.EqualFile(t, got, "testdata/commands.golden")
 }
 ```

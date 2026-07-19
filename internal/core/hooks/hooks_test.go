@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/config"
 )
 
 // requirePOSIXShell skips the test on platforms where the runner cannot

@@ -16,9 +16,9 @@ import (
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 
-	"github.com/package-register/mocode/internal/ui/common"
-	fimage "github.com/package-register/mocode/internal/ui/image"
-	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	fimage "github.com/nextsko/mocode-agent/internal/ui/image"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 // FilePickerID is the identifier for the FilePicker dialog.

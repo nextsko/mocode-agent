@@ -4,8 +4,8 @@ import (
 	"context"
 	_ "embed"
 
-	"github.com/package-register/mocode/internal/core/agent/prompt"
-	"github.com/package-register/mocode/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
+	"github.com/nextsko/mocode-agent/internal/core/config"
 )
 
 //go:embed templates/coder.md.tpl

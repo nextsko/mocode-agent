@@ -9,12 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
-	"github.com/package-register/mocode/tools/plugins/searchcommon"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/tools/plugins/searchcommon"
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/util/fsext"
+	"github.com/nextsko/mocode-agent/internal/util/fsext"
 )
 
 const GlobToolName = "glob"

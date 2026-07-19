@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	agentcore "github.com/package-register/mocode/internal/core/agent"
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/domain/session"
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/ui/chat"
-	"github.com/package-register/mocode/internal/ui/panel"
+	agentcore "github.com/nextsko/mocode-agent/internal/core/agent"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/ui/chat"
+	"github.com/nextsko/mocode-agent/internal/ui/panel"
 )
 
 func (m *UI) ensureAgentRuntimeState(sessionID string) *sessionAgentRuntimeState {

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/package-register/mocode/internal/core/evaluation/criterion"
-	"github.com/package-register/mocode/internal/core/evaluation/evalset"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/criterion"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/evalset"
 )
 
 // EvalSelector scores candidates with a criterion and selects the highest

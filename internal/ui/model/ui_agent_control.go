@@ -8,14 +8,14 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/package-register/mocode/internal/core/agent/notify"
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/permission"
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/ui/chat"
-	"github.com/package-register/mocode/internal/ui/notification"
-	"github.com/package-register/mocode/internal/ui/util"
-	agenttools "github.com/package-register/mocode/tools"
+	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/ui/chat"
+	"github.com/nextsko/mocode-agent/internal/ui/notification"
+	"github.com/nextsko/mocode-agent/internal/ui/util"
+	agenttools "github.com/nextsko/mocode-agent/tools"
 )
 
 // sendMessage sends a message with the given content and attachments.

@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/sahilm/fuzzy"
 
-	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
 )
 
 // CommandItem wraps a uicmd.Command to implement the ListItem interface.

@@ -11,9 +11,9 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/agent/prompt"
-	"github.com/package-register/mocode/internal/core/permission"
-	"github.com/package-register/mocode/tools"
+	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/tools"
 )
 
 //go:embed templates/agentic_fetch.md

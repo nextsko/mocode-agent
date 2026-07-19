@@ -53,7 +53,7 @@ tasks:
   build:
     desc: Run build
     vars:
-      LDFLAGS: '{{if .VERSION}}-ldflags="-X github.com/package-register/mocode/internal/util/version.Version={{.VERSION}}"{{end}}'
+      LDFLAGS: '{{if .VERSION}}-ldflags="-X github.com/nextsko/mocode-agent/internal/util/version.Version={{.VERSION}}"{{end}}'
     cmds:
       - "go build {{.BUILDVCS_FLAG}} -o bin/mocode{{exeExt}} -v {{if .RACE}}-race{{end}} {{.LDFLAGS}} ."
     sources:
@@ -171,7 +171,7 @@ tasks:
     vars:
       NAME:
         sh: 'echo {{.CLI_ARGS | default (env "NAME" | default "mocode")}}'
-      LDFLAGS: '{{if .VERSION}}-ldflags="-X github.com/package-register/mocode/internal/util/version.Version={{.VERSION}}"{{end}}'
+      LDFLAGS: '{{if .VERSION}}-ldflags="-X github.com/nextsko/mocode-agent/internal/util/version.Version={{.VERSION}}"{{end}}'
       INSTALL_DIR:
         sh: 'echo {{.INSTALL_DIR | default (env "INSTALL_DIR" | default "C:/Users/16143/go/bin")}}'
 

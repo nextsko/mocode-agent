@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/package-register/mocode/internal/core/evaluation/criterion"
-	"github.com/package-register/mocode/internal/core/evaluation/evalset"
-	"github.com/package-register/mocode/internal/core/evaluation/metric"
-	"github.com/package-register/mocode/internal/core/evaluation/result"
-	"github.com/package-register/mocode/internal/domain/session"
-	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/criterion"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/evalset"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/metric"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/result"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
 
 // LocalOptions configures the local service.

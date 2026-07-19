@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/package-register/mocode/internal/util/fsext"
+	"github.com/nextsko/mocode-agent/internal/util/fsext"
 )
 
 func Init(workingDir string, debug bool) (*ConfigStore, error) {

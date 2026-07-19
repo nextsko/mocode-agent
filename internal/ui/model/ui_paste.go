@@ -11,10 +11,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/ui/common"
-	"github.com/package-register/mocode/internal/ui/util"
-	"github.com/package-register/mocode/internal/util/fsext"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/util"
+	"github.com/nextsko/mocode-agent/internal/util/fsext"
 )
 
 // handlePasteMsg handles a paste message.

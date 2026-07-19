@@ -11,7 +11,7 @@ import (
 	"charm.land/log/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/package-register/mocode/internal/transport/workspace"
+	"github.com/nextsko/mocode-agent/internal/transport/workspace"
 )
 
 var runCmd = &cobra.Command{

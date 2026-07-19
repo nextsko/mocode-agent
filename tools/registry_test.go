@@ -1,12 +1,13 @@
 package tools
 
 import (
-	"github.com/package-register/mocode/internal/core/knowledge/memory"
-	"github.com/package-register/mocode/tools/plugins/sshcommon"
-	"github.com/stretchr/testify/assert"
 	"slices"
 	"sort"
 	"testing"
+
+	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
+	"github.com/nextsko/mocode-agent/tools/plugins/sshcommon"
+	"github.com/stretchr/testify/assert"
 )
 
 // knownAllToolNames mirrors config.allToolNames().

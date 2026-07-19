@@ -4,7 +4,7 @@ package metric
 import (
 	"context"
 
-	"github.com/package-register/mocode/internal/core/evaluation/criterion"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/criterion"
 )
 
 // EvalMetric binds a name and pass threshold to a criterion.

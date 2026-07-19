@@ -7,9 +7,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/package-register/mocode/internal/domain/session/sessionexport"
-	"github.com/package-register/mocode/internal/ui/dialog"
-	"github.com/package-register/mocode/internal/ui/util"
+	"github.com/nextsko/mocode-agent/internal/domain/session/sessionexport"
+	"github.com/nextsko/mocode-agent/internal/ui/dialog"
+	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
 
 func (m *UI) exportSession(action dialog.ActionExportSession) tea.Cmd {

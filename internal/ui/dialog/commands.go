@@ -9,10 +9,10 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/ui/common"
-	"github.com/package-register/mocode/internal/ui/list"
-	"github.com/package-register/mocode/internal/ui/slash"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/list"
+	"github.com/nextsko/mocode-agent/internal/ui/slash"
 )
 
 // CommandsID is the identifier for the commands dialog.

@@ -12,10 +12,10 @@ import (
 	"github.com/clipperhouse/displaywidth"
 	"github.com/clipperhouse/uax29/v2/words"
 
-	"github.com/package-register/mocode/internal/ui/chat"
-	"github.com/package-register/mocode/internal/ui/common"
-	"github.com/package-register/mocode/internal/ui/list"
-	"github.com/package-register/mocode/internal/util/anim"
+	"github.com/nextsko/mocode-agent/internal/ui/chat"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/list"
+	"github.com/nextsko/mocode-agent/internal/util/anim"
 )
 
 // Constants for multi-click detection.

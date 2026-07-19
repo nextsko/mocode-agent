@@ -4,7 +4,7 @@ Terminal-based AI coding assistant with multi-model support, LSP integration, an
 
 ## Project
 
-- **Module**: `github.com/package-register/mocode`
+- **Module**: `github.com/nextsko/mocode-agent`
 - **Go Version**: 1.26.2
 - **Binary Name**: `mocode`
 

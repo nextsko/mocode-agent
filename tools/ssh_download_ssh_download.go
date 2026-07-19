@@ -8,9 +8,9 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
-	"github.com/package-register/mocode/internal/core/permission"
-	"github.com/package-register/mocode/tools/plugins/sshcommon"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/tools/plugins/sshcommon"
 )
 
 //go:embed ssh_download.md

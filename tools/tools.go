@@ -4,10 +4,11 @@
 package tools
 
 import (
-	"charm.land/fantasy"
 	"context"
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
-	"github.com/package-register/mocode/tools/plugins/netcommon"
+
+	"charm.land/fantasy"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/tools/plugins/netcommon"
 )
 
 // Network tool re-exports from netcommon.

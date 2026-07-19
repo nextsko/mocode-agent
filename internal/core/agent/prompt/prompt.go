@@ -12,10 +12,10 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/shellruntime/shell"
-	"github.com/package-register/mocode/internal/core/skills"
-	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/shellruntime/shell"
+	"github.com/nextsko/mocode-agent/internal/core/skills"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 // Prompt represents a template-based prompt generator.

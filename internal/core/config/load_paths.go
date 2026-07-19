@@ -15,8 +15,8 @@ import (
 
 	"github.com/qjebbs/go-jsons"
 
-	"github.com/package-register/mocode/internal/util/fsext"
-	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/util/fsext"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 func lookupConfigs(cwd string) []string {

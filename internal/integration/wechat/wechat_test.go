@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	wechatbot "github.com/package-register/mocode/internal/integration/wechat/sdk"
+	wechatbot "github.com/nextsko/mocode-agent/internal/integration/wechat/sdk"
 )
 
 // ─── Slash Command Tests ─────────────────────────────────────────────────────

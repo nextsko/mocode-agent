@@ -1,7 +1,7 @@
 # mocode CI/CD 修复笔记
 
-> 来源仓库：https://github.com/package-register/mocode  
-> 整理时间：2026-06-04  
+> 来源仓库：https://github.com/nextsko/mocode-agent
+> 整理时间：2026-06-04
 > 背景：两个 CI workflow（Test + Lint）长期失败，逐一排查修复最终全部通过
 
 ---

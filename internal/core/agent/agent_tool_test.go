@@ -6,7 +6,7 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/agent/notify"
+	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
 )
 
 // TestTaskResult_OmitsEmptyFields 验证空字段不进入 JSON 输出，避免前端

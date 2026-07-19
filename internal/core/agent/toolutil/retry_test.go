@@ -12,7 +12,7 @@ import (
 	"charm.land/fantasy"
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 )
 
 // stubTool is a minimal fantasy.AgentTool that records call count and can be

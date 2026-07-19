@@ -8,9 +8,9 @@ import (
 	"charm.land/fantasy"
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/hooks"
-	"github.com/package-register/mocode/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/hooks"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
 )
 
 // fakeTool records the context it was invoked with so tests can assert on

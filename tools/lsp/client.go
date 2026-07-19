@@ -17,10 +17,10 @@ import (
 	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"
 	"github.com/charmbracelet/x/powernap/pkg/transport"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/util/csync"
-	"github.com/package-register/mocode/internal/util/fsext"
-	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
+	"github.com/nextsko/mocode-agent/internal/util/fsext"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 // DiagnosticCounts holds the count of diagnostics by severity.

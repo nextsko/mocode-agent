@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/package-register/mocode/internal/config/config",
+  "$id": "https://github.com/nextsko/mocode-agent/internal/config/config",
   "$ref": "#/$defs/Config",
   "$defs": {
     "Attribution": {

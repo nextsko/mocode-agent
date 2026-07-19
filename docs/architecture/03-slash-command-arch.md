@@ -1,7 +1,7 @@
 # Mocode Slash Command 系统架构分析
 
-> 分析时间：2026-06-05  
-> 来源仓库：https://github.com/package-register/mocode
+> 分析时间：2026-06-05
+> 来源仓库：https://github.com/nextsko/mocode-agent
 
 ---
 

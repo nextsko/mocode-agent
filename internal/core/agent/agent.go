@@ -17,16 +17,16 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/agent/ctxcompress"
-	"github.com/package-register/mocode/internal/core/agent/notify"
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/knowledge/memory"
-	"github.com/package-register/mocode/internal/domain/session"
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/util/csync"
-	"github.com/package-register/mocode/internal/util/errcoll"
-	"github.com/package-register/mocode/internal/util/pubsub"
-	"github.com/package-register/mocode/internal/util/version"
+	"github.com/nextsko/mocode-agent/internal/core/agent/ctxcompress"
+	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
+	"github.com/nextsko/mocode-agent/internal/util/errcoll"
+	"github.com/nextsko/mocode-agent/internal/util/pubsub"
+	"github.com/nextsko/mocode-agent/internal/util/version"
 )
 
 const (

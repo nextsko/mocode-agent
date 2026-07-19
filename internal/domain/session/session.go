@@ -6,7 +6,7 @@ import (
 
 	"github.com/zeebo/xxh3"
 
-	"github.com/package-register/mocode/internal/util/pubsub"
+	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 )
 
 type TodoStatus string

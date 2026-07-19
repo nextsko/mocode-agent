@@ -17,7 +17,7 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"github.com/invopop/jsonschema"
 
-	"github.com/package-register/mocode/internal/util/csync"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
 )
 
 const (

@@ -12,15 +12,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
-	"github.com/package-register/mocode/internal/util/errcoll"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/util/errcoll"
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/permission"
-	"github.com/package-register/mocode/internal/core/shellruntime/shell"
-	"github.com/package-register/mocode/internal/util/fsext"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/core/shellruntime/shell"
+	"github.com/nextsko/mocode-agent/internal/util/fsext"
 )
 
 type BashParams struct {

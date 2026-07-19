@@ -10,15 +10,15 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
-	"github.com/package-register/mocode/internal/util/errcoll"
-	"github.com/package-register/mocode/tools/plugins/netcommon"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/util/errcoll"
+	"github.com/nextsko/mocode-agent/tools/plugins/netcommon"
 
 	"charm.land/fantasy"
 	md "github.com/JohannesKaufmann/html-to-markdown"
 	"github.com/PuerkitoBio/goquery"
 
-	"github.com/package-register/mocode/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
 )
 
 const (

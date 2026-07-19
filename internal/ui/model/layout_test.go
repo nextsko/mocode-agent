@@ -7,8 +7,8 @@ import (
 
 	"charm.land/bubbles/v2/textarea"
 
-	"github.com/package-register/mocode/internal/ui/chat"
-	"github.com/package-register/mocode/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/chat"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
 )
 
 // testMessageItem is a minimal chat item used to populate the chat list

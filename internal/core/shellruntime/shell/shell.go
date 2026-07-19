@@ -26,7 +26,7 @@ import (
 	"mvdan.cc/sh/v3/interp"
 	"mvdan.cc/sh/v3/syntax"
 
-	"github.com/package-register/mocode/internal/util/errcoll"
+	"github.com/nextsko/mocode-agent/internal/util/errcoll"
 )
 
 // The shell engine is always mvdan/sh (a Go-implemented POSIX-compatible

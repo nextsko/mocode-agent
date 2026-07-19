@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
-	"github.com/package-register/mocode/tools/plugins/netcommon"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/tools/plugins/netcommon"
 
 	"charm.land/fantasy"
 )

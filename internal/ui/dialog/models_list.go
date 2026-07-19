@@ -8,8 +8,8 @@ import (
 
 	"github.com/sahilm/fuzzy"
 
-	"github.com/package-register/mocode/internal/ui/list"
-	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/ui/list"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
 )
 
 // ModelsList is a list specifically for model items and groups.

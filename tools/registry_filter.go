@@ -1,9 +1,10 @@
 package tools
 
 import (
-	"charm.land/fantasy"
 	"context"
-	"github.com/package-register/mocode/tools/filter"
+
+	"charm.land/fantasy"
+	"github.com/nextsko/mocode-agent/tools/filter"
 )
 
 // BuildFiltered is like Build but applies zero or more FilterFuncs to the

@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/package-register/mocode/internal/integration/wechat/sdk/internal/protocol"
+	"github.com/nextsko/mocode-agent/internal/integration/wechat/sdk/internal/protocol"
 )
 
 // Credentials holds bot authentication data.

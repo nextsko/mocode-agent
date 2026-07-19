@@ -17,9 +17,9 @@ import (
 	powernap "github.com/charmbracelet/x/powernap/pkg/lsp"
 	"github.com/sourcegraph/jsonrpc2"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/util/csync"
-	"github.com/package-register/mocode/internal/util/fsext"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
+	"github.com/nextsko/mocode-agent/internal/util/fsext"
 )
 
 const unavailableRetryDelay = 30 * time.Second

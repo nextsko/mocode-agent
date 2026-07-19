@@ -6,11 +6,11 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/agent"
-	"github.com/package-register/mocode/internal/core/evaluation/criterion"
-	"github.com/package-register/mocode/internal/core/evaluation/metric"
-	"github.com/package-register/mocode/internal/core/evaluation/result"
-	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/core/agent"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/criterion"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/metric"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/result"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
 
 // Service covers the two evaluation phases:

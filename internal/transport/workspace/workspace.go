@@ -12,15 +12,15 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/agent/extension"
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/permission"
-	"github.com/package-register/mocode/internal/domain/history"
-	"github.com/package-register/mocode/internal/domain/session"
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/ui/slash"
-	"github.com/package-register/mocode/tools/lsp"
-	mcptools "github.com/package-register/mocode/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/agent/extension"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/domain/history"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/ui/slash"
+	"github.com/nextsko/mocode-agent/tools/lsp"
+	mcptools "github.com/nextsko/mocode-agent/tools/mcp"
 )
 
 // LSPClientInfo holds information about an LSP client's state. This is

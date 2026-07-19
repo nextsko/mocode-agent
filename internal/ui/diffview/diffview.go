@@ -13,7 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/zeebo/xxh3"
 
-	"github.com/package-register/mocode/internal/ui/xchroma"
+	"github.com/nextsko/mocode-agent/internal/ui/xchroma"
 )
 
 const (

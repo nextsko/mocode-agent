@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/core/agent/notify"
-	rtpkg "github.com/package-register/mocode/internal/core/agent/roundtable"
-	"github.com/package-register/mocode/internal/util/pubsub"
+	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
+	rtpkg "github.com/nextsko/mocode-agent/internal/core/agent/roundtable"
+	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 )
 
 type mockSeatRunner struct {

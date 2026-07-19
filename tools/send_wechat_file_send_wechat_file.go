@@ -6,7 +6,7 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/domain/messenger"
+	"github.com/nextsko/mocode-agent/internal/domain/messenger"
 )
 
 // WeChatSendFileToolName is the tool name for sending files to WeChat.

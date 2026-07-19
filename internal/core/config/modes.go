@@ -12,8 +12,8 @@ import (
 	"github.com/BurntSushi/toml"
 	"gopkg.in/yaml.v3"
 
-	"github.com/package-register/mocode/internal/util/fsext"
-	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/util/fsext"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 //go:embed templates/modes/*.md

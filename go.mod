@@ -1,4 +1,4 @@
-module github.com/package-register/mocode
+module github.com/nextsko/mocode-agent
 
 go 1.26.5
 
@@ -21,7 +21,6 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/charlievieth/fastwalk v1.0.14
 	github.com/charmbracelet/colorprofile v0.4.3
-	github.com/charmbracelet/openai-go v0.0.0-20260319145158-d0740cc34266
 	github.com/charmbracelet/ultraviolet v0.0.0-20260703014108-f5a850f9c2b7
 	github.com/charmbracelet/x/ansi v0.11.7
 	github.com/charmbracelet/x/editor v0.2.0
@@ -51,6 +50,7 @@ require (
 	github.com/mattn/go-isatty v0.0.23
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/nxadm/tail v1.4.11
+	github.com/openai/openai-go/v3 v3.43.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/qjebbs/go-jsons v1.0.0-alpha.6
 	github.com/rivo/uniseg v0.4.7
@@ -159,7 +159,6 @@ require (
 	github.com/muesli/roff v0.1.0 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
-	github.com/openai/openai-go/v3 v3.43.0 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/pierrec/lz4/v4 v4.1.26 // indirect
 	github.com/pjbgf/sha1cd v0.6.0 // indirect

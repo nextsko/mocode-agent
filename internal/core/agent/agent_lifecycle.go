@@ -16,16 +16,16 @@ import (
 	"charm.land/fantasy/providers/google"
 	"charm.land/fantasy/providers/openai"
 
-	"github.com/package-register/mocode/internal/core/agent/notify"
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
-	"github.com/package-register/mocode/internal/core/knowledge/memory"
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/domain/session/sessionexport"
-	"github.com/package-register/mocode/internal/util/errcoll"
-	"github.com/package-register/mocode/internal/util/ext"
-	"github.com/package-register/mocode/internal/util/pubsub"
-	"github.com/package-register/mocode/tools"
-	"github.com/package-register/mocode/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/domain/session/sessionexport"
+	"github.com/nextsko/mocode-agent/internal/util/errcoll"
+	"github.com/nextsko/mocode-agent/internal/util/ext"
+	"github.com/nextsko/mocode-agent/internal/util/pubsub"
+	"github.com/nextsko/mocode-agent/tools"
+	"github.com/nextsko/mocode-agent/tools/mcp"
 )
 
 func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy.AgentResult, error) {

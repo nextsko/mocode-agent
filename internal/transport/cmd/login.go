@@ -10,8 +10,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/cobra"
 
-	"github.com/package-register/mocode/internal/integration/authhandler"
-	"github.com/package-register/mocode/internal/transport/workspace"
+	"github.com/nextsko/mocode-agent/internal/integration/authhandler"
+	"github.com/nextsko/mocode-agent/internal/transport/workspace"
 )
 
 var loginCmd = &cobra.Command{

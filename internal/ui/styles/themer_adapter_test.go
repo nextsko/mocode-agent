@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/domain/theme"
+	"github.com/nextsko/mocode-agent/internal/domain/theme"
 )
 
 // TestSpinnerThemer_ImplementsPort is a compile-time check that SpinnerThemer

@@ -5,11 +5,11 @@ import (
 	_ "embed"
 	"fmt"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
 )
 
 //go:embed todos.md

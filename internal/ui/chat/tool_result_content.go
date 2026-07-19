@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/package-register/mocode/internal/util/diff"
-	"github.com/package-register/mocode/internal/util/ext"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/util/diff"
+	"github.com/nextsko/mocode-agent/internal/util/ext"
 )
 
 type toolResultContentWidths struct {

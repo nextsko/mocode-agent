@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/tools/filter"
+	"github.com/nextsko/mocode-agent/tools/filter"
 )
 
 // ─── helpers ──────────────────────────────────────────────────────────────────

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 var (

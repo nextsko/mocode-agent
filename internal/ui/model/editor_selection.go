@@ -5,7 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/package-register/mocode/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
 )
 
 func (m *UI) selectAllEditorText() {

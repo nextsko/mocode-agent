@@ -9,11 +9,11 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/skills"
-	"github.com/package-register/mocode/internal/util/infra"
-	"github.com/package-register/mocode/tools/lsp"
-	"github.com/package-register/mocode/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/skills"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
+	"github.com/nextsko/mocode-agent/tools/lsp"
+	"github.com/nextsko/mocode-agent/tools/mcp"
 )
 
 const MocodeInfoToolName = "mocode_info"

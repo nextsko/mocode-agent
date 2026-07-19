@@ -13,10 +13,10 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/pkg/browser"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/ui/dialog"
-	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/package-register/mocode/internal/ui/util"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/ui/dialog"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
 
 func (m *UI) drawHeader(scr uv.Screen, area uv.Rectangle) {

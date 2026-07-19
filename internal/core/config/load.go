@@ -12,7 +12,7 @@ import (
 
 	powernapConfig "github.com/charmbracelet/x/powernap/pkg/config"
 
-	"github.com/package-register/mocode/internal/util/csync"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
 )
 
 const defaultCatwalkURL = "https://catwalk.charm.land"

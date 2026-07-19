@@ -9,7 +9,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 // andyCodeAgentConfig is the TOML structure for a legacy agent file.

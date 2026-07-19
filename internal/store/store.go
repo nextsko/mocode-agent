@@ -15,8 +15,8 @@ import (
 
 	"github.com/zeebo/xxh3"
 
-	"github.com/package-register/mocode/internal/domain/session"
-	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 // Store is the top-level file-based persistence layer.

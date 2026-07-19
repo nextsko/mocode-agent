@@ -8,14 +8,14 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/permission"
-	"github.com/package-register/mocode/internal/util/ext"
-	"github.com/package-register/mocode/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/util/ext"
+	"github.com/nextsko/mocode-agent/tools/mcp"
 )
 
 type ListMCPResourcesParams struct {

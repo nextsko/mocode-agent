@@ -18,7 +18,7 @@ import (
 	"github.com/charlievieth/fastwalk"
 	"gopkg.in/yaml.v3"
 
-	"github.com/package-register/mocode/internal/util/pubsub"
+	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 )
 
 const (

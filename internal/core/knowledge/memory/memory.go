@@ -14,7 +14,7 @@ import (
 
 	"charm.land/fantasy"
 
-	dmem "github.com/package-register/mocode/internal/domain/memory"
+	dmem "github.com/nextsko/mocode-agent/internal/domain/memory"
 )
 
 // Re-exported domain types. Callers use memory.Entry / memory.Memory / etc.

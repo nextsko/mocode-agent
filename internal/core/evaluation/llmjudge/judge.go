@@ -14,8 +14,8 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/evaluation/criterion"
-	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/criterion"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
 
 // Judge scores a trace against rubrics using an LLM.

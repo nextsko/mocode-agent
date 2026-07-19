@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/package-register/mocode/internal/core/evaluation/criterion"
-	"github.com/package-register/mocode/internal/core/evaluation/evalset"
-	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/criterion"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/evalset"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
 
 // traceWith returns a trace whose final assistant text is s.

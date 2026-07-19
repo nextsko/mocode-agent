@@ -23,19 +23,19 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
-	"github.com/package-register/mocode/internal/core/agent/extension"
-	"github.com/package-register/mocode/internal/core/app"
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/config/projects"
-	"github.com/package-register/mocode/internal/domain/session"
-	"github.com/package-register/mocode/internal/integration/wechat"
-	"github.com/package-register/mocode/internal/transport/workspace"
-	"github.com/package-register/mocode/internal/ui/common"
-	ui "github.com/package-register/mocode/internal/ui/model"
-	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/package-register/mocode/internal/util/infra"
-	mocodelog "github.com/package-register/mocode/internal/util/log"
-	"github.com/package-register/mocode/internal/util/version"
+	"github.com/nextsko/mocode-agent/internal/core/agent/extension"
+	"github.com/nextsko/mocode-agent/internal/core/app"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/config/projects"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/integration/wechat"
+	"github.com/nextsko/mocode-agent/internal/transport/workspace"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	ui "github.com/nextsko/mocode-agent/internal/ui/model"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
+	mocodelog "github.com/nextsko/mocode-agent/internal/util/log"
+	"github.com/nextsko/mocode-agent/internal/util/version"
 )
 
 func init() {
@@ -125,7 +125,7 @@ mocode --continue
 
 		if finalModel, runErr := program.Run(); runErr != nil {
 			slog.Error("TUI run error", "error", runErr)
-			return errors.New("mocode crashed. If metrics are enabled, we were notified about it. If you'd like to report it, please copy the stacktrace above and open an issue at https://github.com/package-register/mocode/issues/new?template=bug.yml")
+			return errors.New("mocode crashed. If metrics are enabled, we were notified about it. If you'd like to report it, please copy the stacktrace above and open an issue at https://github.com/nextsko/mocode-agent/issues/new?template=bug.yml")
 		} else if m, ok := finalModel.(*ui.UI); ok {
 			if summary := m.QuitSummary(); summary != "" {
 				fmt.Println(summary)

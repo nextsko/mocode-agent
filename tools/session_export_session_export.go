@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/domain/session/sessionexport"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/domain/session/sessionexport"
 )
 
 // SessionExportToolName is the registered name of the session_export tool.

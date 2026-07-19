@@ -19,9 +19,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/package-register/mocode/internal/integration/wechat/sdk/internal/auth"
-	"github.com/package-register/mocode/internal/integration/wechat/sdk/internal/crypto"
-	"github.com/package-register/mocode/internal/integration/wechat/sdk/internal/protocol"
+	"github.com/nextsko/mocode-agent/internal/integration/wechat/sdk/internal/auth"
+	"github.com/nextsko/mocode-agent/internal/integration/wechat/sdk/internal/crypto"
+	"github.com/nextsko/mocode-agent/internal/integration/wechat/sdk/internal/protocol"
 )
 
 // MessageHandler is called for each incoming user message.

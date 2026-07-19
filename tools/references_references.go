@@ -14,12 +14,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 
 	"charm.land/fantasy"
 	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"
 
-	"github.com/package-register/mocode/tools/lsp"
+	"github.com/nextsko/mocode-agent/tools/lsp"
 )
 
 type ReferencesParams struct {

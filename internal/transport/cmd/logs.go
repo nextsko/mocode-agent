@@ -16,8 +16,8 @@ import (
 	"github.com/nxadm/tail"
 	"github.com/spf13/cobra"
 
-	"github.com/package-register/mocode/internal/util/infra"
-	mocodelog "github.com/package-register/mocode/internal/util/log"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
+	mocodelog "github.com/nextsko/mocode-agent/internal/util/log"
 )
 
 const defaultTailLines = 1000

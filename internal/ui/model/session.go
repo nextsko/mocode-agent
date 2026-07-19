@@ -12,13 +12,13 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/package-register/mocode/internal/domain/history"
-	"github.com/package-register/mocode/internal/domain/session"
-	"github.com/package-register/mocode/internal/ui/common"
-	"github.com/package-register/mocode/internal/ui/styles"
-	"github.com/package-register/mocode/internal/ui/util"
-	"github.com/package-register/mocode/internal/util/diff"
-	"github.com/package-register/mocode/internal/util/fsext"
+	"github.com/nextsko/mocode-agent/internal/domain/history"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/ui/util"
+	"github.com/nextsko/mocode-agent/internal/util/diff"
+	"github.com/nextsko/mocode-agent/internal/util/fsext"
 )
 
 // loadSessionMsg is a message indicating that a session and its files have

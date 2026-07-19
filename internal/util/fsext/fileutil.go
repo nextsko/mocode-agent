@@ -12,8 +12,8 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/charlievieth/fastwalk"
 
-	"github.com/package-register/mocode/internal/util/csync"
-	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 type FileInfo struct {
@@ -29,7 +29,7 @@ func SkipHidden(path string) bool {
 	}
 
 	commonIgnoredDirs := map[string]bool{
-			"node_modules":     true,
+		"node_modules":     true,
 		"vendor":           true,
 		"dist":             true,
 		"build":            true,

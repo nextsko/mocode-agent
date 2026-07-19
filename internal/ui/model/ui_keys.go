@@ -7,10 +7,10 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/package-register/mocode/internal/domain/session/message"
-	"github.com/package-register/mocode/internal/ui/completions"
-	"github.com/package-register/mocode/internal/ui/dialog"
-	"github.com/package-register/mocode/internal/ui/util"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/ui/completions"
+	"github.com/nextsko/mocode-agent/internal/ui/dialog"
+	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
 
 func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {

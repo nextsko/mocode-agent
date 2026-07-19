@@ -5,10 +5,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/skills"
-	"github.com/package-register/mocode/internal/ui/common"
-	uistyles "github.com/package-register/mocode/internal/ui/styles"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/skills"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
+	uistyles "github.com/nextsko/mocode-agent/internal/ui/styles"
 )
 
 // TestSkillStatusItemsIncludesBuiltinSkills verifies sidebar skills include

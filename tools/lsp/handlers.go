@@ -8,7 +8,7 @@ import (
 	powernap "github.com/charmbracelet/x/powernap/pkg/lsp"
 	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"
 
-	"github.com/package-register/mocode/tools/lsp/util"
+	"github.com/nextsko/mocode-agent/tools/lsp/util"
 )
 
 // HandleWorkspaceConfiguration handles workspace configuration requests

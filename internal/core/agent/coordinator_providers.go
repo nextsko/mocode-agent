@@ -10,8 +10,8 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/util/log"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/util/log"
 
 	"charm.land/fantasy/providers/anthropic"
 	"charm.land/fantasy/providers/azure"
@@ -21,7 +21,7 @@ import (
 	"charm.land/fantasy/providers/openaicompat"
 	"charm.land/fantasy/providers/openrouter"
 	"charm.land/fantasy/providers/vercel"
-	openaisdk "github.com/charmbracelet/openai-go/option"
+	openaisdk "github.com/openai/openai-go/v3/option"
 )
 
 // This file groups the provider-construction methods of the coordinator.

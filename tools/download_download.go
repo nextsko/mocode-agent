@@ -12,13 +12,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/core/agent/toolutil"
-	"github.com/package-register/mocode/tools/plugins/netcommon"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/tools/plugins/netcommon"
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/permission"
-	"github.com/package-register/mocode/internal/util/ext"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/util/ext"
 )
 
 type DownloadParams struct {

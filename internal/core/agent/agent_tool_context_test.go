@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/tools"
+	"github.com/nextsko/mocode-agent/tools"
 )
 
 type fakeToolContextPermissionChecker struct {

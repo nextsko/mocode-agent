@@ -21,12 +21,12 @@ import (
 
 	"charm.land/catwalk/pkg/catwalk"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/core/knowledge/memory"
-	wechat "github.com/package-register/mocode/internal/integration/wechat"
-	"github.com/package-register/mocode/internal/transport/workspace"
-	"github.com/package-register/mocode/internal/util/infra"
-	"github.com/package-register/mocode/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
+	wechat "github.com/nextsko/mocode-agent/internal/integration/wechat"
+	"github.com/nextsko/mocode-agent/internal/transport/workspace"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
+	"github.com/nextsko/mocode-agent/tools/mcp"
 )
 
 //go:embed assets/*

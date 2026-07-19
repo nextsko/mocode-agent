@@ -18,8 +18,8 @@ import (
 	"charm.land/catwalk/pkg/embedded"
 	"github.com/charmbracelet/x/etag"
 
-	"github.com/package-register/mocode/internal/util/csync"
-	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 type syncer[T any] interface {

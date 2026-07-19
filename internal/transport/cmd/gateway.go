@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/package-register/mocode/internal/integration/wechat/gateway"
+	"github.com/nextsko/mocode-agent/internal/integration/wechat/gateway"
 )
 
 var gatewayCmd = &cobra.Command{

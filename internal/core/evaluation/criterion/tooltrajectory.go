@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/package-register/mocode/internal/core/evaluation/evalset"
-	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/core/evaluation/evalset"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
 
 // Score evaluates the ToolTrajectory criterion against the tool calls actually

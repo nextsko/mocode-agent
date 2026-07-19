@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 var unsafeSessionPathChars = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)

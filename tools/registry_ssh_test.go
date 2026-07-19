@@ -2,8 +2,9 @@ package tools
 
 import (
 	"context"
-	"github.com/package-register/mocode/tools/plugins/sshcommon"
 	"testing"
+
+	"github.com/nextsko/mocode-agent/tools/plugins/sshcommon"
 )
 
 // TestRegistry_IncludesSSHTools asserts that AllToolNames() returns

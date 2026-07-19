@@ -13,11 +13,11 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/package-register/mocode/internal/core/agent/notify"
-	rtpkg "github.com/package-register/mocode/internal/core/agent/roundtable"
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/util/pubsub"
-	"github.com/package-register/mocode/tools"
+	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
+	rtpkg "github.com/nextsko/mocode-agent/internal/core/agent/roundtable"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/util/pubsub"
+	"github.com/nextsko/mocode-agent/tools"
 )
 
 //go:embed templates/roundtable_tool.md

@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"sync"
 
-	"github.com/package-register/mocode/internal/util/log"
+	"github.com/nextsko/mocode-agent/internal/util/log"
 )
 
 // getTea is a one-time lookup for the tea binary. Returns empty string if not

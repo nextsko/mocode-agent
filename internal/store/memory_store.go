@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/package-register/mocode/internal/domain/memory"
+	"github.com/nextsko/mocode-agent/internal/domain/memory"
 )
 
 // MemoryStore provides file-based memory persistence via JSONL.

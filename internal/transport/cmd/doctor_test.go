@@ -14,15 +14,15 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/util/csync"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
 )
 
 func TestParseDoctorModulePath(t *testing.T) {
 	t.Parallel()
 
-	mod := parseDoctorModulePath([]byte("module github.com/package-register/mocode\n\ngo 1.26.0\n"))
-	require.Equal(t, "github.com/package-register/mocode", mod)
+	mod := parseDoctorModulePath([]byte("module github.com/nextsko/mocode-agent\n\ngo 1.26.0\n"))
+	require.Equal(t, "github.com/nextsko/mocode-agent", mod)
 }
 
 func TestInspectDoctorPath(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"charm.land/fantasy"
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/core/knowledge/memory"
+	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
 )
 
 // mockMemory implements memory.Service for testing.

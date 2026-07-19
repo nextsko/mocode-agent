@@ -3,12 +3,13 @@ package lsp
 import (
 	"context"
 	"fmt"
-	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"
-	"github.com/package-register/mocode/internal/core/config"
-	"github.com/package-register/mocode/internal/util/csync"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClient(t *testing.T) {

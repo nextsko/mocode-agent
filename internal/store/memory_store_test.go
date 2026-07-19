@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/domain/memory"
+	"github.com/nextsko/mocode-agent/internal/domain/memory"
 )
 
 func TestMemoryStore_PersistAndSearch(t *testing.T) {
