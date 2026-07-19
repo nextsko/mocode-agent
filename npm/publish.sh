@@ -77,13 +77,7 @@ for dir in "$NPM_DIR"/mocode-cli "$NPM_DIR"/mocode-cli-*/; do
   "
 done
 
-echo "==> Publishing platform packages first"
-for pkg in mocode-cli-linux-x64 mocode-cli-linux-arm64 mocode-cli-darwin-x64 mocode-cli-darwin-arm64 mocode-cli-win32-x64; do
-  echo "  npm publish $pkg"
-  npm publish "$NPM_DIR/$pkg" --access public
-done
-
-echo "==> Publishing main package @fromsko/mocode-cli"
+echo "==> Publishing @fromsko/mocode-cli"
 npm publish "$NPM_DIR/mocode-cli" --access public
-
 echo "==> Done! @fromsko/mocode-cli@${VERSION} published."
+
