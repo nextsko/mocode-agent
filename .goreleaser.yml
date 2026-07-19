@@ -64,8 +64,8 @@ checksum:
 
 release:
   github:
-    owner: package-register
-    name: mocode
+    owner: nextsko
+    name: mocode-build
   draft: false
   prerelease: false
   name_template: '{{.Tag}}'
@@ -76,4 +76,4 @@ release:
     - {{.Message}}
     {{end}}
 
-    **Full Changelog**: https://github.com/package-register/mocode/compare/{{.PreviousTag}}...{{.Tag}}
+    **Full Changelog**: https://github.com/nextsko/mocode-build/compare/{{.PreviousTag}}...{{.Tag}}
