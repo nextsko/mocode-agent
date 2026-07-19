@@ -25,8 +25,8 @@ builds:
       - GOEXPERIMENT=greenteagc
     ldflags:
       - -s -w
-      - -X github.com/package-register/mocode/internal/util/version.Version={{.Version}}
-      - -X github.com/package-register/mocode/internal/util/version.Commit={{.ShortCommit}}
+      - -X github.com/nextsko/mocode-build/internal/util/version.Version={{.Version}}
+      - -X github.com/nextsko/mocode-build/internal/util/version.Commit={{.ShortCommit}}
     flags:
       - -buildvcs=false
     mod_timestamp: "{{ .CommitTimestamp }}"
@@ -73,7 +73,7 @@ changelog:
 release:
   github:
     owner: nextsko
-    name: mocode-agent
+    name: mocode-build
   draft: false
   prerelease: auto
   name_template: "{{ .Tag }}"
