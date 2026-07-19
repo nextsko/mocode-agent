@@ -48,3 +48,21 @@
 | 07 | [guides/07-evolution-loop-plan.md](guides/07-evolution-loop-plan.md) | 内循环闭环进化系统设计 |
 | 08 | [guides/08-evaluation-plan.md](guides/08-evaluation-plan.md) | Evaluation 体系落地计划 |
 | 09 | [guides/09-ci-fix-log.md](guides/09-ci-fix-log.md) | CI/CD 修复历史记录 |
+
+### 参考研究（外部项目深度分析）
+
+| 目录 | 文档 | 主题 |
+|------|------|------|
+| plans/search-tools/01 | [plans/search-tools/01-grep-tool-architecture.md](plans/search-tools/01-grep-tool-architecture.md) | oh-my-pi grep 工具完整架构（TS + Rust）|
+| plans/search-tools/02 | [plans/search-tools/02-web-search-provider-chain.md](plans/search-tools/02-web-search-provider-chain.md) | Web Search 22 Provider 懒加载 + Fallback 链 |
+| plans/search-tools/03 | [plans/search-tools/03-ast-grep-design.md](plans/search-tools/03-ast-grep-design.md) | AST 结构搜索设计（tree-sitter + ast-grep-core）|
+| plans/search-tools/04 | [plans/search-tools/04-rust-native-grep-engine.md](plans/search-tools/04-rust-native-grep-engine.md) | Rust 原生 RE2/PCRE2 双引擎搜索实现 |
+| plans/search-tools/05 | [plans/search-tools/05-search-testing-observability.md](plans/search-tools/05-search-testing-observability.md) | 搜索工具测试策略与可观测性设计 |
+| plans/agentic-fetch/01 | [plans/agentic-fetch/01-context-canceled-failure.md](plans/agentic-fetch/01-context-canceled-failure.md) | agentic_fetch 端点不可用时 context canceled 失败链路 |
+| plans/agentic-fetch/02 | [plans/agentic-fetch/02-fallback-strategy.md](plans/agentic-fetch/02-fallback-strategy.md) | 四层降级（L1 缓存 → L2 主链 → L3 兜底 → L4 软错误）|
+| plans/agentic-fetch/03 | [plans/agentic-fetch/03-context-isolation-plan.md](plans/agentic-fetch/03-context-isolation-plan.md) | 子 Agent context 隔离改造（含软/硬取消分类）|
+| plans/summary-async/01 | [plans/summary-async/01-sync-blocking-root-cause.md](plans/summary-async/01-sync-blocking-root-cause.md) | `/summary` slash 同步阻塞 TUI 根因（tea.Cmd 直包 RPC）|
+| plans/summary-async/02 | [plans/summary-async/02-async-fix-options.md](plans/summary-async/02-async-fix-options.md) | 异步化方案对比：选定复用 summaryQueue + 主动 drain |
+| plans/summary-async/03 | [plans/summary-async/03-implementation-plan.md](plans/summary-async/03-implementation-plan.md) | M0–M5 PR 拆解：设计澄清 → API → pubsub → UI → 测试 → 文档 |
+| plans/summary-async/04 | [plans/summary-async/04-pubsub-integration.md](plans/summary-async/04-pubsub-integration.md) | 接入 app.events 总线：SummaryCompletedMsg + setupSubscriber 范式 |
+| plans/summary-async/05 | [plans/summary-async/05-testing-matrix.md](plans/summary-async/05-testing-matrix.md) | 单元/集成/UI/端到端测试矩阵 + V1–V4 手动验证步骤 |
