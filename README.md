@@ -188,8 +188,8 @@ Override with env vars:
 ```bash
 task build    # go build -buildvcs=false
 task test     # go test -race -failfast ./...
-task lint     # CI lint profile on changed files
-task lint:strict # full legacy golangci-lint suite
+task lint        # golangci-lint on changed files
+task lint:strict # full lint suite across the entire repo
 task fmt      # gofumpt -w .
 task dev      # MOCODE_PROFILE=true go run -buildvcs=false .
 ```

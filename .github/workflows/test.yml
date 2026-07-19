@@ -54,7 +54,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(--config=.golangci.ci.yml --timeout=5m --whole-files)
+          args=(--config=.golangci.yml --timeout=5m --whole-files)
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" && -n "${GITHUB_BASE_REF:-}" ]]; then
             args+=(--new-from-merge-base="origin/${GITHUB_BASE_REF}")
           elif git rev-parse --verify HEAD~1 >/dev/null 2>&1; then

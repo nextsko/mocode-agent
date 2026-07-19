@@ -8,7 +8,7 @@ vars:
   RACE:
     sh: test -f race.log && echo "1" || echo ""
   BUILDVCS_FLAG: -buildvcs=false
-  LINT_CONFIG: .golangci.ci.yml
+  LINT_CONFIG: .golangci.yml
 
 env:
   CGO_ENABLED: 0
@@ -31,10 +31,10 @@ tasks:
       GOEXPERIMENT: null
 
   lint:strict:
-    desc: Run the full legacy lint suite across the repository
+    desc: Run the full lint suite across the entire repository (slower)
     cmds:
       - task: lint:log
-      - golangci-lint run --path-mode=abs --config=".golangci.yml" --timeout=5m
+      - golangci-lint run --path-mode=abs --config="{{.LINT_CONFIG}}" --timeout=10m
     env:
       GOEXPERIMENT: null
 
