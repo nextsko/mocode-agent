@@ -398,7 +398,7 @@ func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error
 
 	store.Overrides().SkipPermissionRequests = yolo
 
-	if err := projects.Register(cwd, filepath.Join(cwd, ".mocode")); err != nil {
+	if err := projects.Register(cwd); err != nil {
 		slog.Warn("Failed to register project", "error", err)
 	}
 

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	wechatbot "github.com/package-register/mocode/internal/integration/wechat/sdk"
+	"github.com/package-register/mocode/internal/util/infra"
 )
 
 // Credentials aliases the SDK's credentials type.
@@ -164,13 +165,13 @@ func (c *Channel) LoginWithCallbacks(ctx context.Context, force bool, callbacks 
 	}
 
 	// Set state dir for cursor/context token persistence.
-	stateDir := filepath.Join(os.TempDir(), "mocode", "wechat", "state", creds.UserID)
+	stateDir := filepath.Join(os.TempDir(), "mocode-wechat", "state", creds.UserID)
 	bot.SetStateDir(stateDir)
 
 	c.mu.Lock()
 	c.bot = bot
 	c.Credentials = creds
-	c.recentMsgPath = filepath.Join(os.TempDir(), "mocode", "wechat", "recent-msgs", creds.UserID+".json")
+	c.recentMsgPath = filepath.Join(os.TempDir(), "mocode-wechat", "recent-msgs", creds.UserID+".json")
 	c.recentMsgs = nil // will be lazy-loaded on first message
 	c.mu.Unlock()
 
@@ -599,8 +600,7 @@ func (c *Channel) downloadAllMedia(ctx context.Context, msg *wechatbot.IncomingM
 	mediaDir := c.mediaDir
 	c.mu.Unlock()
 	if mediaDir == "" {
-		home, _ := os.UserHomeDir()
-		mediaDir = filepath.Join(home, ".mocode", "wechat", "media")
+		mediaDir = infra.WeChatMediaDir()
 	}
 
 	download := func(media *wechatbot.CDNMedia, aesKey, mediaType, fileName string) *MediaInfo {

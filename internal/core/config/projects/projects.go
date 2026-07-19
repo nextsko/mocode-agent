@@ -16,7 +16,6 @@ const projectsFileName = "projects.json"
 // Project represents a tracked project directory.
 type Project struct {
 	Path         string    `json:"path"`
-	MocodeDir    string    `json:"mocode_dir,omitempty"`
 	LastAccessed time.Time `json:"last_accessed"`
 }
 
@@ -75,7 +74,7 @@ func Save(list *ProjectList) error {
 }
 
 // Register adds or updates a project in the list.
-func Register(workingDir, mocodeDir string) error {
+func Register(workingDir string) error {
 	list, err := Load()
 	if err != nil {
 		return err
@@ -88,7 +87,6 @@ func Register(workingDir, mocodeDir string) error {
 	for i, p := range list.Projects {
 		if p.Path == workingDir {
 			list.Projects[i].LastAccessed = now
-			list.Projects[i].MocodeDir = mocodeDir
 			found = true
 			break
 		}
@@ -97,7 +95,6 @@ func Register(workingDir, mocodeDir string) error {
 	if !found {
 		list.Projects = append(list.Projects, Project{
 			Path:         workingDir,
-			MocodeDir:    mocodeDir,
 			LastAccessed: now,
 		})
 	}

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	wechatbot "github.com/package-register/mocode/internal/integration/wechat/sdk"
+	"github.com/package-register/mocode/internal/util/infra"
 )
 
 // AccountStatus represents the connection state of a WeChat account.
@@ -64,8 +65,7 @@ func GetManager() *AccountManager {
 // NewAccountManager creates a new AccountManager.
 func NewAccountManager(storeDir string) *AccountManager {
 	if storeDir == "" {
-		home, _ := os.UserHomeDir()
-		storeDir = filepath.Join(home, ".mocode", "wechat")
+		storeDir = infra.WeChatDir()
 	}
 	m := &AccountManager{
 		accounts: make(map[string]*Channel),

@@ -35,7 +35,6 @@ var fastIgnoreDirs = map[string]bool{
 	".Trash":          true,
 	".Spotlight-V100": true,
 	".fseventsd":      true,
-	".mocode":         true,
 	"OrbStack":        true,
 	".local":          true,
 	".share":          true,
@@ -139,7 +138,7 @@ func parsePatterns(lines []string, domain []string) []gitignore.Pattern {
 }
 
 type directoryLister struct {
-	// dirPatterns caches parsed patterns from .gitignore/.mocodeignore for each directory.
+	// dirPatterns caches parsed patterns from .gitignore/.mocodeignore files for each directory.
 	// This avoids re-reading files when building combined matchers.
 	dirPatterns *csync.Map[string, []gitignore.Pattern]
 	// combinedMatchers caches a combined matcher for each directory that includes

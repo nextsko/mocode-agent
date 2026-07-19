@@ -29,7 +29,7 @@ func TestProjectsJSON(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", tmpDir)
 
 	// Register a project
-	err := projects.Register("/test/project", "/test/project/.mocode")
+	err := projects.Register("/test/project")
 	require.NoError(t, err)
 
 	var b bytes.Buffer

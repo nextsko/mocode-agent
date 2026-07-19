@@ -4,6 +4,8 @@ package wechat
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/package-register/mocode/internal/util/infra"
 	"sync"
 	"time"
 )
@@ -31,8 +33,7 @@ type MediaEntry struct {
 // NewMediaStore creates a new media store with automatic cleanup.
 func NewMediaStore(baseDir string, maxAge time.Duration) *MediaStore {
 	if baseDir == "" {
-		home, _ := os.UserHomeDir()
-		baseDir = filepath.Join(home, ".mocode", "wechat", "media")
+		baseDir = infra.WeChatMediaDir()
 	}
 	if maxAge <= 0 {
 		maxAge = 24 * time.Hour

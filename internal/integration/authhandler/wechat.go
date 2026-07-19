@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/package-register/mocode/internal/integration/wechat"
+	"github.com/package-register/mocode/internal/util/infra"
 )
 
 type wechatHandler struct{}
@@ -22,7 +23,7 @@ func (wechatHandler) Login(ctx context.Context, env Env) error {
 	fmt.Fprintln(env.Stdout, "Authenticating WeChat...")
 	wc := wechat.Default()
 	if env.Workspace != nil {
-		wc.SetSessionStore(env.Workspace.WorkingDir() + stringPathSeparator() + ".mocode" + stringPathSeparator() + "wechat" + stringPathSeparator() + "sessions.json")
+		wc.SetSessionStore(infra.WeChatDir() + stringPathSeparator() + "sessions.json")
 	}
 
 	return wc.LoginWithCallbacks(ctx, true, wechat.LoginCallbacks{

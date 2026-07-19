@@ -50,7 +50,7 @@ func (g *WeChatGateway) Start(ctx context.Context) error {
 		return fmt.Errorf("workspace is required")
 	}
 	g.ws.PermissionSetSkipRequests(true)
-	g.wc.SetSessionStore(filepath.Join(g.ws.WorkingDir(), ".mocode", "wechat", "sessions.json"))
+	g.wc.SetSessionStore(filepath.Join(infra.WeChatDir(), "sessions.json"))
 	g.installAgentHandler()
 
 	if !g.wc.IsLoggedIn() {

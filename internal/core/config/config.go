@@ -648,7 +648,7 @@ func (c *Config) SetupAgents() {
 	// Initialize with all built-in + embedded modes.
 	agents := DefaultModeConfigs()
 
-	// Merge disk agents (user-defined .md/.toml in ~/.mocode/agents).
+	// Merge disk agents (user-defined .md/.toml in infra.AgentsDir()).
 	agentsDir := resolveAgentsDir(c)
 	if diskAgents := LoadAgentsFromDir(agentsDir, c.Options.DisabledTools); len(diskAgents) > 0 {
 		for id, a := range diskAgents {

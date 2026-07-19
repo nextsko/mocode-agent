@@ -29,8 +29,7 @@ func SkipHidden(path string) bool {
 	}
 
 	commonIgnoredDirs := map[string]bool{
-		".mocode":          true,
-		"node_modules":     true,
+			"node_modules":     true,
 		"vendor":           true,
 		"dist":             true,
 		"build":            true,

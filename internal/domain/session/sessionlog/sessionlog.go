@@ -2,7 +2,7 @@
 // self-evolving agent system. Each session writes categorized log files
 // into a session directory, enabling post-hoc analysis by the evolution agent.
 //
-// Directory structure (under .mocode/sessions/<session-id>/):
+// Directory structure (under infra.SessionLogsDir()/<session-id>/):
 //
 //	bug.md       - errors, failures, exceptions encountered
 //	info.md      - decisions, milestones, key findings
@@ -57,7 +57,7 @@ type Logger struct {
 }
 
 // NewLogger creates a logger for the given session.
-// baseDir is typically .mocode/sessions/
+// baseDir is typically infra.SessionLogsDir()/
 func NewLogger(baseDir, sessionID string) (*Logger, error) {
 	dir := filepath.Join(baseDir, sessionID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {

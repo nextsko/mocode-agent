@@ -78,3 +78,44 @@ func Long(p string) string {
 	}
 	return strings.Replace(p, "~", homedir, 1)
 }
+
+// ── mocode runtime data directories ─────────────────────────────────────
+//
+// The helpers below are the single source of truth for where mocode stores
+// runtime data (screenshots, session logs, WeChat state, agents, errors,
+// etc.). All callers MUST go through these helpers — no hardcoded
+// "<dir>/.mocode/<sub>" joins anywhere else in the codebase. If you need a
+// new sub-directory, add a helper here.
+
+// AgentsDir returns the directory for user-defined agent .toml/.md files.
+func AgentsDir() string {
+	return filepath.Join(Config(), appName, "agents")
+}
+
+// SessionLogsDir returns the base directory for per-session evolution logs.
+// Each session writes its own sub-directory under this root.
+func SessionLogsDir() string {
+	return filepath.Join(DataDir(), "session-logs")
+}
+
+// ScreenshotsDir returns the directory for screen captures and rollback
+// snapshot repositories (which embed screenshots as their worktree contents).
+func ScreenshotsDir() string {
+	return filepath.Join(DataDir(), "screenshots")
+}
+
+// WeChatDir returns the base directory for the WeChat gateway state
+// (account registry, credentials, session bindings).
+func WeChatDir() string {
+	return filepath.Join(DataDir(), "wechat")
+}
+
+// WeChatMediaDir returns the WeChat media cache directory.
+func WeChatMediaDir() string {
+	return filepath.Join(WeChatDir(), "media")
+}
+
+// ErrorsDir returns the directory that collects async tool execution errors.
+func ErrorsDir() string {
+	return filepath.Join(DataDir(), "errors")
+}

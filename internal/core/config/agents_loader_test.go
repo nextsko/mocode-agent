@@ -199,8 +199,7 @@ func TestResolveAgentsDir_Default(t *testing.T) {
 	cfg := &Config{Options: nil}
 	got := resolveAgentsDir(cfg)
 	assert.NotEmpty(t, got)
-	assert.Contains(t, got, ".mocode")
-	assert.Contains(t, got, "agents")
+	assert.Contains(t, got, filepath.Join("mocode", "agents"))
 }
 
 func setEnv(key, value string) func() {

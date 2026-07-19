@@ -3,7 +3,7 @@
 //
 // Records are pushed to a buffered channel and flushed to JSONL files under the
 // configured errors directory, rotated daily. The collector is project-local:
-// callers pass the project's .mocode/errors directory explicitly.
+// callers pass infra.ErrorsDir() explicitly.
 package errcoll
 
 import (

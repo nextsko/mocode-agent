@@ -13,7 +13,7 @@ var unsafeSessionPathChars = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)
 
 // DefaultStoreRoot returns the global directory used for legacy session paths.
 func DefaultStoreRoot() string {
-	return filepath.Join(infra.Dir(), ".mocode", "sessions")
+	return infra.SessionLogsDir()
 }
 
 // StoreDir returns a stable, filesystem-safe directory name for a session.

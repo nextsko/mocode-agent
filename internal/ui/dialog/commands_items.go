@@ -163,7 +163,7 @@ func (c *Commands) sessionCommandDescriptors() []slash.CommandDescriptor {
 		{
 			ID:          "export_markdown",
 			Title:       "Export Session as Markdown",
-			Description: "Export all active session messages to .mocode/export/ as Markdown.",
+			Description: "Export all active session messages under the global data dir as Markdown.",
 			Category:    slash.CommandCategorySystem,
 			Risk:        slash.RiskLevelWrite,
 			Action:      ActionExportSession{SessionID: c.sessionID, Format: "markdown", Scope: "all"},
@@ -171,7 +171,7 @@ func (c *Commands) sessionCommandDescriptors() []slash.CommandDescriptor {
 		{
 			ID:          "export_html",
 			Title:       "Export Session as HTML",
-			Description: "Export all active session messages to .mocode/export/ as HTML.",
+			Description: "Export all active session messages under the global data dir as HTML.",
 			Category:    slash.CommandCategorySystem,
 			Risk:        slash.RiskLevelWrite,
 			Action:      ActionExportSession{SessionID: c.sessionID, Format: "html", Scope: "all"},

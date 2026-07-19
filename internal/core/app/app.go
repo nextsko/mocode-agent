@@ -9,7 +9,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -123,11 +122,7 @@ func New(ctx context.Context, storeCfg *config.ConfigStore) (*App, error) {
 	// it directly here. Joining it with storeCfg.WorkingDir() would produce
 	// an invalid path with two drive letters on Windows (e.g.
 	// "C:\wd\C:\wd\.mocode\errors"), which os.MkdirAll rejects.
-	dataDir := infra.DataDir()
-	if dataDir == "" {
-		dataDir = filepath.Join(storeCfg.WorkingDir(), ".mocode")
-	}
-	errorsDir := filepath.Join(dataDir, "errors")
+	errorsDir := infra.ErrorsDir()
 	collector, err := errcoll.New(errorsDir)
 	if err != nil {
 		return nil, fmt.Errorf("init error collector: %w", err)

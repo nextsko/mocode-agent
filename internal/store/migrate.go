@@ -100,6 +100,9 @@ func MigrateFromSQLite(ctx context.Context, dbPath string, projectPath string) (
 	fmt.Fprintf(os.Stderr, "  Migrated %d file versions\n", totalFiles)
 
 	// Phase 4: Migrate per-session databases (messages + files from old session stores)
+	// Legacy migration path: reads from the pre-DataDirectory era, where
+	// sessions lived under "<homedir>/.mocode/sessions/<id>/mocode.db".
+	// Keep this literal until the next major migration removes it.
 	sessionRoot := filepath.Join(infra.Dir(), ".mocode", "sessions")
 	if entries, err := os.ReadDir(sessionRoot); err == nil {
 		fmt.Fprintf(os.Stderr, "Migrating per-session databases from %s...\n", sessionRoot)

@@ -25,6 +25,7 @@ import (
 	"github.com/package-register/mocode/internal/core/knowledge/memory"
 	wechat "github.com/package-register/mocode/internal/integration/wechat"
 	"github.com/package-register/mocode/internal/transport/workspace"
+	"github.com/package-register/mocode/internal/util/infra"
 	"github.com/package-register/mocode/tools/mcp"
 )
 
@@ -642,7 +643,7 @@ func (s *Server) handleWeChatStatus(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) loginWeChat() {
 	wc := wechat.Default()
-	wc.SetSessionStore(filepath.Join(s.workspace.WorkingDir(), ".mocode", "wechat", "sessions.json"))
+	wc.SetSessionStore(filepath.Join(infra.WeChatDir(), "sessions.json"))
 	wc.SetAgentHandler(func(ctx context.Context, userID, text string, _ *wechat.IncomingMessage) (string, error) {
 		ctx = memory.WithAppUserInContext(ctx, "mocode", "wx:"+userID)
 		sessKey := "wx:" + userID

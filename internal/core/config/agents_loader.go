@@ -61,7 +61,7 @@ const AgentsVersion = "0.1.0"
 const agentsVersionFile = ".agents_version"
 
 // resolveAgentsDir returns the agents directory path.
-// Priority: MOCODE_AGENTS_DIR env > Options.AgentsDir > ~/.mocode/agents
+// Priority: MOCODE_AGENTS_DIR env > Options.AgentsDir > infra.AgentsDir()
 // ResolveAgentsDir is the exported form so the transport layer can compute the
 // same directory when materializing /evo agents into it.
 func ResolveAgentsDir(cfg *Config) string {
@@ -71,7 +71,7 @@ func ResolveAgentsDir(cfg *Config) string {
 	if cfg.Options != nil && cfg.Options.AgentsDir != "" {
 		return expandPath(cfg.Options.AgentsDir)
 	}
-	return expandPath(filepath.Join(infra.Dir(), ".mocode", "agents"))
+	return expandPath(infra.AgentsDir())
 }
 
 // resolveAgentsDir is kept for in-package callers; delegates to the export.

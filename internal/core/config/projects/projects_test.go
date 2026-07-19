@@ -15,7 +15,7 @@ func TestRegisterAndList(t *testing.T) {
 	t.Setenv("MOCODE_GLOBAL_DATA", filepath.Join(tmpDir, "Mocode"))
 
 	// Test registering a project
-	err := Register("/home/user/project1", "/home/user/project1/.mocode")
+	err := Register("/home/user/project1")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -35,7 +35,7 @@ func TestRegisterAndList(t *testing.T) {
 	}
 
 	// Register another project
-	err = Register("/home/user/project2", "/home/user/project2/.mocode")
+	err = Register("/home/user/project2")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestRegisterUpdatesExisting(t *testing.T) {
 	t.Setenv("MOCODE_GLOBAL_DATA", filepath.Join(tmpDir, "Mocode"))
 
 	// Register a project
-	err := Register("/home/user/project1", "/home/user/project1/.mocode")
+	err := Register("/home/user/project1")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestRegisterUpdatesExisting(t *testing.T) {
 	// Wait a bit and re-register
 	time.Sleep(10 * time.Millisecond)
 
-	err = Register("/home/user/project1", "/home/user/project1/.mocode")
+	err = Register("/home/user/project1")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestRegisterWithParentDataDir(t *testing.T) {
 
 	// Register a project where .Mocode is in a parent directory.
 	// e.g., working in /home/user/monorepo/packages/app but .Mocode is at /home/user/monorepo/.Mocode
-	err := Register("/home/user/monorepo/packages/app", "/home/user/monorepo/.mocode")
+	err := Register("/home/user/monorepo/packages/app")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestRegisterWithExternalDataDir(t *testing.T) {
 
 	// Register a project where .Mocode is in a completely different location.
 	// e.g., project at /home/user/project but data stored at /var/data/Mocode/myproject
-	err := Register("/home/user/project", "/home/user/project/.mocode")
+	err := Register("/home/user/project")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
