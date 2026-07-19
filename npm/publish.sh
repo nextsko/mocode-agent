@@ -15,6 +15,9 @@ DIST="$(git rev-parse --show-toplevel)/dist"
 NPM_DIR="$(git rev-parse --show-toplevel)/npm"
 
 if [[ -n "${NPM_TOKEN:-}" ]]; then
+  # setup-node sets NPM_CONFIG_USERCONFIG to a temp file, so writing ~/.npmrc is ignored.
+  # Unset it so npm reads ~/.npmrc, then write the token there.
+  unset NPM_CONFIG_USERCONFIG
   cat > ~/.npmrc <<- NPMRC
 	registry=https://registry.npmjs.org/
 	//registry.npmjs.org/:_authToken=${NPM_TOKEN}
