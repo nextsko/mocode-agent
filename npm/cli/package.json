@@ -1,0 +1,29 @@
+{
+  "name": "@mocode/cli",
+  "version": "0.7.0",
+  "description": "Terminal AI coding assistant — mocode CLI",
+  "keywords": ["ai", "coding", "assistant", "cli", "terminal", "llm"],
+  "homepage": "https://github.com/nextsko/mocode-agent",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nextsko/mocode-agent.git"
+  },
+  "license": "MIT",
+  "bin": {
+    "mocode": "./bin/mocode.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "files": [
+    "bin/",
+    "install.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

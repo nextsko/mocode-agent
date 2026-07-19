@@ -7,73 +7,84 @@ before:
     - go mod tidy
 
 builds:
-  - id: linux-amd64
-    goos: linux
-    goarch: amd64
+  - id: mocode
+    main: .
+    binary: mocode
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
     env:
       - CGO_ENABLED=0
+      - GOEXPERIMENT=greenteagc
     ldflags:
       - -s -w
-    binary: mocode_linux_amd64
-
-  - id: linux-arm64
-    goos: linux
-    goarch: arm64
-    env:
-      - CGO_ENABLED=0
-    ldflags:
-      - -s -w
-    binary: mocode_linux_arm64
-
-  - id: darwin-amd64
-    goos: darwin
-    goarch: amd64
-    env:
-      - CGO_ENABLED=0
-    ldflags:
-      - -s -w
-    binary: mocode_darwin_amd64
-
-  - id: darwin-arm64
-    goos: darwin
-    goarch: arm64
-    env:
-      - CGO_ENABLED=0
-    ldflags:
-      - -s -w
-    binary: mocode_darwin_arm64
-
-  - id: windows-amd64
-    goos: windows
-    goarch: amd64
-    env:
-      - CGO_ENABLED=0
-    ldflags:
-      - -s -w
-    binary: mocode_windows_amd64.exe
+      - -X github.com/package-register/mocode/internal/util/version.Version={{.Version}}
+      - -X github.com/package-register/mocode/internal/util/version.Commit={{.ShortCommit}}
+    flags:
+      - -buildvcs=false
+    mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:
-  - format: zip
+  - id: default
+    # mocode_v0.7.0_linux_amd64.tar.gz / mocode_v0.7.0_windows_amd64.zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
     format_overrides:
       - goos: windows
-        format: binary
+        format: zip
+    files:
+      - README.md
+      - LICENSE*
 
 checksum:
-  name_template: 'mocode_checksums.txt'
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
   algorithm: sha256
+
+snapshot:
+  version_template: "{{ .Version }}-snapshot-{{ .ShortCommit }}"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^chore(deps)"
+      - "^Merge "
+  groups:
+    - title: "Features"
+      regexp: "^feat"
+      order: 0
+    - title: "Bug Fixes"
+      regexp: "^fix"
+      order: 1
+    - title: "Refactors"
+      regexp: "^refactor"
+      order: 2
+    - title: "Other"
+      order: 999
 
 release:
   github:
     owner: nextsko
-    name: mocode-build
+    name: mocode-agent
   draft: false
-  prerelease: false
-  name_template: '{{.Tag}}'
-  body_template: |
-    ## What's Changed
+  prerelease: auto
+  name_template: "{{ .Tag }}"
+  header: |
+    ## mocode {{ .Tag }}
 
-    {{range .Commits}}
-    - {{.Message}}
-    {{end}}
+    Install via npm:
+    ```sh
+    npm install -g @mocode/cli
+    # or
+    npx @mocode/cli
+    ```
 
-    **Full Changelog**: https://github.com/nextsko/mocode-build/compare/{{.PreviousTag}}...{{.Tag}}
+    Or download the binary directly below.

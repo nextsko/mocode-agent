@@ -15,21 +15,23 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: 0
+      GOEXPERIMENT: greenteagc
+      GOPROXY: https://goproxy.cn,direct
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
       - name: Build
-        run: go build ./...
+        run: go build -buildvcs=false ./...
 
       - name: Test
-        run: go test -failfast -timeout 10m ./...
+        run: go test -failfast -timeout 10m -p 2 ./...
 
       - name: Vet
         run: go vet ./...
@@ -37,14 +39,16 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    env:
+      GOPROXY: https://goproxy.cn,direct
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
@@ -57,7 +61,7 @@ jobs:
           args=(--config=.golangci.yml --timeout=5m --whole-files)
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" && -n "${GITHUB_BASE_REF:-}" ]]; then
             args+=(--new-from-merge-base="origin/${GITHUB_BASE_REF}")
-          elif git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+          elif git rev-parse --verify HEAD~1 > /dev/null 2>&1; then
             args+=(--new-from-rev=HEAD~1)
           else
             args+=(--new)
