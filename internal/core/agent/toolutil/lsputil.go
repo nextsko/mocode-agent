@@ -11,7 +11,7 @@ import (
 
 	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"
 
-	"github.com/package-register/mocode/internal/core/agent/tools/lsp"
+	"github.com/package-register/mocode/tools/lsp"
 )
 
 // OpenInLSPs ensures LSP servers are running and aware of the file, but does

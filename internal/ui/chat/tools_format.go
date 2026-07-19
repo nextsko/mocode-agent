@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/package-register/mocode/internal/core/agent"
-	"github.com/package-register/mocode/internal/core/agent/tools"
 	"github.com/package-register/mocode/internal/util/diff"
 	"github.com/package-register/mocode/internal/util/fsext"
+	"github.com/package-register/mocode/tools"
 )
 
 func (t *baseToolMessageItem) formatToolForCopy() string {

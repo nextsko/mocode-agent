@@ -31,10 +31,9 @@ Mocode models gpt5`,
 			return err
 		}
 
-		dataDir, _ := cmd.Flags().GetString("data-dir")
 		debug, _ := cmd.Flags().GetBool("debug")
 
-		cfg, err := config.Init(cwd, dataDir, debug)
+		cfg, err := config.Init(cwd, debug)
 		if err != nil {
 			return err
 		}

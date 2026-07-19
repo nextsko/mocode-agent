@@ -24,8 +24,6 @@ import (
 
 	"github.com/package-register/mocode/internal/core/agent"
 	"github.com/package-register/mocode/internal/core/agent/notify"
-	"github.com/package-register/mocode/internal/core/agent/tools/lsp"
-	"github.com/package-register/mocode/internal/core/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/core/knowledge/memory"
 	"github.com/package-register/mocode/internal/core/permission"
@@ -39,8 +37,11 @@ import (
 	"github.com/package-register/mocode/internal/store"
 	"github.com/package-register/mocode/internal/util/anim"
 	"github.com/package-register/mocode/internal/util/errcoll"
+	"github.com/package-register/mocode/internal/util/infra"
 	"github.com/package-register/mocode/internal/util/log"
 	"github.com/package-register/mocode/internal/util/pubsub"
+	"github.com/package-register/mocode/tools/lsp"
+	"github.com/package-register/mocode/tools/mcp"
 )
 
 type App struct {
@@ -122,7 +123,7 @@ func New(ctx context.Context, storeCfg *config.ConfigStore) (*App, error) {
 	// it directly here. Joining it with storeCfg.WorkingDir() would produce
 	// an invalid path with two drive letters on Windows (e.g.
 	// "C:\wd\C:\wd\.mocode\errors"), which os.MkdirAll rejects.
-	dataDir := cfg.Options.DataDirectory
+	dataDir := infra.DataDir()
 	if dataDir == "" {
 		dataDir = filepath.Join(storeCfg.WorkingDir(), ".mocode")
 	}

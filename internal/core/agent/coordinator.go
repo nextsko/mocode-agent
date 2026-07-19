@@ -17,15 +17,18 @@ import (
 
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
-	"golang.org/x/sync/errgroup"
-
+	"charm.land/fantasy/providers/anthropic"
+	"charm.land/fantasy/providers/azure"
+	"charm.land/fantasy/providers/google"
+	"charm.land/fantasy/providers/openai"
+	"charm.land/fantasy/providers/openaicompat"
+	"charm.land/fantasy/providers/openrouter"
+	"charm.land/fantasy/providers/vercel"
 	"github.com/package-register/mocode/internal/core/agent/candidate"
 	"github.com/package-register/mocode/internal/core/agent/extension"
 	"github.com/package-register/mocode/internal/core/agent/failover"
 	"github.com/package-register/mocode/internal/core/agent/notify"
 	"github.com/package-register/mocode/internal/core/agent/prompt"
-	"github.com/package-register/mocode/internal/core/agent/tools"
-	"github.com/package-register/mocode/internal/core/agent/tools/lsp"
 	"github.com/package-register/mocode/internal/core/agent/toolutil"
 	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/core/evaluation/llmjudge"
@@ -45,15 +48,10 @@ import (
 	"github.com/package-register/mocode/internal/util/errcoll"
 	"github.com/package-register/mocode/internal/util/infra"
 	"github.com/package-register/mocode/internal/util/pubsub"
-
-	"charm.land/fantasy/providers/anthropic"
-	"charm.land/fantasy/providers/azure"
-	"charm.land/fantasy/providers/google"
-	"charm.land/fantasy/providers/openai"
-	"charm.land/fantasy/providers/openaicompat"
-	"charm.land/fantasy/providers/openrouter"
-	"charm.land/fantasy/providers/vercel"
+	"github.com/package-register/mocode/tools"
+	"github.com/package-register/mocode/tools/lsp"
 	"github.com/qjebbs/go-jsons"
+	"golang.org/x/sync/errgroup"
 )
 
 // Coordinator errors.
@@ -171,15 +169,6 @@ func NewCoordinator(
 	allSkills, activeSkills := discoverSkills(cfg)
 	skillTracker := skills.NewTracker(activeSkills)
 
-	// cfg.Config().Options.DataDirectory is always resolved to an absolute
-	// path by config.setDefaults, so it can be used directly. Joining it
-	// with cfg.WorkingDir() would produce a path with two drive letters
-	// on Windows (e.g. "C:\wd\C:\wd\.mocode\sessions").
-	dataDir := ".mocode"
-	if cfg.Config().Options != nil && cfg.Config().Options.DataDirectory != "" {
-		dataDir = cfg.Config().Options.DataDirectory
-	}
-
 	c := &coordinator{
 		cfg:            cfg,
 		sessions:       sessions,
@@ -196,9 +185,9 @@ func NewCoordinator(
 		allSkills:      allSkills,
 		activeSkills:   activeSkills,
 		skillTracker:   skillTracker,
-		sessionLogDir:  filepath.Join(dataDir, "sessions"),
+		sessionLogDir:  filepath.Join(infra.DataDir(), "session-logs"),
 		errorCollector: errorCollector,
-			sessionSearch:  sessionSearch,
+		sessionSearch:  sessionSearch,
 	}
 
 	// Resolve the active agent from config (supports mode switching).

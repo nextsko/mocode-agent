@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/package-register/mocode/internal/core/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/package-register/mocode/tools/mcp"
 )
 
 var namedArgPattern = regexp.MustCompile(`\$([A-Z][A-Z0-9_]*)`)
@@ -103,7 +103,7 @@ func buildCommandSources(cfg *config.Config) []commandSource {
 			prefix: userCommandPrefix,
 		},
 		{
-			path:   filepath.Join(cfg.Options.DataDirectory, "commands"),
+			path:   filepath.Join(infra.Config(), "mocode", "commands"),
 			prefix: projectCommandPrefix,
 		},
 	}

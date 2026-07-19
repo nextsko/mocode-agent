@@ -19,14 +19,12 @@ var statsCmd = &cobra.Command{
 	Short: "Show usage statistics",
 	Long:  "Display usage statistics including sessions, tokens, and cost.",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		dataDir, _ := cmd.Flags().GetString("data-dir")
-
 		cwd, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("get working directory: %w", err)
 		}
 
-		cfg, err := config.Init(cwd, dataDir, false)
+		cfg, err := config.Init(cwd, false)
 		if err != nil {
 			return fmt.Errorf("init config: %w", err)
 		}

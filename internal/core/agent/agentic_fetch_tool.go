@@ -12,8 +12,8 @@ import (
 	"charm.land/fantasy"
 
 	"github.com/package-register/mocode/internal/core/agent/prompt"
-	"github.com/package-register/mocode/internal/core/agent/tools"
 	"github.com/package-register/mocode/internal/core/permission"
+	"github.com/package-register/mocode/tools"
 )
 
 //go:embed templates/agentic_fetch.md
@@ -90,7 +90,7 @@ func (c *coordinator) agenticFetchTool(_ context.Context, client *http.Client) (
 				return tools.NewPermissionDeniedResponse(), nil
 			}
 
-			tmpDir, err := os.MkdirTemp(c.cfg.Config().Options.DataDirectory, "Mocode-fetch-*")
+			tmpDir, err := os.MkdirTemp(os.TempDir(), "Mocode-fetch-*")
 			if err != nil {
 				return fantasy.NewTextErrorResponse(fmt.Sprintf("Failed to create temporary directory: %s", err)), nil
 			}

@@ -187,9 +187,8 @@ func collectDoctorReport(ctx context.Context, cmd *cobra.Command, opts doctorOpt
 }
 
 func loadDoctorConfigStore(cwd string, cmd *cobra.Command) (*doctorLoadedConfig, error) {
-	dataDir, _ := cmd.Flags().GetString("data-dir")
 	debug, _ := cmd.Flags().GetBool("debug")
-	store, err := config.LoadReadOnly(cwd, dataDir, debug)
+	store, err := config.LoadReadOnly(cwd, debug)
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +308,6 @@ func doctorConfigFilesCheck(cwd string) doctorCheck {
 		config.GlobalConfig(),
 		config.GlobalConfigData(),
 		filepath.Join(cwd, "mocode.json"),
-		filepath.Join(cwd, ".mocode", "mocode.json"),
 	}
 	seen := make(map[string]struct{}, len(paths))
 	paths = slices.DeleteFunc(paths, func(path string) bool {

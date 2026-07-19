@@ -8,12 +8,12 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/package-register/mocode/internal/core/agent"
-	"github.com/package-register/mocode/internal/core/agent/tools"
 	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/panel"
 	"github.com/package-register/mocode/internal/ui/styles"
 	"github.com/package-register/mocode/internal/util/anim"
+	"github.com/package-register/mocode/tools"
 )
 
 // responseContextHeight limits the number of lines displayed in tool output.

@@ -21,11 +21,11 @@ import (
 
 	"charm.land/catwalk/pkg/catwalk"
 
-	"github.com/package-register/mocode/internal/core/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/core/knowledge/memory"
 	wechat "github.com/package-register/mocode/internal/integration/wechat"
 	"github.com/package-register/mocode/internal/transport/workspace"
+	"github.com/package-register/mocode/tools/mcp"
 )
 
 //go:embed assets/*

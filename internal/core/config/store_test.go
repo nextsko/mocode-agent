@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,10 +26,12 @@ func TestConfigStore_ConfigPath_WorkspaceReturnsPath(t *testing.T) {
 	t.Parallel()
 
 	store := &ConfigStore{
-		workspacePath: "/some/workspace/.mocode/mocode.json",
+		config:         &Config{},
+		workingDir:     "/some/workspace",
+		globalDataPath: "/some/workspace/.mocode/mocode.json",
 	}
 
-	path, err := store.configPath(ScopeWorkspace)
+	path, err := store.configPath(ScopeGlobal)
 	require.NoError(t, err)
 	require.Equal(t, "/some/workspace/.mocode/mocode.json", path)
 }
@@ -39,27 +40,28 @@ func TestConfigStore_ConfigPath_WorkspaceErrorsWhenEmpty(t *testing.T) {
 	t.Parallel()
 
 	store := &ConfigStore{
+		config:         &Config{},
+		workingDir:     "/some/workspace",
 		globalDataPath: "/some/global/mocode.json",
-		workspacePath:  "",
 	}
 
-	_, err := store.configPath(ScopeWorkspace)
-	require.Error(t, err)
-	require.True(t, errors.Is(err, ErrNoWorkspaceConfig))
+	path, err := store.configPath(ScopeGlobal)
+	require.NoError(t, err)
+	require.Equal(t, "/some/global/mocode.json", path)
 }
 
 func TestConfigStore_SetConfigField_WorkspaceScopeGuard(t *testing.T) {
 	t.Parallel()
 
+	dir := t.TempDir()
+	globalPath := filepath.Join(dir, "mocode.json")
 	store := &ConfigStore{
 		config:         &Config{},
-		globalDataPath: filepath.Join(t.TempDir(), "global.json"),
-		workspacePath:  "",
+		globalDataPath: globalPath,
 	}
 
-	err := store.SetConfigField(ScopeWorkspace, "foo", "bar")
-	require.Error(t, err)
-	require.True(t, errors.Is(err, ErrNoWorkspaceConfig))
+	err := store.SetConfigField(ScopeGlobal, "foo", "bar")
+	require.NoError(t, err)
 }
 
 func TestConfigStore_SetConfigField_GlobalScopeAlwaysWorks(t *testing.T) {
@@ -83,27 +85,29 @@ func TestConfigStore_SetConfigField_GlobalScopeAlwaysWorks(t *testing.T) {
 func TestConfigStore_RemoveConfigField_WorkspaceScopeGuard(t *testing.T) {
 	t.Parallel()
 
+	dir := t.TempDir()
+	globalPath := filepath.Join(dir, "mocode.json")
+	require.NoError(t, os.WriteFile(globalPath, []byte("{}"), 0o600))
 	store := &ConfigStore{
 		config:         &Config{},
-		globalDataPath: filepath.Join(t.TempDir(), "global.json"),
-		workspacePath:  "",
+		globalDataPath: globalPath,
 	}
 
-	err := store.RemoveConfigField(ScopeWorkspace, "foo")
-	require.Error(t, err)
-	require.True(t, errors.Is(err, ErrNoWorkspaceConfig))
+	err := store.RemoveConfigField(ScopeGlobal, "foo")
+	require.NoError(t, err)
 }
 
 func TestConfigStore_HasConfigField_WorkspaceScopeGuard(t *testing.T) {
 	t.Parallel()
 
+	dir := t.TempDir()
+	globalPath := filepath.Join(dir, "mocode.json")
 	store := &ConfigStore{
 		config:         &Config{},
-		globalDataPath: filepath.Join(t.TempDir(), "global.json"),
-		workspacePath:  "",
+		globalDataPath: globalPath,
 	}
 
-	has := store.HasConfigField(ScopeWorkspace, "foo")
+	has := store.HasConfigField(ScopeGlobal, "foo")
 	require.False(t, has)
 }
 
@@ -149,7 +153,6 @@ func TestScope_String(t *testing.T) {
 	t.Parallel()
 
 	require.Equal(t, "global", ScopeGlobal.String())
-	require.Equal(t, "workspace", ScopeWorkspace.String())
 	require.Contains(t, Scope(99).String(), "Scope(99)")
 }
 
@@ -336,7 +339,7 @@ func TestReloadFromDisk_UsesNewConfigValues(t *testing.T) {
 	require.NoError(t, os.WriteFile(configPath, []byte(initialConfig), 0o600))
 
 	// Load initial config properly
-	store, err := Load(dir, dir, false)
+	store, err := Load(dir, false)
 	require.NoError(t, err)
 
 	// Set globalDataPath for the test (Load doesn't set this directly)
@@ -389,7 +392,7 @@ func TestSetConfigField_AutoReloads(t *testing.T) {
 	require.NoError(t, os.WriteFile(configPath, []byte(initialConfig), 0o600))
 
 	// Load initial config
-	store, err := Load(dir, dir, false)
+	store, err := Load(dir, false)
 	require.NoError(t, err)
 
 	// Verify initial state
@@ -424,7 +427,7 @@ func TestRemoveConfigField_AutoReloads(t *testing.T) {
 	require.NoError(t, os.WriteFile(configPath, []byte(initialConfig), 0o600))
 
 	// Load initial config
-	store, err := Load(dir, dir, false)
+	store, err := Load(dir, false)
 	require.NoError(t, err)
 
 	// Set globalDataPath and capture snapshot
@@ -490,7 +493,7 @@ func TestAutoReloadDisabledDuringReload(t *testing.T) {
 
 	// Load will trigger configureProviders which removes anthropic OAuth config
 	// This should NOT cause infinite recursion thanks to autoReloadDisabled guard
-	store, err := Load(dir, dir, false)
+	store, err := Load(dir, false)
 	require.NoError(t, err)
 
 	// Verify the store loaded successfully and autoReloadDisabled was unset

@@ -15,9 +15,9 @@ import (
 
 	"github.com/package-register/mocode/internal/core/agent/notify"
 	"github.com/package-register/mocode/internal/core/agent/prompt"
-	"github.com/package-register/mocode/internal/core/agent/tools"
 	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/core/knowledge/memory"
+	"github.com/package-register/mocode/tools"
 )
 
 //go:embed templates/agent_tool.md

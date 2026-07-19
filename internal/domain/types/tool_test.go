@@ -67,8 +67,7 @@ func TestToolResult_IsError_VisibleInJSON(t *testing.T) {
 }
 
 func TestToolResult_TypeAlias_Compatibility(t *testing.T) {
-	// Verify that pkg/types.ToolResult is a type alias of internal/types.ToolResult
-	// (this is checked at compile time by the pkg package re-exporting us)
+	// Sanity check: ToolResult identity is preserved through any.
 	var a ToolResult = ToolResult{ToolCallID: "x", Content: "y"}
 	var b any = a
 	if _, ok := b.(ToolResult); !ok {

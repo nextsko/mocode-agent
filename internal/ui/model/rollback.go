@@ -179,7 +179,7 @@ func rollbackRepoDir(sess sessionpkg.Session, workingDir string) (string, error)
 	if project == "." || project == string(filepath.Separator) || project == "" {
 		project = "project"
 	}
-	root := filepath.Join(infra.Dir(), ".mocode", "screens-shops")
+	root := filepath.Join(infra.Dir(), ".mocode", "screenshots")
 	sessionDir := filepath.Base(sessionpkg.StoreDir(root, sess))
 	return filepath.Join(root, sessionDir, safePathName(project)), nil
 }

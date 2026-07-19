@@ -37,7 +37,6 @@ type ConfigStore struct {
 	workingDir         string
 	resolver           VariableResolver
 	globalDataPath     string   // ~/.local/share/mocode/mocode.json
-	workspacePath      string   // .mocode/mocode.json
 	loadedPaths        []string // config files that were successfully loaded
 	knownProviders     []catwalk.Provider
 	overrides          RuntimeOverrides
@@ -132,15 +131,7 @@ func (s *ConfigStore) LoadedPaths() []string {
 
 // configPath returns the file path for the given scope.
 func (s *ConfigStore) configPath(scope Scope) (string, error) {
-	switch scope {
-	case ScopeWorkspace:
-		if s.workspacePath == "" {
-			return "", ErrNoWorkspaceConfig
-		}
-		return s.workspacePath, nil
-	default:
-		return s.globalDataPath, nil
-	}
+	return s.globalDataPath, nil
 }
 
 // HasConfigField checks whether a key exists in the config file for the given
@@ -485,13 +476,7 @@ func (s *ConfigStore) CaptureStalenessSnapshot(paths []string) {
 		seen[abs] = struct{}{}
 	}
 
-	// Also track workspace and global config paths if set
-	if s.workspacePath != "" {
-		abs, err := filepath.Abs(s.workspacePath)
-		if err == nil {
-			seen[abs] = struct{}{}
-		}
-	}
+	// Also track global config path if set
 	if s.globalDataPath != "" {
 		abs, err := filepath.Abs(s.globalDataPath)
 		if err == nil {
@@ -537,24 +522,8 @@ func (s *ConfigStore) ReloadFromDisk(ctx context.Context) error {
 		return fmt.Errorf("failed to reload config: %w", err)
 	}
 
-	// Apply defaults (using existing data directory if set)
-	var dataDir string
-	if s.config != nil && s.config.Options != nil {
-		dataDir = s.config.Options.DataDirectory
-	}
-	cfg.setDefaults(s.workingDir, dataDir)
-
-	// Merge workspace config if present
-	workspacePath := filepath.Join(cfg.Options.DataDirectory, fmt.Sprintf("%s.json", appName))
-	if wsData, err := os.ReadFile(workspacePath); err == nil && len(wsData) > 0 {
-		merged, mergeErr := loadFromBytes(append([][]byte{mustMarshalConfig(cfg)}, wsData))
-		if mergeErr == nil {
-			dataDir := cfg.Options.DataDirectory
-			*cfg = *merged
-			cfg.setDefaults(s.workingDir, dataDir)
-			loadedPaths = append(loadedPaths, workspacePath)
-		}
-	}
+	// Apply defaults
+	cfg.setDefaults(s.workingDir)
 
 	// Validate hooks after all config merging is complete so matcher
 	// regexes are recompiled on the reloaded config (mirrors Load).
@@ -583,7 +552,6 @@ func (s *ConfigStore) ReloadFromDisk(ctx context.Context) error {
 	oldResolver := s.resolver
 	oldKnownProviders := s.knownProviders
 	oldOverrides := s.overrides
-	oldWorkspacePath := s.workspacePath
 
 	// Update store state BEFORE running model/agent setup (so they see new config)
 	s.config = cfg
@@ -591,7 +559,6 @@ func (s *ConfigStore) ReloadFromDisk(ctx context.Context) error {
 	s.resolver = resolver
 	s.knownProviders = providers
 	s.overrides = overrides
-	s.workspacePath = workspacePath
 
 	// Mirror startup flow: setup models and agents against NEW config
 	var setupErr error
@@ -612,7 +579,6 @@ func (s *ConfigStore) ReloadFromDisk(ctx context.Context) error {
 		s.resolver = oldResolver
 		s.knownProviders = oldKnownProviders
 		s.overrides = oldOverrides
-		s.workspacePath = oldWorkspacePath
 		return setupErr
 	}
 

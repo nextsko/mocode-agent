@@ -9,10 +9,10 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"
 
-	"github.com/package-register/mocode/internal/core/agent/tools/lsp"
 	"github.com/package-register/mocode/internal/core/app"
 	"github.com/package-register/mocode/internal/ui/common"
 	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/package-register/mocode/tools/lsp"
 )
 
 // LSPInfo wraps LSP client information with diagnostic counts by severity.

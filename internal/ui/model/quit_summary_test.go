@@ -1,7 +1,6 @@
 package model
 
 import (
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -69,10 +68,11 @@ func TestQuitFileStats(t *testing.T) {
 func TestQuitSessionPath(t *testing.T) {
 	t.Parallel()
 
-	p := quitSessionPath("/tmp/work", session.Session{ID: "abc-123"})
-	// Use filepath.Join to handle OS-specific path separators
-	require.Contains(t, p, filepath.Join("/tmp/work", ".mocode", "sessions"))
+	p := quitSessionPath(session.Session{ID: "abc-123"})
+	// The path now uses the global data directory with the session's hash ID
+	require.Contains(t, p, "sessions")
 	require.Contains(t, p, "history")
+	require.Contains(t, p, session.HashID("abc-123"))
 }
 
 func TestRenderQuitSummary(t *testing.T) {
@@ -93,7 +93,6 @@ func TestRenderQuitSummary(t *testing.T) {
 		Additions:    20,
 		Deletions:    10,
 		SessionID:    "session-abc-123",
-		SessionPath:  "/tmp/work/.mocode/sessions/hash123/history",
 		AppName:      "TestCode",
 	}
 
@@ -170,7 +169,6 @@ func TestRenderQuitSummaryMinimal(t *testing.T) {
 		Additions:    0,
 		Deletions:    0,
 		SessionID:    "sid",
-		SessionPath:  "/tmp/.mocode/sessions/h/history",
 	}
 
 	out := renderQuitSummary(summary, styles.QuitSummary{})

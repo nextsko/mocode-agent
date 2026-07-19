@@ -117,10 +117,10 @@ func (ToolCall) isPart() {}
 // in ~80+ type switches across the codebase.
 //
 // For the public DTO used by SDK and external consumers, see
-// types.ToolResult in internal/types (re-exported as pkg/types.ToolResult).
+// types.ToolResult in internal/domain/types.
 //
 // Note: the runtime and DTO ToolResult types are NOT interchangeable due
-// to Go's sealed interface pattern. See internal/types/tool.go for details.
+// to Go's sealed interface pattern. See internal/domain/types/tool.go for details.
 type ToolResult struct {
 	ToolCallID string `json:"tool_call_id"`
 	Name       string `json:"name"`

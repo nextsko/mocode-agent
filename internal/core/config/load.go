@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -14,24 +13,23 @@ import (
 	powernapConfig "github.com/charmbracelet/x/powernap/pkg/config"
 
 	"github.com/package-register/mocode/internal/util/csync"
-	"github.com/package-register/mocode/internal/util/fsext"
 )
 
 const defaultCatwalkURL = "https://catwalk.charm.land"
 
 // Load loads the configuration from the default paths and returns a
 // ConfigStore that owns both the pure-data Config and all runtime state.
-func Load(workingDir, dataDir string, debug bool) (*ConfigStore, error) {
-	return loadConfigStore(workingDir, dataDir, debug, true, true)
+func Load(workingDir string, debug bool) (*ConfigStore, error) {
+	return loadConfigStore(workingDir, debug, true, true)
 }
 
 // LoadReadOnly loads configuration for inspection without mutating persisted
 // config state or syncing agent files to disk.
-func LoadReadOnly(workingDir, dataDir string, debug bool) (*ConfigStore, error) {
-	return loadConfigStore(workingDir, dataDir, debug, false, false)
+func LoadReadOnly(workingDir string, debug bool) (*ConfigStore, error) {
+	return loadConfigStore(workingDir, debug, false, false)
 }
 
-func loadConfigStore(workingDir, dataDir string, debug bool, persistModels bool, syncAgents bool) (*ConfigStore, error) {
+func loadConfigStore(workingDir string, debug bool, persistModels bool, syncAgents bool) (*ConfigStore, error) {
 	configPaths := lookupConfigs(workingDir)
 
 	cfg, loadedPaths, err := loadFromConfigPaths(configPaths)
@@ -39,13 +37,12 @@ func loadConfigStore(workingDir, dataDir string, debug bool, persistModels bool,
 		return nil, fmt.Errorf("failed to load config from paths %v: %w", configPaths, err)
 	}
 
-	cfg.setDefaults(workingDir, dataDir)
+	cfg.setDefaults(workingDir)
 
 	store := &ConfigStore{
 		config:         cfg,
 		workingDir:     workingDir,
 		globalDataPath: GlobalConfigData(),
-		workspacePath:  filepath.Join(cfg.Options.DataDirectory, fmt.Sprintf("%s.json", appName)),
 		loadedPaths:    loadedPaths,
 	}
 
@@ -53,21 +50,7 @@ func loadConfigStore(workingDir, dataDir string, debug bool, persistModels bool,
 		cfg.Options.Debug = true
 	}
 
-	// Load workspace config last so it has highest priority.
-	if wsData, err := os.ReadFile(store.workspacePath); err == nil && len(wsData) > 0 {
-		merged, mergeErr := loadFromBytes(append([][]byte{mustMarshalConfig(cfg)}, wsData))
-		if mergeErr == nil {
-			// Preserve defaults that setDefaults already applied.
-			dataDir := cfg.Options.DataDirectory
-			*cfg = *merged
-			cfg.setDefaults(workingDir, dataDir)
-			store.config = cfg
-			store.loadedPaths = append(store.loadedPaths, store.workspacePath)
-		}
-	}
-
-	// Validate hooks after all config merging is complete so workspace
-	// hooks also get their matcher regexes compiled.
+	// Validate hooks after config merging is complete.
 	if err := cfg.ValidateHooks(); err != nil {
 		return nil, fmt.Errorf("invalid hook configuration: %w", err)
 	}
@@ -166,21 +149,12 @@ func PushPopMocodeEnv() func() {
 	return restore
 }
 
-func (c *Config) setDefaults(workingDir, dataDir string) {
+func (c *Config) setDefaults(workingDir string) {
 	if c.Options == nil {
 		c.Options = &Options{}
 	}
 	if c.Options.TUI == nil {
 		c.Options.TUI = &TUIOptions{}
-	}
-	if dataDir != "" {
-		c.Options.DataDirectory = dataDir
-	} else if c.Options.DataDirectory == "" {
-		if path, ok := fsext.LookupClosest(workingDir, defaultDataDirectory); ok {
-			c.Options.DataDirectory = path
-		} else {
-			c.Options.DataDirectory = filepath.Join(workingDir, defaultDataDirectory)
-		}
 	}
 	if c.Providers == nil {
 		c.Providers = csync.NewMap[string, ProviderConfig]()

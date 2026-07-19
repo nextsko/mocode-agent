@@ -15,9 +15,9 @@ import (
 
 	"github.com/package-register/mocode/internal/core/agent/notify"
 	rtpkg "github.com/package-register/mocode/internal/core/agent/roundtable"
-	"github.com/package-register/mocode/internal/core/agent/tools"
 	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/util/pubsub"
+	"github.com/package-register/mocode/tools"
 )
 
 //go:embed templates/roundtable_tool.md

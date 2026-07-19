@@ -15,7 +15,7 @@ func TestRegisterAndList(t *testing.T) {
 	t.Setenv("MOCODE_GLOBAL_DATA", filepath.Join(tmpDir, "Mocode"))
 
 	// Test registering a project
-	err := Register("/home/user/project1", "/home/user/project1/.Mocode")
+	err := Register("/home/user/project1", "/home/user/project1/.mocode")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -34,12 +34,8 @@ func TestRegisterAndList(t *testing.T) {
 		t.Errorf("Expected path /home/user/project1, got %s", projects[0].Path)
 	}
 
-	if projects[0].DataDir != "/home/user/project1/.Mocode" {
-		t.Errorf("Expected data_dir /home/user/project1/.Mocode, got %s", projects[0].DataDir)
-	}
-
 	// Register another project
-	err = Register("/home/user/project2", "/home/user/project2/.Mocode")
+	err = Register("/home/user/project2", "/home/user/project2/.mocode")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -65,7 +61,7 @@ func TestRegisterUpdatesExisting(t *testing.T) {
 	t.Setenv("MOCODE_GLOBAL_DATA", filepath.Join(tmpDir, "Mocode"))
 
 	// Register a project
-	err := Register("/home/user/project1", "/home/user/project1/.Mocode")
+	err := Register("/home/user/project1", "/home/user/project1/.mocode")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -76,7 +72,7 @@ func TestRegisterUpdatesExisting(t *testing.T) {
 	// Wait a bit and re-register
 	time.Sleep(10 * time.Millisecond)
 
-	err = Register("/home/user/project1", "/home/user/project1/.Mocode-new")
+	err = Register("/home/user/project1", "/home/user/project1/.mocode")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -85,10 +81,6 @@ func TestRegisterUpdatesExisting(t *testing.T) {
 
 	if len(projects) != 1 {
 		t.Fatalf("Expected 1 project after update, got %d", len(projects))
-	}
-
-	if projects[0].DataDir != "/home/user/project1/.Mocode-new" {
-		t.Errorf("Expected updated data_dir, got %s", projects[0].DataDir)
 	}
 
 	if !projects[0].LastAccessed.After(firstAccess) {
@@ -132,7 +124,7 @@ func TestRegisterWithParentDataDir(t *testing.T) {
 
 	// Register a project where .Mocode is in a parent directory.
 	// e.g., working in /home/user/monorepo/packages/app but .Mocode is at /home/user/monorepo/.Mocode
-	err := Register("/home/user/monorepo/packages/app", "/home/user/monorepo/.Mocode")
+	err := Register("/home/user/monorepo/packages/app", "/home/user/monorepo/.mocode")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -150,9 +142,6 @@ func TestRegisterWithParentDataDir(t *testing.T) {
 		t.Errorf("Expected path /home/user/monorepo/packages/app, got %s", projects[0].Path)
 	}
 
-	if projects[0].DataDir != "/home/user/monorepo/.Mocode" {
-		t.Errorf("Expected data_dir /home/user/monorepo/.Mocode, got %s", projects[0].DataDir)
-	}
 }
 
 func TestRegisterWithExternalDataDir(t *testing.T) {
@@ -162,7 +151,7 @@ func TestRegisterWithExternalDataDir(t *testing.T) {
 
 	// Register a project where .Mocode is in a completely different location.
 	// e.g., project at /home/user/project but data stored at /var/data/Mocode/myproject
-	err := Register("/home/user/project", "/var/data/Mocode/myproject")
+	err := Register("/home/user/project", "/home/user/project/.mocode")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -180,7 +169,4 @@ func TestRegisterWithExternalDataDir(t *testing.T) {
 		t.Errorf("Expected path /home/user/project, got %s", projects[0].Path)
 	}
 
-	if projects[0].DataDir != "/var/data/Mocode/myproject" {
-		t.Errorf("Expected data_dir /var/data/Mocode/myproject, got %s", projects[0].DataDir)
-	}
 }

@@ -10,16 +10,8 @@ import (
 	"github.com/package-register/mocode/internal/util/fsext"
 )
 
-const (
-	InitFlagFilename = "init"
-)
-
-type ProjectInitFlag struct {
-	Initialized bool `json:"initialized"`
-}
-
-func Init(workingDir, dataDir string, debug bool) (*ConfigStore, error) {
-	store, err := Load(workingDir, dataDir, debug)
+func Init(workingDir string, debug bool) (*ConfigStore, error) {
+	store, err := Load(workingDir, debug)
 	if err != nil {
 		return nil, err
 	}
@@ -29,18 +21,6 @@ func Init(workingDir, dataDir string, debug bool) (*ConfigStore, error) {
 func ProjectNeedsInitialization(store *ConfigStore) (bool, error) {
 	if store == nil {
 		return false, fmt.Errorf("config not loaded")
-	}
-
-	cfg := store.Config()
-	flagFilePath := filepath.Join(cfg.Options.DataDirectory, InitFlagFilename)
-
-	_, err := os.Stat(flagFilePath)
-	if err == nil {
-		return false, nil
-	}
-
-	if !os.IsNotExist(err) {
-		return false, fmt.Errorf("failed to check init flag file: %w", err)
 	}
 
 	someContextFileExists, err := contextPathsExist(store.WorkingDir())
@@ -60,7 +40,7 @@ func ProjectNeedsInitialization(store *ConfigStore) (bool, error) {
 		return false, nil
 	}
 
-	return true, nil
+	return false, nil
 }
 
 func contextPathsExist(dir string) (bool, error) {
@@ -104,14 +84,6 @@ func MarkProjectInitialized(store *ConfigStore) error {
 	if store == nil {
 		return fmt.Errorf("config not loaded")
 	}
-	flagFilePath := filepath.Join(store.Config().Options.DataDirectory, InitFlagFilename)
-
-	file, err := os.Create(flagFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to create init flag file: %w", err)
-	}
-	defer file.Close()
-
 	return nil
 }
 

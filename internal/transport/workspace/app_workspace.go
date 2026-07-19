@@ -12,8 +12,6 @@ import (
 	"charm.land/fantasy"
 	"github.com/package-register/mocode/internal/core/agent"
 	"github.com/package-register/mocode/internal/core/agent/extension"
-	"github.com/package-register/mocode/internal/core/agent/tools/lsp"
-	mcptools "github.com/package-register/mocode/internal/core/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/core/app"
 	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/core/knowledge/kngs"
@@ -22,6 +20,9 @@ import (
 	"github.com/package-register/mocode/internal/domain/session"
 	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/slash"
+	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/package-register/mocode/tools/lsp"
+	mcptools "github.com/package-register/mocode/tools/mcp"
 )
 
 // AppWorkspace implements the Workspace interface by delegating
@@ -503,7 +504,7 @@ func (w *AppWorkspace) AvailableAgents() []AgentInfo {
 
 func (w *AppWorkspace) InitKnowledge(ctx context.Context) ([]string, error) {
 	_ = ctx
-	kngDir := filepath.Join(w.WorkingDir(), ".mocode", "kngs")
+	kngDir := filepath.Join(infra.Config(), "mocode", "kngs")
 	return kngs.InitTemplates([]string{kngDir})
 }
 

@@ -6,7 +6,6 @@
 // used across module boundaries without creating tight coupling. They are
 // especially useful for:
 //
-//   - Public APIs (re-exported via pkg/types)
 //   - SDK consumers
 //   - Plugin authors
 //   - Cross-module data exchange where ContentPart or other sealed interfaces
@@ -26,8 +25,8 @@
 //     (i.e., it does not need to implement ContentPart or similar interfaces
 //     that use unexported marker methods like isPart())
 //  3. It has a clear, stable contract that external consumers can rely on
-//  4. The cost of keeping it in two places (internal/* and pkg/types) is
-//     higher than the cost of adding it here
+//  4. The cost of keeping it in two places is higher than the cost of
+//     adding it here
 //
 // # When NOT to Add a Type Here
 //
@@ -42,11 +41,11 @@
 //
 // # Two-Layer ToolResult Architecture
 //
-// mocode has three ToolResult types by design:
+// mocode has two ToolResult types by design:
 //
 //  1. session/message.ToolResult — RUNTIME, implements ContentPart (~80+ uses)
-//  2. types.ToolResult — DTO, public, no ContentPart (this package)
+//  2. types.ToolResult — DTO, no ContentPart (this package)
 //
 // These cannot be unified via type alias due to Go's sealed interface
-// pattern. See internal/types/tool.go for full details.
+// pattern. See internal/domain/types/tool.go for full details.
 package types

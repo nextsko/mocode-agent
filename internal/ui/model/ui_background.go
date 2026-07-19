@@ -9,10 +9,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	execbuiltin "github.com/package-register/mocode/internal/core/agent/tools/builtin/bash"
 	"github.com/package-register/mocode/internal/core/shellruntime/shell"
 	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/chat"
+	"github.com/package-register/mocode/tools"
 )
 
 func (m *UI) resumeBackgroundJobPolling(msgs []*message.Message) tea.Cmd {
@@ -38,7 +38,7 @@ func (m *UI) maybeStartBackgroundJobPoll(tr message.ToolResult) tea.Cmd {
 		return nil
 	}
 
-	var meta execbuiltin.BashResponseMetadata
+	var meta tools.BashResponseMetadata
 	if err := json.Unmarshal([]byte(tr.Metadata), &meta); err != nil {
 		return nil
 	}

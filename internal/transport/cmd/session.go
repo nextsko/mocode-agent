@@ -21,13 +21,13 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
-	"github.com/package-register/mocode/internal/core/agent/tools"
 	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/domain/session"
 	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/store"
 	"github.com/package-register/mocode/internal/ui/chat"
 	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/package-register/mocode/tools"
 )
 
 var sessionCmd = &cobra.Command{
@@ -105,7 +105,6 @@ type sessionServices struct {
 }
 
 func sessionSetup(cmd *cobra.Command) (context.Context, *sessionServices, func(), error) {
-	dataDir, _ := cmd.Flags().GetString("data-dir")
 	ctx := cmd.Context()
 
 	cwd, err := os.Getwd()
@@ -113,12 +112,9 @@ func sessionSetup(cmd *cobra.Command) (context.Context, *sessionServices, func()
 		return nil, nil, nil, fmt.Errorf("get working directory: %w", err)
 	}
 
-	cfg, err := config.Init(cwd, dataDir, false)
+	cfg, err := config.Init(cwd, false)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize config: %w", err)
-	}
-	if dataDir == "" {
-		dataDir = cfg.Config().Options.DataDirectory
 	}
 
 	st, err := store.New(cwd, cfg)

@@ -56,10 +56,10 @@ Mocode projects --json
 				StyleFunc(func(row, col int) lipgloss.Style {
 					return lipgloss.NewStyle().Padding(0, 2)
 				}).
-				Headers("Path", "Data Dir", "Last Accessed")
+				Headers("Path", "Last Accessed")
 
 			for _, p := range projectList {
-				t.Row(p.Path, p.DataDir, p.LastAccessed.Local().Format("2006-01-02 15:04"))
+				t.Row(p.Path, p.LastAccessed.Local().Format("2006-01-02 15:04"))
 			}
 			lipgloss.Println(t)
 			return nil
@@ -67,7 +67,7 @@ Mocode projects --json
 
 		// Not a TTY: plain output
 		for _, p := range projectList {
-			cmd.Printf("%s\t%s\t%s\n", p.Path, p.DataDir, p.LastAccessed.Format("2006-01-02T15:04:05Z07:00"))
+			cmd.Printf("%s\t%s\n", p.Path, p.LastAccessed.Format("2006-01-02T15:04:05Z07:00"))
 		}
 		return nil
 	},

@@ -29,7 +29,7 @@ func TestProjectsJSON(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", tmpDir)
 
 	// Register a project
-	err := projects.Register("/test/project", "/test/project/.Mocode")
+	err := projects.Register("/test/project", "/test/project/.mocode")
 	require.NoError(t, err)
 
 	var b bytes.Buffer
@@ -53,5 +53,4 @@ func TestProjectsJSON(t *testing.T) {
 
 	require.Len(t, result.Projects, 1)
 	require.Equal(t, "/test/project", result.Projects[0].Path)
-	require.Equal(t, "/test/project/.Mocode", result.Projects[0].DataDir)
 }

@@ -17,8 +17,6 @@ import (
 	"charm.land/fantasy/providers/openai"
 
 	"github.com/package-register/mocode/internal/core/agent/notify"
-	"github.com/package-register/mocode/internal/core/agent/tools"
-	"github.com/package-register/mocode/internal/core/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/core/agent/toolutil"
 	"github.com/package-register/mocode/internal/core/knowledge/memory"
 	"github.com/package-register/mocode/internal/domain/session/message"
@@ -26,6 +24,8 @@ import (
 	"github.com/package-register/mocode/internal/util/errcoll"
 	"github.com/package-register/mocode/internal/util/ext"
 	"github.com/package-register/mocode/internal/util/pubsub"
+	"github.com/package-register/mocode/tools"
+	"github.com/package-register/mocode/tools/mcp"
 )
 
 func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy.AgentResult, error) {

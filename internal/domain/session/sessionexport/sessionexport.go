@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/package-register/mocode/internal/util/infra"
 )
 
-const (
-	DefaultDir = ".mocode/export"
-	SummaryDir = ".mocode/export/summary"
+var (
+	DefaultDir = filepath.Join(infra.DataDir(), "export")
+	SummaryDir = filepath.Join(infra.DataDir(), "export", "summary")
 )
 
 type Options struct {
@@ -57,7 +58,7 @@ func Export(messages []message.Message, options Options) (Result, error) {
 		return Result{}, fmt.Errorf("unsupported export format: %s", options.Format)
 	}
 
-	dir := filepath.Join(options.WorkingDir, DefaultDir)
+	dir := DefaultDir
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return Result{}, err
 	}
@@ -81,7 +82,7 @@ func ExportSummary(options SummaryOptions) (Result, error) {
 	if options.Now.IsZero() {
 		options.Now = time.Now()
 	}
-	dir := filepath.Join(options.WorkingDir, SummaryDir)
+	dir := SummaryDir
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return Result{}, err
 	}
@@ -223,7 +224,7 @@ func titleRole(role string) string {
 	return strings.ToUpper(role[:1]) + strings.ToLower(role[1:])
 }
 
-const RecentsDir = ".mocode/export/recents"
+var RecentsDir = filepath.Join(infra.DataDir(), "export", "recents")
 
 type RecentExportOptions struct {
 	Messages   []message.Message
@@ -252,7 +253,7 @@ func ExportRecents(opts RecentExportOptions) (Result, error) {
 		return Result{}, fmt.Errorf("unsupported export format: %s", opts.Format)
 	}
 
-	dir := filepath.Join(opts.WorkingDir, RecentsDir)
+	dir := RecentsDir
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return Result{}, err
 	}

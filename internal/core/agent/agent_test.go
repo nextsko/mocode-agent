@@ -19,9 +19,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/package-register/mocode/internal/core/agent/tools"
 	"github.com/package-register/mocode/internal/domain/session"
 	"github.com/package-register/mocode/internal/domain/session/message"
+	"github.com/package-register/mocode/tools"
 
 	_ "github.com/joho/godotenv/autoload"
 )

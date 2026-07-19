@@ -33,6 +33,7 @@ import (
 	"github.com/package-register/mocode/internal/ui/common"
 	ui "github.com/package-register/mocode/internal/ui/model"
 	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/package-register/mocode/internal/util/infra"
 	mocodelog "github.com/package-register/mocode/internal/util/log"
 	"github.com/package-register/mocode/internal/util/version"
 )
@@ -41,7 +42,6 @@ func init() {
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 	rootCmd.SetHelpFunc(printHelp)
 	rootCmd.PersistentFlags().StringP("cwd", "c", "", "Current working directory")
-	rootCmd.PersistentFlags().StringP("data-dir", "D", "", "Custom mocode data directory")
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Debug")
 	rootCmd.Flags().BoolP("help", "h", false, "Help")
 	rootCmd.Flags().StringP("session", "s", "", "Continue a previous session by ID")
@@ -384,7 +384,6 @@ func setupWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error) {
 func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error) {
 	debug, _ := cmd.Flags().GetBool("debug")
 	yolo, _ := cmd.Flags().GetBool("yolo")
-	dataDir, _ := cmd.Flags().GetString("data-dir")
 	ctx := cmd.Context()
 
 	cwd, err := ResolveCwd(cmd)
@@ -392,30 +391,18 @@ func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error
 		return nil, nil, err
 	}
 
-	store, err := config.Init(cwd, dataDir, debug)
+	store, err := config.Init(cwd, debug)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	cfg := store.Config()
 	store.Overrides().SkipPermissionRequests = yolo
 
-	if err := os.MkdirAll(cfg.Options.DataDirectory, 0o700); err != nil {
-		return nil, nil, fmt.Errorf("failed to create data directory: %q %w", cfg.Options.DataDirectory, err)
-	}
-
-	gitIgnorePath := filepath.Join(cfg.Options.DataDirectory, ".gitignore")
-	if _, err := os.Stat(gitIgnorePath); os.IsNotExist(err) {
-		if err := os.WriteFile(gitIgnorePath, []byte("*\n"), 0o600); err != nil {
-			return nil, nil, fmt.Errorf("failed to create .gitignore file: %q %w", gitIgnorePath, err)
-		}
-	}
-
-	if err := projects.Register(cwd, cfg.Options.DataDirectory); err != nil {
+	if err := projects.Register(cwd, filepath.Join(cwd, ".mocode")); err != nil {
 		slog.Warn("Failed to register project", "error", err)
 	}
 
-	logFile := mocodelog.MainLogPath(cfg.Options.DataDirectory)
+	logFile := filepath.Join(infra.DataDir(), "logs", mocodelog.MainLogFileName)
 	mocodelog.Setup(logFile, debug)
 
 	appInstance, err := app.New(ctx, store)

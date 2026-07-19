@@ -44,7 +44,7 @@ func testStore(cfg *Config) *ConfigStore {
 func TestConfig_setDefaults(t *testing.T) {
 	cfg := &Config{}
 
-	cfg.setDefaults("/tmp", "")
+	cfg.setDefaults("/tmp")
 
 	require.NotNil(t, cfg.Options)
 	require.NotNil(t, cfg.Options.TUI)
@@ -53,7 +53,6 @@ func TestConfig_setDefaults(t *testing.T) {
 	require.NotNil(t, cfg.Models)
 	require.NotNil(t, cfg.LSP)
 	require.NotNil(t, cfg.MCP)
-	require.Equal(t, filepath.Join("/tmp", ".mocode"), cfg.Options.DataDirectory)
 	require.Equal(t, "AGENTS.md", cfg.Options.InitializeAs)
 	for _, path := range defaultContextPaths {
 		require.Contains(t, cfg.Options.ContextPaths, path)
@@ -73,7 +72,7 @@ func TestConfig_configureProviders(t *testing.T) {
 	}
 
 	cfg := &Config{}
-	cfg.setDefaults("/tmp", "")
+	cfg.setDefaults("/tmp")
 	env := NewEnvFromMap(map[string]string{
 		"OPENAI_API_KEY": "test-key",
 	})
@@ -115,7 +114,7 @@ func TestConfig_configureProvidersWithOverride(t *testing.T) {
 			},
 		},
 	})
-	cfg.setDefaults("/tmp", "")
+	cfg.setDefaults("/tmp")
 
 	env := NewEnvFromMap(map[string]string{
 		"OPENAI_API_KEY": "test-key",
@@ -158,7 +157,7 @@ func TestConfig_configureProvidersWithNewProvider(t *testing.T) {
 			},
 		}),
 	}
-	cfg.setDefaults("/tmp", "")
+	cfg.setDefaults("/tmp")
 	env := NewEnvFromMap(map[string]string{
 		"OPENAI_API_KEY": "test-key",
 	})
@@ -193,7 +192,7 @@ func TestConfig_configureProvidersBedrockWithCredentials(t *testing.T) {
 	}
 
 	cfg := &Config{}
-	cfg.setDefaults("/tmp", "")
+	cfg.setDefaults("/tmp")
 	env := NewEnvFromMap(map[string]string{
 		"AWS_ACCESS_KEY_ID":     "test-key-id",
 		"AWS_SECRET_ACCESS_KEY": "test-secret-key",
@@ -222,7 +221,7 @@ func TestConfig_configureProvidersBedrockWithoutCredentials(t *testing.T) {
 	}
 
 	cfg := &Config{}
-	cfg.setDefaults("/tmp", "")
+	cfg.setDefaults("/tmp")
 	env := NewEnvFromMap(map[string]string{})
 	resolver := NewEnvironmentVariableResolver(env)
 	err := cfg.configureProviders(testStore(cfg), env, resolver, knownProviders)
@@ -244,7 +243,7 @@ func TestConfig_configureProvidersBedrockWithoutUnsupportedModel(t *testing.T) {
 	}
 
 	cfg := &Config{}
-	cfg.setDefaults("/tmp", "")
+	cfg.setDefaults("/tmp")
 	env := NewEnvFromMap(map[string]string{
 		"AWS_ACCESS_KEY_ID":     "test-key-id",
 		"AWS_SECRET_ACCESS_KEY": "test-secret-key",
@@ -267,7 +266,7 @@ func TestConfig_configureProvidersVertexAIWithCredentials(t *testing.T) {
 	}
 
 	cfg := &Config{}
-	cfg.setDefaults("/tmp", "")
+	cfg.setDefaults("/tmp")
 	env := NewEnvFromMap(map[string]string{
 		"VERTEXAI_PROJECT":  "test-project",
 		"VERTEXAI_LOCATION": "us-central1",
@@ -298,7 +297,7 @@ func TestConfig_configureProvidersVertexAIWithoutCredentials(t *testing.T) {
 	}
 
 	cfg := &Config{}
-	cfg.setDefaults("/tmp", "")
+	cfg.setDefaults("/tmp")
 	env := NewEnvFromMap(map[string]string{
 		"GOOGLE_GENAI_USE_VERTEXAI": "false",
 		"GOOGLE_CLOUD_PROJECT":      "test-project",
@@ -324,7 +323,7 @@ func TestConfig_configureProvidersVertexAIMissingProject(t *testing.T) {
 	}
 
 	cfg := &Config{}
-	cfg.setDefaults("/tmp", "")
+	cfg.setDefaults("/tmp")
 	env := NewEnvFromMap(map[string]string{
 		"GOOGLE_GENAI_USE_VERTEXAI": "true",
 		"GOOGLE_CLOUD_LOCATION":     "us-central1",
@@ -349,7 +348,7 @@ func TestConfig_configureProvidersSetProviderID(t *testing.T) {
 	}
 
 	cfg := &Config{}
-	cfg.setDefaults("/tmp", "")
+	cfg.setDefaults("/tmp")
 	env := NewEnvFromMap(map[string]string{
 		"OPENAI_API_KEY": "test-key",
 	})
@@ -563,7 +562,7 @@ func TestConfig_configureProvidersWithDisabledProvider(t *testing.T) {
 			},
 		}),
 	}
-	cfg.setDefaults("/tmp", "")
+	cfg.setDefaults("/tmp")
 
 	env := NewEnvFromMap(map[string]string{
 		"OPENAI_API_KEY": "test-key",
@@ -593,7 +592,7 @@ func TestConfig_configureProvidersCustomProviderValidation(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
@@ -616,7 +615,7 @@ func TestConfig_configureProvidersCustomProviderValidation(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
@@ -638,7 +637,7 @@ func TestConfig_configureProvidersCustomProviderValidation(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
@@ -663,7 +662,7 @@ func TestConfig_configureProvidersCustomProviderValidation(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
@@ -688,7 +687,7 @@ func TestConfig_configureProvidersCustomProviderValidation(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
@@ -716,7 +715,7 @@ func TestConfig_configureProvidersCustomProviderValidation(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
@@ -746,7 +745,7 @@ func TestConfig_configureProvidersCustomProviderValidation(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
@@ -779,7 +778,7 @@ func TestConfig_configureProvidersEnhancedCredentialValidation(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{
 			"GOOGLE_GENAI_USE_VERTEXAI": "false",
@@ -812,7 +811,7 @@ func TestConfig_configureProvidersEnhancedCredentialValidation(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
@@ -843,7 +842,7 @@ func TestConfig_configureProvidersEnhancedCredentialValidation(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
@@ -874,7 +873,7 @@ func TestConfig_configureProvidersEnhancedCredentialValidation(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{
 			"OPENAI_API_KEY": "test-key",
@@ -911,7 +910,7 @@ func TestConfig_defaultModelSelection(t *testing.T) {
 		}
 
 		cfg := &Config{}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
 		err := cfg.configureProviders(testStore(cfg), env, resolver, knownProviders)
@@ -947,7 +946,7 @@ func TestConfig_defaultModelSelection(t *testing.T) {
 		}
 
 		cfg := &Config{}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
 		err := cfg.configureProviders(testStore(cfg), env, resolver, knownProviders)
@@ -977,7 +976,7 @@ func TestConfig_defaultModelSelection(t *testing.T) {
 		}
 
 		cfg := &Config{}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
 		err := cfg.configureProviders(testStore(cfg), env, resolver, knownProviders)
@@ -1020,7 +1019,7 @@ func TestConfig_defaultModelSelection(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
 		err := cfg.configureProviders(testStore(cfg), env, resolver, knownProviders)
@@ -1064,7 +1063,7 @@ func TestConfig_defaultModelSelection(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
 		err := cfg.configureProviders(testStore(cfg), env, resolver, knownProviders)
@@ -1106,7 +1105,7 @@ func TestConfig_defaultModelSelection(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
 		err := cfg.configureProviders(testStore(cfg), env, resolver, knownProviders)
@@ -1148,7 +1147,7 @@ func TestConfig_configureProvidersDisableDefaultProviders(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{
 			"OPENAI_API_KEY": "test-key",
@@ -1190,7 +1189,7 @@ func TestConfig_configureProvidersDisableDefaultProviders(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{
 			"MY_API_KEY":     "test-key",
@@ -1244,7 +1243,7 @@ func TestConfig_configureProvidersDisableDefaultProviders(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{
 			"OPENAI_API_KEY":    "test-key",
@@ -1275,7 +1274,7 @@ func TestConfig_configureProvidersDisableDefaultProviders(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
@@ -1299,7 +1298,7 @@ func TestConfig_configureProvidersDisableDefaultProviders(t *testing.T) {
 				},
 			}),
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
@@ -1316,7 +1315,7 @@ func TestConfig_setDefaultsDisableDefaultProvidersEnvVar(t *testing.T) {
 		t.Setenv("MOCODE_DISABLE_DEFAULT_PROVIDERS", "true")
 
 		cfg := &Config{}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		require.True(t, cfg.Options.DisableDefaultProviders)
 	})
@@ -1327,7 +1326,7 @@ func TestConfig_setDefaultsDisableDefaultProvidersEnvVar(t *testing.T) {
 				DisableDefaultProviders: true,
 			},
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 
 		require.True(t, cfg.Options.DisableDefaultProviders)
 	})
@@ -1357,7 +1356,7 @@ func TestConfig_configureSelectedModels(t *testing.T) {
 				SelectedModelTypeLarge: {Provider: "ghost", Model: "missing"},
 			},
 		}
-		cfg.setDefaults(dir, "")
+		cfg.setDefaults(dir)
 		store := &ConfigStore{config: cfg, globalDataPath: globalPath}
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
@@ -1408,7 +1407,7 @@ func TestConfig_configureSelectedModels(t *testing.T) {
 				},
 			},
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
 		err := cfg.configureProviders(testStore(cfg), env, resolver, knownProviders)
@@ -1470,7 +1469,7 @@ func TestConfig_configureSelectedModels(t *testing.T) {
 				},
 			},
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
 		err := cfg.configureProviders(testStore(cfg), env, resolver, knownProviders)
@@ -1515,7 +1514,7 @@ func TestConfig_configureSelectedModels(t *testing.T) {
 				},
 			},
 		}
-		cfg.setDefaults("/tmp", "")
+		cfg.setDefaults("/tmp")
 		env := NewEnvFromMap(map[string]string{})
 		resolver := NewEnvironmentVariableResolver(env)
 		err := cfg.configureProviders(testStore(cfg), env, resolver, knownProviders)

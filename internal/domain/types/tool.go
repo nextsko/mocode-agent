@@ -3,7 +3,7 @@ package types
 // ToolResult represents the result of a tool execution as a public DTO.
 //
 // This is the cross-module DTO used for public APIs and SDK consumers.
-// It contains 9 fields (see pkg/types for the public re-export).
+// It contains 9 fields.
 //
 // For the RUNTIME type used in Session message storage, see
 // message.ToolResult (in internal/session/message).

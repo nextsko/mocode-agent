@@ -15,6 +15,7 @@ import (
 	"github.com/package-register/mocode/internal/core/knowledge/memory"
 	"github.com/package-register/mocode/internal/integration/wechat"
 	"github.com/package-register/mocode/internal/transport/workspace"
+	"github.com/package-register/mocode/internal/util/infra"
 	"github.com/package-register/mocode/internal/util/log"
 )
 
@@ -250,8 +251,8 @@ func (g *WeChatGateway) PrintStartupSummary() {
 	fmt.Fprintln(g.stdout)
 	fmt.Fprintln(g.stdout, "Workspace")
 	fmt.Fprintf(g.stdout, "  Path:              %s\n", g.ws.WorkingDir())
-	fmt.Fprintf(g.stdout, "  Data directory:    %s\n", cfg.Options.DataDirectory)
-	fmt.Fprintf(g.stdout, "  Log path:          %s\n", log.MainLogPath(cfg.Options.DataDirectory))
+	fmt.Fprintf(g.stdout, "  Data directory:    %s\n", infra.DataDir())
+	fmt.Fprintf(g.stdout, "  Log path:          %s\n", log.MainLogPath(infra.DataDir()))
 	fmt.Fprintln(g.stdout)
 
 	selected := cfg.Models[config.SelectedModelTypeLarge]

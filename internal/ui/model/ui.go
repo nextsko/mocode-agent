@@ -24,7 +24,6 @@ import (
 	xstrings "github.com/charmbracelet/x/exp/strings"
 
 	"github.com/package-register/mocode/internal/core/agent/notify"
-	"github.com/package-register/mocode/internal/core/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/core/app"
 	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/core/permission"
@@ -45,6 +44,7 @@ import (
 	"github.com/package-register/mocode/internal/util/infra"
 	"github.com/package-register/mocode/internal/util/pubsub"
 	"github.com/package-register/mocode/internal/util/version"
+	"github.com/package-register/mocode/tools/mcp"
 )
 
 // MouseScrollThreshold defines how many lines to scroll the chat when a mouse

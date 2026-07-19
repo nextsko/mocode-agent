@@ -10,7 +10,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/package-register/mocode/internal/core/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/core/skills"
 	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/common"
@@ -18,6 +17,7 @@ import (
 	"github.com/package-register/mocode/internal/ui/slash"
 	"github.com/package-register/mocode/internal/util/fsext"
 	"github.com/package-register/mocode/internal/util/infra"
+	"github.com/package-register/mocode/tools/mcp"
 )
 
 func (m *UI) openAtCompletions(depth, limit int) tea.Cmd {

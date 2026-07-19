@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/package-register/mocode/internal/core/agent/tools/lsp"
 	"github.com/package-register/mocode/internal/util/csync"
 	"github.com/package-register/mocode/internal/util/pubsub"
+	"github.com/package-register/mocode/tools/lsp"
 )
 
 // LSPEventType represents the type of LSP event

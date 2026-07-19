@@ -163,7 +163,7 @@ func (t *Toast) Draw(scr uv.Screen, area uv.Rectangle) {
 		container = st.Toast.InfoMessage.Border(lipgloss.RoundedBorder()).BorderForeground(st.Toast.InfoMessage.GetForeground())
 	}
 
-	toastStyle := container.Width(contentWidth + 4).Padding(0, 1)
+	toastStyle := container.Width(contentWidth+4).Padding(0, 1)
 	rendered := toastStyle.Render(content)
 	renderedWidth := lipgloss.Width(rendered)
 	renderedHeight := lipgloss.Height(rendered)

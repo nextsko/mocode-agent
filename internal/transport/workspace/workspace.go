@@ -13,14 +13,14 @@ import (
 	"charm.land/fantasy"
 
 	"github.com/package-register/mocode/internal/core/agent/extension"
-	"github.com/package-register/mocode/internal/core/agent/tools/lsp"
-	mcptools "github.com/package-register/mocode/internal/core/agent/tools/mcp"
 	"github.com/package-register/mocode/internal/core/config"
 	"github.com/package-register/mocode/internal/core/permission"
 	"github.com/package-register/mocode/internal/domain/history"
 	"github.com/package-register/mocode/internal/domain/session"
 	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/slash"
+	"github.com/package-register/mocode/tools/lsp"
+	mcptools "github.com/package-register/mocode/tools/mcp"
 )
 
 // LSPClientInfo holds information about an LSP client's state. This is

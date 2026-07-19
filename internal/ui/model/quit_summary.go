@@ -15,6 +15,7 @@ import (
 	"github.com/package-register/mocode/internal/domain/session"
 	"github.com/package-register/mocode/internal/domain/session/message"
 	"github.com/package-register/mocode/internal/ui/styles"
+	"github.com/package-register/mocode/internal/util/infra"
 )
 
 type quitSummary struct {
@@ -98,7 +99,7 @@ func (m *UI) buildQuitSummary(ctx context.Context) (quitSummary, error) {
 		Additions:    additions,
 		Deletions:    deletions,
 		SessionID:    m.session.ID,
-		SessionPath:  quitSessionPath(cwd, *m.session),
+		SessionPath:  quitSessionPath(*m.session),
 		AppName:      config.GetAppName(m.com.Config()),
 	}, nil
 }
@@ -126,8 +127,8 @@ func quitFileStats(files []SessionFile) (changed, additions, deletions int) {
 	return changed, additions, deletions
 }
 
-func quitSessionPath(cwd string, s session.Session) string {
-	return filepath.Join(cwd, ".mocode", "sessions", session.HashID(s.ID), "history")
+func quitSessionPath(s session.Session) string {
+	return filepath.Join(infra.DataDir(), "sessions", session.HashID(s.ID), "history")
 }
 
 func renderQuitSummary(summary quitSummary, qs styles.QuitSummary) string {

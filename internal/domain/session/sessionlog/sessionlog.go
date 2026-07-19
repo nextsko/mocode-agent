@@ -162,8 +162,13 @@ func (l *Logger) getFile(cat string) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Write header on first open.
-	f.WriteString(fmt.Sprintf("# %s\n\n", catName(cat)))
+	// Write header only when the file is new/empty. A new Logger is created
+	// per turn (and per sub-agent), so without this check the header would
+	// repeat every time we open an existing file in O_APPEND mode.
+	info, err := f.Stat()
+	if err == nil && info.Size() == 0 {
+		f.WriteString(fmt.Sprintf("# %s\n\n", catName(cat)))
+	}
 	l.files[cat] = f
 	return f, nil
 }
