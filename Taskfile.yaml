@@ -244,10 +244,8 @@ tasks:
         msg: Not on main branch
       - sh: "[ $(git status --porcelain=2 | wc -l) = 0 ]"
         msg: "Git is dirty"
-      - sh: 'gh run list --workflow build.yml --commit $(git rev-parse HEAD) --status success --json conclusion -q ".[0].conclusion" | grep -q success'
-        msg: "Test build for this commit failed or not present"
-      - sh: 'gh run list --workflow snapshot.yml --commit $(git rev-parse HEAD) --status success --json conclusion -q ".[0].conclusion" | grep -q success'
-        msg: "Snapshot build for this commit failed or not present"
+      - sh: 'gh run list --workflow test.yml --commit $(git rev-parse HEAD) --status success --json conclusion -q ".[0].conclusion" | grep -q success'
+        msg: "Test build (CI) for this commit failed or not present"
     cmds:
       - task: fetch-tags
       - task: version:bump
@@ -255,12 +253,12 @@ tasks:
       - 'git commit -m "🔧 chore: 升级版本到 {{.CLEAN_NEXT}}-fromsko"'
       - git tag --annotate --sign -m "{{.NEXT}}" {{.NEXT}} {{.CLI_ARGS}}
       - 'echo "Pushing {{.NEXT}}..."'
-      - git push origin main --follow-tags
+      - git push agent main --follow-tags
 
   fetch-tags:
     cmds:
       - git tag -d nightly || true
-      - git fetch --tags
+      - git fetch agent --tags
 
   deps:
     desc: Update Fantasy and Catwalk
