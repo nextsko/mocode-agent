@@ -206,7 +206,7 @@ tasks:
       CLEAN_NEXT:
         sh: NEXT=$(svu next --always 2>/dev/null || go run github.com/caarlos0/svu/v3@latest next --always); echo "${NEXT#v}"
     cmds:
-      - powershell -NoProfile -Command "Set-Content -Path 'internal/version/version.go' -Value ([regex]::Replace((Get-Content 'internal/version/version.go' -Raw),'Version = \".*\"','Version = \"{{.CLEAN_NEXT}}-fromsko\"')) -NoNewline"
+      - powershell -NoProfile -Command "Set-Content -Path 'internal/util/version/version.go' -Value ([regex]::Replace((Get-Content 'internal/util/version/version.go' -Raw),'Version = \".*\"','Version = \"{{.CLEAN_NEXT}}-fromsko\"')) -NoNewline"
       - echo "Version bumped to {{.CLEAN_NEXT}}-fromsko"
 
   version:set:
@@ -217,14 +217,14 @@ tasks:
       CLEAN_VERSION:
         sh: VERSION='{{.VERSION}}'; echo "${VERSION#v}"
     cmds:
-      - powershell -NoProfile -Command "Set-Content -Path 'internal/version/version.go' -Value ([regex]::Replace((Get-Content 'internal/version/version.go' -Raw),'Version = \".*\"','Version = \"{{.CLEAN_VERSION}}-fromsko\"')) -NoNewline"
+      - powershell -NoProfile -Command "Set-Content -Path 'internal/util/version/version.go' -Value ([regex]::Replace((Get-Content 'internal/util/version/version.go' -Raw),'Version = \".*\"','Version = \"{{.CLEAN_VERSION}}-fromsko\"')) -NoNewline"
       - echo "Version set to {{.CLEAN_VERSION}}-fromsko"
 
   version:show:
     desc: Show current internal version and next semver tag
     vars:
       CURRENT_VERSION:
-        sh: powershell -NoProfile -Command "if ((Get-Content 'internal/version/version.go' -Raw) -match 'Version = \"([^\"]+)\"') { Write-Output $$Matches[1] }"
+        sh: powershell -NoProfile -Command "if ((Get-Content 'internal/util/version/version.go' -Raw) -match 'Version = \"([^\"]+)\"') { Write-Output $$Matches[1] }"
       NEXT:
         sh: svu next --always || go run github.com/caarlos0/svu/v3@latest next --always
     cmds:
