@@ -1,0 +1,19 @@
+{
+  "name": "@fromsko/mocode-cli-darwin-arm64",
+  "version": "0.7.0",
+  "description": "mocode binary for darwin-arm64",
+  "license": "MIT",
+  "main": "mocode",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "mocode"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

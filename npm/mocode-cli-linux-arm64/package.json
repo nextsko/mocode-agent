@@ -1,0 +1,19 @@
+{
+  "name": "@fromsko/mocode-cli-linux-arm64",
+  "version": "0.7.0",
+  "description": "mocode binary for linux-arm64",
+  "license": "MIT",
+  "main": "mocode",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "mocode"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

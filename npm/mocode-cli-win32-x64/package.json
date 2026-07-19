@@ -1,0 +1,19 @@
+{
+  "name": "@fromsko/mocode-cli-win32-x64",
+  "version": "0.7.0",
+  "description": "mocode binary for win32-x64",
+  "license": "MIT",
+  "main": "mocode.exe",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "mocode.exe"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

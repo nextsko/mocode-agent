@@ -82,9 +82,9 @@ release:
 
     Install via npm:
     ```sh
-    npm install -g @mocode/cli
+    npm install -g @fromsko/mocode-cli
     # or
-    npx @mocode/cli
+    npx @fromsko/mocode-cli
     ```
 
     Or download the binary directly below.

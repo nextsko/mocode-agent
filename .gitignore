@@ -67,3 +67,6 @@ vendor/
 
 # Isolated worktrees created by /comet-build
 /.worktrees/
+# npm platform package binaries (downloaded at publish time via goreleaser)
+npm/mocode-cli-*/mocode
+npm/mocode-cli-*/mocode.exe
