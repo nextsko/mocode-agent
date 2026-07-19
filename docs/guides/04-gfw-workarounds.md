@@ -197,3 +197,93 @@ warning: in the working copy of 'go.mod', LF will be replaced by CRLF
 - 警告**可以忽略** — Git 会自动按 `.gitattributes` 处理
 - 想消除警告：在 `.gitattributes` 显式指定 `go.mod text eol=lf`
 - **不要**用 `git config core.autocrlf=false` 强行关闭
+
+---
+
+## 🔁 Windows 下批量 Git Clone 踩坑记录
+
+> 整理时间：2026-07-20  
+> 背景：在 `C:\Users\16143\Desktop\mocode\tmp` 批量克隆 5 个 GitHub 仓库，连续触发目录占用与代理不通
+
+---
+
+### 1. 先清理残留目录再克隆
+
+```bash
+rm -rf c:/Users/16143/Desktop/mocode/tmp/*
+```
+
+**现象**：
+- 若上次克隆残留 `.git/objects/pack/*.lock`，`rm -rf` 会报：
+  - `The process cannot access the file because it is being used by another process.`
+
+**应对**：
+- 先确认后台无残留 git：
+```bash
+tasklist 2>/dev/null | grep -i git || echo no_git
+```
+- 若存在，强制结束：
+```powershell
+powershell.exe -NoProfile -Command 'Get-Process git* -ErrorAction SilentlyContinue | Stop-Process -Force'
+```
+
+---
+
+### 2. 环境变量代理对 Git 无效
+
+```bash
+$env:HTTP_PROXY="http://127.0.0.1:7897"
+$env:HTTPS_PROXY="http://127.0.0.1:7897"
+git clone https://github.com/...   # 仍直连失败
+```
+
+**原因**：Git for Windows 默认**不读取** `HTTP_PROXY/HTTPS_PROXY`。
+
+**正确做法**：显式配置 git proxy：
+
+```bash
+git config --global http.proxy http://127.0.0.1:7897
+git config --global https.proxy http://127.0.0.1:7897
+```
+
+**注意**：如果代理服务实际未监听，仍会报：
+- `Failed to connect to github.com port 443 after ...`
+
+---
+
+### 3. 目录已存在会阻断后续 clone
+
+```bash
+git clone ... && git clone ... && git clone ...
+```
+
+若第 1 个仓库已存在目录，后续 clone 整体失败：
+- `fatal: destination path 'xxx' already exists and is not an empty directory.`
+
+**应对**：
+- 先确保目录清空，再逐个 clone；或 `git clone <url> <new_dir>` 换目录名。
+
+---
+
+### 4. 实测结论：可直连时优先直连
+
+本次批量克隆最终全部成功，但最后 4 个仓库实际走了**直连**，未走 `127.0.0.1:7897`。
+
+建议保留流程：
+```bash
+# 先尝试无代理直连
+git clone https://github.com/...
+# 只有连续超时时再切代理
+git config --global http.proxy http://127.0.0.1:7897
+```
+
+---
+
+### 5. 小建议
+
+| 场景 | 推荐做法 |
+|---|---|
+| 批量 clone | 每次只克隆一个仓库，失败单独处理 |
+| 目录已存在 | 先 `git status` 确认是否为脏目录 |
+| 长时间无输出 | 观察 `Updating files: ...` 进度条，不要误判为卡死 |
+| 清理失败 | 用 `powershell Stop-Process -Force git*` 后再删目录 |
