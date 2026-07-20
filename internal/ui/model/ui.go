@@ -23,6 +23,7 @@ import (
 	"github.com/charmbracelet/ultraviolet/screen"
 	xstrings "github.com/charmbracelet/x/exp/strings"
 
+	"github.com/nextsko/mocode-agent/internal/core/agent"
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
 	"github.com/nextsko/mocode-agent/internal/core/app"
 	"github.com/nextsko/mocode-agent/internal/core/config"
@@ -939,6 +940,20 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			slog.Error("Error reported", "error", msg.Msg)
 		}
 		m.toast.Show(msg)
+	case agent.SummaryCompletedMsg:
+		// Delivered by the coordinator's summaryDone broker (forwarded
+		// via app.events) when an asynchronous /summary run finishes.
+		if msg.Err != nil {
+			cmds = append(cmds, util.ReportError(fmt.Errorf("failed to summarize: %w", msg.Err)))
+		} else if msg.Path != "" {
+			cmds = append(cmds, func() tea.Msg {
+				return util.NewInfoMsg("Session summary saved: " + msg.Path)
+			})
+		} else {
+			cmds = append(cmds, func() tea.Msg {
+				return util.NewInfoMsg("Session summarized")
+			})
+		}
 	case util.ClearStatusMsg:
 		m.toast.Hide()
 	case completions.CompletionItemsLoadedMsg:

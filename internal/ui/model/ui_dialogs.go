@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
-	"github.com/nextsko/mocode-agent/internal/domain/session/sessionexport"
 	"github.com/nextsko/mocode-agent/internal/integration/wechat"
 	"github.com/nextsko/mocode-agent/internal/ui/dialog"
 	fimage "github.com/nextsko/mocode-agent/internal/ui/image"
@@ -108,18 +106,24 @@ func (m *UI) handleDialogAction(action tea.Msg) tea.Cmd {
 			cmds = append(cmds, util.ReportWarn("Agent is busy, please wait before summarizing session..."))
 			break
 		}
+		// Slash /summary is a user-driven action, while the LLM-driven
+		// session_summary tool path is allowed to run during a busy turn.
+		// Keeping the guard here is intentional: it prevents UI spam from
+		// repeated Enter presses and avoids stacking duplicate summary
+		// goroutines (the active sessionID is registered with activeRequests
+		// by sessionAgent.Summarize so IsBusy() returns true while a
+		// summary is in flight, which naturally rate-limits subsequent
+		// triggers).
+		sessionID := msg.SessionID
+		cmds = append(cmds, func() tea.Msg { return util.NewInfoMsg("Summarizing session…") })
 		cmds = append(cmds, func() tea.Msg {
-			err := m.com.Workspace.AgentSummarize(context.Background(), msg.SessionID)
-			if err != nil {
+			if err := m.com.Workspace.AgentEnqueueSummary(context.Background(), sessionID); err != nil {
 				return util.ReportError(err)()
 			}
-			pattern := filepath.Join(m.com.Workspace.WorkingDir(), sessionexport.SummaryDir, "summary-"+sessionexport.SanitizeName(msg.SessionID)+"-*.md")
-			matches, _ := filepath.Glob(pattern)
-			if len(matches) > 0 {
-				return util.NewInfoMsg("Session summary saved: " + matches[len(matches)-1])
-			}
-			return util.NewInfoMsg("Session summarized")
+			return nil
 		})
+		// Completion InfoMsg / ErrorMsg is delivered via SummaryCompletedMsg
+		// on app.events, not synchronously here.
 	case dialog.ActionRollback:
 		m.dialog.CloseDialog(dialog.RollbackID)
 		cmds = append(cmds, m.performRollback(msg.Target))
