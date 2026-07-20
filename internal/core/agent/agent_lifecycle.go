@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -18,7 +17,6 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/domain/session/sessionexport"
 	"github.com/nextsko/mocode-agent/internal/util/errcoll"
@@ -130,21 +128,6 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 
 	// Add the error collector to the context for tool error recording.
 	ctx = errcoll.WithContext(ctx, a.errorCollector)
-
-	// Add memory service and user info to context for memory tools.
-	if a.memory != nil {
-		ctx = memory.WithMemoryServiceInContext(ctx, a.memory)
-		if _, _, ok := memory.AppUserFromContext(ctx); !ok {
-			userID := os.Getenv("USER")
-			if userID == "" {
-				userID = os.Getenv("USERNAME")
-			}
-			if userID == "" {
-				userID = "default"
-			}
-			ctx = memory.WithAppUserInContext(ctx, "mocode", userID)
-		}
-	}
 
 	genCtx, cancel := context.WithCancel(ctx)
 	a.activeRequests.Set(call.SessionID, cancel)

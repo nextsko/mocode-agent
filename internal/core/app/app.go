@@ -24,7 +24,6 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/agent"
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
 	"github.com/nextsko/mocode-agent/internal/core/config"
-	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/shellruntime/shell"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
@@ -53,7 +52,6 @@ type App struct {
 	AgentCoordinator agent.Coordinator
 
 	LSPManager *lsp.Manager
-	Memory     memory.Service
 
 	config *config.ConfigStore
 
@@ -84,7 +82,6 @@ type SessionServices struct {
 	Messages    message.Service
 	History     history.Service
 	FileTracker filetracker.Service
-	Memory      memory.Service
 }
 
 // New initializes a new application instance with file-based storage.
@@ -592,7 +589,6 @@ func (app *App) InitCoderAgent(ctx context.Context) error {
 		app.History,
 		app.FileTracker,
 		app.LSPManager,
-		app.Memory,
 		app.agentNotifications,
 		app.ErrorCollector,
 		app.store.Search(),
@@ -944,41 +940,3 @@ func (s *storeFileTrackerService) ListReadFiles(ctx context.Context, sid string)
 func (s *storeFileTrackerService) DeleteSession(ctx context.Context, sid string) {
 	s.store.DeleteSession(ctx, sid)
 }
-
-// storeMemoryService wraps *store.MemoryStore.
-type storeMemoryService struct {
-	store *store.MemoryStore
-}
-
-func newStoreMemoryService(st *store.Store) *storeMemoryService {
-	return &storeMemoryService{store: st.Memories()}
-}
-
-func (s *storeMemoryService) AddMemory(ctx context.Context, app, user, mem string, topics []string, kind memory.Kind, eventTime *time.Time, participants []string, location string) error {
-	return s.store.AddMemory(ctx, app, user, mem, topics, kind, eventTime, participants, location)
-}
-
-func (s *storeMemoryService) UpdateMemory(ctx context.Context, app, user, mid, mem string, topics []string, kind memory.Kind, eventTime *time.Time, participants []string, location string) error {
-	return s.store.UpdateMemory(ctx, app, user, mid, mem, topics, kind, eventTime, participants, location)
-}
-
-func (s *storeMemoryService) DeleteMemory(ctx context.Context, app, user, mid string) error {
-	return s.store.DeleteMemory(ctx, app, user, mid)
-}
-
-func (s *storeMemoryService) ClearMemories(ctx context.Context, app, user string) error {
-	return s.store.ClearMemories(ctx, app, user)
-}
-
-func (s *storeMemoryService) ReadMemories(ctx context.Context, app, user string, limit int) ([]*memory.Entry, error) {
-	return s.store.ReadMemories(ctx, app, user, limit)
-}
-
-func (s *storeMemoryService) SearchMemories(ctx context.Context, app, user, query string, limit int) ([]*memory.Entry, error) {
-	return s.store.SearchMemories(ctx, app, user, query, limit)
-}
-
-func (s *storeMemoryService) Tools() []fantasy.AgentTool {
-	return memory.ToolsFor(s, memory.DefaultToolOptions())
-}
-func (s *storeMemoryService) Close() error { return s.store.Close() }

@@ -16,7 +16,6 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
 	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
 	"github.com/nextsko/mocode-agent/internal/core/config"
-	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
 	"github.com/nextsko/mocode-agent/tools"
 )
 
@@ -376,13 +375,10 @@ func (c *coordinator) runSubAgentDAG(ctx context.Context, params subAgentBatchPa
 			queue = queue[1:]
 			visited++
 			for j, t := range params.Tasks {
-				for _, dep := range t.DependsOn {
-					if dep == params.Tasks[idx].ID {
-						inDegree[j]--
-						if inDegree[j] == 0 {
-							queue = append(queue, j)
-						}
-						break
+				if slices.Contains(t.DependsOn, params.Tasks[idx].ID) {
+					inDegree[j]--
+					if inDegree[j] == 0 {
+						queue = append(queue, j)
 					}
 				}
 			}
@@ -547,7 +543,7 @@ func (c *coordinator) runSubAgentDAG(ctx context.Context, params subAgentBatchPa
 }
 
 func readOnlyAgentTools(allowed []string) []string {
-	readOnly := []string{"glob", "grep", "ls", "sourcegraph", "view", "crawl", "download_docs", tools.SessionSummaryToolName, tools.SessionExportToolName, memory.SearchToolName, memory.LoadToolName}
+	readOnly := []string{"glob", "grep", "ls", "sourcegraph", "view", "crawl", "download_docs", tools.SessionSummaryToolName, tools.SessionExportToolName}
 	if allowed == nil {
 		return readOnly
 	}

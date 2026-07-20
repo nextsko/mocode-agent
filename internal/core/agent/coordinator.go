@@ -29,7 +29,6 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/config"
-	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/shellruntime/screencap"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
@@ -127,7 +126,6 @@ type coordinator struct {
 	history     history.Service
 	filetracker filetracker.Service
 	lspManager  *lsp.Manager
-	memory      memory.Service
 	notify      pubsub.Publisher[notify.Notification]
 
 	currentAgent  SessionAgent
@@ -170,7 +168,6 @@ func NewCoordinator(
 	history history.Service,
 	filetracker filetracker.Service,
 	lspManager *lsp.Manager,
-	memory memory.Service,
 	notify pubsub.Publisher[notify.Notification],
 	errorCollector *errcoll.Collector,
 	sessionSearch *store.SessionSearch,
@@ -187,7 +184,6 @@ func NewCoordinator(
 		history:        history,
 		filetracker:    filetracker,
 		lspManager:     lspManager,
-		memory:         memory,
 		notify:         notify,
 		agents:         make(map[string]SessionAgent),
 		subagentIndex:  csync.NewMap[string, string](),
@@ -540,7 +536,6 @@ func (c *coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, age
 		Messages:             c.messages,
 		Tools:                nil,
 		Notify:               c.notify,
-		Memory:               c.memory,
 		WorkingDir:           c.cfg.WorkingDir(),
 		ErrorCollector:       c.errorCollector,
 	})
@@ -599,7 +594,6 @@ func (c *coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 		FileTracker:  c.filetracker,
 		Sessions:     c.sessions,
 		Messages:     c.messages,
-		Memory:       c.memory,
 		AllSkills:    c.allSkills,
 		ActiveSkills: c.activeSkills,
 		SkillTracker: c.skillTracker,
@@ -862,7 +856,6 @@ func toSessionLogMeta(m toolutil.SessionLogMeta) sessionlog.Meta {
 		ErrorType:  m.ErrorType,
 	}
 }
-
 
 func isExactoSupported(modelID string) bool {
 	supportedModels := []string{

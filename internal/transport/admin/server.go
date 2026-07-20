@@ -22,7 +22,6 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
-	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
 	wechat "github.com/nextsko/mocode-agent/internal/integration/wechat"
 	"github.com/nextsko/mocode-agent/internal/transport/workspace"
 	"github.com/nextsko/mocode-agent/internal/util/infra"
@@ -645,7 +644,6 @@ func (s *Server) loginWeChat() {
 	wc := wechat.Default()
 	wc.SetSessionStore(filepath.Join(infra.WeChatDir(), "sessions.json"))
 	wc.SetAgentHandler(func(ctx context.Context, userID, text string, _ *wechat.IncomingMessage) (string, error) {
-		ctx = memory.WithAppUserInContext(ctx, "mocode", "wx:"+userID)
 		sessKey := "wx:" + userID
 		stopTyping := wc.StartTyping(ctx, userID)
 		defer stopTyping()

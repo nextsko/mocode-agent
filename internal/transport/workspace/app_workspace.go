@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -13,13 +12,11 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/agent"
 	"github.com/nextsko/mocode-agent/internal/core/app"
 	"github.com/nextsko/mocode-agent/internal/core/config"
-	"github.com/nextsko/mocode-agent/internal/core/knowledge/kngs"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/domain/history"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/slash"
-	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/nextsko/mocode-agent/tools/lsp"
 	mcptools "github.com/nextsko/mocode-agent/tools/mcp"
 )
@@ -516,8 +513,7 @@ func (w *AppWorkspace) AvailableAgents() []AgentInfo {
 
 func (w *AppWorkspace) InitKnowledge(ctx context.Context) ([]string, error) {
 	_ = ctx
-	kngDir := filepath.Join(infra.Config(), "mocode", "kngs")
-	return kngs.InitTemplates([]string{kngDir})
+	return nil, nil
 }
 
 func (w *AppWorkspace) CurrentAgentID() string {

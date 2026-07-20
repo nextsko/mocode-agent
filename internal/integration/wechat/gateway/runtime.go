@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
-	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
 	"github.com/nextsko/mocode-agent/internal/integration/wechat"
 	"github.com/nextsko/mocode-agent/internal/transport/workspace"
 	"github.com/nextsko/mocode-agent/internal/util/infra"
@@ -117,7 +116,6 @@ func (g *WeChatGateway) installAgentHandler() {
 	g.wc.InitButler(&gatewayButlerWorkspace{g.ws})
 
 	g.wc.SetAgentHandler(func(ctx context.Context, userID, text string, _ *wechat.IncomingMessage) (string, error) {
-		ctx = memory.WithAppUserInContext(ctx, "mocode", wechat.SessionKey(userID))
 		stopTyping := g.wc.StartTyping(ctx, userID)
 		defer stopTyping()
 

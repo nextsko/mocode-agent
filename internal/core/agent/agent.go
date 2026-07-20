@@ -20,7 +20,6 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/agent/ctxcompress"
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
 	"github.com/nextsko/mocode-agent/internal/core/config"
-	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/util/csync"
@@ -103,7 +102,6 @@ type sessionAgent struct {
 	messages             message.Service
 	disableAutoSummarize bool
 	isYolo               bool
-	memory               memory.Service
 	workingDir           string
 	notify               pubsub.Publisher[notify.Notification]
 	callbacks            *AgentCallbacks
@@ -126,7 +124,6 @@ type SessionAgentOptions struct {
 	Sessions             session.Service
 	Messages             message.Service
 	Tools                []fantasy.AgentTool
-	Memory               memory.Service
 	WorkingDir           string
 	Notify               pubsub.Publisher[notify.Notification]
 	Callbacks            *AgentCallbacks
@@ -147,7 +144,6 @@ func NewSessionAgent(
 		disableAutoSummarize: opts.DisableAutoSummarize,
 		tools:                csync.NewSliceFrom(opts.Tools),
 		isYolo:               opts.IsYolo,
-		memory:               opts.Memory,
 		workingDir:           opts.WorkingDir,
 		notify:               opts.Notify,
 		callbacks:            opts.Callbacks,

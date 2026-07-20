@@ -7,7 +7,6 @@ import (
 	"charm.land/fantasy"
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/config"
-	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
 	"github.com/nextsko/mocode-agent/internal/domain/filetracker"
@@ -72,7 +71,6 @@ type ToolDeps struct {
 	FileTracker     filetracker.Service
 	Sessions        session.Service
 	Messages        message.Service
-	Memory          memory.Service
 	AllSkills       []*skills.Skill
 	ActiveSkills    []*skills.Skill
 	SkillTracker    *skills.Tracker
@@ -131,7 +129,6 @@ func standardPlugins() []ToolPlugin {
 		mocodePlugin{},
 		lspPlugin{},
 		mcpMetaPlugin{},
-		memoryPlugin{},
 		thinkPlugin{},
 		giteaPlugin{},
 		gitOpsPlugin{},
@@ -328,28 +325,6 @@ func (mcpMetaPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool
 		NewListMCPResourcesTool(deps.Cfg, deps.Permissions),
 		NewReadMCPResourceTool(deps.Cfg, deps.Permissions),
 	}
-}
-
-// ─── plugin/memory ────────────────────────────────────────────────────────────
-
-type memoryPlugin struct{}
-
-func (memoryPlugin) Descriptors() []ToolDescriptor {
-	return []ToolDescriptor{
-		{Name: memory.AddToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
-		{Name: memory.UpdateToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
-		{Name: memory.DeleteToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
-		{Name: memory.ClearToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
-		{Name: memory.SearchToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
-		{Name: memory.LoadToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
-	}
-}
-
-func (memoryPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
-	if deps.Memory == nil {
-		return nil
-	}
-	return deps.Memory.Tools()
 }
 
 // ─── plugin/gitea ────────────────────────────────────────────────────────────

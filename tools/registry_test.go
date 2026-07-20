@@ -5,7 +5,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
 	"github.com/nextsko/mocode-agent/tools/plugins/sshcommon"
 	"github.com/stretchr/testify/assert"
 )
@@ -47,12 +46,6 @@ var knownAllToolNames = []string{
 	SessionSummaryToolName,
 	SessionSearchToolName,
 	ReadFilesToolName,
-	memory.AddToolName,
-	memory.UpdateToolName,
-	memory.DeleteToolName,
-	memory.ClearToolName,
-	memory.SearchToolName,
-	memory.LoadToolName,
 	IssuesToolName,
 	PullsToolName,
 	NotificationsToolName,

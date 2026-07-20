@@ -11,7 +11,6 @@ func (app *App) useStoreServices() error {
 	app.Messages = newStoreMessageService(app.store)
 	app.History = newStoreHistoryService(app.store)
 	app.FileTracker = newStoreFileTrackerService(app.store)
-	app.Memory = newStoreMemoryService(app.store)
 	if app.eventsCtx != nil {
 		app.subscribeSessionServices(app.eventsCtx)
 	}
