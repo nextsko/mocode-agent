@@ -1,11 +1,12 @@
 package tools
 
 import (
-	"charm.land/fantasy"
 	"context"
+	"testing"
+
+	"charm.land/fantasy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 // stubNamedTool creates a minimal AgentTool whose Info().Name returns name.

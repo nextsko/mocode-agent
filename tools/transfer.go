@@ -1,11 +1,12 @@
 package tools
 
 import (
-	"charm.land/fantasy"
 	"context"
 	_ "embed"
 	"fmt"
 	"strings"
+
+	"charm.land/fantasy"
 )
 
 const (

@@ -2,8 +2,9 @@ package tools
 
 import (
 	"errors"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestErrorResult(t *testing.T) {

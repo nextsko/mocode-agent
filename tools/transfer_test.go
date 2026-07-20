@@ -1,12 +1,13 @@
 package tools
 
 import (
-	"charm.land/fantasy"
 	"context"
 	"fmt"
+	"testing"
+
+	"charm.land/fantasy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 // ─── TransferTracker — basic counter ─────────────────────────────────────────
