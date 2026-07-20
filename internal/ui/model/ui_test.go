@@ -963,24 +963,3 @@ func (w *testWorkspace) InitKnowledge(_ context.Context) ([]string, error) {
 	w.initKnowledgeCalls++
 	return []string{"written.md"}, nil
 }
-
-func TestHandleAgentNotification_Roundtable(t *testing.T) {
-	t.Parallel()
-
-	ui := newTestUIWithConfig(t, &config.Config{})
-	ui.session = &session.Session{ID: "session-a"}
-
-	ui.handleAgentNotification(notify.Notification{
-		Type:         notify.TypeRoundtableTurn,
-		SessionID:    "roundtable-session",
-		SessionTitle: "Design Review",
-	})
-	assert.Equal(t, "roundtable turn: Design Review", ui.agentStatus)
-
-	ui.handleAgentNotification(notify.Notification{
-		Type:         notify.TypeRoundtableFinished,
-		SessionID:    "roundtable-session",
-		SessionTitle: "Design Review",
-	})
-	assert.Empty(t, ui.agentStatus)
-}

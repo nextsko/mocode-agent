@@ -21,7 +21,6 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
-	"github.com/nextsko/mocode-agent/internal/core/agent/extension"
 	"github.com/nextsko/mocode-agent/internal/core/app"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/config/projects"
@@ -395,12 +394,6 @@ func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error
 	// Wire the spinner themer port: transport -> ui/styles adapter -> domain.theme port.
 	// core/app never imports ui/styles, so its spinner colors are injected here.
 	appInstance.SetSpinnerThemer(styles.SpinnerThemer{})
-
-	// Wire the extension/callback manager (on_xxx lifecycle hooks). An empty
-	// manager is still valid: dispatch is a no-op until extensions register.
-	if appInstance.AgentCoordinator != nil {
-		appInstance.AgentCoordinator.SetExtensions(extension.NewManager())
-	}
 
 	ws := workspace.NewAppWorkspace(appInstance, store)
 	cleanup := func() { appInstance.Shutdown() }

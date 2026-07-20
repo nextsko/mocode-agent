@@ -390,11 +390,6 @@ type Agent struct {
 
 	// MaxTokens overrides the max output tokens for this agent.
 	MaxTokens *int64 `json:"max_tokens,omitempty"`
-
-	// BestOfN enables best-of-N candidate selection. When > 1, each turn
-	// generates N candidate responses in parallel and a judge selects the best.
-	// The judge uses the small model. Default 0/1 disables it (single run).
-	BestOfN int `json:"best_of_n,omitempty" jsonschema:"description=Generate N candidate responses per turn and select the best via an LLM judge (default 1, no selection),minimum=1,maximum=8,example=3"`
 }
 
 type Tools struct {
@@ -537,7 +532,6 @@ const maxRecentModelsPerType = 5
 func allToolNames() []string {
 	return []string{
 		"agent",
-		"roundtable",
 		"bash",
 		"mocode_info",
 		"mocode_logs",

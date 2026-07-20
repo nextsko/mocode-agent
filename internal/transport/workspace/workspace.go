@@ -12,7 +12,6 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
 
-	"github.com/nextsko/mocode-agent/internal/core/agent/extension"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/domain/history"
@@ -190,13 +189,6 @@ type Workspace interface {
 	// registered providers. This is the single source of truth for both
 	// the Slash Completions (input float layer) and Command Palette.
 	BuildCommandRegistry() []slash.CommandDescriptor
-
-	// AgentRegisterExtension attaches a lifecycle extension to the agent
-	// coordinator (e.g. the /evo observability extension). The extension is
-	// registered and enabled; dispatch considers it from the next run.
-	AgentRegisterExtension(ext extension.Extension)
-	// AgentUnregisterExtension detaches a lifecycle extension by name.
-	AgentUnregisterExtension(name string)
 
 	// AgentDir returns the directory the config loader scans for agent .md
 	// files. The /evo loop materializes fixed agents here so they become

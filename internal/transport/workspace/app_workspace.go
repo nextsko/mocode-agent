@@ -11,7 +11,6 @@ import (
 
 	"charm.land/fantasy"
 	"github.com/nextsko/mocode-agent/internal/core/agent"
-	"github.com/nextsko/mocode-agent/internal/core/agent/extension"
 	"github.com/nextsko/mocode-agent/internal/core/app"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/knowledge/kngs"
@@ -554,20 +553,6 @@ func (w *AppWorkspace) SwitchAgent(ctx context.Context, agentID string) error {
 		cfg.Options.ActiveMode = agentID
 	}
 	return w.app.AgentCoordinator.SetMainAgent(agentID)
-}
-
-// AgentRegisterExtension attaches a lifecycle extension to the coordinator.
-func (w *AppWorkspace) AgentRegisterExtension(ext extension.Extension) {
-	if w.app.AgentCoordinator != nil {
-		w.app.AgentCoordinator.RegisterExtension(ext)
-	}
-}
-
-// AgentUnregisterExtension detaches a lifecycle extension by name.
-func (w *AppWorkspace) AgentUnregisterExtension(name string) {
-	if w.app.AgentCoordinator != nil {
-		w.app.AgentCoordinator.UnregisterExtension(name)
-	}
 }
 
 // AgentDir returns the agents directory the config loader scans.

@@ -115,8 +115,7 @@ func FinalText(trace []message.Message) string {
 // ToolCalls extracts the ordered sequence of tool calls made by the agent.
 //
 // Assistant messages emit their ToolCall parts in order. Sub-agent calls are
-// also recorded as assistant messages by the coordinator, so a multi-agent
-// roundtable trace yields the full flattened tool-call sequence.
+// also recorded as assistant messages by the coordinator.
 func ToolCalls(trace []message.Message) []message.ToolCall {
 	var calls []message.ToolCall
 	for _, msg := range trace {

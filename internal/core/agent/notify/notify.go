@@ -16,11 +16,6 @@ const (
 	// TypeReAuthenticate indicates the agent encountered an
 	// authentication error and the user needs to re-authenticate.
 	TypeReAuthenticate Type = "re_authenticate"
-	// TypeRoundtableTurn indicates a roundtable meeting has completed
-	// one participant turn.
-	TypeRoundtableTurn Type = "roundtable_turn"
-	// TypeRoundtableFinished indicates a roundtable meeting has ended.
-	TypeRoundtableFinished Type = "roundtable_finished"
 	// TypeSubagentCompleted indicates a sub-agent dispatched by the
 	// Agent tool has finished. It carries a SubagentCompleted payload
 	// describing the result so the web UI can refresh the parent tool

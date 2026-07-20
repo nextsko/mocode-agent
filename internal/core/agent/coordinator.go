@@ -24,8 +24,6 @@ import (
 	"charm.land/fantasy/providers/openaicompat"
 	"charm.land/fantasy/providers/openrouter"
 	"charm.land/fantasy/providers/vercel"
-	"github.com/nextsko/mocode-agent/internal/core/agent/candidate"
-	"github.com/nextsko/mocode-agent/internal/core/agent/extension"
 	"github.com/nextsko/mocode-agent/internal/core/agent/failover"
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
 	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
@@ -84,16 +82,6 @@ type Coordinator interface {
 	// SetMessenger wires the external-account send port (e.g. WeChat) that
 	// the coordinator-owned messaging tools use. Safe to call once at startup.
 	SetMessenger(m messenger.Messenger)
-	// SetExtensions wires the on_xxx lifecycle hook manager. The /evo mode
-	// uses this to register an observability extension that folds successful
-	// runs into the optimal-theory prompt. Safe to call once at startup.
-	SetExtensions(m *extension.Manager)
-	// RegisterExtension adds an extension to the lifecycle manager and
-	// enables it. Used by the /evo mode to attach its observability
-	// extension without owning the manager.
-	RegisterExtension(ext extension.Extension)
-	// UnregisterExtension removes an extension by name (e.g. on /evo exit).
-	UnregisterExtension(name string)
 	Run(ctx context.Context, sessionID, prompt string, attachments ...message.Attachment) (*fantasy.AgentResult, error)
 	Cancel(sessionID string)
 	// CancelSubagent stops a single sub-agent dispatched by the Agent
@@ -167,10 +155,6 @@ type coordinator struct {
 	// messenger is the external-account send port (e.g. WeChat). Defaults to
 	// NoopMessenger; wired from the composition root after construction.
 	messenger messenger.Messenger
-	// extensions holds the on_xxx lifecycle hook manager. Defaults to a
-	// no-op manager; the /evo mode wires an observability extension here so
-	// runs/tools emit events without per-agent configuration.
-	extensions *extension.Manager
 	// Skills discovery results (session-start snapshot).
 	allSkills    []*skills.Skill // Pre-filter: all discovered after dedup.
 	activeSkills []*skills.Skill // Post-filter: active skills only.
@@ -257,19 +241,6 @@ func (c *coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 		return nil, err
 	}
 
-	// Extension lifecycle: BeforeRun lets extensions observe (or abort via a
-	// Decision) every agent run. Dispatched before any work so observers see
-	// the prompt that drives the turn.
-	if dec := c.fireExtensions(ctx, extension.EventBeforeRun, &extension.Context{
-		SessionID: sessionID, AgentName: c.activeAgentID, Prompt: prompt,
-	}); dec != nil && dec.AbortRun {
-		// Honor the guardrail: a BeforeRun abort stops the run before any work
-		// begins. This is the only safe abort point — after work starts the
-		// agent owns the turn. Surfaced as a typed error so callers can tell a
-		// guardrail stop from a real failure.
-		return nil, fmt.Errorf("run aborted by extension: %s", dec.AbortReason)
-	}
-
 	// ── session logging (self-evolution data) ───────────────────────────────
 	sl, _ := sessionlog.NewLogger(c.sessionLogDir, sessionID)
 	if sl != nil {
@@ -348,26 +319,9 @@ func (c *coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 	beforeLoaded := c.skillTracker.LoadedNames()
 	var result *fantasy.AgentResult
 	var originalErr error
-	if agentCfg := c.activeAgentConfig(); agentCfg != nil && agentCfg.BestOfN > 1 {
-		result, originalErr = c.runBestOfN(ctx, sessionID, prompt, maxTokens, mergedOptions, temp, topP, topK, freqPenalty, presPenalty, attachments, agentCfg.BestOfN)
-	} else {
-		result, originalErr = run()
-	}
+	result, originalErr = run()
 	defer c.drainQueuedSummaries()
 	logTurnSkillUsage(sessionID, prompt, c.activeSkills, c.skillTracker, beforeLoaded)
-
-	// Extension lifecycle: AfterRun or OnError depending on the outcome.
-	// Observers (the /evo loop) use this to fold successful turns into the
-	// optimal-theory prompt and capture failures as evolution data.
-	runEvt := extension.EventAfterRun
-	if originalErr != nil {
-		runEvt = extension.EventOnError
-	}
-	c.fireExtensions(ctx, runEvt, &extension.Context{
-		SessionID: sessionID, AgentName: c.activeAgentID, Prompt: prompt,
-		Messages: resultMessages(result), Response: resultResponseText(result),
-		ToolNames: resultToolNames(result), Err: originalErr,
-	})
 
 	// Effect loop: after a successful turn, asynchronously score it via an LLM
 	// judge and record the score into sessionlog. This feeds the positive
@@ -639,13 +593,6 @@ func (c *coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 		}
 		allTools = append(allTools, agenticFetchTool)
 	}
-	if slices.Contains(agentCfg.AllowedTools, RoundtableToolName) {
-		roundtableTool, err := c.roundtableTool(ctx)
-		if err != nil {
-			return nil, err
-		}
-		allTools = append(allTools, roundtableTool)
-	}
 
 	// ── standard tools via registry ──────────────────────────────────────────
 	modelName := ""
@@ -726,7 +673,6 @@ func (c *coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 	coordOwned := map[string]bool{
 		AgentToolName:                  true,
 		tools.AgenticFetchToolName:     true,
-		RoundtableToolName:             true,
 		tools.TransferToolName:         true,
 		tools.WeChatSendImageToolName:  true,
 		tools.WeChatSendFileToolName:   true,
@@ -948,73 +894,8 @@ func (c *coordinator) activeAgentConfig() *config.Agent {
 	return &agentCfg
 }
 
-// runBestOfN generates n candidate responses in parallel (each in its own task
-// session) and uses an LLM judge to select the best. It is the best-of-N path
-// enabled by config.Agent.BestOfN > 1. When the judge model cannot be built,
-// it degrades to a single run.
-func (c *coordinator) runBestOfN(
-	ctx context.Context,
-	sessionID, prompt string,
-	maxTokens int64,
-	mergedOptions fantasy.ProviderOptions,
-	temp, topP *float64,
-	topK *int64,
-	freqPenalty, presPenalty *float64,
-	attachments []message.Attachment,
-	n int,
-) (*fantasy.AgentResult, error) {
-	judgeModel, err := c.buildSmallLanguageModel(ctx)
-	if err != nil {
-		slog.Warn("best-of-n: cannot build judge model, falling back to single run", "error", err)
-		return c.currentAgent.Run(ctx, SessionAgentCall{
-			SessionID:        sessionID,
-			Prompt:           prompt,
-			Attachments:      attachments,
-			MaxOutputTokens:  maxTokens,
-			ProviderOptions:  mergedOptions,
-			Temperature:      temp,
-			TopP:             topP,
-			TopK:             topK,
-			FrequencyPenalty: freqPenalty,
-			PresencePenalty:  presPenalty,
-		})
-	}
-	gen := func(ctx context.Context, runID int) (candidate.Result, error) {
-		taskSession, err := c.sessions.CreateTaskSession(ctx, fmt.Sprintf("bestofn-%d", runID), sessionID, fmt.Sprintf("best-of-n candidate %d", runID))
-		if err != nil {
-			return candidate.Result{}, err
-		}
-		res, err := c.currentAgent.Run(ctx, SessionAgentCall{
-			SessionID:        taskSession.ID,
-			Prompt:           prompt,
-			Attachments:      attachments,
-			MaxOutputTokens:  maxTokens,
-			ProviderOptions:  mergedOptions,
-			Temperature:      temp,
-			TopP:             topP,
-			TopK:             topK,
-			FrequencyPenalty: freqPenalty,
-			PresencePenalty:  presPenalty,
-		})
-		if err != nil {
-			return candidate.Result{Result: res, SessionID: taskSession.ID, Err: err}, err
-		}
-		trace, traceErr := c.messages.List(ctx, taskSession.ID)
-		if traceErr != nil {
-			trace = nil
-		}
-		return candidate.Result{Result: res, Trace: trace, SessionID: taskSession.ID}, nil
-	}
-	sel := &candidate.LLMSelector{Model: judgeModel, Prompt: prompt}
-	winner, err := candidate.Run(ctx, n, gen, sel)
-	if err != nil {
-		return nil, err
-	}
-	return winner.Result, nil
-}
-
 // buildSmallLanguageModel constructs the configured small model as a
-// fantasy.LanguageModel, for use as the best-of-N judge.
+// fantasy.LanguageModel, for use as the judge in scoreTurn.
 func (c *coordinator) buildSmallLanguageModel(ctx context.Context) (fantasy.LanguageModel, error) {
 	smallModelCfg, ok := c.cfg.Config().Models[config.SelectedModelTypeSmall]
 	if !ok {
@@ -1099,55 +980,6 @@ func (c *coordinator) SetMessenger(m messenger.Messenger) {
 		m = messenger.NoopMessenger{}
 	}
 	c.messenger = m
-}
-
-// SetExtensions wires the on_xxx lifecycle hook manager. A nil manager is
-// replaced with an empty one so dispatch is always a safe no-op; this lets
-// callers fire events unconditionally without nil checks.
-func (c *coordinator) SetExtensions(m *extension.Manager) {
-	if m == nil {
-		m = extension.NewManager()
-	}
-	c.extensions = m
-}
-
-// RegisterExtension adds an extension to the lifecycle manager, enabling it.
-// Lazily allocates a manager if SetExtensions was never called.
-func (c *coordinator) RegisterExtension(ext extension.Extension) {
-	if c.extensions == nil {
-		c.extensions = extension.NewManager()
-	}
-	// Reject shadowing duplicates rather than silently replacing: two extensions
-	// sharing a Name would silently shadow each other, which is a wiring bug.
-	// Log best-effort; the run continues unaffected (see extension.Dispatch recover).
-	if err := c.extensions.RegisterOrError(ext); err != nil {
-		slog.Warn("extension register rejected", "err", err)
-	}
-}
-
-// UnregisterExtension removes an extension by name (e.g. on /evo exit).
-func (c *coordinator) UnregisterExtension(name string) {
-	if c.extensions != nil {
-		c.extensions.Unregister(name)
-	}
-}
-
-// fireExtensions dispatches an event to every enabled extension. Safe to call
-// before SetExtensions (a nil manager is a no-op).
-// fireExtensions dispatches a lifecycle event and returns the aggregated
-// Decision. A non-nil Decision with AbortRun set means an extension requested
-// the run stop; the caller (Run) honors it at BeforeRun by returning early
-// before any work begins. At AfterRun the run is already complete, so the
-// decision is only logged.
-func (c *coordinator) fireExtensions(ctx context.Context, ev extension.Event, ec *extension.Context) *extension.Decision {
-	if c.extensions == nil {
-		return nil
-	}
-	dec := c.extensions.Dispatch(ctx, ev, ec)
-	if dec != nil && dec.AbortRun {
-		slog.Warn("Run aborted by extension", "event", string(ev), "reason", dec.AbortReason)
-	}
-	return dec
 }
 
 // resultMessages returns the message trace from a run result. Currently nil:
@@ -1503,12 +1335,6 @@ func (c *coordinator) runSubAgentWithMeta(ctx context.Context, params subAgentPa
 		defer c.subagentIndex.Del(params.AgentID)
 	}
 
-	// Extension lifecycle for the sub-agent run, mirroring the main Run path
-	// so the /evo observability loop sees delegated runs too.
-	c.fireExtensions(ctx, extension.EventBeforeRun, &extension.Context{
-		SessionID: session.ID, AgentName: params.AgentID, Prompt: params.Prompt,
-	})
-
 	// Run the agent
 	result, err := params.Agent.Run(ctx, SessionAgentCall{
 		SessionID:        session.ID,
@@ -1523,16 +1349,6 @@ func (c *coordinator) runSubAgentWithMeta(ctx context.Context, params subAgentPa
 		NonInteractive:   true,
 	})
 	duration := time.Since(startTime)
-
-	// Extension lifecycle: AfterRun or OnError for the sub-agent.
-	subEvt := extension.EventAfterRun
-	if err != nil {
-		subEvt = extension.EventOnError
-	}
-	c.fireExtensions(ctx, subEvt, &extension.Context{
-		SessionID: session.ID, AgentName: params.AgentID, Prompt: params.Prompt,
-		Err: err,
-	})
 
 	if err != nil {
 		// Distinguish user-initiated cancellation from a real error so
