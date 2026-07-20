@@ -601,6 +601,14 @@ func (app *App) InitCoderAgent(ctx context.Context) error {
 		slog.Error("Failed to create coder agent", "err", err)
 		return err
 	}
+
+	// Mount the asynchronous summary completion broker. setupEvents ran
+	// before InitCoderAgent, so the coordinator's summaryDone broker
+	// was not yet available when other sources were wired; subscribe
+	// here now that AgentCoordinator is initialized. The forwarded
+	// events arrive in the TUI as agent.SummaryCompletedMsg.
+	setupSubscriber(app.eventsCtx, app.serviceEventsWG, "summary",
+		app.AgentCoordinator.SummarySubscribe, app.events)
 	return nil
 }
 

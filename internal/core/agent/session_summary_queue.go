@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+
+	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 )
 
 type sessionSummaryQueue struct {
@@ -42,9 +44,15 @@ func (c *coordinator) drainQueuedSummaries() {
 	for _, sessionID := range c.summaryQueue.Drain() {
 		sessionID := sessionID
 		go func() {
-			if err := c.Summarize(context.Background(), sessionID); err != nil {
+			path, err := c.SummarizeWithPath(context.Background(), sessionID)
+			if err != nil {
 				slog.Error("scheduled session summary failed", "session_id", sessionID, "error", err)
 			}
+			c.summaryDone.Publish(pubsub.UpdatedEvent, SummaryCompletedMsg{
+				SessionID: sessionID,
+				Path:      path,
+				Err:       err,
+			})
 		}()
 	}
 }

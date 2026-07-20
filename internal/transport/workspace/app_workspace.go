@@ -207,6 +207,19 @@ func (w *AppWorkspace) AgentSummarize(ctx context.Context, sessionID string) err
 	return w.app.AgentCoordinator.Summarize(ctx, sessionID)
 }
 
+// AgentEnqueueSummary schedules a session summary asynchronously via
+// the coordinator's summary queue. The LLM generation runs in a
+// goroutine on context.Background(); the TUI is not blocked. The
+// completion notification is delivered via app.events as a
+// SummaryCompletedMsg (see internal/core/agent/coordinator.go).
+func (w *AppWorkspace) AgentEnqueueSummary(_ context.Context, sessionID string) error {
+	if w.app.AgentCoordinator == nil {
+		return errors.New("agent coordinator not initialized")
+	}
+	w.app.AgentCoordinator.EnqueueSummaryAndDrain(sessionID)
+	return nil
+}
+
 func (w *AppWorkspace) UpdateAgentModel(ctx context.Context) error {
 	return w.app.UpdateAgentModel(ctx)
 }

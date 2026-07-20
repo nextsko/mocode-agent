@@ -66,6 +66,17 @@ var (
 	errSmallModelNotFound              = errors.New("small model not found in provider config")
 )
 
+// SummaryCompletedMsg is the payload published on the coordinator's
+// summaryDone broker whenever an asynchronous session summary finishes
+// (success or failure). The TUI subscribes via app.events and renders
+// a completion InfoMsg / ErrorMsg. Path is empty on failure; Err is
+// nil on success.
+type SummaryCompletedMsg struct {
+	SessionID string
+	Path      string
+	Err       error
+}
+
 type Coordinator interface {
 	// SetMainAgent switches the active agent to the given mode/agent ID.
 	// This supports transfer_to_agent and mode switching.
@@ -97,6 +108,17 @@ type Coordinator interface {
 	QueuedPromptsList(sessionID string) []string
 	ClearQueue(sessionID string)
 	Summarize(context.Context, string) error
+	// EnqueueSummaryAndDrain enqueues a session for asynchronous summary
+	// generation and immediately drains the queue. Unlike Summarize, it
+	// never blocks the caller; the LLM-driven generation runs in a
+	// goroutine on context.Background(). Used by the /summary slash
+	// command path to keep the TUI interactive while the summary runs.
+	EnqueueSummaryAndDrain(sessionID string)
+	// SummarySubscribe exposes the channel of SummaryCompletedMsg events
+	// emitted by the asynchronous summary goroutine. The composition root
+	// (internal/core/app/app.go) forwards these into app.events so the
+	// TUI can render a completion InfoMsg without polling.
+	SummarySubscribe(ctx context.Context) <-chan pubsub.Event[SummaryCompletedMsg]
 	Model() Model
 	ActiveAgentID() string
 	// ActiveAgentSystemPrompt returns the proven system prompt of the active
@@ -131,8 +153,14 @@ type coordinator struct {
 	// before the sub-agent goroutine starts and removed in a defer so
 	// that cancelled sub-agents can be stopped without affecting the
 	// parent session.
-	subagentIndex  *csync.Map[string, string]
-	summaryQueue   *sessionSummaryQueue
+	subagentIndex *csync.Map[string, string]
+	summaryQueue  *sessionSummaryQueue
+	// summaryDone emits a SummaryCompletedMsg whenever the asynchronous
+	// summary goroutine finishes (success or failure). The composition
+	// root (internal/core/app/app.go) subscribes to it inside
+	// InitCoderAgent and forwards events into app.events so the TUI can
+	// render the completion state via Update().
+	summaryDone    *pubsub.Broker[SummaryCompletedMsg]
 	sessionLogDir  string // base dir for session logs
 	errorCollector *errcoll.Collector
 	sessionSearch  *store.SessionSearch
@@ -182,6 +210,7 @@ func NewCoordinator(
 		agents:         make(map[string]SessionAgent),
 		subagentIndex:  csync.NewMap[string, string](),
 		summaryQueue:   sessionSummaryQueueNew(),
+		summaryDone:    pubsub.NewBroker[SummaryCompletedMsg](),
 		allSkills:      allSkills,
 		activeSkills:   activeSkills,
 		skillTracker:   skillTracker,
@@ -1323,13 +1352,39 @@ func (c *coordinator) QueuedPromptsList(sessionID string) []string {
 	return c.currentAgent.QueuedPromptsList(sessionID)
 }
 
-func (c *coordinator) Summarize(ctx context.Context, sessionID string) error {
+// SummarizeWithPath returns the export path of the saved summary alongside
+// any error. The path is the on-disk location written by sessionexport,
+// which is what the TUI renders in the completion InfoMsg.
+func (c *coordinator) SummarizeWithPath(ctx context.Context, sessionID string) (string, error) {
 	providerCfg, ok := c.cfg.Config().Providers.Get(c.currentAgent.Model().ModelCfg.Provider)
 	if !ok {
-		return errModelProviderNotConfigured
+		return "", errModelProviderNotConfigured
 	}
-	_, err := c.currentAgent.Summarize(ctx, sessionID, getProviderOptions(c.currentAgent.Model(), providerCfg))
+	return c.currentAgent.Summarize(ctx, sessionID, getProviderOptions(c.currentAgent.Model(), providerCfg))
+}
+
+func (c *coordinator) Summarize(ctx context.Context, sessionID string) error {
+	_, err := c.SummarizeWithPath(ctx, sessionID)
 	return err
+}
+
+// EnqueueSummaryAndDrain implements Coordinator. It pushes the
+// sessionID onto the summary queue and immediately runs the drain,
+// rather than waiting for the next Run() defer (which only fires for
+// tool-driven scheduling). Used by the /summary slash command path.
+func (c *coordinator) EnqueueSummaryAndDrain(sessionID string) {
+	if sessionID == "" {
+		return
+	}
+	c.summaryQueue.Add(sessionID)
+	c.drainQueuedSummaries()
+}
+
+// SummarySubscribe implements Coordinator. It exposes the channel of
+// SummaryCompletedMsg events published by the asynchronous summary
+// goroutine so the composition root can forward them into app.events.
+func (c *coordinator) SummarySubscribe(ctx context.Context) <-chan pubsub.Event[SummaryCompletedMsg] {
+	return c.summaryDone.Subscribe(ctx)
 }
 
 func (c *coordinator) isUnauthorized(err error) bool {

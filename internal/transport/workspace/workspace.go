@@ -108,6 +108,12 @@ type Workspace interface {
 	AgentQueuedPromptsList(sessionID string) []string
 	AgentClearQueue(sessionID string)
 	AgentSummarize(ctx context.Context, sessionID string) error
+	// AgentEnqueueSummary asynchronously schedules a session summary via
+	// the coordinator's summary queue. Used by the /summary slash command
+	// path so the TUI Update loop is not blocked by LLM generation. The
+	// caller receives no error indication of completion; UI must subscribe
+	// to app.events for SummaryCompletedMsg.
+	AgentEnqueueSummary(ctx context.Context, sessionID string) error
 	UpdateAgentModel(ctx context.Context) error
 	InitCoderAgent(ctx context.Context) error
 	GetDefaultSmallModel(providerID string) config.SelectedModel
