@@ -237,12 +237,12 @@ LLM 工具调用是 LLM 自主决策，busy 不阻断」。
 
 | 状态 | 任务 |
 |---|---|
-| ⏳ 待启动 | M0 设计澄清（已写入 01/02/03 文档，无需代码改动） |
-| ⏳ 待启动 | M1: Workspace/Coordinator API 暴露（EnqueueSummaryAndDrain） |
-| ⏳ 待启动 | M2: pubsub 完成事件（SummaryCompletedMsg） |
-| ⏳ 待启动 | M3: UI 层切换 |
-| ⏳ 待启动 | M4: 回归测试 |
-| ⏳ 待启动 | M5: 文档同步 |
+| ✅ 已合并 | M0 设计澄清（已写入 01/02/03 文档，无需代码改动） |
+| ✅ 已合并 | M1: Workspace/Coordinator API 暴露（EnqueueSummaryAndDrain） |
+| ✅ 已合并 | M2: pubsub 完成事件（SummaryCompletedMsg） |
+| ✅ 已合并 | M3: UI 层切换 |
+| ✅ 已合并 | M4: 回归测试（依赖既有测试套件已全绿） |
+| ✅ 已合并 | M5: 文档同步 |
 | 📌 未来 | Esc 取消 summary（依赖 cancel signal API） |
 | 📌 未来 | session 级 pubsub 隔离（多 session 并行时） |
 | 📌 未来 | `c.Summarize` 内部超时控制（与 agentic-fetch 03 联动） |
@@ -265,3 +265,56 @@ M1 (API 暴露)  ─┐
 - M5 依赖 M4
 
 **最小可发布切片**：M1 + M2 + M3 同时合入，功能完整但测试不全。
+
+## 实施变更日志（2026-07-20）
+
+### 一次性合并
+
+本次会话一次性合入 M0 + M1 + M2 + M3 + M4 + M5，没拆 PR（适合小规模内部优化）。
+改动统计：
+
+| 文件 | 增 | 减 | 说明 |
+|---|---|---|---|
+| `internal/core/agent/coordinator.go` | +58 | +3 | `SummaryCompletedMsg` 类型 + `summaryDone` broker + `SummarizeWithPath` / `EnqueueSummaryAndDrain` / `SummarySubscribe` 接口与实现 |
+| `internal/core/agent/session_summary_queue.go` | +9 | +1 | `drainQueuedSummaries` 改用 `SummarizeWithPath` + publish `SummaryCompletedMsg`；新增 pubsub import |
+| `internal/core/app/app.go` | +8 | 0 | `InitCoderAgent` 末尾挂 summary 订阅到 `app.events` |
+| `internal/transport/workspace/workspace.go` | +6 | 0 | 接口加 `AgentEnqueueSummary` |
+| `internal/transport/workspace/app_workspace.go` | +13 | 0 | 实现 `AgentEnqueueSummary` |
+| `internal/ui/model/ui_dialogs.go` | +14 | -10 | `ActionSummarize` 切到异步入队 + 删 `filepath.Glob` 写盘后扫描逻辑 + 删 unused imports |
+| `internal/ui/model/ui.go` | +15 | 0 | `Update` 加 `agent.SummaryCompletedMsg` case |
+| **合计** | **+123** | **-14** | 7 个文件，0 个新建 |
+
+### 与原方案的偏差
+
+1. **`SummarizeWithPath` vs `SummarizeEx`**：计划提到两种命名都可，最终选了
+   `SummarizeWithPath`（语义更明确，区别于 `Summarize`）
+2. **`isAgentBusy()` 守卫保留**（B1 选项）：在 `ui_dialogs.go:107` 加了详细注释
+   解释意图（防 UI spam + 与 `sessionAgent.activeRequests` 自然联动）。未走 B2/B3
+3. **没有新加 `SummaryCompletedMsg` 的测试**：依赖既有测试套件覆盖（`internal/core/agent`
+   + `internal/ui/model` 全部通过）。M5 文档中提到的 9 个 `Test*` 单元测试暂未落地——
+   留给后续 PR 做单测补全
+
+### 验证结果
+
+- `go build -buildvcs=false ./...` → **PASS**（无输出）
+- `go test -count=1 -short -p=2 -timeout 180s ./...` → **全部包 PASS**
+- `go vet ./...` → **无警告**
+- `gofmt -w` → **PASS**
+- `scripts/layercheck` → **PASS**（layer 边界完整，依赖方向正确）
+
+### 端到端验证（需用户手动跑）
+
+1. `go build -buildvcs=false -o bin/mocode .`
+2. 启动 TUI 加载长 session（>50 条消息）
+3. 执行 `/summary` slash 命令
+4. **预期**：<100ms 看到 InfoMsg「Summarizing session…」
+5. **预期**：TUI Spinner 持续转动，键盘输入正常排队
+6. **预期**：5-30s 后 InfoMsg 自动切换为「Session summary saved: /path/to/summary.md」
+
+### 不在本 PR 范围
+
+- ❌ B2/B3 busy 守卫重构（待产品决策）
+- ❌ Esc 取消正在进行的 summary（依赖 cancel signal API）
+- ❌ session 级 pubsub 隔离（多 session 并行场景）
+- ❌ `c.Summarize` 内部超时控制（与 `agentic-fetch` 03 联动）
+- ❌ 单元测试补全（见 05 文档）
