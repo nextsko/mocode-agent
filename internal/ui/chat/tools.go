@@ -339,12 +339,6 @@ func (t *baseToolMessageItem) RawRender(width int) string {
 			AgentName:       t.toolCall.AgentName,
 		})
 
-		// Prepend hook indicator if hooks ran for this tool call.
-		if t.result != nil {
-			if hookLine := toolOutputHookIndicator(t.sty, t.result.Metadata, toolItemWidth); hookLine != "" {
-				content = hookLine + "\n\n" + content
-			}
-		}
 		// Prepend agent badge if set.
 		if t.toolCall.AgentName != "" {
 			badge := styles.AgentBadgeStyleFor(t.toolCall.AgentName).Render(t.toolCall.AgentName)

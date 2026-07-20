@@ -29,8 +29,6 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/config"
-	"github.com/nextsko/mocode-agent/internal/core/evaluation/llmjudge"
-	"github.com/nextsko/mocode-agent/internal/core/hooks"
 	"github.com/nextsko/mocode-agent/internal/core/knowledge/memory"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/shellruntime/screencap"
@@ -322,14 +320,6 @@ func (c *coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 	result, originalErr = run()
 	defer c.drainQueuedSummaries()
 	logTurnSkillUsage(sessionID, prompt, c.activeSkills, c.skillTracker, beforeLoaded)
-
-	// Effect loop: after a successful turn, asynchronously score it via an LLM
-	// judge and record the score into sessionlog. This feeds the positive
-	// (effect) side of the evolution loop — low scores become evolution data.
-	// Best-effort: failures are silent, never affect the returned result.
-	if result != nil && originalErr == nil {
-		go c.scoreTurn(sessionID, prompt)
-	}
 
 	if c.isUnauthorized(originalErr) {
 		switch {
@@ -661,12 +651,6 @@ func (c *coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 		tools.NewWeChatScreenshotTool(messengerPort, screenshotDir),
 	)
 
-	// ── build hook runner if PreToolUse hooks are configured ─────────────────
-	var hookRunner *hooks.Runner
-	if preToolHooks := c.cfg.Config().Hooks[hooks.EventPreToolUse]; len(preToolHooks) > 0 {
-		hookRunner = hooks.NewRunner(preToolHooks, c.cfg.WorkingDir(), c.cfg.WorkingDir())
-	}
-
 	// ── filter by AllowedTools ────────────────────────────────────────────────
 	// coordinator-owned tools (agent, agentic_fetch, transfer_to_agent) bypass
 	// the AllowedTools filter because they are already conditioned at the top.
@@ -717,8 +701,6 @@ func (c *coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 	// without hook interception to avoid firing the user's hook N times
 	// per delegated turn. The top-level invocation of the sub-agent tool
 	// itself is still wrapped from the coder's side.
-	filteredTools = wrapToolsWithHooks(filteredTools, hookRunner, isSubAgent)
-
 	return filteredTools, nil
 }
 
@@ -881,86 +863,6 @@ func toSessionLogMeta(m toolutil.SessionLogMeta) sessionlog.Meta {
 	}
 }
 
-// activeAgentConfig returns the config for the currently active agent, or nil
-// if it cannot be resolved.
-func (c *coordinator) activeAgentConfig() *config.Agent {
-	agentCfg, ok := c.cfg.Config().Agents[c.activeAgentID]
-	if !ok {
-		agentCfg, ok = c.cfg.Config().Agents[config.AgentDefault]
-		if !ok {
-			return nil
-		}
-	}
-	return &agentCfg
-}
-
-// buildSmallLanguageModel constructs the configured small model as a
-// fantasy.LanguageModel, for use as the judge in scoreTurn.
-func (c *coordinator) buildSmallLanguageModel(ctx context.Context) (fantasy.LanguageModel, error) {
-	smallModelCfg, ok := c.cfg.Config().Models[config.SelectedModelTypeSmall]
-	if !ok {
-		return nil, errSmallModelNotSelected
-	}
-	smallProviderCfg, ok := c.cfg.Config().Providers.Get(smallModelCfg.Provider)
-	if !ok {
-		return nil, errSmallModelProviderNotConfigured
-	}
-	smallProvider, err := c.buildProvider(smallProviderCfg, smallModelCfg, true)
-	if err != nil {
-		return nil, err
-	}
-	smallModelID := smallModelCfg.Model
-	if smallModelCfg.Provider == openrouter.Name && isExactoSupported(smallModelID) {
-		smallModelID += ":exacto"
-	}
-	return smallProvider.LanguageModel(ctx, smallModelID)
-}
-
-// scoreTurn asynchronously scores a completed turn with an LLM judge and
-// records the result into the session log. It is the online end of the
-// evaluation system: the same judging capability used offline by `mocode eval`
-// here produces a per-turn quality signal that feeds the evolution loop.
-//
-// Best-effort and non-blocking: any failure (no small model, judge error) is
-// logged at debug level and dropped. The returned turn result is unaffected.
-func (c *coordinator) scoreTurn(sessionID, prompt string) {
-	ctx := context.Background()
-	judgeModel, err := c.buildSmallLanguageModel(ctx)
-	if err != nil {
-		slog.Debug("effect loop: no judge model, skipping turn scoring", "error", err)
-		return
-	}
-	trace, err := c.messages.List(ctx, sessionID)
-	if err != nil || len(trace) == 0 {
-		slog.Debug("effect loop: no trace to score", "error", err)
-		return
-	}
-	judge := &llmjudge.Judge{Model: judgeModel}
-	// Score the turn against a general helpfulness rubric. This is deliberately
-	// broad: the goal is a quality signal, not a task-specific pass/fail.
-	res, err := judge.Judge(ctx, []string{
-		"Did the response address the user's request accurately and completely?",
-		"Was the response helpful, clear, and free of errors?",
-	}, trace)
-	if err != nil {
-		slog.Debug("effect loop: judge failed", "error", err)
-		return
-	}
-	// Record the score into the session log so the evolution producer and any
-	// analysis tooling can consume it.
-	if lg, _ := sessionlog.NewLogger(c.sessionLogDir, sessionID); lg != nil {
-		lg.LogInfo("turn_score", fmt.Sprintf("score=%.2f reason=%s", res.Score, truncateForLogScore(res.Reason)), sessionlog.Meta{})
-		lg.Close()
-	}
-}
-
-func truncateForLogScore(s string) string {
-	const max = 200
-	if len(s) <= max {
-		return s
-	}
-	return s[:max] + "..."
-}
 
 func isExactoSupported(modelID string) bool {
 	supportedModels := []string{
@@ -980,52 +882,6 @@ func (c *coordinator) SetMessenger(m messenger.Messenger) {
 		m = messenger.NoopMessenger{}
 	}
 	c.messenger = m
-}
-
-// resultMessages returns the message trace from a run result. Currently nil:
-// fantasy.AgentResult exposes []fantasy.Message (per-step), but the extension
-// Context.Messages is []message.Message (the domain type). These are distinct
-// structs, not aliases, so flattening requires a conversion the evo loop does
-// not need — extension consumers use Prompt + Response + ToolNames instead.
-// When a future extension needs the full trace, add a fantasy->domain Message
-// converter here.
-func resultMessages(_ *fantasy.AgentResult) []message.Message {
-	return nil
-}
-
-// resultResponseText extracts the agent's final textual response, nil-safe.
-// Used to feed the evo lesson-distiller (prompt + response -> principle).
-func resultResponseText(r *fantasy.AgentResult) string {
-	if r == nil {
-		return ""
-	}
-	return r.Response.Content.Text()
-}
-
-// resultToolNames returns the distinct tool names the agent called during the
-// run, in first-use order. Each name is a skill the agent exercised — the /evo
-// loop captures them as emergent skills for the fixed agent's manifest.
-func resultToolNames(r *fantasy.AgentResult) []string {
-	if r == nil {
-		return nil
-	}
-	var names []string
-	seen := make(map[string]bool)
-	for _, step := range r.Steps {
-		for _, msg := range step.Messages {
-			for _, part := range msg.Content {
-				if tc, ok := fantasy.AsMessagePart[fantasy.ToolCallPart](part); ok {
-					name := strings.TrimSpace(tc.ToolName)
-					if name == "" || seen[name] {
-						continue
-					}
-					seen[name] = true
-					names = append(names, name)
-				}
-			}
-		}
-	}
-	return names
 }
 
 // SetMainAgent switches the active agent to the given agent/mode ID.

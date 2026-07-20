@@ -42,7 +42,6 @@ func (q *sessionSummaryQueue) Drain() []string {
 
 func (c *coordinator) drainQueuedSummaries() {
 	for _, sessionID := range c.summaryQueue.Drain() {
-		sessionID := sessionID
 		go func() {
 			path, err := c.SummarizeWithPath(context.Background(), sessionID)
 			if err != nil {
