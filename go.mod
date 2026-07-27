@@ -5,11 +5,11 @@ go 1.26.5
 require (
 	charm.land/bubbles/v2 v2.1.1
 	charm.land/bubbletea/v2 v2.0.8
-	charm.land/catwalk v0.49.28
+	charm.land/catwalk v0.51.1
 	charm.land/fang/v2 v2.0.1
 	charm.land/fantasy v0.38.1
 	charm.land/glamour/v2 v2.0.1
-	charm.land/lipgloss/v2 v2.0.4
+	charm.land/lipgloss/v2 v2.0.5
 	charm.land/log/v2 v2.0.0
 	github.com/BurntSushi/toml v1.6.0
 	github.com/JohannesKaufmann/html-to-markdown v1.6.0
@@ -46,10 +46,10 @@ require (
 	github.com/kbinani/screenshot v0.0.0-20250624051815-089614a94018
 	github.com/kevinburke/ssh_config v1.6.0
 	github.com/lucasb-eyer/go-colorful v1.4.0
-	github.com/mattn/go-isatty v0.0.23
+	github.com/mattn/go-isatty v0.0.24
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/nxadm/tail v1.4.11
-	github.com/openai/openai-go/v3 v3.43.0
+	github.com/openai/openai-go/v3 v3.46.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/qjebbs/go-jsons v1.0.0-alpha.6
 	github.com/rivo/uniseg v0.4.7
@@ -81,8 +81,8 @@ require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	git.sr.ht/~jackmordaunt/go-toast v1.1.2 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/internal v1.10.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.22.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/internal v1.12.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
