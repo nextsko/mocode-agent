@@ -13,38 +13,49 @@ The module path is `github.com/nextsko/mocode-agent`.
 
 ## Architecture
 
+```
 main.go                            CLI entry point (cobra via internal/transport/cmd)
+tools/                             LLM tool registry (builtin + plugins + mcp + lsp)
+  filter/                          Tool filtering
+  lsp/                             LSP client + manager + edit helpers
+  mcp/                             MCP server lifecycle + tool discovery
+  plugins/                         Plugin shared libs (netcommon, sshcommon, gitopscommon, ...)
 internal/
   core/                            Core domain logic
-    agent/                         LLM agents, coordinator, tools, roundtable
-      candidate/ failover/         Eval selection, model failover (agent capabilities)
-      evolution/                   Self-evolution patch system (.mocode/patches)
-      ctxcompress/ notify/         Context compression, notifications
-      tools/                       LLM tool registry (builtin + plugins + mcp)
-      toolutil/                    Shared tool helpers
-    app/                           In-process composition root (store, agents, LSP, MCP)
-    config/                        Mocode.json loading and providers
+    agent/                         LLM agents, coordinator, subagent cards
+      ctxcompress/                 Context window compression
+      failover/                    Model failover (retry on 429/503/529)
+      notify/                      Agent event notifications
+      prompt/                      System prompt assembly
+      subagent_cards/              Subagent role card definitions (by domain)
+      templates/                   System prompt Go templates (*.md.tpl)
+      toolutil/                    Shared tool helpers (LSP util, etc.)
+    app/                           In-process composition root (store, agents, LSP, MCP wiring)
+    config/                        mocode.json loading, providers, projects, modes
     crawler/                       Network fetch/scrape used by plugins
-    evaluation/                    LLM-judge evaluation harness
-    hooks/                         PreToolUse shell hooks (see HOOKS.md)
-    knowledge/                     Memory service + kngs templates
     permission/                    Tool permission checks
     shellruntime/                  Bash/screencap execution engine
       shell/                       Shell job runner used by bash tool
       screencap/                   Screen capture
     skills/                        Agent skills discovery + builtin skills
-  domain/                          Domain models
-    session/                       Session + message models (message/, sessionlog/)
-    types/ history/ filetracker/   Shared DTOs, prompt history, file tracking
+  domain/                          Domain models (layer-1 ports + DTOs)
+    session/                       Session + message models (message/, sessionlog/, sessionexport/)
+    history/                       Prompt history
+    filetracker/                   File change tracking
+    memory/                        Memory domain types
+    messenger/                     Messaging port (Messenger interface — anti-corruption layer)
+    theme/                         Theme domain types
   util/                            Standard-library-style helpers
-    csync/ diff/ errcoll/ ext/     Concurrency, diff, error collection, str/path
-    fsext/ infra/ log/ pubsub/     FS helpers, home/data paths, logging, event bus
-    version/                       Build version
+    anim/ csync/ diff/ errcoll/    Concurrency, diff, error collection, animation
+    ext/ fsext/ infra/ log/        Str/path helpers, FS helpers, home/data paths, logging
+    pubsub/ version/               Event bus, build version
   integration/                     External integrations
     authhandler/                   OAuth login handlers
     wechat/                        WeChat bot + butler (gateway entry)
+      gateway/                     Persistent WeChat gateway
+      sdk/                         WeChat SDK
   transport/                       Entry surfaces
-    cmd/                           Cobra CLI (not slash commands)
+    cmd/                           Cobra CLI
     admin/                         Local admin HTTP settings UI (127.0.0.1)
     workspace/                     Frontend facade (AppWorkspace)
   store/                           JSONL file persistence (+ sidecar indexes)
@@ -72,18 +83,16 @@ See [docs/architecture/control-plane.md](docs/architecture/control-plane.md).
 ### Key Patterns
 
 - **Config is a Service**: accessed via `config.Service`, not global state.
-- **Tools are self-documenting**: each tool has `.go` + `.md` in `internal/core/agent/tools/`.
+- **Tools are self-documenting**: each tool has `.go` + `.md` in `tools/`.
 - **System prompts are Go templates**: `internal/core/agent/templates/*.md.tpl`.
 - **Context files**: AGENTS.md, Mocode.md, CLAUDE.md, GEMINI.md from working directory.
 - **Persistence**: JSONL via `internal/store/` under `%LOCALAPPDATA%/mocode/` or `~/.local/share/mocode/`.
 - **Pub/sub**: `internal/util/pubsub` for agent, UI, and services.
-- **Hooks**: User shell commands in Mocode.json; engine in `internal/hooks/`. See `HOOKS.md`.
+- **Hooks**: User shell commands in mocode.json; engine in `internal/core/hooks/`. See `HOOKS.md`.
 - **CGO disabled**: `CGO_ENABLED=0`, `GOEXPERIMENT=greenteagc`.
 
-- **Layer boundaries**: verified by `go run ./scripts/layercheck` (zero upward violations). Dependency direction is strictly `transport/integration/ui -> core -> store/domain -> util`.
-- **Dependency inversion via domain ports**: cross-layer needs go through interfaces in `internal/domain/` (e.g. `messenger.Messenger`, `theme.SpinnerThemer`); integration/UI provide adapters. See docs/dev-notes/structure-governance-baseline.md.
-- **Agent extensions**: lifecycle hooks via `internal/core/agent/extension`; panic-recovered, duplicate-name-rejecting, AbortRun-honoring. The coordinator fires `before_run`/`after_run` events.
-- **Self-evolution with quality gates**: `internal/core/agent/evolution` produces patches from session logs; candidates pass through `evolution/gates` (SpecGate -> SafetyGate) before persistence via `cmd evolve`.
+- **Layer boundaries**: dependency direction is strictly `transport/integration/ui -> core -> store/domain -> util`.
+- **Dependency inversion via domain ports**: cross-layer needs go through interfaces in `internal/domain/` (e.g. `messenger.Messenger`, `theme.SpinnerThemer`); integration/UI provide adapters.
 - **Web search provider chain**: `netcommon.Provider` interface with fallback (DuckDuckGo HTML -> Instant Answer API); inject custom chains via `NewWebSearchToolWithProvider`.
 ## Build/Test/Lint Commands
 
