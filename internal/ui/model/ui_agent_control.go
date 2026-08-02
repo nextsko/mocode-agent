@@ -15,7 +15,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/ui/chat"
 	"github.com/nextsko/mocode-agent/internal/ui/notification"
 	"github.com/nextsko/mocode-agent/internal/ui/util"
-	agenttools "github.com/nextsko/mocode-agent/tools"
+	agenttools "github.com/nextsko/mocode-agent/internal/core/tools"
 )
 
 // sendMessage sends a message with the given content and attachments.

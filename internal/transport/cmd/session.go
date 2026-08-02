@@ -27,7 +27,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/store"
 	"github.com/nextsko/mocode-agent/internal/ui/chat"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
-	"github.com/nextsko/mocode-agent/tools"
+	"github.com/nextsko/mocode-agent/internal/core/tools"
 )
 
 var sessionCmd = &cobra.Command{

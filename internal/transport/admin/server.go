@@ -25,7 +25,7 @@ import (
 	wechat "github.com/nextsko/mocode-agent/internal/integration/wechat"
 	"github.com/nextsko/mocode-agent/internal/transport/workspace"
 	"github.com/nextsko/mocode-agent/internal/util/infra"
-	"github.com/nextsko/mocode-agent/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
 )
 
 //go:embed assets/*

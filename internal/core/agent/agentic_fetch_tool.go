@@ -13,7 +13,7 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
-	"github.com/nextsko/mocode-agent/tools"
+	"github.com/nextsko/mocode-agent/internal/core/tools"
 )
 
 //go:embed templates/agentic_fetch.md

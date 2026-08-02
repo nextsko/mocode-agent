@@ -18,8 +18,8 @@ import (
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/slash"
-	"github.com/nextsko/mocode-agent/tools/lsp"
-	mcptools "github.com/nextsko/mocode-agent/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
+	mcptools "github.com/nextsko/mocode-agent/internal/core/tools/mcp"
 )
 
 // LSPClientInfo holds information about an LSP client's state. This is

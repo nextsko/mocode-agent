@@ -12,7 +12,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/shellruntime/shell"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/chat"
-	"github.com/nextsko/mocode-agent/tools"
+	"github.com/nextsko/mocode-agent/internal/core/tools"
 )
 
 func (m *UI) resumeBackgroundJobPolling(msgs []*message.Message) tea.Cmd {

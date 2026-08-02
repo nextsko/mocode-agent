@@ -6,7 +6,7 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/util/csync"
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
-	"github.com/nextsko/mocode-agent/tools/lsp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
 )
 
 // LSPEventType represents the type of LSP event

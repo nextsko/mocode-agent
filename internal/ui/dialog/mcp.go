@@ -15,7 +15,7 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/ui/common"
-	mcptools "github.com/nextsko/mocode-agent/tools/mcp"
+	mcptools "github.com/nextsko/mocode-agent/internal/core/tools/mcp"
 )
 
 const MCPID = "mcp"

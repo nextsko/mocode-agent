@@ -45,7 +45,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 	"github.com/nextsko/mocode-agent/internal/util/version"
-	"github.com/nextsko/mocode-agent/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
 )
 
 // MouseScrollThreshold defines how many lines to scroll the chat when a mouse

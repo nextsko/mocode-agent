@@ -38,8 +38,8 @@ import (
 	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/nextsko/mocode-agent/internal/util/log"
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
-	"github.com/nextsko/mocode-agent/tools/lsp"
-	"github.com/nextsko/mocode-agent/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
 )
 
 type App struct {

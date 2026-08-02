@@ -3,7 +3,7 @@ package agent
 import (
 	"encoding/json"
 
-	"github.com/nextsko/mocode-agent/tools"
+	"github.com/nextsko/mocode-agent/internal/core/tools"
 )
 
 // agentToolContext implements tools.ToolContext for in-process tool

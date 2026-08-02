@@ -43,8 +43,8 @@ import (
 	"github.com/nextsko/mocode-agent/internal/util/errcoll"
 	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
-	"github.com/nextsko/mocode-agent/tools"
-	"github.com/nextsko/mocode-agent/tools/lsp"
+	"github.com/nextsko/mocode-agent/internal/core/tools"
+	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
 	"github.com/qjebbs/go-jsons"
 	"golang.org/x/sync/errgroup"
 )

@@ -12,7 +12,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
-	"github.com/nextsko/mocode-agent/tools"
+	"github.com/nextsko/mocode-agent/internal/core/tools"
 )
 
 // -----------------------------------------------------------------------------

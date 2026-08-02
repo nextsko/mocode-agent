@@ -17,7 +17,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
 	"github.com/nextsko/mocode-agent/internal/util/ext"
 	"github.com/nextsko/mocode-agent/internal/util/fsext"
-	"github.com/nextsko/mocode-agent/tools"
+	"github.com/nextsko/mocode-agent/internal/core/tools"
 )
 
 // PermissionsID is the identifier for the permissions dialog.

@@ -17,7 +17,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/ui/slash"
 	"github.com/nextsko/mocode-agent/internal/util/fsext"
 	"github.com/nextsko/mocode-agent/internal/util/infra"
-	"github.com/nextsko/mocode-agent/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
 )
 
 func (m *UI) openAtCompletions(depth, limit int) tea.Cmd {

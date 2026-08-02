@@ -7,7 +7,7 @@ import (
 	"charm.land/lipgloss/v2/tree"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent"
-	"github.com/nextsko/mocode-agent/tools"
+	"github.com/nextsko/mocode-agent/internal/core/tools"
 )
 
 func getDigits(n int) int {

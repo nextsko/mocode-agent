@@ -13,7 +13,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/ui/panel"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
 	"github.com/nextsko/mocode-agent/internal/util/anim"
-	"github.com/nextsko/mocode-agent/tools"
+	"github.com/nextsko/mocode-agent/internal/core/tools"
 )
 
 // responseContextHeight limits the number of lines displayed in tool output.
