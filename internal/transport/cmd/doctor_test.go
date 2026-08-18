@@ -157,7 +157,7 @@ func TestDoctorSubagentTUICheckFailsOnMissingActiveModeOrSubAgent(t *testing.T) 
 	require.Equal(t, doctorStatusFail, check.Status)
 }
 
-func TestDoctorSubagentSourceCheckWarnsOnIndexBasedPanelBinding(t *testing.T) {
+func TestDoctorSubagentSourceCheckOKWhenCapabilitiesPresent(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -171,26 +171,17 @@ func TestDoctorSubagentSourceCheckWarnsOnIndexBasedPanelBinding(t *testing.T) {
 		"registerAgentToolTopology(",
 		"resolveAgentToolContainerID(",
 		"containerID := m.resolveAgentToolContainerID(toolCallID)",
-		"len(msg.ToolCalls()) == 0 && len(msg.ToolResults()) == 0 && msg.Role == message.Assistant",
-		"summary := firstContentLine(msg.Content().Text)",
-		"childSessionDescriptor(parentTool, childSessionID)",
+		"len(event.Payload.ToolCalls()) == 0 && len(event.Payload.ToolResults()) == 0",
+		"summary := firstContentLine(event.Payload.Content().Text)",
+		"summaryEntry.SetStatusSummary(summary)",
 		"func agentToolChildCallIDs(tc message.ToolCall) []string {",
 		"fmt.Sprintf(\"%s-%d\", tc.ID, i+1)",
 		"DependsOn",
 		"fmt.Sprintf(\"%s-%s\", tc.ID, taskID)",
 	}, "\n")), 0o644))
 
-	chatAgentPath := filepath.Join(tmpDir, "internal", "ui", "chat", "agent.go")
-	require.NoError(t, os.MkdirAll(filepath.Dir(chatAgentPath), 0o755))
-	require.NoError(t, os.WriteFile(chatAgentPath, []byte(strings.Join([]string{
-		"package chat",
-		"if i < len(r.agent.nestedTools) {",
-		"content = r.agent.nestedTools[i].Render(80)",
-		"}",
-	}, "\n")), 0o644))
-
 	check := doctorSubagentSourceCheck(tmpDir, doctorWorkspaceFacts{})
-	require.Equal(t, doctorStatusWarn, check.Status)
+	require.Equal(t, doctorStatusOK, check.Status)
 	require.Equal(t, "TUI / subagent source", check.Name)
 }
 

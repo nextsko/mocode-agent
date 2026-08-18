@@ -236,11 +236,7 @@ func TestHandleAgentNotificationTracksSessionScopedRuntime(t *testing.T) {
 		Providers: csync.NewMap[string, config.ProviderConfig](),
 		Options:   &config.Options{},
 	})
-	ws := ui.com.Workspace.(*testWorkspace)
-	ws.currentAgentID = config.AgentCoder
-	ws.availableAgents = []workspace.AgentInfo{{ID: config.AgentCoder, Name: "Coder"}}
 	ui.session = &session.Session{ID: "session-a", Title: "A"}
-	ui.agentRuntimes = make(map[string]*sessionAgentRuntimeState)
 
 	require.Nil(t, ui.handleAgentNotification(notify.Notification{
 		SessionID: "session-a",
@@ -255,43 +251,12 @@ func TestHandleAgentNotificationTracksSessionScopedRuntime(t *testing.T) {
 	}))
 	require.Equal(t, "thinking...", ui.agentStatus)
 
-	aEntries := ui.agentRuntimes["session-a"].entries
-	require.Len(t, aEntries, 1)
-	require.Equal(t, agentRuntimeThinking, aEntries[config.AgentCoder].Status)
-
-	bEntries := ui.agentRuntimes["session-b"].entries
-	require.Len(t, bEntries, 1)
-	require.Equal(t, agentRuntimeExecuting, bEntries[config.AgentCoder].Status)
-	require.Equal(t, "bash", bEntries[config.AgentCoder].ToolName)
-
 	_ = ui.handleAgentNotification(notify.Notification{
 		SessionID:    "session-a",
 		SessionTitle: "A",
 		Type:         notify.TypeAgentFinished,
 	})
 	require.Empty(t, ui.agentStatus)
-	require.Equal(t, agentRuntimeStopped, ui.agentRuntimes["session-a"].entries[config.AgentCoder].Status)
-}
-
-func TestUpdateAgentRuntimeKeepsFirstSeenOrderStable(t *testing.T) {
-	t.Parallel()
-
-	ui := newTestUIWithConfig(t, &config.Config{
-		Providers: csync.NewMap[string, config.ProviderConfig](),
-		Options:   &config.Options{},
-	})
-
-	now := time.Now()
-	ui.updateAgentRuntime("session-a", "alpha", "Alpha", agentRuntimeThinking, "", now)
-	ui.updateAgentRuntime("session-a", "beta", "Beta", agentRuntimeExecuting, "bash", now.Add(time.Second))
-	ui.updateAgentRuntime("session-a", "alpha", "Alpha", agentRuntimeStopped, "", now.Add(2*time.Second))
-
-	state := ui.agentRuntimes["session-a"]
-	require.NotNil(t, state)
-	require.Equal(t, []string{"alpha", "beta"}, state.order)
-	require.Equal(t, 0, state.entries["alpha"].FirstSeenOrder)
-	require.Equal(t, 1, state.entries["beta"].FirstSeenOrder)
-	require.Equal(t, agentRuntimeStopped, state.entries["alpha"].Status)
 }
 
 func TestHandleChildSessionMessage_AssociatesBatchSubAgentSessionWithParentAgentTool(t *testing.T) {
@@ -343,7 +308,7 @@ func TestHandleChildSessionMessage_AssociatesBatchSubAgentSessionWithParentAgent
 	require.Equal(t, "bash-call-1", toolItem.NestedTools()[0].ToolCall().ID)
 }
 
-func TestHandleChildSessionMessage_TracksTextOnlySubAgentRuntime(t *testing.T) {
+func TestHandleChildSessionMessage_PropagatesTextOnlySummaryToAgentTool(t *testing.T) {
 	t.Parallel()
 
 	ui := newTestUIWithConfig(t, &config.Config{
@@ -380,13 +345,11 @@ func TestHandleChildSessionMessage_TracksTextOnlySubAgentRuntime(t *testing.T) {
 		},
 	})
 
-	state := ui.agentRuntimes["session-parent"]
-	require.NotNil(t, state)
-	entry := state.entries[childSessionID]
-	require.NotNil(t, entry)
-	require.Equal(t, config.AgentTask, entry.DisplayName)
-	require.Equal(t, agentRuntimeExecuting, entry.Status)
-	require.Equal(t, "Analyzed the failure path.", entry.Summary)
+	item := ui.chat.MessageItem("agent-call")
+	require.NotNil(t, item)
+	summaryItem, ok := item.(interface{ StatusSummary() string })
+	require.True(t, ok)
+	require.Equal(t, "Analyzed the failure path.", summaryItem.StatusSummary())
 }
 
 func TestSetSessionMessages_LoadsNestedBatchSubAgentHistory(t *testing.T) {
@@ -847,15 +810,12 @@ func newTestUIWithConfig(t *testing.T, cfg *config.Config) *UI {
 				Escape:     DefaultKeyMap().Editor.Escape,
 			},
 		),
-		keyMap:             DefaultKeyMap(),
-		agentRuntimes:      make(map[string]*sessionAgentRuntimeState),
-		agentToolParents:   make(map[string]string),
-		agentToolChildren:  make(map[string]string),
-		agentToolTaskIDs:   make(map[string]string),
-		agentToolSummaries: make(map[string]map[string]string),
-		todoContinuations:  make(map[string]*todoAutoContinueState),
-		width:              120,
-		height:             40,
+		keyMap:            DefaultKeyMap(),
+		agentToolParents:  make(map[string]string),
+		agentToolChildren: make(map[string]string),
+		todoContinuations: make(map[string]*todoAutoContinueState),
+		width:             120,
+		height:            40,
 	}
 	return ui
 }

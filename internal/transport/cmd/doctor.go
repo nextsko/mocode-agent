@@ -757,11 +757,11 @@ func doctorSubagentSourceCheck(cwd string, facts doctorWorkspaceFacts) doctorChe
 			},
 		},
 		{
-			Name: "text-only child runtime tracking",
+			Name: "text-only child summary propagation",
 			Markers: []string{
-				"len(msg.ToolCalls()) == 0 && len(msg.ToolResults()) == 0 && msg.Role == message.Assistant",
-				"summary := firstContentLine(msg.Content().Text)",
-				"childSessionDescriptor(parentTool, childSessionID)",
+				"len(event.Payload.ToolCalls()) == 0 && len(event.Payload.ToolResults()) == 0",
+				"summary := firstContentLine(event.Payload.Content().Text)",
+				"summaryEntry.SetStatusSummary(summary)",
 			},
 		},
 		{
@@ -797,18 +797,6 @@ func doctorSubagentSourceCheck(cwd string, facts doctorWorkspaceFacts) doctorChe
 			Name:    "TUI / subagent source",
 			Status:  doctorStatusFail,
 			Summary: "current UI source is missing one or more required subagent display paths",
-			Details: details,
-		}
-	}
-
-	chatAgentPath := filepath.Join(cwd, "internal", "ui", "chat", "agent.go")
-	if chatAgentData, err := os.ReadFile(chatAgentPath); err == nil &&
-		doctorSourceHasMarkers(string(chatAgentData), "if i < len(r.agent.nestedTools)", "content = r.agent.nestedTools[i].Render(80)") {
-		details = append(details, "caveat: panel task rendering still maps nestedTools by index in internal/ui/chat/agent.go")
-		return doctorCheck{
-			Name:    "TUI / subagent source",
-			Status:  doctorStatusWarn,
-			Summary: "subagent display paths are present, but panel binding still has an index-based caveat",
 			Details: details,
 		}
 	}

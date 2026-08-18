@@ -11,11 +11,11 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
+	agenttools "github.com/nextsko/mocode-agent/internal/core/tools"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/chat"
 	"github.com/nextsko/mocode-agent/internal/ui/notification"
 	"github.com/nextsko/mocode-agent/internal/ui/util"
-	agenttools "github.com/nextsko/mocode-agent/internal/core/tools"
 )
 
 // sendMessage sends a message with the given content and attachments.
@@ -174,17 +174,6 @@ func (m *UI) handlePermissionNotification(notification permission.PermissionNoti
 // handleAgentNotification translates domain agent events into desktop
 // notifications using the UI notification backend.
 func (m *UI) handleAgentNotification(n notify.Notification) tea.Cmd {
-	if n.SessionID != "" {
-		switch n.Type {
-		case notify.TypeAgentThinking:
-			m.updateAgentRuntime(n.SessionID, m.com.Workspace.CurrentAgentID(), "", agentRuntimeThinking, "", time.Now())
-		case notify.TypeAgentToolExecuting:
-			m.updateAgentRuntime(n.SessionID, m.com.Workspace.CurrentAgentID(), "", agentRuntimeExecuting, n.ToolName, time.Now())
-		case notify.TypeAgentFinished:
-			m.updateAgentRuntime(n.SessionID, m.com.Workspace.CurrentAgentID(), "", agentRuntimeStopped, "", time.Now())
-		}
-	}
-
 	switch n.Type {
 	case notify.TypeAgentThinking:
 		if m.hasSession() && n.SessionID == m.session.ID {
@@ -264,9 +253,6 @@ func (m *UI) newSession() tea.Cmd {
 	m.promptQueue = 0
 	m.pillsView = ""
 	m.historyReset()
-	if len(m.agentRuntimes) > 0 {
-		delete(m.agentRuntimes, sessionID)
-	}
 	if len(m.todoContinuations) > 0 {
 		delete(m.todoContinuations, sessionID)
 	}
@@ -279,12 +265,6 @@ func (m *UI) newSession() tea.Cmd {
 	}
 	if len(m.agentToolChildren) > 0 {
 		clear(m.agentToolChildren)
-	}
-	if len(m.agentToolTaskIDs) > 0 {
-		clear(m.agentToolTaskIDs)
-	}
-	if len(m.agentToolSummaries) > 0 {
-		clear(m.agentToolSummaries)
 	}
 	if len(m.backgroundJobs) > 0 {
 		clear(m.backgroundJobs)

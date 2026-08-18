@@ -264,15 +264,12 @@ type UI struct {
 	pillsView          string
 
 	// Agent status tracking
-	agentStatus        string    // Current agent status text (e.g., "thinking", "executing tool")
-	agentStatusTime    time.Time // When the status was last updated
-	agentRuntimes      map[string]*sessionAgentRuntimeState
-	agentToolParents   map[string]string
-	agentToolChildren  map[string]string
-	agentToolTaskIDs   map[string]string
-	agentToolSummaries map[string]map[string]string
-	todoContinuations  map[string]*todoAutoContinueState
-	backgroundJobs     map[string]string
+	agentStatus       string    // Current agent status text (e.g., "thinking", "executing tool")
+	agentStatusTime   time.Time // When the status was last updated
+	agentToolParents  map[string]string
+	agentToolChildren map[string]string
+	todoContinuations map[string]*todoAutoContinueState
+	backgroundJobs    map[string]string
 
 	// Todo spinner
 	todoSpinner    spinner.Model
@@ -300,29 +297,6 @@ type UI struct {
 		index    int
 		draft    string
 	}
-}
-
-type agentRuntimeStatus string
-
-const (
-	agentRuntimeThinking  agentRuntimeStatus = "thinking"
-	agentRuntimeExecuting agentRuntimeStatus = "executing"
-	agentRuntimeStopped   agentRuntimeStatus = "stopped"
-)
-
-type agentRuntimeEntry struct {
-	ID             string
-	DisplayName    string
-	Status         agentRuntimeStatus
-	ToolName       string
-	LatestActivity time.Time
-	Summary        string
-	FirstSeenOrder int
-}
-
-type sessionAgentRuntimeState struct {
-	order   []string
-	entries map[string]*agentRuntimeEntry
 }
 
 // New creates a new instance of the [UI] model.
@@ -383,10 +357,7 @@ func New(com *common.Common, initialSessionID string, continueLast bool) *UI {
 		todoSpinner:         todoSpinner,
 		lspStates:           make(map[string]app.LSPClientInfo),
 		mcpStates:           make(map[string]mcp.ClientInfo),
-		agentRuntimes:       make(map[string]*sessionAgentRuntimeState),
 		agentToolChildren:   make(map[string]string),
-		agentToolTaskIDs:    make(map[string]string),
-		agentToolSummaries:  make(map[string]map[string]string),
 		todoContinuations:   make(map[string]*todoAutoContinueState),
 		backgroundJobs:      make(map[string]string),
 		notifyBackend:       notification.NoopBackend{},
@@ -573,7 +544,6 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setState(uiChat, m.focus)
 		m.session = msg.session
 		m.sessionFiles = msg.files
-		m.ensureAgentRuntimeState(m.session.ID)
 		cmds = append(cmds, m.startLSPs(msg.lspFilePaths()))
 		msgs, err := m.com.Workspace.ListMessages(context.Background(), m.session.ID)
 		if err != nil {
@@ -641,7 +611,6 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.session != nil && msg.Payload.ID == m.session.ID {
 			prevHasInProgress := hasInProgressTodo(m.session.Todos)
 			m.session = &msg.Payload
-			m.ensureAgentRuntimeState(m.session.ID)
 			m.updateTodoContinuationState(m.session.ID, msg.Payload.Todos)
 			if !prevHasInProgress && hasInProgressTodo(m.session.Todos) {
 				m.todoIsSpinning = true
@@ -1088,7 +1057,6 @@ func (m *UI) reloadNestedToolsForItem(toolItem chat.ToolMessageItem) {
 	var nestedTools []chat.ToolMessageItem
 	for _, childToolCallID := range m.registerAgentToolTopology(toolItem.MessageID(), sessionIDOrEmpty(m.session), tc) {
 		agentSessionID := m.com.Workspace.CreateAgentToolSessionID(toolItem.MessageID(), childToolCallID)
-		taskID := childSessionTaskID(&tc, agentSessionID)
 		nestedMsgs, err := m.com.Workspace.ListMessages(context.Background(), agentSessionID)
 		if err != nil || len(nestedMsgs) == 0 {
 			continue
@@ -1097,9 +1065,6 @@ func (m *UI) reloadNestedToolsForItem(toolItem chat.ToolMessageItem) {
 		nestedMsgPtrs := make([]*message.Message, len(nestedMsgs))
 		for i := range nestedMsgs {
 			nestedMsgPtrs[i] = &nestedMsgs[i]
-			if m.hasSession() {
-				m.trackChildSessionRuntime(m.session.ID, agentSessionID, &tc, nestedMsgs[i])
-			}
 		}
 		nestedToolResultMap := chat.BuildToolResultMap(nestedMsgPtrs)
 
@@ -1110,7 +1075,6 @@ func (m *UI) reloadNestedToolsForItem(toolItem chat.ToolMessageItem) {
 				if !ok {
 					continue
 				}
-				m.registerAgentToolTaskID(nestedToolItem.ToolCall().ID, taskID)
 				if simplifiable, ok := nestedToolItem.(chat.Compactable); ok {
 					simplifiable.SetCompact(true)
 				}
@@ -1307,19 +1271,12 @@ func (m *UI) handleChildSessionMessage(event pubsub.Event[message.Message]) tea.
 		return nil
 	}
 
-	parentSessionID := m.parentSessionIDForChild(childSessionID, parentMessageID, toolCallID)
+	// Resolve parent ownership for the child session. The sidebar/panel
+	// runtime tracking that consumed this value was removed; the mapping is
+	// kept for sub-agent topology wiring.
+	_ = m.parentSessionIDForChild(childSessionID, parentMessageID, toolCallID)
 	containerID := m.resolveAgentToolContainerID(toolCallID)
-	agentItem, parentToolItem := m.findAgentToolItem(containerID)
-	parentTaskID := ""
-	if parentSessionID != "" {
-		var parentTool *message.ToolCall
-		if parentToolItem != nil {
-			tc := parentToolItem.ToolCall()
-			parentTool = &tc
-			parentTaskID = childSessionTaskID(parentTool, childSessionID)
-		}
-		m.trackChildSessionRuntime(parentSessionID, childSessionID, parentTool, event.Payload)
-	}
+	agentItem, _ := m.findAgentToolItem(containerID)
 
 	if len(event.Payload.ToolCalls()) == 0 && len(event.Payload.ToolResults()) == 0 {
 		// Even though there are no tool calls/results to render as nested
@@ -1359,7 +1316,6 @@ func (m *UI) handleChildSessionMessage(event pubsub.Event[message.Message]) tea.
 		if !found {
 			// Create a new nested tool item.
 			nestedItem := chat.NewToolMessageItem(m.com.Styles, event.Payload.ID, tc, nil, false)
-			m.registerAgentToolTaskID(tc.ID, parentTaskID)
 			if simplifiable, ok := nestedItem.(chat.Compactable); ok {
 				simplifiable.SetCompact(true)
 			}
