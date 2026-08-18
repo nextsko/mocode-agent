@@ -475,7 +475,13 @@ func doctorProviderConnectivityCheck(loaded *doctorLoadedConfig, loadErr error) 
 	categoryCounts := make(map[string]int)
 	var okCount, warnCount, failCount int
 	for _, provider := range enabled {
-		err := provider.TestConnection(loaded.resolver)
+		// Route the probe through the config-derived client so the
+		// options.network proxy applies; a bare default client reported
+		// false connectivity failures behind a proxy.
+		err := provider.TestConnection(
+			loaded.resolver,
+			loaded.cfg.HTTPClient(loaded.resolver, 10*time.Second),
+		)
 		issue := classifyDoctorProviderIssue(err)
 		label := provider.ID
 		if provider.Name != "" && provider.Name != provider.ID {

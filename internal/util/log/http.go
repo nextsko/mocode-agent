@@ -11,6 +11,16 @@ import (
 )
 
 // NewHTTPClient creates an HTTP client with debug logging enabled when debug mode is on.
+//
+// Deprecated: this client is based on http.DefaultTransport and therefore
+// IGNORES the configured options.network proxy. Wrap an existing transport
+// with HTTPRoundTripLogger instead:
+//
+//	rt := http.RoundTripper(cfg.HTTPTransport(resolver))
+//	rt = &log.HTTPRoundTripLogger{Transport: rt}
+//	client := &http.Client{Transport: rt}
+//
+// See coordinator.providerHTTPClient for the canonical wiring.
 func NewHTTPClient() *http.Client {
 	return &http.Client{
 		Transport: &HTTPRoundTripLogger{

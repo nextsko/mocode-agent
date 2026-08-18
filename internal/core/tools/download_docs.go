@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/tools/nethttp"
 
 	"charm.land/fantasy"
 
@@ -27,7 +28,13 @@ type DownloadDocsParams struct {
 	MaxFiles int    `json:"max_files,omitempty" description:"Maximum number of files to return (default: 50, max: 100)"`
 }
 
-func NewDownloadDocsTool(proxyURL ...string) fantasy.AgentTool {
+// NewDownloadDocsTool builds the download_docs tool. The factory is the
+// single proxy source of truth: go-git clones through transport.ProxyOptions
+// (not http.Client), so the tool reads the factory's resolved ProxyURL.
+func NewDownloadDocsTool(factory *nethttp.Factory) fantasy.AgentTool {
+	if factory == nil {
+		factory = nethttp.NewFactory(nil, "")
+	}
 	return fantasy.NewParallelAgentTool(
 		DownloadDocsToolName,
 		toolutil.FirstLineDescription(downloadDocsDescription),
@@ -50,8 +57,8 @@ func NewDownloadDocsTool(proxyURL ...string) fantasy.AgentTool {
 			downhub := crawler.NewDownhub().
 				URL(params.RepoURL).
 				MaxFiles(params.MaxFiles)
-			if len(proxyURL) > 0 && proxyURL[0] != "" {
-				downhub = downhub.Proxy(proxyURL[0])
+			if proxy := factory.ProxyURL(); proxy != "" {
+				downhub = downhub.Proxy(proxy)
 			}
 
 			if params.DocsPath != "" {

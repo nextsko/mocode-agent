@@ -3,27 +3,23 @@ package netcommon
 import (
 	"net/http"
 	"time"
+
+	"github.com/nextsko/mocode-agent/internal/core/tools/nethttp"
 )
 
 // DefaultHTTPTimeout is the standard request timeout for web tools. Tools that
 // move large payloads (download) override it via NewHTTPClient.
 const DefaultHTTPTimeout = 30 * time.Second
 
-// sharedTransport builds the connection-pool tuning every web tool used to
-// duplicate inline: a generous idle pool with per-host limiting and a long
-// idle lifetime, so repeated fetches reuse connections without exhausting file
-// descriptors.
-func sharedTransport() *http.Transport {
-	t := http.DefaultTransport.(*http.Transport).Clone()
-	t.MaxIdleConns = 100
-	t.MaxIdleConnsPerHost = 10
-	t.IdleConnTimeout = 90 * time.Second
-	return t
-}
+// defaultFactory is the fallback port used when a tool is constructed without
+// an injected client (tests, ad-hoc wiring). It shares ONE pool-tuned
+// transport across all fallback clients instead of building a transport per
+// call, which silently defeated connection reuse.
+var defaultFactory = nethttp.NewFactory(nil, "")
 
 // DefaultHTTPClient returns an *http.Client with the shared connection pool and
-// the standard 30s request timeout. Most web tools (web_search, web_fetch,
-// fetch, sourcegraph) call this when no client is injected.
+// the standard 30s request timeout. Prefer injecting a config-derived
+// nethttp.Factory (registry does); this is the env-proxy fallback.
 func DefaultHTTPClient() *http.Client {
 	return NewHTTPClient(DefaultHTTPTimeout)
 }
@@ -32,8 +28,5 @@ func DefaultHTTPClient() *http.Client {
 // caller-chosen request timeout. Use this when a tool needs the same pool
 // tuning but a different timeout (e.g. download uses 5 minutes).
 func NewHTTPClient(timeout time.Duration) *http.Client {
-	return &http.Client{
-		Timeout:   timeout,
-		Transport: sharedTransport(),
-	}
+	return defaultFactory.Client(timeout)
 }

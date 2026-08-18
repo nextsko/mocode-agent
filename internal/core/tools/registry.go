@@ -17,7 +17,9 @@ import (
 	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/nextsko/mocode-agent/internal/util/log"
 	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/nethttp"
 	"github.com/nextsko/mocode-agent/internal/core/tools/plugins/sshcommon"
+	"sync"
 )
 
 // ToolKind distinguishes builtin from plugin tools.
@@ -63,6 +65,11 @@ type ToolPlugin interface {
 }
 
 // ToolDeps holds all runtime dependencies needed to construct tools.
+//
+// SysML view: each field is a port on the toolkit block. HTTP is the shared
+// outbound-HTTP port — plugins must derive clients from it instead of
+// building their own transports, so proxy config and the connection pool are
+// owned by exactly one place.
 type ToolDeps struct {
 	Cfg             *config.ConfigStore
 	Permissions     permission.Service
@@ -77,6 +84,17 @@ type ToolDeps struct {
 	ModelName       string
 	SummarySchedule SessionSummaryScheduler
 	SessionSearch   *store.SessionSearch
+	HTTP            *nethttp.Factory
+}
+
+// NewHTTPFactory builds the canonical outbound-HTTP factory from the config
+// store: config's proxy-aware transport plus the resolved proxy URL (needed
+// by non-http.Client stacks such as go-git). The composition root calls this
+// ONCE and shares the result across every agent build.
+func NewHTTPFactory(store *config.ConfigStore) *nethttp.Factory {
+	cfg := store.Config()
+	resolver := store.Resolver()
+	return nethttp.NewFactory(cfg.HTTPTransport(resolver), cfg.ResolvedProxyURL(resolver))
 }
 
 // AllToolDescriptors returns descriptors for every standard (non-coordinator) tool.
@@ -110,7 +128,12 @@ func NewRegistry() *Registry {
 }
 
 // Build runs every registered plugin and returns the combined tool list.
+// A nil deps.HTTP is self-healed into the config-derived factory so plugins
+// and tests never need nil checks.
 func (r *Registry) Build(ctx context.Context, deps ToolDeps) []fantasy.AgentTool {
+	if deps.HTTP == nil && deps.Cfg != nil {
+		deps.HTTP = NewHTTPFactory(deps.Cfg)
+	}
 	var all []fantasy.AgentTool
 	for _, p := range r.plugins {
 		all = append(all, p.Build(ctx, deps)...)
@@ -200,7 +223,7 @@ func (searchPlugin) Descriptors() []ToolDescriptor {
 
 func (searchPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	wd := deps.Cfg.WorkingDir()
-	webClient := deps.Cfg.Config().HTTPClient(deps.Cfg.Resolver(), 30)
+	webClient := deps.HTTP.Client(nethttp.DefaultTimeout)
 	return []fantasy.AgentTool{
 		NewGlobTool(wd),
 		NewGrepTool(wd, deps.Cfg.Config().Tools.Grep),
@@ -223,15 +246,18 @@ func (networkPlugin) Descriptors() []ToolDescriptor {
 
 func (networkPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	wd := deps.Cfg.WorkingDir()
-	cfg := deps.Cfg.Config()
-	webClient := cfg.HTTPClient(deps.Cfg.Resolver(), 30)
-	downloadClient := cfg.HTTPClient(deps.Cfg.Resolver(), 300)
+	// All web clients derive from the one shared proxy-aware factory.
+	// Regression note: these used to be HTTPClient(resolver, 30) and
+	// (resolver, 300) — bare ints are nanoseconds, so every fetch/crawl/
+	// download died instantly with "context deadline exceeded".
+	webClient := deps.HTTP.Client(nethttp.DefaultTimeout)
+	downloadClient := deps.HTTP.Client(nethttp.DownloadTimeout)
 	retryPolicy := toolutil.DefaultRetryPolicy()
 	return []fantasy.AgentTool{
 		toolutil.WithRetry(NewFetchTool(deps.Permissions, wd, webClient), retryPolicy),
 		toolutil.WithRetry(NewCrawlTool(webClient), retryPolicy),
 		toolutil.WithRetry(NewDownloadTool(deps.Permissions, wd, downloadClient), retryPolicy),
-		NewDownloadDocsTool(cfg.ResolvedProxyURL(deps.Cfg.Resolver())),
+		NewDownloadDocsTool(deps.HTTP),
 	}
 }
 
@@ -387,7 +413,8 @@ func (gitOpsPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool 
 // tools share state.  The Startable hooks let the registry close the
 // pool on shutdown.
 type sshPlugin struct {
-	svc *sshcommon.Service
+	once sync.Once
+	svc  *sshcommon.Service
 }
 
 func (p *sshPlugin) Descriptors() []ToolDescriptor {
@@ -400,9 +427,11 @@ func (p *sshPlugin) Descriptors() []ToolDescriptor {
 }
 
 func (p *sshPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
-	if p.svc == nil {
+	// sync.Once: Build can be called from concurrent agent builds
+	// (mode switches, sub-agents); the old nil-check was a data race.
+	p.once.Do(func() {
 		p.svc = sshcommon.NewService()
-	}
+	})
 	return []fantasy.AgentTool{
 		NewSshExecTool(p.svc, deps.Permissions),
 		NewSshUploadTool(p.svc, deps.Permissions),
