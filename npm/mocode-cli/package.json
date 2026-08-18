@@ -1,8 +1,15 @@
 {
   "name": "@fromsko/mocode-cli",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Terminal AI coding assistant — mocode",
-  "keywords": ["ai", "coding", "assistant", "cli", "terminal", "llm"],
+  "keywords": [
+    "ai",
+    "coding",
+    "assistant",
+    "cli",
+    "terminal",
+    "llm"
+  ],
   "homepage": "https://github.com/nextsko/mocode-agent",
   "repository": {
     "type": "git",
@@ -16,11 +23,11 @@
     "bin/"
   ],
   "optionalDependencies": {
-    "@fromsko/mocode-cli-linux-x64":   "0.7.0",
-    "@fromsko/mocode-cli-linux-arm64":  "0.7.0",
-    "@fromsko/mocode-cli-darwin-x64":  "0.7.0",
-    "@fromsko/mocode-cli-darwin-arm64": "0.7.0",
-    "@fromsko/mocode-cli-win32-x64":   "0.7.0"
+    "@fromsko/mocode-cli-linux-x64": "0.8.0",
+    "@fromsko/mocode-cli-linux-arm64": "0.8.0",
+    "@fromsko/mocode-cli-darwin-x64": "0.8.0",
+    "@fromsko/mocode-cli-darwin-arm64": "0.8.0",
+    "@fromsko/mocode-cli-win32-x64": "0.8.0"
   },
   "engines": {
     "node": ">=18"

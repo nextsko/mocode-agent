@@ -5,7 +5,12 @@ import "runtime/debug"
 // Build-time parameters set via -ldflags.
 
 var (
-	Version = "0.8.0-fromsko"
+	// Version is the fallback shown when no VCS/build info is available.
+	// Keep it in lockstep with the latest git tag (v0.8.0) — the tag is the
+	// real source of truth: init() below overrides this with the buildinfo
+	// Main.Version (tag or pseudo-version), so in any git checkout this
+	// string never displays.
+	Version = "0.8.0"
 	Commit  = "unknown"
 )
 

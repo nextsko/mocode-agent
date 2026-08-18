@@ -1,6 +1,6 @@
 {
   "name": "@fromsko/mocode-cli-linux-arm64",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "mocode binary for linux-arm64",
   "license": "MIT",
   "main": "mocode",

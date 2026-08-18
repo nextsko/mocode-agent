@@ -70,3 +70,7 @@ vendor/
 # npm platform package binaries (downloaded at publish time via goreleaser)
 npm/mocode-cli-*/mocode
 npm/mocode-cli-*/mocode.exe
+
+# Local build output and machine bootstrap scripts (not part of releases)
+/bin/
+install-go.sh
