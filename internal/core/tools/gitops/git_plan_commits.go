@@ -1,3 +1,5 @@
+// Package gitops hosts the structured git commit tools: plan_commits
+// classifies working-tree changes and execute_commits applies them in order.
 package gitops
 
 import (

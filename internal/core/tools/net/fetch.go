@@ -1,3 +1,7 @@
+// Package net hosts the web-bound builtin tools: fetch, crawl,
+// web_fetch/web_search, download, download_docs and sourcegraph. The
+// crawler/ subpackage is the shared crawling foundation; see the parent
+// tools package doc for the tree-wide layout contract.
 package net
 
 import (

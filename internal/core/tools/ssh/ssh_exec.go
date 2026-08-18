@@ -1,3 +1,5 @@
+// Package ssh hosts the remote-execution tools (ssh_exec, ssh_upload,
+// ssh_download, ssh_list_hosts) over the shared sshcommon connection pool.
 package ssh
 
 import (

@@ -1,3 +1,5 @@
+// Package gitea hosts the Gitea issue/pull/notification tools delegated
+// to the tea CLI (giteacommon).
 package gitea
 
 import (

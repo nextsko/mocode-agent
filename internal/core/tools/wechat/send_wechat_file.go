@@ -1,3 +1,6 @@
+// Package wechat hosts the WeChat channel tools (send file/image,
+// screenshot) over the messenger port; built by the coordinator, not the
+// registry.
 package wechat
 
 import (
