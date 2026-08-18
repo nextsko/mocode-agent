@@ -379,7 +379,10 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 				return fantasy.NewTextErrorResponse(msg), nil
 			}
 
-			// Wait for either completion, auto-background threshold, or context cancellation
+			// Wait for either completion, auto-background threshold, or context cancellation.
+			// Poll IsDone only — GetOutput copies the whole buffer, which made
+			// chatty commands O(n²) over the wait window. Output is fetched
+			// once, after the loop exits.
 			ticker := time.NewTicker(100 * time.Millisecond)
 			defer ticker.Stop()
 
@@ -395,12 +398,10 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 			for {
 				select {
 				case <-ticker.C:
-					stdout, stderr, done, execErr = bgShell.GetOutput()
-					if done {
+					if bgShell.IsDone() {
 						break waitLoop
 					}
 				case <-timeout:
-					stdout, stderr, done, execErr = bgShell.GetOutput()
 					break waitLoop
 				case <-ctx.Done():
 					// Incoming context was cancelled before we moved to background
@@ -409,6 +410,7 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 					return fantasy.ToolResponse{}, ctx.Err()
 				}
 			}
+			stdout, stderr, done, execErr = bgShell.GetOutput()
 
 			if done {
 				// Command completed within threshold - return synchronously

@@ -156,6 +156,11 @@ tasks:
     cmds:
       - go run {{.BUILDVCS_FLAG}} .
 
+  dev:ship:
+    desc: Rapid dev loop — test + build + atomically replace the globally installed mocode binary (args: --fast, --pkgs ./internal/x/...)
+    cmds:
+      - bash scripts/devship.sh {{.CLI_ARGS}}
+
   install:
     desc: Install the application to GOBIN (or GOPATH/bin)
     cmds:

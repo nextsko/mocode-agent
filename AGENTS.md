@@ -96,6 +96,8 @@ See [docs/architecture/control-plane.md](docs/architecture/control-plane.md).
 - **Web search provider chain**: `netcommon.Provider` interface with fallback (DuckDuckGo HTML -> Instant Answer API); inject custom chains via `NewWebSearchToolWithProvider`.
 ## Build/Test/Lint Commands
 
+- **快速开发闭环（约束）**：改码后一律 `bash scripts/devship.sh`（或 `task dev:ship`；`--fast` 跳测试、`--pkgs ./internal/xxx/...` 定向测试）一次完成 构建→测试→原子替换全局 mocode→版本核验，禁止手工 cp/mv 二进制；版本唯一真相源是 git tag，仅发布时打 tag，开发期接受伪版本，禁止手工改 npm 包版本。
+
 - **Version bump**: Use `task version:show` to inspect the current internal version and next semver tag, use `task version:bump` to automatically bump `internal/version/version.go`, use `task version:set VERSION=x.y.z` to set a specific version manually, and use `task release` to bump the version, create the release commit, tag it, and push it in one flow.
 
 - **Build**: `go build -buildvcs=false -o bin/mocode .` or `task build`

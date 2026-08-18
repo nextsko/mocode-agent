@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,22 +27,33 @@ const (
 	BackgroundKillForcePeriod = 500 * time.Millisecond
 )
 
-// syncBuffer is a thread-safe wrapper around bytes.Buffer.
+// syncBuffer is a thread-safe wrapper around bytes.Buffer that also tracks
+// when the last write happened, so observers can distinguish "producing
+// output" from "quiet — maybe waiting for input".
 type syncBuffer struct {
-	buf bytes.Buffer
-	mu  sync.RWMutex
+	buf        bytes.Buffer
+	mu         sync.RWMutex
+	lastWriteMs atomic.Int64
 }
 
 func (sb *syncBuffer) Write(p []byte) (n int, err error) {
 	sb.mu.Lock()
 	defer sb.mu.Unlock()
-	return sb.buf.Write(p)
+	n, err = sb.buf.Write(p)
+	if n > 0 {
+		sb.lastWriteMs.Store(time.Now().UnixMilli())
+	}
+	return n, err
 }
 
 func (sb *syncBuffer) WriteString(s string) (n int, err error) {
 	sb.mu.Lock()
 	defer sb.mu.Unlock()
-	return sb.buf.WriteString(s)
+	n, err = sb.buf.WriteString(s)
+	if n > 0 {
+		sb.lastWriteMs.Store(time.Now().UnixMilli())
+	}
+	return n, err
 }
 
 func (sb *syncBuffer) String() string {
@@ -55,6 +67,35 @@ func (sb *syncBuffer) Len() int {
 	sb.mu.RLock()
 	defer sb.mu.RUnlock()
 	return sb.buf.Len()
+}
+
+// Tail returns at most the last n bytes of the buffer, cut at a line boundary
+// when possible so incremental reads stay line-aligned.
+func (sb *syncBuffer) Tail(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	sb.mu.RLock()
+	defer sb.mu.RUnlock()
+	b := sb.buf.Bytes()
+	if len(b) <= n {
+		return string(b)
+	}
+	cut := len(b) - n
+	if i := bytes.IndexByte(b[cut:], '\n'); i >= 0 {
+		cut += i + 1
+	}
+	return string(b[cut:])
+}
+
+// IdleMs reports milliseconds since the last write (0 when nothing written
+// yet and the caller should fall back to started-at).
+func (sb *syncBuffer) IdleMs() int64 {
+	last := sb.lastWriteMs.Load()
+	if last == 0 {
+		return 0
+	}
+	return time.Now().UnixMilli() - last
 }
 
 // BackgroundShell represents a shell running in the background.
@@ -71,7 +112,11 @@ type BackgroundShell struct {
 	stderr      *syncBuffer
 	done        chan struct{}
 	exitErr     error
+	// runner is assigned by the start goroutine (TTY path) and read by
+	// WriteInput/Kill/Status from other goroutines — every access must go
+	// through setRunner/runnerRef (the old bare field access was a data race).
 	runner      backgroundRunner
+	runnerMu    sync.Mutex
 	completedAt atomic.Int64 // Unix timestamp when job completed (0 if still running)
 	startedAt   atomic.Int64 // Unix timestamp when job started (0 if never started)
 	exitCode    atomic.Int32 // captured exit code (0 before completion)
@@ -94,6 +139,18 @@ type backgroundRunner interface {
 	// WriteStdin sends bytes to the process stdin. For TTY jobs this writes to
 	// the PTY master. Implementations that cannot accept input return an error.
 	WriteStdin(p []byte) (int, error)
+}
+
+func (bs *BackgroundShell) setRunner(r backgroundRunner) {
+	bs.runnerMu.Lock()
+	bs.runner = r
+	bs.runnerMu.Unlock()
+}
+
+func (bs *BackgroundShell) runnerRef() backgroundRunner {
+	bs.runnerMu.Lock()
+	defer bs.runnerMu.Unlock()
+	return bs.runner
 }
 
 // JobState is the lifecycle state of a background job.
@@ -127,6 +184,15 @@ type JobStatus struct {
 	ExitCode    int      `json:"exit_code,omitempty"`
 	StdoutBytes int      `json:"stdout_bytes"`
 	StderrBytes int      `json:"stderr_bytes"`
+	// IdleMs is milliseconds since the last output byte (stdout or stderr).
+	// 0 for finished jobs. Together with State it lets the agent tell
+	// "slow but working" apart from "stalled, likely waiting for input".
+	IdleMs int64 `json:"idle_ms,omitempty"`
+	// LikelyPrompting is true when the job is running, has been quiet for
+	// a beat, and the tail of its output looks like an interactive prompt
+	// ("[y/N]", "Password:", a trailing "?" or ":", ...). This is the signal
+	// that unblocks the classic TTY hang: answer it with job_input.
+	LikelyPrompting bool `json:"likely_prompting,omitempty"`
 }
 
 // BackgroundShellManager manages background shell instances.
@@ -157,8 +223,16 @@ func GetBackgroundShellManager() *BackgroundShellManager {
 
 // Start creates and starts a new background shell with the given command.
 func (m *BackgroundShellManager) Start(ctx context.Context, workingDir string, blockFuncs []BlockFunc, command string, description string, opts ...BackgroundShellOptions) (*BackgroundShell, error) {
-	// Check job limit
-	if m.shells.Len() >= MaxBackgroundJobs {
+	// The job limit protects against runaway concurrency, so it must count
+	// only LIVE jobs — completed-but-retained jobs (8h retention) used to
+	// exhaust the cap and block new work until cleanup.
+	running := 0
+	for s := range m.shells.Seq() {
+		if !s.IsDone() {
+			running++
+		}
+	}
+	if running >= MaxBackgroundJobs {
 		return nil, fmt.Errorf("maximum number of background jobs (%d) reached. Please terminate or wait for some jobs to complete", MaxBackgroundJobs)
 	}
 	options := BackgroundShellOptions{}
@@ -199,6 +273,11 @@ func (m *BackgroundShellManager) Start(ctx context.Context, workingDir string, b
 	if !options.TTY {
 		stdinR, stdinW, err := os.Pipe()
 		if err != nil {
+			// The shell was already registered above; without this Take it
+			// would linger forever as a "running" ghost that never completes
+			// and leaks a MaxBackgroundJobs slot.
+			_, _ = m.shells.Take(id)
+			cancel()
 			return nil, fmt.Errorf("create stdin pipe: %w", err)
 		}
 		bgShell.stdinReader = stdinR
@@ -215,7 +294,7 @@ func (m *BackgroundShellManager) Start(ctx context.Context, workingDir string, b
 			var runner backgroundRunner
 			runner, err = startTTYBackgroundProcess(shellCtx, shell.GetWorkingDir(), shell.GetEnv(), shell.blockFuncs, command, bgShell.stdout)
 			if err == nil {
-				bgShell.runner = runner
+				bgShell.setRunner(runner)
 				err = runner.Wait()
 			}
 		} else {
@@ -268,19 +347,23 @@ func (m *BackgroundShellManager) Kill(id string) error {
 	}
 
 	shell.cancel()
-	if shell.runner != nil {
-		_ = shell.runner.Terminate(false)
+	if r := shell.runnerRef(); r != nil {
+		_ = r.Terminate(false)
 	}
 	if shell.waitFor(BackgroundKillGracePeriod) {
 		return nil
 	}
-	if shell.runner != nil {
-		_ = shell.runner.Terminate(true)
+	if r := shell.runnerRef(); r != nil {
+		_ = r.Terminate(true)
 		if shell.waitFor(BackgroundKillForcePeriod) {
 			return nil
 		}
 	}
-	return fmt.Errorf("background shell %s is still shutting down", id)
+	// The job refused to die (uninterruptible syscall, ignored signals).
+	// Re-register it so it stays observable via job_output instead of
+	// becoming an invisible orphan that the manager has forgotten about.
+	m.shells.Set(id, shell)
+	return fmt.Errorf("background shell %s is still shutting down (kept for observation; retry later)", id)
 }
 
 // BackgroundShellInfo contains information about a background shell.
@@ -338,8 +421,8 @@ func (m *BackgroundShellManager) KillAll(ctx context.Context) {
 	for _, shell := range shells {
 		wg.Go(func() {
 			shell.cancel()
-			if shell.runner != nil {
-				_ = shell.runner.Terminate(false)
+			if r := shell.runnerRef(); r != nil {
+				_ = r.Terminate(false)
 			}
 			select {
 			case <-shell.done:
@@ -350,6 +433,52 @@ func (m *BackgroundShellManager) KillAll(ctx context.Context) {
 	wg.Wait()
 }
 
+// promptIdleThreshold is how long a running job must stay quiet before its
+// output tail is checked against the prompt heuristics.
+const promptIdleThreshold = 2 * time.Second
+
+// looksPrompting inspects the tail of a job's combined output for shapes
+// that commonly mean "an interactive program is blocked waiting for the user".
+// Conservative by design: progress bars and log lines must not match.
+func looksPrompting(tail string) bool {
+	if tail == "" {
+		return false
+	}
+	// Only the last few lines matter.
+	lines := strings.Split(tail, "\n")
+	if len(lines) > 5 {
+		lines = lines[len(lines)-5:]
+	}
+	last := ""
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.TrimSpace(lines[i]) != "" {
+			last = lines[i]
+			break
+		}
+	}
+	low := strings.ToLower(strings.TrimSpace(last))
+	if low == "" {
+		return false
+	}
+	switch {
+	case strings.HasSuffix(low, "?"),
+		strings.HasSuffix(low, ":"),
+		strings.HasSuffix(low, ">"),
+		strings.Contains(low, "y/n"),
+		strings.Contains(low, "yes/no"),
+		strings.Contains(low, "[y"),
+		strings.Contains(low, "password"),
+		strings.Contains(low, "passphrase"),
+		strings.Contains(low, "press any key"),
+		strings.Contains(low, "press enter"),
+		strings.Contains(low, "do you want"),
+		strings.Contains(low, "proceed?"),
+		strings.Contains(low, "continue?"):
+		return true
+	}
+	return false
+}
+
 // GetOutput returns the current output of a background shell.
 func (bs *BackgroundShell) GetOutput() (stdout string, stderr string, done bool, err error) {
 	select {
@@ -357,6 +486,20 @@ func (bs *BackgroundShell) GetOutput() (stdout string, stderr string, done bool,
 		return bs.stdout.String(), bs.stderr.String(), true, bs.exitErr
 	default:
 		return bs.stdout.String(), bs.stderr.String(), false, nil
+	}
+}
+
+// GetTailOutput is the incremental-friendly variant of GetOutput: it returns
+// at most the last maxStdout/maxStderr bytes of each stream (line-aligned),
+// so polling a chatty long-running job no longer ships its whole log history
+// into the model context on every job_output call.
+func (bs *BackgroundShell) GetTailOutput(maxStdout, maxStderr int) (stdout string, stderr string, truncated bool, done bool, err error) {
+	truncated = bs.stdout.Len() > maxStdout || bs.stderr.Len() > maxStderr
+	select {
+	case <-bs.done:
+		return bs.stdout.Tail(maxStdout), bs.stderr.Tail(maxStderr), truncated, true, bs.exitErr
+	default:
+		return bs.stdout.Tail(maxStdout), bs.stderr.Tail(maxStderr), truncated, false, nil
 	}
 }
 
@@ -379,8 +522,8 @@ func (bs *BackgroundShell) WriteInput(p []byte) (int, error) {
 	switch {
 	case bs.stdinWriter != nil:
 		w = bs.stdinWriter
-	case bs.runner != nil:
-		w = stdinRunnerWriter{bs.runner}
+	case bs.runnerRef() != nil:
+		w = stdinRunnerWriter{bs.runnerRef()}
 	default:
 		return 0, fmt.Errorf("background shell %s does not accept stdin input", bs.ID)
 	}
@@ -423,30 +566,50 @@ func (bs *BackgroundShell) Status() JobStatus {
 		}
 	}
 
-	started := bs.startedAt.Load()
+	startED := bs.startedAt.Load()
 	end := bs.completedAt.Load()
-	if end == 0 && started > 0 {
+	if end == 0 && startED > 0 {
 		end = time.Now().Unix()
 	}
 	var elapsedMs int64
-	if started > 0 && end >= started {
-		elapsedMs = (end - started) * 1000
+	if startED > 0 && end >= startED {
+		elapsedMs = (end - startED) * 1000
+	}
+
+	// Output activity: how long since the last byte arrived. For running jobs
+	// a long idle combined with a prompt-looking tail is the classic "blocked
+	// waiting for user input" signature the agent needs to see.
+	idleMs := int64(0)
+	likelyPrompting := false
+	if !done {
+		stdoutIdle := bs.stdout.IdleMs()
+		stderrIdle := bs.stderr.IdleMs()
+		idleMs = max(stdoutIdle, stderrIdle)
+		if idleMs >= promptIdleThreshold.Milliseconds() {
+			tail := bs.stdout.Tail(512)
+			if t := bs.stderr.Tail(512); t != "" {
+				tail += "\n" + t
+			}
+			likelyPrompting = looksPrompting(tail)
+		}
 	}
 
 	return JobStatus{
-		ID:          bs.ID,
-		State:       state,
-		Command:     bs.Command,
-		Description: bs.Description,
-		WorkingDir:  bs.WorkingDir,
-		TTY:         bs.TTY,
-		Interactive: bs.stdinWriter != nil || bs.runner != nil,
-		StartedAtMs: started * 1000,
-		ElapsedMs:   elapsedMs,
-		Done:        done,
-		ExitCode:    exitCode,
-		StdoutBytes: bs.stdout.Len(),
-		StderrBytes: bs.stderr.Len(),
+		ID:              bs.ID,
+		State:           state,
+		Command:         bs.Command,
+		Description:     bs.Description,
+		WorkingDir:      bs.WorkingDir,
+		TTY:             bs.TTY,
+		Interactive:     bs.stdinWriter != nil || bs.runnerRef() != nil,
+		StartedAtMs:     startED * 1000,
+		ElapsedMs:       elapsedMs,
+		Done:            done,
+		ExitCode:        exitCode,
+		StdoutBytes:     bs.stdout.Len(),
+		StderrBytes:     bs.stderr.Len(),
+		IdleMs:          idleMs,
+		LikelyPrompting: likelyPrompting,
 	}
 }
 
