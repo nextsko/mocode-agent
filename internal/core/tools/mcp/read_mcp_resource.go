@@ -1,4 +1,4 @@
-package tools
+package mcp
 
 import (
 	"cmp"
@@ -14,7 +14,6 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
-	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
 	"github.com/nextsko/mocode-agent/internal/util/ext"
 )
 
@@ -71,7 +70,7 @@ func NewReadMCPResourceTool(cfg *config.ConfigStore, permissions permission.Serv
 				return toolutil.NewPermissionDeniedResponse(), nil
 			}
 
-			contents, err := mcp.ReadResource(ctx, cfg, params.MCPName, params.URI)
+			contents, err := ReadResource(ctx, cfg, params.MCPName, params.URI)
 			if err != nil {
 				return fantasy.NewTextErrorResponse(err.Error()), nil
 			}

@@ -16,18 +16,25 @@
 //	                        download, download_docs, sourcegraph
 //	  ssh/                  ssh_exec, ssh_upload, ssh_download, ssh_list_hosts
 //	  gitea/                gitea_issues, gitea_pulls, gitea_notifications
+//	  gitops/               git_plan_commits, git_execute_commits
+//	  wechat/               send_wechat_file/image, screenshot_to_wechat
+//	                        (built by the coordinator, not the registry)
 //	  mcp/                  MCP bridge: sessions, transports, meta tools
+//	                        (list/read_mcp_resources, mcp-tools adapter)
 //	  lsp/                  LSP manager and its tools
 //	  plugins/<x>common/    shared library for one tool category
 //	    netcommon/          fetch/search helpers all web tools share
 //	    sshcommon/          SSH connection pool + exec helpers
 //	    giteacommon/        tea CLI plumbing
 //
-// Root-level files are the fs/shell/session/diagnostic core that every
-// runtime needs (edit, view, bash, job_*, todos, ...). Everything with an
-// external-system affinity lives in its category directory; the façade
-// (tools.go) re-exports the stable tools.X symbols so consumers outside the
-// tree are insulated from the layout.
+// Root-level files are the fs/shell/session core that every runtime needs
+// (edit, view, bash, job_*, todos, ...). This is deliberate: the file tools
+// share one dependency set (permissions + filetracker + history) wired by a
+// single plugin block, so splitting them would cut a cohesive unit — they
+// stay until the contracts adapter lands. Everything with an external-system
+// affinity lives in its category directory; the façade (tools.go) re-exports
+// the stable tools.X symbols so consumers outside the tree are insulated
+// from the layout.
 //
 // A file in tools/ root exports New<Tool>Tool(deps...) fantasy.AgentTool
 // constructors and one <Tool>ToolName constant. A plugin block in

@@ -10,7 +10,9 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
 	"github.com/nextsko/mocode-agent/internal/core/tools/gitea"
+	"github.com/nextsko/mocode-agent/internal/core/tools/gitops"
 	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
 	"github.com/nextsko/mocode-agent/internal/core/tools/net"
 	"github.com/nextsko/mocode-agent/internal/core/tools/nethttp"
 	"github.com/nextsko/mocode-agent/internal/core/tools/plugins/sshcommon"
@@ -341,8 +343,8 @@ type mcpMetaPlugin struct{}
 
 func (mcpMetaPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
-		{Name: ListMCPResourcesToolName, Kind: ToolKindPlugin, Category: CategoryMCPMeta},
-		{Name: ReadMCPResourceToolName, Kind: ToolKindPlugin, Category: CategoryMCPMeta},
+		{Name: mcp.ListMCPResourcesToolName, Kind: ToolKindPlugin, Category: CategoryMCPMeta},
+		{Name: mcp.ReadMCPResourceToolName, Kind: ToolKindPlugin, Category: CategoryMCPMeta},
 	}
 }
 
@@ -351,8 +353,8 @@ func (mcpMetaPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool
 		return nil
 	}
 	return []fantasy.AgentTool{
-		NewListMCPResourcesTool(deps.Cfg, deps.Permissions),
-		NewReadMCPResourceTool(deps.Cfg, deps.Permissions),
+		mcp.NewListMCPResourcesTool(deps.Cfg, deps.Permissions),
+		mcp.NewReadMCPResourceTool(deps.Cfg, deps.Permissions),
 	}
 }
 
@@ -396,16 +398,16 @@ type gitOpsPlugin struct{}
 
 func (gitOpsPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
-		{Name: PlanCommitsToolName, Kind: ToolKindPlugin, Category: CategoryGitOps},
-		{Name: ExecuteCommitsToolName, Kind: ToolKindPlugin, Category: CategoryGitOps},
+		{Name: gitops.PlanCommitsToolName, Kind: ToolKindPlugin, Category: CategoryGitOps},
+		{Name: gitops.ExecuteCommitsToolName, Kind: ToolKindPlugin, Category: CategoryGitOps},
 	}
 }
 
 func (gitOpsPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	wd := deps.Cfg.WorkingDir()
 	return []fantasy.AgentTool{
-		NewPlanCommitsTool(wd),
-		NewExecuteCommitsTool(wd),
+		gitops.NewPlanCommitsTool(wd),
+		gitops.NewExecuteCommitsTool(wd),
 	}
 }
 

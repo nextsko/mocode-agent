@@ -8,8 +8,11 @@ import (
 
 	"charm.land/fantasy"
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/tools/gitops"
+	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
 	"github.com/nextsko/mocode-agent/internal/core/tools/net"
 	"github.com/nextsko/mocode-agent/internal/core/tools/plugins/netcommon"
+	"github.com/nextsko/mocode-agent/internal/core/tools/wechat"
 )
 
 // Network tool re-exports from netcommon.
@@ -113,3 +116,40 @@ func NewPermissionDeniedResponse() fantasy.ToolResponse {
 func FirstLineDescription(content []byte) string {
 	return toolutil.FirstLineDescription(content)
 }
+
+// Re-exports from the gitops and wechat subpackages (moved out of the root in
+// the 0.8.x restructure; alias re-exports keep the historical tools.X import
+// paths stable for consumers outside the tools tree — coordinator and UI).
+const (
+	PlanCommitsToolName    = gitops.PlanCommitsToolName
+	ExecuteCommitsToolName = gitops.ExecuteCommitsToolName
+
+	WeChatSendImageToolName  = wechat.WeChatSendImageToolName
+	WeChatSendFileToolName   = wechat.WeChatSendFileToolName
+	WeChatScreenshotToolName = wechat.WeChatScreenshotToolName
+)
+
+var (
+	NewPlanCommitsTool    = gitops.NewPlanCommitsTool
+	NewExecuteCommitsTool = gitops.NewExecuteCommitsTool
+
+	NewWeChatSendImageTool  = wechat.NewWeChatSendImageTool
+	NewWeChatSendFileTool   = wechat.NewWeChatSendFileTool
+	NewWeChatScreenshotTool = wechat.NewWeChatScreenshotTool
+
+	// mcp subpackage (MCP bridge meta tools moved out of the root).
+	NewListMCPResourcesTool = mcp.NewListMCPResourcesTool
+	NewReadMCPResourceTool  = mcp.NewReadMCPResourceTool
+	GetMCPTools             = mcp.GetMCPTools
+)
+
+// MCP bridge re-exports (meta tools live in tools/mcp).
+const (
+	ListMCPResourcesToolName = mcp.ListMCPResourcesToolName
+	ReadMCPResourceToolName  = mcp.ReadMCPResourceToolName
+)
+
+// MCPToolStruct is re-exported because the coordinator iterates MCP tools and
+// touches its Name field (alias, NOT a new type: keep identity for any
+// caller doing type switches).
+type MCPToolStruct = mcp.MCPToolStruct

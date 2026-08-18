@@ -1,4 +1,4 @@
-package tools
+package mcp
 
 import (
 	"context"
@@ -7,9 +7,9 @@ import (
 
 	"charm.land/fantasy"
 
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
-	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
 )
 
 // whitelistDockerTools contains Docker MCP tools that don't require permission.
@@ -24,7 +24,7 @@ var whitelistDockerTools = []string{
 // GetMCPTools gets all the currently available MCP tools.
 func GetMCPTools(permissions permission.Service, cfg *config.ConfigStore, wd string) []*MCPToolStruct {
 	var result []*MCPToolStruct
-	for mcpName, tools := range mcp.Tools() {
+	for mcpName, tools := range Tools() {
 		for _, tool := range tools {
 			result = append(result, &MCPToolStruct{
 				mcpName:     mcpName,
@@ -41,7 +41,7 @@ func GetMCPTools(permissions permission.Service, cfg *config.ConfigStore, wd str
 // Tool is a tool from a MCP.
 type MCPToolStruct struct {
 	mcpName         string
-	tool            *mcp.Tool
+	tool            *Tool
 	cfg             *config.ConfigStore
 	permissions     permission.Service
 	workingDir      string
@@ -98,7 +98,7 @@ func (m *MCPToolStruct) Info() fantasy.ToolInfo {
 }
 
 func (m *MCPToolStruct) Run(ctx context.Context, params fantasy.ToolCall) (fantasy.ToolResponse, error) {
-	sessionID := GetSessionFromContext(ctx)
+	sessionID := toolutil.GetSessionFromContext(ctx)
 	if sessionID == "" {
 		return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for creating a new file")
 	}
@@ -121,19 +121,19 @@ func (m *MCPToolStruct) Run(ctx context.Context, params fantasy.ToolCall) (fanta
 			return fantasy.ToolResponse{}, err
 		}
 		if !p {
-			return NewPermissionDeniedResponse(), nil
+			return toolutil.NewPermissionDeniedResponse(), nil
 		}
 	}
 
-	result, err := mcp.RunTool(ctx, m.cfg, m.mcpName, m.tool.Name, params.Input)
+	result, err := RunTool(ctx, m.cfg, m.mcpName, m.tool.Name, params.Input)
 	if err != nil {
 		return fantasy.NewTextErrorResponse(err.Error()), nil
 	}
 
 	switch result.Type {
 	case "image", "media":
-		if !GetSupportsImagesFromContext(ctx) {
-			modelName := GetModelNameFromContext(ctx)
+		if !toolutil.GetSupportsImagesFromContext(ctx) {
+			modelName := toolutil.GetModelNameFromContext(ctx)
 			return fantasy.NewTextErrorResponse(fmt.Sprintf("This model (%s) does not support image data.", modelName)), nil
 		}
 
