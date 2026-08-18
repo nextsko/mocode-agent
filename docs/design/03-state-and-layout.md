@@ -462,21 +462,13 @@ func (m *UI) Draw(scr uv.Screen, area image.Rectangle) *tea.Cursor {
     // 7. 浮层（completions / attach）
     if m.completionsOpen { m.completions.Draw(scr, ...) }
 
-    // 8. Panel 叠加（agent 多任务时）
-    if m.com.Panels != nil && m.com.Panels.IsVisible() {
-        // chat 区缩 3/5，panel 占底部 2/5
-        chatArea := upper; panelRect := lower
-        m.com.Panels.Draw(scr, panelRect)
-        m.chat.Draw(scr, chatArea)
-    }
-
-    // 9. Dialog（最后画，永远最上层）
+    // 8. Dialog（最后画，永远最上层）
     if m.dialog.HasDialogs() {
         return m.dialog.Draw(scr, scr.Bounds())
     }
 
-    // 10. Debug 指示（MOCODE_UI_DEBUG=true 时画随机色方块）
-    // 11. Cursor 定位
+    // 9. Debug 指示（MOCODE_UI_DEBUG=true 时画随机色方块）
+    // 10. Cursor 定位
     return m.computeCursor()
 }
 ```

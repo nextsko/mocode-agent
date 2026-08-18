@@ -46,7 +46,7 @@ one of these exact prefixes:
 
 - `topic` (required unless `resume_id` is set): the meeting subject.
 - `participants`: list of seats. When omitted, a default moderator/researcher/
-  reviewer/executor panel is used.
+  reviewer/executor roster is used.
 - `max_turns`: discussion turn budget (default 20).
 - `resume_id`: resume a previously saved roundtable snapshot.
 

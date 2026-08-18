@@ -163,127 +163,6 @@ if ((insideTmux || inProcessMode || nativePanes) && viewedTeammate) {
 **折叠策略**：
 > "Surplus idle agents now collapse into an expandable summary row"（多余 idle agents 折叠到可展开摘要行）
 
-### mocode 现状 vs 改进
-
-#### 改进 1 · Live + Static 双层渲染
-
-```go
-// 当前：所有内容都重绘（panel_view.go:103-108）
-func (v *View) RenderMain(width int) string {
-    // 全部渲染
-}
-
-// 改进：区分活跃和已完成
-type AgentPanelView struct {
-    mu        sync.RWMutex
-    live      map[string]*panel.Panel  // 活跃 agents
-    committed []string                   // 已完成摘要
-    visible   bool
-}
-
-func (v *AgentPanelView) AddLive(panel *panel.Panel) {
-    v.mu.Lock()
-    defer v.mu.Unlock()
-    v.live[panel.ID] = panel
-}
-
-func (v *AgentPanelView) Commit(panelID string, summary string) {
-    v.mu.Lock()
-    defer v.mu.Unlock()
-    if p, ok := v.live[panelID]; ok {
-        delete(v.live, panelID)
-        v.committed = append(v.committed, summary)
-    }
-}
-```
-
-#### 改进 2 · Aggregate Rows 而非字面 panes
-
-```go
-// 紧凑行布局
-type AgentRow struct {
-    Name      string
-    Status    string  // running | queued | idle | blocked | done | failed
-    Activity  string  // "scanning auth middleware"
-    Elapsed   time.Duration
-    Result    string  // 完成时填充
-}
-
-// 渲染
-func renderAgentRows(rows []AgentRow, sty *styles.Styles, width int) string {
-    var b strings.Builder
-    for _, r := range rows {
-        // 固定列宽防止抖动
-        nameCol := padRight(r.Name, NAME_COL_WIDTH)
-        statusGlyph := statusIcon(r.Status, sty)
-        activity := r.Activity
-        b.WriteString(fmt.Sprintf("%s %s %s %s\n",
-            statusGlyph, nameCol, activity, formatElapsed(r.Elapsed)))
-    }
-    return b.String()
-}
-
-const NAME_COL_WIDTH = 26  // 固定名宽
-```
-
-#### 改进 3 · Detail Dialog（选中 agent 后）
-
-```go
-// 按 Enter 打开选中 agent 的详情
-type AgentDetailDialog struct {
-    com       *common.Common
-    agentID   string
-    tools     []ToolMessageItem
-    summary   string
-    help      help.Model
-}
-
-func (d *AgentDetailDialog) Draw(scr uv.Screen, area image.Rectangle) *tea.Cursor {
-    rc := dialog.NewRenderContext(d.com.Styles, area.Dx())
-    rc.Title = fmt.Sprintf("Agent: %s", d.agentID)
-    rc.AddPart(d.summary)
-    rc.AddPart(strings.Repeat("─", area.Dx()-4))
-    rc.AddPart(renderNestedTools(d.tools, area.Dx()-4))
-    rc.AddPart(d.help.View())
-    return dialog.DrawCenter(rc, scr, area)
-}
-```
-
-#### 改进 4 · 状态正交化（关键洞察）
-
-```go
-// Claude Code 强调：execution / task / interaction / communication 四态独立
-type AgentRuntimeState struct {
-    Execution string  // running | idle | missing
-    Task      string  // queued | assigned | blocked | done | failed
-    Interaction string // none | permission | question
-    Communication int  // unread count
-    LastUpdate time.Time
-}
-```
-
-#### 改进 5 · 折叠策略（>6 agents 时）
-
-```go
-func (v *AgentPanelView) Render(width int) string {
-    if len(v.live) > 6 {
-        // 折叠：显示 5 个 + "N more..."
-        var b strings.Builder
-        i := 0
-        for id, p := range v.live {
-            if i >= 5 {
-                b.WriteString(fmt.Sprintf("... and %d more agents (press 'e' to expand)\n", len(v.live)-5))
-                break
-            }
-            b.WriteString(renderAgentRow(p, width))
-            i++
-        }
-        return b.String()
-    }
-    return v.renderAll(width)
-}
-```
-
 ---
 
 ## 三、AskUserQuestion 组件
@@ -775,40 +654,6 @@ func (c *ToolContext) ValidateEdit(path string) error {
 
 > "Fixed idle subagents vanishing from the agent panel while other subagents were still working; surplus idle agents now collapse into an expandable summary row"
 
-### mocode 改进：动态 panel 折叠
-
-```go
-// panel/view.go
-type View struct {
-    mu      sync.RWMutex
-    live    []*Panel  // 活跃
-    idle    []*Panel  // 空闲（可折叠）
-    visible bool
-}
-
-func (v *View) Render(width int) string {
-    var b strings.Builder
-    for _, p := range v.live {
-        b.WriteString(p.RenderRow(width))
-        b.WriteString("\n")
-    }
-    
-    // 折叠 idle
-    if len(v.idle) > 0 {
-        if v.idleExpanded {
-            b.WriteString("─ idle agents ─\n")
-            for _, p := range v.idle {
-                b.WriteString(p.RenderRow(width))
-                b.WriteString("\n")
-            }
-        } else {
-            b.WriteString(fmt.Sprintf("... %d idle agents (press 'e' to expand)\n", len(v.idle)))
-        }
-    }
-    return b.String()
-}
-```
-
 ---
 
 ## 七、teammate 颜色分配（@agentName 徽章）
@@ -1140,12 +985,9 @@ var StatusGlyphs = map[string]struct{ Glyph, Color string }{
 | 借鉴点 | mocode 现有 | 改造难度 | 价值 |
 |--------|-----------|----------|------|
 | 嵌套 subagent 树渲染 | ✅ 已实现 | 低（增量） | 高 |
-| Panel 树多任务 | ✅ 已实现 | 低 | 中 |
 | AskUserQuestion | ❌ 未实现 | 中 | 极高 |
 | Permission bubble | ❌ 未实现 | 中 | 高 |
 | 工具并发 | ❌ 顺序 | 中 | 中 |
 | Agent badge 颜色 | ⚠️ 部分 | 低 | 中 |
-| Live/Committed 双层 | ❌ 单层 | 低 | 中 |
-| Idle 折叠 | ❌ 全部显示 | 低 | 中 |
 
 **总结**：mocode 已有 60% 的 subagent 渲染基础，**最大缺口是 AskUserQuestion**——建议优先实现。

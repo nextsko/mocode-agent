@@ -1,12 +1,11 @@
-# 02 · 6 大优秀设计技巧拆解
+# 02 · 5 大优秀设计技巧拆解
 
 > 拆解目标：
 > 1. 侧边好看面板
 > 2. 微信二维码渲染
 > 3. `/` slash 浮动面板
 > 4. agent 树状展示
-> 5. agent 卡片设计
-> 6. 顶栏 oMo 流光字体
+> 5. 顶栏 oMo 流光字体
 
 每个技巧包含：**效果描述 / 核心代码 / 设计意图 / 复用模板**。
 
@@ -537,153 +536,6 @@ func (n NestedToolItem) Render(sty *Styles, width int) string {
     }
     return root.Enumerator(roundedEnumerator(2, 6)).String()
 }
-```
-
----
-
-## 技巧 5 · Agent 卡片设计（Panel 树）
-
-### 效果
-
-并行的多个 agent 同时跑时：
-
-```
-┌─ Main ─┐┌─ task-1 ────────────┐┌─ task-2 ────────────┐
-│        ││ ✓ Plan complete     ││ ▶ Implementing...   │
-│ Active ││   ✓ grep auth.go    ││   ▶ edit users.go   │
-│        ││   ✓ view schema.go  ││   ▶ view tests.go   │
-└────────┘└─────────────────────┘└─────────────────────┘
-```
-
-类似 tmux 的横向分屏，**每个 panel 显示一个并行子任务**。
-
-### 核心实现（`internal/ui/panel/`）
-
-#### Panel 节点
-
-```go
-type Direction int
-const (
-    Vertical   Direction = iota  // 左右分屏
-    Horizontal                   // 上下分屏
-)
-
-type Panel struct {
-    ID        string
-    Title     string
-    Content   string
-    Direction Direction
-    Children  []*Panel
-    Sizes     []float64  // 0-1 比例（须和为 1）
-    Border    lipgloss.Style
-    TitleStyle lipgloss.Style
-    Active    bool       // 当前聚焦
-    mu        sync.RWMutex
-}
-
-func NewSplit(id string, dir Direction, children ...*Panel) *Panel {
-    sizes := make([]float64, len(children))
-    for i := range sizes { sizes[i] = 1.0 / float64(len(children)) }
-    return &Panel{ID: id, Direction: dir, Children: children, Sizes: sizes}
-}
-```
-
-#### 渲染
-
-```go
-func (p *Panel) RenderAt(scr uv.Screen, area image.Rectangle) {
-    if p.IsLeaf() {
-        p.renderLeaf(scr, area)
-    } else {
-        p.renderSplit(scr, area)
-    }
-}
-
-func (p *Panel) renderLeaf(scr uv.Screen, area image.Rectangle) {
-    content := p.GetContent()
-    borderStyle := p.Border
-    if p.Active { borderStyle = borderStyle.Foreground(lipgloss.Color("205")) }  // 高亮 active
-
-    innerW := area.Dx() - 4  // 左右边框各 1 + 内 padding 2
-    innerH := area.Dy() - 2  // 上下边框
-
-    // 标题行
-    var b strings.Builder
-    if title := p.TitleStyle.Render(" "+p.Title+" "); p.Title != "" && innerW > len(title)+2 {
-        b.WriteString("┌" + title + strings.Repeat("─", innerW-len(title)) + "┐\n")
-    } else {
-        b.WriteString("┌" + strings.Repeat("─", innerW) + "┐\n")
-    }
-
-    // 内容（截断/pad 到 innerW x innerH）
-    lines := strings.Split(content, "\n")
-    for i := 0; i < innerH; i++ {
-        line := ""
-        if i < len(lines) { line = lines[i] }
-        if len(line) > innerW {
-            line = line[:innerW]
-        } else {
-            line += strings.Repeat(" ", innerW-len(line))
-        }
-        b.WriteString("│" + line + "│\n")
-    }
-    b.WriteString("└" + strings.Repeat("─", innerW) + "┘")
-
-    uv.NewStyledString(borderStyle.Render(b.String())).Draw(scr, area)
-}
-
-func (p *Panel) renderSplit(scr uv.Screen, area image.Rectangle) {
-    var offset int
-    for i, child := range p.Children {
-        var childArea image.Rectangle
-        switch p.Direction {
-        case Vertical:
-            childW := int(float64(area.Dx()) * p.Sizes[i])
-            if i == len(p.Children)-1 { childW = area.Dx() - offset }  // 余数给最后一个
-            childArea = image.Rect(area.Min.X+offset, area.Min.Y, area.Min.X+offset+childW, area.Max.Y)
-            offset += childW
-        case Horizontal:
-            // 类似
-        }
-        child.RenderAt(scr, childArea)
-    }
-}
-```
-
-#### 与 Agent 集成（注入 View）
-
-```go
-// chat/tools.go 中定义注入点
-var toolPanelView *panel.View
-var agentPanelResolver func(parentID string, params agent.AgentParams, tools []ToolMessageItem) []panel.AgentPanelData
-
-func SetToolPanelView(pv *panel.View) { toolPanelView = pv }
-func SetAgentPanelResolver(resolver ...) { agentPanelResolver = resolver }
-
-// 在 ui.go 启动时注入
-chat.SetToolPanelView(com.Panels)
-chat.SetAgentPanelResolver(ui.agentTaskPanelsForRender)
-```
-
-### 设计意图
-
-1. **Panel 是树结构**（不是列表），支持任意嵌套的横向/纵向分屏。
-2. **Content 是 string 而非 component**：每个 panel 只是"容器"，内容由调用方生成。
-3. **Active 状态高亮**：聚焦的 panel 边框换色（lipgloss.Color("205")）。
-4. **优先级分配**：`Sizes[i] * area` 给每个子，余数给最后一个避免丢像素。
-
-### 复用模板
-
-```go
-// 任何需要"分屏展示多任务"的场景都适用
-type PanelGrid struct {
-    Root    *Panel
-    Active  string  // panel ID
-    Visible bool
-}
-
-func (g *PanelGrid) Show() / Hide() / SetActive(id)
-func (g *PanelGrid) UpdateContent(id, content string)
 ```
 
 ---

@@ -344,7 +344,7 @@ Action severity: `warn` → `pause` → `stop`. On pause, Moderator proposes rec
 ## 8. TUI / UX
 
 - **Transcript** renders in the existing chat area as `RoundtableMessageItem`s with seat badges, turn index, and phase tag.
-- **Side panel** (reuse `internal/ui/panel`) shows:
+- **Side panel** shows:
   - Seat roster + current speaker + status.
   - Active agenda items.
   - Adopted decisions.

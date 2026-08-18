@@ -181,7 +181,6 @@ if ((insideTmux || inProcessMode || nativePanes) && viewedTeammate) {
 
 ### 3.2 Agents View（← 键打开）
 
-- **Live 阶段**：活跃 agents 渲染到 compact live panel
 - **Committed 阶段**：完成结果 commit 到 `<Static>` 历史（不重绘）
 - **路由条件**：`agent call count >= 2 && all calls are agents && !pending confirmation`
 
@@ -706,7 +705,6 @@ func (c *Coordinator) handleMessage(msg Message) {
 ### 6.8 UI：Team Dashboard
 
 ```go
-// internal/ui/panel/team_dashboard.go
 type TeamDashboard struct {
     com   *common.Common
     team  *team.Team
@@ -1086,42 +1084,6 @@ func (v *AgentPanelView) Render(width int) string {
 }
 ```
 
-### 9.4 Idle 折叠
-
-```go
-func (v *AgentPanelView) renderWithFold(width int) string {
-    liveList := sortedLive(v.live)
-    var shown []*TeammateRow
-    var hidden int
-    
-    for i, row := range liveList {
-        if i < 5 {
-            shown = append(shown, row)
-        } else {
-            hidden++
-        }
-    }
-    
-    var b strings.Builder
-    for _, row := range shown {
-        b.WriteString(row.Render(width))
-        b.WriteString("\n")
-    }
-    if hidden > 0 {
-        if v.expanded {
-            // 展开全部
-            for _, row := range liveList[5:] {
-                b.WriteString(row.Render(width))
-                b.WriteString("\n")
-            }
-        } else {
-            b.WriteString(fmt.Sprintf("... and %d more (press 'e' to expand)\n", hidden))
-        }
-    }
-    return b.String()
-}
-```
-
 ---
 
 ## 十、可落地的改进清单
@@ -1132,7 +1094,6 @@ func (v *AgentPanelView) renderWithFold(width int) string {
 | TaskBoard 实现 | 3h | ⭐⭐⭐⭐⭐ |
 | Teammate 子进程 spawn | 6h | ⭐⭐⭐⭐ |
 | AgentsViewDialog（← 键） | 4h | ⭐⭐⭐⭐⭐ |
-| Live + Committed 双层 panel | 3h | ⭐⭐⭐⭐ |
 | Idle agent 折叠 | 1h | ⭐⭐⭐ |
 | Aggregate row renderer | 2h | ⭐⭐⭐⭐ |
 | Plan approval flow | 4h | ⭐⭐⭐ |
@@ -1190,9 +1151,8 @@ func (v *AgentPanelView) renderWithFold(width int) string {
 | TaskBoard | ⚠️ TodoWrite 部分有 | 低（扩展） | 极高 |
 | Teammate 进程 | ❌ 无 | 高（需要 subprocess） | 极高 |
 | AgentsViewDialog | ❌ 无 | 中（新建 dialog） | 高 |
-| Live/Committed | ❌ Panel 单层 | 低（Panel 改） | 中 |
 | Color 分配 | ❌ 无 | 低（新增函数） | 中 |
-| Aggregate Row | ⚠️ Panel 树有 | 低（仿写） | 高 |
+| Aggregate Row | ⚠️ 树形渲染有 | 低（仿写） | 高 |
 | 文件分区 | ❌ 无 | 低（配置） | 中 |
 
 **mocode 落地路径**：
