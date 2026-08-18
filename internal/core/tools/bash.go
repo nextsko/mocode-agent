@@ -75,76 +75,105 @@ type bashDescriptionData struct {
 	ModelName       string
 }
 
+// bannedCommands is a minimal, catastrophic-only deny list. Routine commands
+// (network tools, package managers, sudo, ...) are NOT hard-blocked anymore —
+// they simply go through the normal permission flow. Only commands that can
+// instantly destroy the system or make it unbootable are blocked outright.
 var bannedCommands = []string{
-	// Network/Download tools
-	"alias",
-	"aria2c",
-	"axel",
-	"chrome",
-	"curl",
-	"curlie",
-	"firefox",
-	"http-prompt",
-	"httpie",
-	"links",
-	"lynx",
-	"nc",
-	"safari",
-	"scp",
-	"ssh",
-	"telnet",
-	"w3m",
-	"wget",
-	"xh",
-
-	// System administration
-	"doas",
-	"su",
-	"sudo",
-
-	// Package managers
-	"apk",
-	"apt",
-	"apt-cache",
-	"apt-get",
-	"dnf",
-	"dpkg",
-	"emerge",
-	"home-manager",
-	"makepkg",
-	"opkg",
-	"pacman",
-	"paru",
-	"pkg",
-	"pkg_add",
-	"pkg_delete",
-	"portage",
-	"rpm",
-	"yay",
-	"yum",
-	"zypper",
-
-	// System modification
-	"at",
-	"batch",
-	"chkconfig",
-	"crontab",
+	// Disk / partition destruction
 	"fdisk",
 	"mkfs",
-	"mount",
 	"parted",
-	"service",
-	"systemctl",
-	"umount",
 
-	// Network configuration
-	"firewall-cmd",
-	"ifconfig",
-	"ip",
-	"iptables",
-	"pfctl",
-	"route",
-	"ufw",
+	// Power state — killing the machine mid-session
+	"halt",
+	"poweroff",
+	"reboot",
+	"shutdown",
+}
+
+// criticalRootDirs are top-level system directories whose recursive deletion
+// makes the system unbootable. User-writable locations (/home, /tmp, /opt,
+// /srv, ...) are intentionally NOT protected — deleting those is the user's
+// own call.
+var criticalRootDirs = map[string]struct{}{
+	"/":      {},
+	"/bin":   {},
+	"/boot":  {},
+	"/dev":   {},
+	"/etc":   {},
+	"/lib":   {},
+	"/lib32": {},
+	"/lib64": {},
+	"/proc":  {},
+	"/root":  {},
+	"/run":   {},
+	"/sbin":  {},
+	"/sys":   {},
+	"/usr":   {},
+	"/var":   {},
+}
+
+// catastrophicCommandBlocker hard-blocks commands that instantly destroy the
+// system: `rm -rf /` (and friends), fork bombs, mkfs.* helper binaries and
+// `dd` writing over raw disks. Everything else is left to the permission
+// system.
+func catastrophicCommandBlocker() shell.BlockFunc {
+	return func(args []string) bool {
+		if len(args) == 0 {
+			return false
+		}
+		lower := strings.ToLower(strings.Join(args, " "))
+
+		// Fork bombs, mkfs.* binaries and raw-disk dd.
+		if strings.HasPrefix(lower, ":(){") ||
+			strings.HasPrefix(lower, "mkfs.") ||
+			(args[0] == "dd" && strings.Contains(lower, "of=/dev/sd")) ||
+			(args[0] == "dd" && strings.Contains(lower, "of=/dev/nvme")) ||
+			(args[0] == "dd" && strings.Contains(lower, "of=/dev/vd")) ||
+			(args[0] == "dd" && strings.Contains(lower, "of=/dev/hd")) {
+			return true
+		}
+
+		// rm -rf targeting the filesystem root or critical system dirs.
+		if args[0] != "rm" {
+			return false
+		}
+		recursive, force := false, false
+		targets := make([]string, 0, len(args))
+		for _, arg := range args[1:] {
+			switch {
+			case arg == "--recursive":
+				recursive = true
+			case arg == "--force":
+				force = true
+			case strings.HasPrefix(arg, "-") && len(arg) > 1:
+				for _, c := range strings.TrimPrefix(arg, "-") {
+					if c == 'r' {
+						recursive = true
+					}
+					if c == 'f' {
+						force = true
+					}
+				}
+			default:
+				targets = append(targets, arg)
+			}
+		}
+		if !recursive || !force {
+			return false
+		}
+		for _, t := range targets {
+			cleaned := strings.TrimRight(t, "/*")
+			if cleaned == "" {
+				cleaned = "/"
+			}
+			if _, bad := criticalRootDirs[cleaned]; bad {
+				return true
+			}
+		}
+		return false
+	}
 }
 
 func bashDescription(attribution *config.Attribution, modelName string) string {
@@ -165,28 +194,7 @@ func bashDescription(attribution *config.Attribution, modelName string) string {
 func blockFuncs() []shell.BlockFunc {
 	return []shell.BlockFunc{
 		shell.CommandsBlocker(bannedCommands),
-
-		// System package managers
-		shell.ArgumentsBlocker("apk", []string{"add"}, nil),
-		shell.ArgumentsBlocker("apt", []string{"install"}, nil),
-		shell.ArgumentsBlocker("apt-get", []string{"install"}, nil),
-		shell.ArgumentsBlocker("dnf", []string{"install"}, nil),
-		shell.ArgumentsBlocker("pacman", nil, []string{"-S"}),
-		shell.ArgumentsBlocker("pkg", []string{"install"}, nil),
-		shell.ArgumentsBlocker("yum", []string{"install"}, nil),
-		shell.ArgumentsBlocker("zypper", []string{"install"}, nil),
-
-		// Language-specific package managers
-		shell.ArgumentsBlocker("brew", []string{"install"}, nil),
-		shell.ArgumentsBlocker("cargo", []string{"install"}, nil),
-		shell.ArgumentsBlocker("gem", []string{"install"}, nil),
-		shell.ArgumentsBlocker("npm", []string{"install"}, []string{"--global"}),
-		shell.ArgumentsBlocker("npm", []string{"install"}, []string{"-g"}),
-		shell.ArgumentsBlocker("pip", []string{"install"}, []string{"--user"}),
-		shell.ArgumentsBlocker("pip3", []string{"install"}, []string{"--user"}),
-		shell.ArgumentsBlocker("pnpm", []string{"add"}, []string{"--global"}),
-		shell.ArgumentsBlocker("pnpm", []string{"add"}, []string{"-g"}),
-		shell.ArgumentsBlocker("yarn", []string{"global", "add"}, nil),
+		catastrophicCommandBlocker(),
 	}
 }
 
