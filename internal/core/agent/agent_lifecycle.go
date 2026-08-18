@@ -23,7 +23,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/util/ext"
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 	"github.com/nextsko/mocode-agent/internal/core/tools"
-	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 )
 
 func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy.AgentResult, error) {

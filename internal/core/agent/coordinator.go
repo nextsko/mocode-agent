@@ -42,8 +42,8 @@ import (
 	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 	"github.com/nextsko/mocode-agent/internal/core/tools"
-	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
-	"github.com/nextsko/mocode-agent/internal/core/tools/nethttp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/nethttp"
 	"github.com/qjebbs/go-jsons"
 	"golang.org/x/sync/errgroup"
 )

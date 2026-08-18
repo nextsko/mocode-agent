@@ -11,7 +11,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
-	agenttools "github.com/nextsko/mocode-agent/internal/core/tools"
+	"github.com/nextsko/mocode-agent/internal/core/tools"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/chat"
 	"github.com/nextsko/mocode-agent/internal/ui/notification"
@@ -262,7 +262,7 @@ func (m *UI) newSession() tea.Cmd {
 	if len(m.backgroundJobs) > 0 {
 		clear(m.backgroundJobs)
 	}
-	agenttools.ResetCache()
+	tools.ResetCache()
 	return tea.Batch(
 		func() tea.Msg {
 			m.com.Workspace.LSPStopAll(context.Background())

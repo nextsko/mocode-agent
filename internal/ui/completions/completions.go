@@ -16,7 +16,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/ui/list"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
 	"github.com/nextsko/mocode-agent/internal/util/fsext"
-	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 )
 
 const (

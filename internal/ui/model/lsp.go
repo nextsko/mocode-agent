@@ -12,7 +12,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/app"
 	"github.com/nextsko/mocode-agent/internal/ui/common"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
-	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
 )
 
 // LSPInfo wraps LSP client information with diagnostic counts by severity.

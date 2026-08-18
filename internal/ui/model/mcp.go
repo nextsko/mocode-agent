@@ -9,7 +9,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/ui/common"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
-	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 )
 
 // mcpInfo renders the MCP status section showing active MCP clients and their

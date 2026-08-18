@@ -21,7 +21,7 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
-	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 	"github.com/nextsko/mocode-agent/internal/transport/workspace"
 )
 

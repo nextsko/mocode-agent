@@ -1,13 +1,14 @@
 package tools
 
 import (
-	"github.com/nextsko/mocode-agent/internal/core/tools/gitea"
-	"github.com/nextsko/mocode-agent/internal/core/tools/net"
+	web "github.com/nextsko/mocode-agent/internal/core/tools/core/web"
+	
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitea"
 	"slices"
 	"sort"
 	"testing"
 
-	"github.com/nextsko/mocode-agent/internal/core/tools/plugins/sshcommon"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/plugins/sshcommon"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,8 +41,8 @@ var knownAllToolNames = []string{
 	WriteToolName,
 	ListMCPResourcesToolName,
 	ReadMCPResourceToolName,
-	net.CrawlToolName,
-	net.DownloadDocsToolName,
+	web.CrawlToolName,
+	web.DownloadDocsToolName,
 	TransferToolName,
 	SessionExportToolName,
 	MessageExportToolName,

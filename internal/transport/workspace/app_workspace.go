@@ -17,8 +17,8 @@ import (
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/slash"
-	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
-	mcptools "github.com/nextsko/mocode-agent/internal/core/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
+	mcptools "github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 )
 
 // AppWorkspace implements the Workspace interface by delegating

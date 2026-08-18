@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"charm.land/fantasy"
-	"github.com/nextsko/mocode-agent/internal/core/tools/filter"
+	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/filter"
 )
 
 // BuildFiltered is like Build but applies zero or more FilterFuncs to the

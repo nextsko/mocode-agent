@@ -9,14 +9,17 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
-	"github.com/nextsko/mocode-agent/internal/core/tools/gitea"
-	"github.com/nextsko/mocode-agent/internal/core/tools/gitops"
-	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
-	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
-	"github.com/nextsko/mocode-agent/internal/core/tools/net"
-	"github.com/nextsko/mocode-agent/internal/core/tools/nethttp"
-	"github.com/nextsko/mocode-agent/internal/core/tools/plugins/sshcommon"
-	"github.com/nextsko/mocode-agent/internal/core/tools/ssh"
+	fs "github.com/nextsko/mocode-agent/internal/core/tools/core/fs"
+	shell "github.com/nextsko/mocode-agent/internal/core/tools/core/shell"
+	"github.com/nextsko/mocode-agent/internal/core/tools/core/web"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/nethttp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/plugins/sshcommon"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitea"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitops"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/ssh"
+	agenttools "github.com/nextsko/mocode-agent/internal/core/tools/internalx/agent"
+	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
 	"github.com/nextsko/mocode-agent/internal/domain/filetracker"
 	"github.com/nextsko/mocode-agent/internal/domain/history"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
@@ -87,7 +90,7 @@ type ToolDeps struct {
 	ActiveSkills    []*skills.Skill
 	SkillTracker    *skills.Tracker
 	ModelName       string
-	SummarySchedule SessionSummaryScheduler
+	SummarySchedule agenttools.SessionSummaryScheduler
 	SessionSearch   *store.SessionSearch
 	HTTP            *nethttp.Factory
 }
@@ -170,19 +173,19 @@ type execPlugin struct{}
 
 func (execPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
-		{Name: BashToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
-		{Name: JobOutputToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
-		{Name: JobInputToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
-		{Name: JobKillToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
+		{Name: shell.BashToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
+		{Name: shell.JobOutputToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
+		{Name: shell.JobInputToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
+		{Name: shell.JobKillToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
 	}
 }
 
 func (execPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{
-		NewBashTool(deps.Permissions, deps.Cfg.WorkingDir(), deps.Cfg.Config().Options.Attribution, deps.ModelName),
-		NewJobOutputTool(),
-		NewJobInputTool(),
-		NewJobKillTool(),
+		shell.NewBashTool(deps.Permissions, deps.Cfg.WorkingDir(), deps.Cfg.Config().Options.Attribution, deps.ModelName),
+		shell.NewJobOutputTool(),
+		shell.NewJobInputTool(),
+		shell.NewJobKillTool(),
 	}
 }
 
@@ -192,12 +195,12 @@ type filePlugin struct{}
 
 func (filePlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
-		{Name: EditToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
-		{Name: MultiEditToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
-		{Name: ViewToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
-		{Name: ReadFilesToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
-		{Name: WriteToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
-		{Name: LSToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
+		{Name: fs.EditToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
+		{Name: fs.MultiEditToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
+		{Name: fs.ViewToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
+		{Name: fs.ReadFilesToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
+		{Name: fs.WriteToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
+		{Name: fs.LSToolName, Kind: ToolKindBuiltin, Category: CategoryFile},
 	}
 }
 
@@ -205,12 +208,12 @@ func (filePlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	wd := deps.Cfg.WorkingDir()
 	cfg := deps.Cfg.Config()
 	return []fantasy.AgentTool{
-		NewEditTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
-		NewMultiEditTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
-		NewViewTool(deps.LSPManager, deps.Permissions, deps.FileTracker, deps.SkillTracker, wd, cfg.Options.SkillsPaths...),
-		NewReadFilesTool(deps.Permissions, deps.FileTracker, wd),
-		NewWriteTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
-		NewLsTool(deps.Permissions, wd, cfg.Tools.Ls),
+		fs.NewEditTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
+		fs.NewMultiEditTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
+		fs.NewViewTool(deps.LSPManager, deps.Permissions, deps.FileTracker, deps.SkillTracker, wd, cfg.Options.SkillsPaths...),
+		fs.NewReadFilesTool(deps.Permissions, deps.FileTracker, wd),
+		fs.NewWriteTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
+		fs.NewLsTool(deps.Permissions, wd, cfg.Tools.Ls),
 	}
 }
 
@@ -220,9 +223,9 @@ type searchPlugin struct{}
 
 func (searchPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
-		{Name: GlobToolName, Kind: ToolKindPlugin, Category: CategorySearch},
-		{Name: GrepToolName, Kind: ToolKindPlugin, Category: CategorySearch},
-		{Name: net.SourcegraphToolName, Kind: ToolKindPlugin, Category: CategorySearch},
+		{Name: fs.GlobToolName, Kind: ToolKindPlugin, Category: CategorySearch},
+		{Name: fs.GrepToolName, Kind: ToolKindPlugin, Category: CategorySearch},
+		{Name: web.SourcegraphToolName, Kind: ToolKindPlugin, Category: CategorySearch},
 	}
 }
 
@@ -230,9 +233,9 @@ func (searchPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool 
 	wd := deps.Cfg.WorkingDir()
 	webClient := deps.HTTP.Client(nethttp.DefaultTimeout)
 	return []fantasy.AgentTool{
-		NewGlobTool(wd),
-		NewGrepTool(wd, deps.Cfg.Config().Tools.Grep),
-		net.NewSourcegraphTool(webClient),
+		fs.NewGlobTool(wd),
+		fs.NewGrepTool(wd, deps.Cfg.Config().Tools.Grep),
+		web.NewSourcegraphTool(webClient),
 	}
 }
 
@@ -242,10 +245,10 @@ type networkPlugin struct{}
 
 func (networkPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
-		{Name: net.FetchToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
-		{Name: net.CrawlToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
-		{Name: net.DownloadToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
-		{Name: net.DownloadDocsToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
+		{Name: web.FetchToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
+		{Name: web.CrawlToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
+		{Name: web.DownloadToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
+		{Name: web.DownloadDocsToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
 	}
 }
 
@@ -259,10 +262,10 @@ func (networkPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool
 	downloadClient := deps.HTTP.Client(nethttp.DownloadTimeout)
 	retryPolicy := toolutil.DefaultRetryPolicy()
 	return []fantasy.AgentTool{
-		toolutil.WithRetry(net.NewFetchTool(deps.Permissions, wd, webClient), retryPolicy),
-		toolutil.WithRetry(net.NewCrawlTool(webClient), retryPolicy),
-		toolutil.WithRetry(net.NewDownloadTool(deps.Permissions, wd, downloadClient), retryPolicy),
-		net.NewDownloadDocsTool(deps.HTTP),
+		toolutil.WithRetry(web.NewFetchTool(deps.Permissions, wd, webClient), retryPolicy),
+		toolutil.WithRetry(web.NewCrawlTool(webClient), retryPolicy),
+		toolutil.WithRetry(web.NewDownloadTool(deps.Permissions, wd, downloadClient), retryPolicy),
+		web.NewDownloadDocsTool(deps.HTTP),
 	}
 }
 
@@ -272,23 +275,23 @@ type sessionPlugin struct{}
 
 func (sessionPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
-		{Name: TodosToolName, Kind: ToolKindPlugin, Category: CategorySession},
-		{Name: SessionExportToolName, Kind: ToolKindPlugin, Category: CategorySession},
-		{Name: MessageExportToolName, Kind: ToolKindPlugin, Category: CategorySession},
-		{Name: SessionSummaryToolName, Kind: ToolKindPlugin, Category: CategorySession},
-		{Name: SessionSearchToolName, Kind: ToolKindPlugin, Category: CategorySession},
+		{Name: agenttools.TodosToolName, Kind: ToolKindPlugin, Category: CategorySession},
+		{Name: agenttools.SessionExportToolName, Kind: ToolKindPlugin, Category: CategorySession},
+		{Name: agenttools.MessageExportToolName, Kind: ToolKindPlugin, Category: CategorySession},
+		{Name: agenttools.SessionSummaryToolName, Kind: ToolKindPlugin, Category: CategorySession},
+		{Name: agenttools.SessionSearchToolName, Kind: ToolKindPlugin, Category: CategorySession},
 	}
 }
 
 func (sessionPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	t := []fantasy.AgentTool{
-		NewTodosTool(deps.Sessions),
-		NewSessionExportTool(deps.Messages, deps.Cfg.WorkingDir()),
-		NewMessageExportTool(deps.Messages, deps.Cfg.WorkingDir()),
-		NewSessionSummaryTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), SessionSummaryScheduler(deps.SummarySchedule)),
+		agenttools.NewTodosTool(deps.Sessions),
+		agenttools.NewSessionExportTool(deps.Messages, deps.Cfg.WorkingDir()),
+		agenttools.NewMessageExportTool(deps.Messages, deps.Cfg.WorkingDir()),
+		agenttools.NewSessionSummaryTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), agenttools.SessionSummaryScheduler(deps.SummarySchedule)),
 	}
 	if deps.SessionSearch != nil {
-		t = append(t, NewSessionSearchTool(deps.SessionSearch))
+		t = append(t, agenttools.NewSessionSearchTool(deps.SessionSearch))
 	}
 	return t
 }
@@ -299,15 +302,15 @@ type mocodePlugin struct{}
 
 func (mocodePlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
-		{Name: MocodeInfoToolName, Kind: ToolKindPlugin, Category: CategoryMocode},
-		{Name: MocodeLogsToolName, Kind: ToolKindPlugin, Category: CategoryMocode},
+		{Name: agenttools.MocodeInfoToolName, Kind: ToolKindPlugin, Category: CategoryMocode},
+		{Name: agenttools.MocodeLogsToolName, Kind: ToolKindPlugin, Category: CategoryMocode},
 	}
 }
 
 func (mocodePlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{
-		NewMocodeInfoTool(deps.Cfg, deps.LSPManager, deps.AllSkills, deps.ActiveSkills, deps.SkillTracker),
-		NewMocodeLogsTool(log.MainLogPath(infra.DataDir())),
+		agenttools.NewMocodeInfoTool(deps.Cfg, deps.LSPManager, deps.AllSkills, deps.ActiveSkills, deps.SkillTracker),
+		agenttools.NewMocodeLogsTool(log.MainLogPath(infra.DataDir())),
 	}
 }
 
@@ -317,9 +320,9 @@ type lspPlugin struct{}
 
 func (lspPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
-		{Name: DiagnosticsToolName, Kind: ToolKindPlugin, Category: CategoryLSP},
-		{Name: ReferencesToolName, Kind: ToolKindPlugin, Category: CategoryLSP},
-		{Name: LSPRestartToolName, Kind: ToolKindPlugin, Category: CategoryLSP},
+		{Name: agenttools.DiagnosticsToolName, Kind: ToolKindPlugin, Category: CategoryLSP},
+		{Name: lsp.ReferencesToolName, Kind: ToolKindPlugin, Category: CategoryLSP},
+		{Name: lsp.LSPRestartToolName, Kind: ToolKindPlugin, Category: CategoryLSP},
 	}
 }
 
@@ -331,9 +334,9 @@ func (lspPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 		return nil
 	}
 	return []fantasy.AgentTool{
-		NewDiagnosticsTool(deps.LSPManager),
-		NewReferencesTool(deps.LSPManager),
-		NewLSPRestartTool(deps.LSPManager),
+		agenttools.NewDiagnosticsTool(deps.LSPManager),
+		lsp.NewReferencesTool(deps.LSPManager),
+		lsp.NewLSPRestartTool(deps.LSPManager),
 	}
 }
 
@@ -384,12 +387,12 @@ type thinkPlugin struct{}
 
 func (thinkPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
-		{Name: ThinkToolName, Kind: ToolKindPlugin, Category: CategoryReasoning},
+		{Name: agenttools.ThinkToolName, Kind: ToolKindPlugin, Category: CategoryReasoning},
 	}
 }
 
 func (thinkPlugin) Build(_ context.Context, _ ToolDeps) []fantasy.AgentTool {
-	return []fantasy.AgentTool{NewThinkTool()}
+	return []fantasy.AgentTool{agenttools.NewThinkTool()}
 }
 
 // ─── plugin/gitops ────────────────────────────────────────────────────────────
@@ -460,8 +463,8 @@ func (p *sshPlugin) Stop(_ context.Context) error {
 func coordinatorToolNames() []ToolDescriptor {
 	return []ToolDescriptor{
 		{Name: AgentToolName, Kind: ToolKindPlugin, Category: CategorySession},
-		{Name: AgenticFetchToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
-		{Name: TransferToolName, Kind: ToolKindPlugin, Category: CategorySession},
+		{Name: web.AgenticFetchToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
+		{Name: agenttools.TransferToolName, Kind: ToolKindPlugin, Category: CategorySession},
 	}
 }
 
