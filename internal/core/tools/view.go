@@ -19,9 +19,9 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
+	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
 	"github.com/nextsko/mocode-agent/internal/domain/filetracker"
 	"github.com/nextsko/mocode-agent/internal/util/ext"
-	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
 )
 
 //go:embed view.md

@@ -1,4 +1,4 @@
-package tools
+package gitea
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 // PullsToolName is the registered name of the gitea_pulls tool.
 const PullsToolName = "gitea_pulls"
 
-//go:embed pulls.md
+//go:embed gitea_pulls.md
 var pullsDescription []byte
 
 // PullsParams holds input parameters for the gitea_pulls tool.

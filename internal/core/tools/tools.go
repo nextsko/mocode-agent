@@ -8,6 +8,7 @@ import (
 
 	"charm.land/fantasy"
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/tools/net"
 	"github.com/nextsko/mocode-agent/internal/core/tools/plugins/netcommon"
 )
 
@@ -16,6 +17,34 @@ const (
 	WebFetchToolName      = netcommon.WebFetchToolName
 	WebSearchToolName     = netcommon.WebSearchToolName
 	LargeContentThreshold = netcommon.LargeContentThreshold
+)
+
+// Re-exports from the net subpackage (web tool implementations live in
+// tools/net since the 0.8.x restructure; the façade keeps the historical
+// tools.X import paths stable for consumers outside the tools tree).
+const (
+	AgenticFetchToolName = net.AgenticFetchToolName
+	FetchToolName        = net.FetchToolName
+	DownloadToolName     = net.DownloadToolName
+	SourcegraphToolName  = net.SourcegraphToolName
+)
+
+var (
+	NewSourcegraphTool = net.NewSourcegraphTool
+	NewWebFetchTool    = net.NewWebFetchTool
+	NewWebSearchTool   = net.NewWebSearchTool
+)
+
+// Parameter type aliases from the net subpackage (kept stable for external
+// callers such as coordinator-owned tools and UI permission dialogs).
+type (
+	AgenticFetchParams            = net.AgenticFetchParams
+	AgenticFetchPermissionsParams = net.AgenticFetchPermissionsParams
+	DownloadParams                = net.DownloadParams
+	DownloadPermissionsParams     = net.DownloadPermissionsParams
+	FetchParams                   = net.FetchParams
+	FetchPermissionsParams        = net.FetchPermissionsParams
+	SourcegraphParams             = net.SourcegraphParams
 )
 
 var FetchURLAndConvert = netcommon.FetchURLAndConvert

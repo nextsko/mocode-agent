@@ -1,4 +1,4 @@
-package tools
+package net
 
 import (
 	"context"
@@ -11,8 +11,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-	"github.com/nextsko/mocode-agent/internal/util/errcoll"
 	"github.com/nextsko/mocode-agent/internal/core/tools/plugins/netcommon"
+	"github.com/nextsko/mocode-agent/internal/util/errcoll"
 
 	"charm.land/fantasy"
 	md "github.com/JohannesKaufmann/html-to-markdown"

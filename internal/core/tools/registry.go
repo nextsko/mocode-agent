@@ -9,6 +9,12 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
+	"github.com/nextsko/mocode-agent/internal/core/tools/gitea"
+	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/net"
+	"github.com/nextsko/mocode-agent/internal/core/tools/nethttp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/plugins/sshcommon"
+	"github.com/nextsko/mocode-agent/internal/core/tools/ssh"
 	"github.com/nextsko/mocode-agent/internal/domain/filetracker"
 	"github.com/nextsko/mocode-agent/internal/domain/history"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
@@ -16,9 +22,6 @@ import (
 	"github.com/nextsko/mocode-agent/internal/store"
 	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/nextsko/mocode-agent/internal/util/log"
-	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
-	"github.com/nextsko/mocode-agent/internal/core/tools/nethttp"
-	"github.com/nextsko/mocode-agent/internal/core/tools/plugins/sshcommon"
 	"sync"
 )
 
@@ -217,7 +220,7 @@ func (searchPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
 		{Name: GlobToolName, Kind: ToolKindPlugin, Category: CategorySearch},
 		{Name: GrepToolName, Kind: ToolKindPlugin, Category: CategorySearch},
-		{Name: SourcegraphToolName, Kind: ToolKindPlugin, Category: CategorySearch},
+		{Name: net.SourcegraphToolName, Kind: ToolKindPlugin, Category: CategorySearch},
 	}
 }
 
@@ -227,7 +230,7 @@ func (searchPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool 
 	return []fantasy.AgentTool{
 		NewGlobTool(wd),
 		NewGrepTool(wd, deps.Cfg.Config().Tools.Grep),
-		NewSourcegraphTool(webClient),
+		net.NewSourcegraphTool(webClient),
 	}
 }
 
@@ -237,10 +240,10 @@ type networkPlugin struct{}
 
 func (networkPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
-		{Name: FetchToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
-		{Name: CrawlToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
-		{Name: DownloadToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
-		{Name: DownloadDocsToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
+		{Name: net.FetchToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
+		{Name: net.CrawlToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
+		{Name: net.DownloadToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
+		{Name: net.DownloadDocsToolName, Kind: ToolKindPlugin, Category: CategoryNetwork},
 	}
 }
 
@@ -254,10 +257,10 @@ func (networkPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool
 	downloadClient := deps.HTTP.Client(nethttp.DownloadTimeout)
 	retryPolicy := toolutil.DefaultRetryPolicy()
 	return []fantasy.AgentTool{
-		toolutil.WithRetry(NewFetchTool(deps.Permissions, wd, webClient), retryPolicy),
-		toolutil.WithRetry(NewCrawlTool(webClient), retryPolicy),
-		toolutil.WithRetry(NewDownloadTool(deps.Permissions, wd, downloadClient), retryPolicy),
-		NewDownloadDocsTool(deps.HTTP),
+		toolutil.WithRetry(net.NewFetchTool(deps.Permissions, wd, webClient), retryPolicy),
+		toolutil.WithRetry(net.NewCrawlTool(webClient), retryPolicy),
+		toolutil.WithRetry(net.NewDownloadTool(deps.Permissions, wd, downloadClient), retryPolicy),
+		net.NewDownloadDocsTool(deps.HTTP),
 	}
 }
 
@@ -359,17 +362,17 @@ type giteaPlugin struct{}
 
 func (giteaPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
-		{Name: IssuesToolName, Kind: ToolKindPlugin, Category: CategoryGitea},
-		{Name: PullsToolName, Kind: ToolKindPlugin, Category: CategoryGitea},
-		{Name: NotificationsToolName, Kind: ToolKindPlugin, Category: CategoryGitea},
+		{Name: gitea.IssuesToolName, Kind: ToolKindPlugin, Category: CategoryGitea},
+		{Name: gitea.PullsToolName, Kind: ToolKindPlugin, Category: CategoryGitea},
+		{Name: gitea.NotificationsToolName, Kind: ToolKindPlugin, Category: CategoryGitea},
 	}
 }
 
 func (giteaPlugin) Build(_ context.Context, _ ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{
-		NewIssuesTool(),
-		NewPullsTool(),
-		NewNotificationsTool(),
+		gitea.NewIssuesTool(),
+		gitea.NewPullsTool(),
+		gitea.NewNotificationsTool(),
 	}
 }
 
@@ -433,10 +436,10 @@ func (p *sshPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool 
 		p.svc = sshcommon.NewService()
 	})
 	return []fantasy.AgentTool{
-		NewSshExecTool(p.svc, deps.Permissions),
-		NewSshUploadTool(p.svc, deps.Permissions),
-		NewSshDownloadTool(p.svc, deps.Permissions),
-		NewSshListHostsTool(p.svc),
+		ssh.NewSshExecTool(p.svc, deps.Permissions),
+		ssh.NewSshUploadTool(p.svc, deps.Permissions),
+		ssh.NewSshDownloadTool(p.svc, deps.Permissions),
+		ssh.NewSshListHostsTool(p.svc),
 	}
 }
 

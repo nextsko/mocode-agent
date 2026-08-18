@@ -15,12 +15,12 @@ import (
 	"charm.land/fantasy"
 
 	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
 	"github.com/nextsko/mocode-agent/internal/domain/filetracker"
 	"github.com/nextsko/mocode-agent/internal/domain/history"
 	"github.com/nextsko/mocode-agent/internal/util/diff"
 	"github.com/nextsko/mocode-agent/internal/util/ext"
 	"github.com/nextsko/mocode-agent/internal/util/fsext"
-	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
 )
 
 type MultiEditOperation struct {

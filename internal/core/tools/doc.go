@@ -12,12 +12,22 @@
 //	  contracts.go          the target Tool/ToolContext/ToolResult contracts
 //	  filter/               composable predicates applied after Build
 //	  nethttp/              THE outbound-HTTP port (interface block)
+//	  net/                  web tools: fetch, crawl, web_fetch, web_search,
+//	                        download, download_docs, sourcegraph
+//	  ssh/                  ssh_exec, ssh_upload, ssh_download, ssh_list_hosts
+//	  gitea/                gitea_issues, gitea_pulls, gitea_notifications
 //	  mcp/                  MCP bridge: sessions, transports, meta tools
 //	  lsp/                  LSP manager and its tools
 //	  plugins/<x>common/    shared library for one tool category
 //	    netcommon/          fetch/search helpers all web tools share
 //	    sshcommon/          SSH connection pool + exec helpers
 //	    giteacommon/        tea CLI plumbing
+//
+// Root-level files are the fs/shell/session/diagnostic core that every
+// runtime needs (edit, view, bash, job_*, todos, ...). Everything with an
+// external-system affinity lives in its category directory; the façade
+// (tools.go) re-exports the stable tools.X symbols so consumers outside the
+// tree are insulated from the layout.
 //
 // A file in tools/ root exports New<Tool>Tool(deps...) fantasy.AgentTool
 // constructors and one <Tool>ToolName constant. A plugin block in

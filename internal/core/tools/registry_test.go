@@ -1,6 +1,8 @@
 package tools
 
 import (
+	"github.com/nextsko/mocode-agent/internal/core/tools/gitea"
+	"github.com/nextsko/mocode-agent/internal/core/tools/net"
 	"slices"
 	"sort"
 	"testing"
@@ -38,17 +40,17 @@ var knownAllToolNames = []string{
 	WriteToolName,
 	ListMCPResourcesToolName,
 	ReadMCPResourceToolName,
-	CrawlToolName,
-	DownloadDocsToolName,
+	net.CrawlToolName,
+	net.DownloadDocsToolName,
 	TransferToolName,
 	SessionExportToolName,
 	MessageExportToolName,
 	SessionSummaryToolName,
 	SessionSearchToolName,
 	ReadFilesToolName,
-	IssuesToolName,
-	PullsToolName,
-	NotificationsToolName,
+	gitea.IssuesToolName,
+	gitea.PullsToolName,
+	gitea.NotificationsToolName,
 	PlanCommitsToolName,
 	ExecuteCommitsToolName,
 	sshcommon.SshExecToolName,

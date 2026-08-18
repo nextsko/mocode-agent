@@ -1,4 +1,4 @@
-package tools
+package gitea
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 // IssuesToolName is the registered name of the gitea_issues tool.
 const IssuesToolName = "gitea_issues"
 
-//go:embed issues.md
+//go:embed gitea_issues.md
 var issuesDescription []byte
 
 // IssuesParams holds input parameters for the gitea_issues tool.

@@ -1,4 +1,4 @@
-package tools
+package net
 
 // AgenticFetchToolName is the name of the agentic fetch tool.
 const AgenticFetchToolName = "agentic_fetch"

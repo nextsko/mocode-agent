@@ -14,8 +14,8 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
-	"github.com/nextsko/mocode-agent/internal/util/ext"
 	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
+	"github.com/nextsko/mocode-agent/internal/util/ext"
 )
 
 type ReadMCPResourceParams struct {

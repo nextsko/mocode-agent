@@ -18,9 +18,9 @@ const teaRetryAfter = 5 * time.Minute
 
 var (
 	teaMu      sync.Mutex
-	teaPath    string     // resolved path, non-empty once found (cached forever)
-	teaMissAt  time.Time  // when the last failed lookup happened (zero = never tried)
-	teaChecked bool       // whether at least one lookup has run
+	teaPath    string    // resolved path, non-empty once found (cached forever)
+	teaMissAt  time.Time // when the last failed lookup happened (zero = never tried)
+	teaChecked bool      // whether at least one lookup has run
 )
 
 // getTea resolves the tea binary path. Positive results are cached for the

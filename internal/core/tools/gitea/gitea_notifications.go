@@ -1,4 +1,4 @@
-package tools
+package gitea
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 // NotificationsToolName is the registered name of the gitea_notifications tool.
 const NotificationsToolName = "gitea_notifications"
 
-//go:embed notifications.md
+//go:embed gitea_notifications.md
 var notificationsDescription []byte
 
 // NotificationsParams holds input parameters for the gitea_notifications tool.
