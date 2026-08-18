@@ -53,3 +53,39 @@ func TestExtractImportsNoImports(t *testing.T) {
 		t.Errorf("expected nil, got %v", got)
 	}
 }
+
+func TestBannedBy(t *testing.T) {
+	cases := []struct {
+		name    string
+		pkg     string
+		imports []string
+		banned  bool
+	}{
+		{"nethttp importing fantasy is banned",
+			"github.com/nextsko/mocode-agent/internal/core/tools/nethttp",
+			[]string{"net/http", "charm.land/fantasy"}, true},
+		{"nethttp importing fantasy subpackage is banned",
+			"github.com/nextsko/mocode-agent/internal/core/tools/nethttp",
+			[]string{"charm.land/fantasy/providers/openai"}, true},
+		{"nethttp importing config is banned",
+			"github.com/nextsko/mocode-agent/internal/core/tools/nethttp",
+			[]string{"github.com/nextsko/mocode-agent/internal/core/config"}, true},
+		{"nethttp importing net/http is fine",
+			"github.com/nextsko/mocode-agent/internal/core/tools/nethttp",
+			[]string{"net/http", "time"}, false},
+		{"netcommon importing catwalk is banned",
+			"github.com/nextsko/mocode-agent/internal/core/tools/plugins/netcommon",
+			[]string{"golang.org/x/net/html", "charm.land/catwalk/pkg/catwalk"}, true},
+		{"rule does not leak to prefix-sibling packages",
+			"github.com/nextsko/mocode-agent/internal/core/tools/nethttpx",
+			[]string{"charm.land/fantasy"}, false},
+		{"unrelated package unaffected",
+			"github.com/nextsko/mocode-agent/internal/core/agent",
+			[]string{"charm.land/fantasy"}, false},
+	}
+	for _, c := range cases {
+		if _, _, got := bannedBy(c.pkg, c.imports); got != c.banned {
+			t.Errorf("%s: bannedBy(%s) = %v, want %v", c.name, c.pkg, got, c.banned)
+		}
+	}
+}

@@ -1,77 +1,82 @@
 // Package tools is the framework-agnostic toolkit that hosts every
-// LLM-callable tool in the mocode runtime. It is the new home for the
-// 40+ built-in, plugin, MCP, and LSP tools that today live under
-// internal/core/agent/tools, and it exposes them through a small,
-// stable contract so the agent runtime can consume tools by name
-// without depending on any particular LLM runtime.
+// LLM-callable tool in the mocode runtime.
 //
-// # Contract (forward reference)
+// # Directory is the architecture (目录即结构)
 //
-// The public contract of this package is introduced in the next
-// sub-tasks of the refactor (1.2 onward). It will define five core
-// abstractions:
+// The layout of this tree IS the architecture. Like a Next.js app where
+// app/<route>/page.tsx is the route, here the directory tells you what a
+// file is for — no registration file to hunt down:
 //
-//   - Tool, the interface every LLM-callable tool implements.
-//   - ToolProvider, a named bundle of related tools.
-//   - ToolContext, the request-scoped runtime handle passed to Execute.
-//   - ToolResult, the structured output returned from Execute.
-//   - Schema, a framework-agnostic description of a tool's argument shape.
+//	tools/                  one builtin tool per file (fetch.go → fetch tool)
+//	  registry.go           the composition point: plugin blocks in build order
+//	  contracts.go          the target Tool/ToolContext/ToolResult contracts
+//	  filter/               composable predicates applied after Build
+//	  nethttp/              THE outbound-HTTP port (interface block)
+//	  mcp/                  MCP bridge: sessions, transports, meta tools
+//	  lsp/                  LSP manager and its tools
+//	  plugins/<x>common/    shared library for one tool category
+//	    netcommon/          fetch/search helpers all web tools share
+//	    sshcommon/          SSH connection pool + exec helpers
+//	    giteacommon/        tea CLI plumbing
 //
-// This doc records their shape today so reviewers and downstream
-// packages can reason about the surface without waiting for the
-// follow-up commits. The concrete declarations will live in
-// contracts.go alongside this package.
+// A file in tools/ root exports New<Tool>Tool(deps...) fantasy.AgentTool
+// constructors and one <Tool>ToolName constant. A plugin block in
+// registry.go wires exactly those constructors with the ports it needs.
 //
-// # Framework-agnostic invariant
+// # SysML view: blocks, ports, constraints
 //
-// This package, including every subpackage (builtin/, plugins/,
-// mcp/, lsp/, filter/), MUST NOT import:
+//   - Block: every ToolPlugin (execPlugin, networkPlugin, sshPlugin, ...) is
+//     a block — encapsulated state plus behaviour, composed only through the
+//     registry.
+//   - Port: ToolDeps fields are the block's ports. HTTP is the canonical
+//     example: plugins must derive clients from deps.HTTP (*nethttp.Factory)
+//     and never construct transports themselves, so proxy configuration and
+//     the connection pool have exactly one owner. sshPlugin owns its
+//     connection pool privately and exposes it only through its four tools.
+//   - Constraint: scripts/layercheck is the constraint verifier. Besides the
+//     layer rule (util ← domain ← store ← core ← transport/ui) it enforces
+//     per-package import bans declared below; violations fail the build.
+//   - Lifecycle: plugins implementing Startable are started/stopped by
+//     Registry.StartAll/StopAll. The coordinator holds ONE registry for its
+//     lifetime and drains it via Close on app shutdown.
 //
-//   - charm.land/fantasy or any subpath thereof
-//   - charm.land/catwalk
-//   - internal/core/agent or any subpath
-//   - internal/core/config or any subpath
-//   - any future LLM runtime library (for example trpc-agent-go)
+// # Enforced package constraints (see scripts/layercheck)
 //
-// All coupling to the LLM runtime is concentrated in exactly one
-// file, internal/core/agent/agenttool_adapter.go, so a future kernel
-// swap touches one file rather than 40+ tools. A CI dependency-boundary
-// check enforces the rule; any forbidden import in this tree fails the
-// build.
+//	tools/nethttp          may not import fantasy, catwalk, core/agent, core/config
+//	tools/plugins/netcommon may not import fantasy, catwalk, core/agent
+//
+// nethttp stays pure (net/http + time only) so any future runtime can sit
+// behind it; netcommon may not grow LLM-runtime coupling.
+//
+// # Honest boundary status
+//
+// The framework-agnostic ambition is INCOMPLETE and tracked here instead of
+// being papered over:
+//
+//   - Lived today: tools.ToolContext / ToolResult / MCPHandles are real —
+//     core/agent/agent_tool_context.go implements the ToolContext port for
+//     in-process tool execution.
+//   - Not yet: no production tool implements tools.Tool; the 40+ builtin
+//     constructors return fantasy.AgentTool directly and this package imports
+//     charm.land/fantasy, core/config, and core/agent/toolutil. The planned
+//     consolidation point is an agenttool_adapter.go at the agent boundary
+//     that converts tools.Tool ⇄ fantasy.AgentTool. Until that adapter lands,
+//     layercheck deliberately does NOT ban fantasy imports here; banning them
+//     would fail the build ~40 times and teach people to ignore the check.
+//   - Coordinator-owned tools (agent, agentic_fetch, transfer_to_agent) are
+//     built outside the registry because they call back into coordinator
+//     state; their descriptors are mirrored in coordinatorToolNames().
 //
 // # Adding a new tool
 //
-// The intended usage shape, once the contracts land, is:
-//
-//	package mytool
-//
-//	import (
-//		"context"
-//		"encoding/json"
-//
-//		"github.com/nextsko/mocode-agent/internal/core/tools"
-//	)
-//
-//	type myTool struct{ /* unexported fields */ }
-//
-//	func New() tools.Tool { return &myTool{} }
-//
-//	func (t *myTool) Name() string                { return "my_tool" }
-//	func (t *myTool) Description() string         { return "Short summary sent to the LLM." }
-//	func (t *myTool) Schema() tools.Schema        { return tools.Schema{ /* ... */ } }
-//	func (t *myTool) Execute(ctx context.Context, tctx tools.ToolContext, args json.RawMessage) (tools.ToolResult, error) {
-//		// tool implementation
-//	}
-//
-//	func init() { tools.Register("my_tool", New()) }
-//
-// Consumers opt in by blank-importing the umbrella packages that
-// aggregate builtins, plugins, and bridges:
-//
-//	import (
-//		_ "github.com/nextsko/mocode-agent/internal/core/tools/builtin/all"
-//		_ "github.com/nextsko/mocode-agent/internal/core/tools/plugins/all"
-//	)
+//  1. Create <tool>.go next to its siblings, export New<Tool>Tool(...) and
+//     <Tool>ToolName, embed <tool>.md for the description.
+//  2. Add the descriptor + wiring to the matching plugin block in
+//     registry.go (that file is the single composition point).
+//  3. If the tool is network-bound, take *nethttp.Factory (or a client
+//     derived from it) — never build your own transport.
+//  4. Add the tool name to knownAllToolNames in registry_test.go so the
+//     config list cross-check stays authoritative.
 //
 // # Module
 //
