@@ -29,6 +29,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
+	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
 	"github.com/nextsko/mocode-agent/internal/domain/history"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
@@ -45,7 +46,6 @@ import (
 	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 	"github.com/nextsko/mocode-agent/internal/util/version"
-	"github.com/nextsko/mocode-agent/internal/core/tools/mcp"
 )
 
 // MouseScrollThreshold defines how many lines to scroll the chat when a mouse
@@ -339,7 +339,6 @@ func New(com *common.Common, initialSessionID string, continueLast bool) *UI {
 	ta.Focus()
 
 	ch := NewChat(com)
-	chat.SetToolPanelView(com.Panels)
 
 	keyMap := DefaultKeyMap()
 
@@ -397,7 +396,6 @@ func New(com *common.Common, initialSessionID string, continueLast bool) *UI {
 		startedAt:           time.Now(),
 		adminServer:         admin.New(com.Workspace),
 	}
-	chat.SetAgentPanelResolver(ui.agentTaskPanelsForRender)
 
 	status := NewStatus(com)
 
@@ -1515,24 +1513,6 @@ func (m *UI) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 			Min: image.Pt(4, 1),
 			Max: image.Pt(8, 3),
 		})
-	}
-
-	// Panel overlay: render split panel view for parallel agent tasks
-	if m.com.Panels != nil && m.com.Panels.IsVisible() {
-		panelArea := layout.main
-		// Shrink main area to make room; panels take bottom 40%
-		splitY := panelArea.Min.Y + panelArea.Dy()*3/5
-		chatArea := uv.Rectangle{
-			Min: image.Pt(panelArea.Min.X, panelArea.Min.Y),
-			Max: image.Pt(panelArea.Max.X, splitY),
-		}
-		panelRect := uv.Rectangle{
-			Min: image.Pt(panelArea.Min.X, splitY+1),
-			Max: image.Pt(panelArea.Max.X, panelArea.Max.Y),
-		}
-		m.com.Panels.Draw(scr, panelRect)
-		// Re-render chat into reduced area
-		m.chat.Draw(scr, chatArea)
 	}
 
 	// This needs to come last to overlay on top of everything. We always pass

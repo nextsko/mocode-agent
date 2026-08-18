@@ -11,7 +11,6 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/transport/workspace"
-	"github.com/nextsko/mocode-agent/internal/ui/panel"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
 	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
@@ -26,7 +25,6 @@ var AllowedImageTypes = []string{".jpg", ".jpeg", ".png"}
 type Common struct {
 	Workspace workspace.Workspace
 	Styles    *styles.Styles
-	Panels    *panel.View
 }
 
 // Config returns the pure-data configuration associated with this [Common] instance.
@@ -40,7 +38,6 @@ func DefaultCommon(ws workspace.Workspace) *Common {
 	return &Common{
 		Workspace: ws,
 		Styles:    &s,
-		Panels:    panel.NewView(&s),
 	}
 }
 

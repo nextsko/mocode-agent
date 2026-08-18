@@ -11,7 +11,6 @@ import (
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/chat"
-	"github.com/nextsko/mocode-agent/internal/ui/panel"
 )
 
 func (m *UI) ensureAgentRuntimeState(sessionID string) *sessionAgentRuntimeState {
@@ -98,24 +97,6 @@ func (m *UI) registerAgentToolTopology(messageID, sessionID string, tc message.T
 		m.registerAgentToolChild(tc.ID, childToolCallID)
 	}
 	return childToolCallIDs
-}
-
-func (m *UI) agentTaskPanelsForRender(parentToolCallID string, params agentcore.AgentParams, nestedTools []chat.ToolMessageItem) []panel.AgentPanelData {
-	panels := chat.BuildAgentTaskPanels(parentToolCallID, params, nestedTools, func(toolCallID string) string {
-		if m.agentToolTaskIDs == nil {
-			return ""
-		}
-		return strings.TrimSpace(m.agentToolTaskIDs[toolCallID])
-	}, func(taskID string) string {
-		if m.agentToolSummaries == nil {
-			return ""
-		}
-		return strings.TrimSpace(m.agentToolSummaries[parentToolCallID][taskID])
-	})
-	if len(panels) == 0 {
-		return chat.BuildLegacyAgentPanels(parentToolCallID, params, nestedTools)
-	}
-	return panels
 }
 
 func (m *UI) updateAgentRuntime(sessionID, agentID, displayName string, status agentRuntimeStatus, toolName string, activity time.Time) *agentRuntimeEntry {

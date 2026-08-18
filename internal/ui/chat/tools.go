@@ -8,12 +8,11 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent"
+	"github.com/nextsko/mocode-agent/internal/core/tools"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/common"
-	"github.com/nextsko/mocode-agent/internal/ui/panel"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
 	"github.com/nextsko/mocode-agent/internal/util/anim"
-	"github.com/nextsko/mocode-agent/internal/core/tools"
 )
 
 // responseContextHeight limits the number of lines displayed in tool output.
@@ -45,26 +44,6 @@ type ToolMessageItem interface {
 	SetMessageID(id string)
 	SetStatus(status ToolStatus)
 	Status() ToolStatus
-}
-
-// toolPanelView is set by the UI model for parallel agent panel display.
-var toolPanelView *panel.View
-
-// agentPanelResolver lets the UI layer provide task-aware panel grouping for
-// nested agent tool calls.
-var agentPanelResolver func(parentToolCallID string, params agent.AgentParams, nestedTools []ToolMessageItem) []panel.AgentPanelData
-
-// SetToolPanelView sets the panel view reference for agent tool rendering.
-func SetToolPanelView(pv *panel.View) {
-	toolPanelView = pv
-}
-
-// SetAgentPanelResolver sets the resolver used to build task-aware agent
-// panels for multi-agent tool calls.
-func SetAgentPanelResolver(
-	resolver func(parentToolCallID string, params agent.AgentParams, nestedTools []ToolMessageItem) []panel.AgentPanelData,
-) {
-	agentPanelResolver = resolver
 }
 
 // Compactable is an interface for tool items that can render in a compacted mode.
@@ -111,7 +90,6 @@ type ToolRenderOpts struct {
 	Compact         bool
 	IsSpinning      bool
 	Status          ToolStatus
-	PanelView       *panel.View
 	AgentName       string
 }
 
@@ -335,7 +313,6 @@ func (t *baseToolMessageItem) RawRender(width int) string {
 			Compact:         t.isCompact,
 			IsSpinning:      t.isSpinning(),
 			Status:          t.computeStatus(),
-			PanelView:       toolPanelView,
 			AgentName:       t.toolCall.AgentName,
 		})
 

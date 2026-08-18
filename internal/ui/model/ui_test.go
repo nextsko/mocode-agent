@@ -857,7 +857,6 @@ func newTestUIWithConfig(t *testing.T, cfg *config.Config) *UI {
 		width:              120,
 		height:             40,
 	}
-	chat.SetAgentPanelResolver(ui.agentTaskPanelsForRender)
 	return ui
 }
 

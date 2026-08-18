@@ -11,7 +11,6 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/agent"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
-	"github.com/nextsko/mocode-agent/internal/ui/panel"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
 	"github.com/nextsko/mocode-agent/internal/util/anim"
 )
@@ -195,17 +194,6 @@ func (r *AgentToolRenderContext) RenderTool(sty *styles.Styles, width int, opts 
 		childTools.Child(childView)
 	}
 
-	// Build panel view for parallel agent display
-	if opts.PanelView != nil && len(r.agent.nestedTools) > 0 && params.Tasks != nil && len(params.Tasks) > 0 {
-		panels := BuildLegacyAgentPanels(r.agent.toolCall.ID, params, r.agent.nestedTools)
-		if agentPanelResolver != nil {
-			if resolved := agentPanelResolver(r.agent.toolCall.ID, params, r.agent.nestedTools); len(resolved) > 0 {
-				panels = resolved
-			}
-		}
-		opts.PanelView.BuildAgentPanels(r.agent.toolCall.ID, panels)
-	}
-
 	// Build parts.
 	var parts []string
 	parts = append(parts, childTools.Enumerator(roundedEnumerator(2, max(0, taskTagWidth-5))).String())
@@ -224,146 +212,6 @@ func (r *AgentToolRenderContext) RenderTool(sty *styles.Styles, width int, opts 
 	}
 
 	return result
-}
-
-// BuildAgentTaskPanels groups nested tool calls by task ID using UI-provided
-// lookup callbacks. It is used by the TUI layer to build stable multi-agent
-// panels even when a task emits multiple nested tools.
-func BuildAgentTaskPanels(
-	parentToolCallID string,
-	params agent.AgentParams,
-	nestedTools []ToolMessageItem,
-	taskIDForToolCall func(toolCallID string) string,
-	summaryForTask func(taskID string) string,
-) []panel.AgentPanelData {
-	if len(params.Tasks) == 0 {
-		return nil
-	}
-
-	panels := make([]panel.AgentPanelData, 0, len(params.Tasks))
-	grouped := make(map[string][]ToolMessageItem, len(nestedTools))
-	for _, nestedTool := range nestedTools {
-		if taskIDForToolCall == nil {
-			continue
-		}
-		taskID := strings.TrimSpace(taskIDForToolCall(nestedTool.ToolCall().ID))
-		if taskID == "" {
-			continue
-		}
-		grouped[taskID] = append(grouped[taskID], nestedTool)
-	}
-
-	for i, task := range params.Tasks {
-		taskID := strings.TrimSpace(task.ID)
-		if taskID == "" {
-			taskID = fmt.Sprintf("task-%d", i+1)
-		}
-
-		content := renderAgentTaskPanelContent(grouped[taskID])
-		if content == "" && summaryForTask != nil {
-			content = strings.TrimSpace(summaryForTask(taskID))
-		}
-
-		panels = append(panels, panel.AgentPanelData{
-			ID:      taskID,
-			Title:   taskID,
-			Content: content,
-		})
-	}
-
-	return panels
-}
-
-// BuildLegacyAgentPanels preserves the original order-based fallback for agent
-// panels when no task-aware mapping is available.
-func BuildLegacyAgentPanels(parentToolCallID string, params agent.AgentParams, nestedTools []ToolMessageItem) []panel.AgentPanelData {
-	if len(params.Tasks) == 0 {
-		return nil
-	}
-
-	hasDeps := false
-	for _, task := range params.Tasks {
-		if len(task.DependsOn) > 0 {
-			hasDeps = true
-			break
-		}
-	}
-
-	nestedByID := make(map[string][]ToolMessageItem, len(nestedTools))
-	unmapped := make([]ToolMessageItem, 0, len(nestedTools))
-	for _, nestedTool := range nestedTools {
-		expectedTaskID, ok := expectedAgentTaskIDForNestedTool(parentToolCallID, params, nestedTool.ToolCall().ID)
-		if !ok {
-			unmapped = append(unmapped, nestedTool)
-			continue
-		}
-		nestedByID[expectedTaskID] = append(nestedByID[expectedTaskID], nestedTool)
-	}
-
-	panels := make([]panel.AgentPanelData, 0, len(params.Tasks))
-	for i, task := range params.Tasks {
-		taskID := strings.TrimSpace(task.ID)
-		if taskID == "" {
-			taskID = fmt.Sprintf("task-%d", i+1)
-		}
-
-		content := renderAgentTaskPanelContent(nestedByID[taskID])
-		if content == "" && !hasDeps && len(unmapped) > 0 {
-			content = unmapped[0].Render(80)
-			unmapped = unmapped[1:]
-		}
-
-		panels = append(panels, panel.AgentPanelData{
-			ID:      taskID,
-			Title:   taskID,
-			Content: content,
-		})
-	}
-
-	return panels
-}
-
-func expectedAgentTaskIDForNestedTool(parentToolCallID string, params agent.AgentParams, nestedToolCallID string) (string, bool) {
-	if parentToolCallID == "" || nestedToolCallID == "" || len(params.Tasks) == 0 {
-		return "", false
-	}
-
-	hasDeps := false
-	for _, task := range params.Tasks {
-		if len(task.DependsOn) > 0 {
-			hasDeps = true
-			break
-		}
-	}
-
-	for i, task := range params.Tasks {
-		taskID := strings.TrimSpace(task.ID)
-		if taskID == "" {
-			taskID = fmt.Sprintf("task-%d", i+1)
-		}
-
-		expectedChildToolCallID := fmt.Sprintf("%s-%d", parentToolCallID, i+1)
-		if hasDeps {
-			expectedChildToolCallID = fmt.Sprintf("%s-%s", parentToolCallID, taskID)
-		}
-		if nestedToolCallID == expectedChildToolCallID {
-			return taskID, true
-		}
-	}
-
-	return "", false
-}
-
-func renderAgentTaskPanelContent(nestedTools []ToolMessageItem) string {
-	if len(nestedTools) == 0 {
-		return ""
-	}
-
-	parts := make([]string, 0, len(nestedTools))
-	for _, nestedTool := range nestedTools {
-		parts = append(parts, nestedTool.Render(80))
-	}
-	return strings.Join(parts, "\n\n")
 }
 
 // -----------------------------------------------------------------------------
