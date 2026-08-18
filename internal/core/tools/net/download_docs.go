@@ -11,7 +11,7 @@ import (
 
 	"charm.land/fantasy"
 
-	"github.com/nextsko/mocode-agent/internal/core/crawler"
+	"github.com/nextsko/mocode-agent/internal/core/tools/net/crawler"
 )
 
 const (

@@ -24,6 +24,8 @@
 //	  lsp/                  LSP manager and its tools
 //	  plugins/<x>common/    shared library for one tool category
 //	    netcommon/          fetch/search helpers all web tools share
+//	    searchcommon/       ripgrep/pure-Go search stack (shared by grep,
+//	                        glob, lsp references)
 //	    sshcommon/          SSH connection pool + exec helpers
 //	    giteacommon/        tea CLI plumbing
 //
