@@ -784,8 +784,6 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						cmds = append(cmds, cmd)
 					}
 				}
-			} else if cmd := m.handleSidebarAgentClick(msg.Y); cmd != nil {
-				cmds = append(cmds, cmd)
 			}
 		}
 

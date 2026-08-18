@@ -4,15 +4,12 @@ import (
 	"cmp"
 	"fmt"
 	"image"
-	"strings"
 
-	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/ultraviolet/layout"
 
 	"github.com/nextsko/mocode-agent/internal/ui/common"
-	"github.com/nextsko/mocode-agent/internal/ui/styles"
 )
 
 // modelInfo renders the current model information including reasoning
@@ -61,32 +58,30 @@ func (m *UI) modelInfo(width int) string {
 
 // getDynamicHeightLimits will give us the num of items to show in each section based on the height
 // some items are more important than others.
-func getDynamicHeightLimits(availableHeight, fileCount, lspCount, mcpCount, skillCount, agentCount int) (maxFiles, maxLSPs, maxMCPs, maxSkills, maxAgents int) {
+func getDynamicHeightLimits(availableHeight, fileCount, lspCount, mcpCount, skillCount int) (maxFiles, maxLSPs, maxMCPs, maxSkills int) {
 	const (
 		minItemsPerSection      = 2
 		defaultMaxFilesShown    = 1000
 		defaultMaxLSPsShown     = 1000
 		defaultMaxMCPsShown     = 1000
 		defaultMaxSkillsShown   = 1000
-		defaultMaxAgentsShown   = 1000
 		minAvailableHeightLimit = 10
 	)
 
 	if availableHeight < minAvailableHeightLimit {
-		return minItemsPerSection, minItemsPerSection, minItemsPerSection, minItemsPerSection, minItemsPerSection
+		return minItemsPerSection, minItemsPerSection, minItemsPerSection, minItemsPerSection
 	}
 
 	maxFiles = minItemsPerSection
 	maxLSPs = minItemsPerSection
 	maxMCPs = minItemsPerSection
 	maxSkills = minItemsPerSection
-	maxAgents = minItemsPerSection
 
-	remainingHeight := max(0, availableHeight-(minItemsPerSection*5))
+	remainingHeight := max(0, availableHeight-(minItemsPerSection*4))
 
-	sectionValues := []*int{&maxFiles, &maxLSPs, &maxMCPs, &maxSkills, &maxAgents}
-	sectionCaps := []int{defaultMaxFilesShown, defaultMaxLSPsShown, defaultMaxMCPsShown, defaultMaxSkillsShown, defaultMaxAgentsShown}
-	sectionNeeds := []int{max(0, fileCount-maxFiles), max(0, lspCount-maxLSPs), max(0, mcpCount-maxMCPs), max(0, skillCount-maxSkills), max(0, agentCount-maxAgents)}
+	sectionValues := []*int{&maxFiles, &maxLSPs, &maxMCPs, &maxSkills}
+	sectionCaps := []int{defaultMaxFilesShown, defaultMaxLSPsShown, defaultMaxMCPsShown, defaultMaxSkillsShown}
+	sectionNeeds := []int{max(0, fileCount-maxFiles), max(0, lspCount-maxLSPs), max(0, mcpCount-maxMCPs), max(0, skillCount-maxSkills)}
 
 	for remainingHeight > 0 {
 		allocated := false
@@ -125,7 +120,7 @@ func getDynamicHeightLimits(availableHeight, fileCount, lspCount, mcpCount, skil
 		}
 	}
 
-	return maxFiles, maxLSPs, maxMCPs, maxSkills, maxAgents
+	return maxFiles, maxLSPs, maxMCPs, maxSkills
 }
 
 // sidebar renders the chat sidebar containing session title, working
@@ -145,7 +140,6 @@ func (m *UI) drawSidebar(scr uv.Screen, area uv.Rectangle) {
 		title,
 		"",
 		cwd,
-		m.activeAgentLine(width),
 		"",
 		m.modelInfo(width),
 		"",
@@ -181,15 +175,12 @@ func (m *UI) drawSidebar(scr uv.Screen, area uv.Rectangle) {
 
 	skillsCount := len(m.skillStatusItems())
 
-	agentsCount := len(m.currentSessionAgentEntries())
-
-	maxFiles, maxLSPs, maxMCPs, maxSkills, maxAgents := getDynamicHeightLimits(remainingHeight, filesCount, lspsCount, mcpsCount, skillsCount, agentsCount)
+	maxFiles, maxLSPs, maxMCPs, maxSkills := getDynamicHeightLimits(remainingHeight, filesCount, lspsCount, mcpsCount, skillsCount)
 
 	lspSection := m.lspInfo(width, maxLSPs, true)
 	mcpSection := m.mcpInfo(width, maxMCPs, true)
 	skillsSection := m.skillsInfo(width, maxSkills, true)
 	filesSection := m.filesInfo(m.com.Workspace.WorkingDir(), width, maxFiles, true)
-	agentsSection := m.agentInfo(width, maxAgents)
 
 	uv.NewStyledString(
 		lipgloss.NewStyle().
@@ -201,8 +192,6 @@ func (m *UI) drawSidebar(scr uv.Screen, area uv.Rectangle) {
 					sidebarHeader,
 					filesSection,
 					"",
-					agentsSection,
-					"",
 					lspSection,
 					"",
 					mcpSection,
@@ -211,74 +200,4 @@ func (m *UI) drawSidebar(scr uv.Screen, area uv.Rectangle) {
 				),
 			),
 	).Draw(scr, area)
-}
-
-// agentInfo renders the current session agent runtime section.
-func (m *UI) agentInfo(width, maxItems int) string {
-	t := m.com.Styles
-
-	title := t.Resource.Heading.Render("Agents")
-	title = common.Section(t, title, width)
-
-	agents := m.currentSessionAgentEntries()
-	if len(agents) == 0 {
-		return lipgloss.NewStyle().Width(width).Render(title + "\n\n" + t.Resource.AdditionalText.Render("No activity yet"))
-	}
-
-	if maxItems <= 0 {
-		return lipgloss.NewStyle().Width(width).Render(title + "\n\n" + t.Resource.AdditionalText.Render("No activity yet"))
-	}
-
-	var rendered []string
-	displayCount := min(len(agents), maxItems)
-	for i := 0; i < displayCount; i++ {
-		entry := agents[i]
-		badgeLabel := entry.DisplayName
-		if strings.TrimSpace(badgeLabel) == "" {
-			badgeLabel = "Agent"
-		}
-		badge := styles.AgentBadgeStyleFor(entry.ID).Render(badgeLabel)
-		icon := t.Resource.OfflineIcon.String()
-		statusText := "stopped"
-		switch entry.Status {
-		case agentRuntimeThinking:
-			icon = t.Resource.BusyIcon.String()
-			statusText = "thinking"
-		case agentRuntimeExecuting:
-			icon = t.Resource.BusyIcon.String()
-			if entry.ToolName != "" {
-				statusText = "executing " + entry.ToolName
-			} else {
-				statusText = "executing"
-			}
-		}
-		summary := strings.TrimSpace(entry.Summary)
-		line := lipgloss.JoinHorizontal(
-			lipgloss.Left,
-			icon,
-			" ",
-			badge,
-			" ",
-			t.Resource.Name.Render(statusText),
-		)
-		if summary != "" && summary != statusText {
-			line += "\n" + t.Resource.AdditionalText.Render(summary)
-		}
-		rendered = append(rendered, line)
-	}
-
-	list := lipgloss.JoinVertical(lipgloss.Left, rendered...)
-
-	if len(agents) > maxItems {
-		remaining := len(agents) - maxItems
-		list = list + "\n" + t.Resource.AdditionalText.Render(fmt.Sprintf("…and %d more", remaining))
-	}
-
-	return lipgloss.NewStyle().Width(width).Render(title + "\n\n" + list)
-}
-
-// handleSidebarAgentClick handles a mouse click in the sidebar area.
-func (m *UI) handleSidebarAgentClick(y int) tea.Cmd {
-	_ = y
-	return nil
 }

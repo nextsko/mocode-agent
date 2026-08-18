@@ -152,15 +152,6 @@ func (m *UI) activeAgentMode() string {
 	return activeAgentMode(m.com)
 }
 
-func (m *UI) activeAgentLine(width int) string {
-	t := m.com.Styles
-	return common.Status(t, common.StatusOpts{
-		Icon:        t.Resource.OnlineIcon.String(),
-		Title:       t.Resource.Name.Render(m.activeAgentMode()),
-		Description: t.Resource.StatusText.Render("active agent"),
-	}, width)
-}
-
 func landingStatus(m *UI, width int) string {
 	sectionWidth := max(18, width)
 	rows := []string{
