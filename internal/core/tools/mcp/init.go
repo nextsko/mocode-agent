@@ -351,7 +351,13 @@ func updateState(name string, state State, err error, client *ClientSession, cou
 
 func createSession(ctx context.Context, name string, m config.MCPConfig, cfg *config.ConfigStore) (*ClientSession, error) {
 	timeout := mcpTimeout(m)
-	mcpCtx, cancel := context.WithCancel(ctx)
+	// WITHOUT the WithoutCancel detach, a session (re)created from a tool
+	// call's request context (getOrRenewClient) died as soon as that request
+	// finished, so stdio MCP servers were respawned on nearly every call.
+	// WithoutCancel keeps context VALUES (auth, logging) while stripping the
+	// caller's cancellation and deadline; the session's lifetime is owned by
+	// its own cancel below and closed via ClientSession.Close.
+	mcpCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	cancelTimer := time.AfterFunc(timeout, cancel)
 
 	transport, err := createTransport(mcpCtx, m, cfg)

@@ -669,6 +669,14 @@ func (app *App) Shutdown() {
 		app.LSPManager.KillAll(shutdownCtx)
 	})
 
+	// Drain the coordinator's tool registry (closes plugin-owned pools,
+	// e.g. the shared SSH connections).
+	wg.Go(func() {
+		if err := app.AgentCoordinator.Close(shutdownCtx); err != nil {
+			slog.Error("Failed to close tool registry on shutdown", "error", err)
+		}
+	})
+
 	// Call all cleanup functions.
 	for _, cleanup := range app.cleanupFuncs {
 		if cleanup != nil {

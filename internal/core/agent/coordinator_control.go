@@ -38,6 +38,20 @@ func (c *coordinator) CancelAll() {
 	c.currentAgent.CancelAll()
 }
 
+// Close drains the coordinator's tool registry, closing plugin-owned
+// resources such as the shared SSH connection pool. Safe to call once at
+// shutdown; Build after Close recreates lazily-startable state.
+func (c *coordinator) Close(ctx context.Context) error {
+	if c.toolRegistry == nil {
+		return nil
+	}
+	if err := c.toolRegistry.StopAll(ctx); err != nil {
+		slog.Warn("tool registry shutdown reported error", "error", err)
+		return err
+	}
+	return nil
+}
+
 func (c *coordinator) ClearQueue(sessionID string) {
 	c.currentAgent.ClearQueue(sessionID)
 }

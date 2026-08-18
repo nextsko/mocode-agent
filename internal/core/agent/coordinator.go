@@ -43,6 +43,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 	"github.com/nextsko/mocode-agent/internal/core/tools"
 	"github.com/nextsko/mocode-agent/internal/core/tools/lsp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/nethttp"
 	"github.com/qjebbs/go-jsons"
 	"golang.org/x/sync/errgroup"
 )
@@ -115,6 +116,10 @@ type Coordinator interface {
 	// zero-overhead default.
 	SmallLanguageModel(ctx context.Context) fantasy.LanguageModel
 	UpdateModels(ctx context.Context) error
+	// Close releases coordinator-owned resources (the tool registry's
+	// connection pools, e.g. SSH). Called from the composition root's
+	// Shutdown after all agents are cancelled.
+	Close(ctx context.Context) error
 }
 
 type coordinator struct {
@@ -130,6 +135,13 @@ type coordinator struct {
 	currentAgent  SessionAgent
 	activeAgentID string
 	agents        map[string]SessionAgent
+	// toolRegistry is the ONE registry for the coordinator's lifetime.
+	// Previously every buildTools call (mode switch, UpdateModels, sub-agent)
+	// built a fresh registry, leaking a new SSH connection pool each time
+	// because nothing ever called StopAll. Close() now drains it.
+	toolRegistry *tools.Registry
+	// httpFactory is the shared outbound-HTTP port for every tool build.
+	httpFactory *nethttp.Factory
 	// subagentIndex maps the user-visible sub-agent ID (params.AgentID,
 	// e.g. "<parentToolCallID>-1") to the internal sub-session ID used by
 	// sessionAgent.Cancel. The mapping is populated by runSubAgentWithMeta
@@ -195,6 +207,8 @@ func NewCoordinator(
 		sessionLogDir:  filepath.Join(infra.DataDir(), "session-logs"),
 		errorCollector: errorCollector,
 		sessionSearch:  sessionSearch,
+		toolRegistry:   tools.NewRegistry(),
+		httpFactory:    tools.NewHTTPFactory(cfg),
 	}
 
 	// Resolve the active agent from config (supports mode switching).
@@ -603,8 +617,9 @@ func (c *coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 			return nil
 		},
 		SessionSearch: c.sessionSearch,
+		HTTP:          c.httpFactory,
 	}
-	allTools = append(allTools, tools.NewRegistry().Build(ctx, deps)...)
+	allTools = append(allTools, c.toolRegistry.Build(ctx, deps)...)
 
 	// ── transfer_to_agent (coordinator-owned, config-driven) ─────────────────
 	if len(agentCfg.SubAgents) > 0 {
