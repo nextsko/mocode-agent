@@ -256,13 +256,6 @@ func (m *UI) newSession() tea.Cmd {
 	if len(m.todoContinuations) > 0 {
 		delete(m.todoContinuations, sessionID)
 	}
-	if len(m.agentToolParents) > 0 {
-		for toolCallID, parentSessionID := range m.agentToolParents {
-			if parentSessionID == sessionID {
-				delete(m.agentToolParents, toolCallID)
-			}
-		}
-	}
 	if len(m.agentToolChildren) > 0 {
 		clear(m.agentToolChildren)
 	}

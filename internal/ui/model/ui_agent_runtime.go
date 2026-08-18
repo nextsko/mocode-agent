@@ -6,22 +6,9 @@ import (
 	"strings"
 
 	agentcore "github.com/nextsko/mocode-agent/internal/core/agent"
-	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/chat"
 )
-
-func (m *UI) registerAgentToolParent(toolCallID, sessionID string) {
-	toolCallID = strings.TrimSpace(toolCallID)
-	sessionID = strings.TrimSpace(sessionID)
-	if toolCallID == "" || sessionID == "" {
-		return
-	}
-	if m.agentToolParents == nil {
-		m.agentToolParents = make(map[string]string)
-	}
-	m.agentToolParents[toolCallID] = sessionID
-}
 
 func (m *UI) registerAgentToolChild(parentToolCallID, childToolCallID string) {
 	parentToolCallID = strings.TrimSpace(parentToolCallID)
@@ -35,29 +22,15 @@ func (m *UI) registerAgentToolChild(parentToolCallID, childToolCallID string) {
 	m.agentToolChildren[childToolCallID] = parentToolCallID
 }
 
-func (m *UI) registerAgentToolTopology(messageID, sessionID string, tc message.ToolCall) []string {
+func (m *UI) registerAgentToolTopology(messageID string, tc message.ToolCall) []string {
 	if messageID == "" {
 		return nil
 	}
 	childToolCallIDs := agentToolChildCallIDs(tc)
 	for _, childToolCallID := range childToolCallIDs {
-		if sessionID != "" {
-			m.registerAgentToolParent(childToolCallID, sessionID)
-		}
 		m.registerAgentToolChild(tc.ID, childToolCallID)
 	}
 	return childToolCallIDs
-}
-
-func (m *UI) parentSessionIDForChild(childSessionID, parentMessageID, toolCallID string) string {
-	if toolCallID != "" && m.agentToolParents != nil {
-		if sessionID := strings.TrimSpace(m.agentToolParents[toolCallID]); sessionID != "" {
-			return sessionID
-		}
-	}
-	_ = childSessionID
-	_ = parentMessageID
-	return ""
 }
 
 func (m *UI) resolveAgentToolContainerID(toolCallID string) string {
@@ -151,11 +124,4 @@ func firstContentLine(text string) string {
 		}
 	}
 	return ""
-}
-
-func sessionIDOrEmpty(sess *session.Session) string {
-	if sess == nil {
-		return ""
-	}
-	return sess.ID
 }

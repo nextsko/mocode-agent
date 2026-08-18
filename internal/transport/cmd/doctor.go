@@ -752,7 +752,7 @@ func doctorSubagentSourceCheck(cwd string, facts doctorWorkspaceFacts) doctorChe
 			Name: "history hydration",
 			Markers: []string{
 				"func (m *UI) loadNestedToolCalls(",
-				"registerAgentToolTopology(toolItem.MessageID(), sessionIDOrEmpty(m.session), tc)",
+				"registerAgentToolTopology(toolItem.MessageID(), tc)",
 				"m.loadNestedToolCalls(nestedMessageItems)",
 			},
 		},

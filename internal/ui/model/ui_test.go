@@ -811,7 +811,6 @@ func newTestUIWithConfig(t *testing.T, cfg *config.Config) *UI {
 			},
 		),
 		keyMap:            DefaultKeyMap(),
-		agentToolParents:  make(map[string]string),
 		agentToolChildren: make(map[string]string),
 		todoContinuations: make(map[string]*todoAutoContinueState),
 		width:             120,

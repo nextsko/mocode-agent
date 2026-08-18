@@ -166,7 +166,7 @@ func TestDoctorSubagentSourceCheckOKWhenCapabilitiesPresent(t *testing.T) {
 	require.NoError(t, os.WriteFile(uiPath, []byte(strings.Join([]string{
 		"package model",
 		"func (m *UI) loadNestedToolCalls() {}",
-		"registerAgentToolTopology(toolItem.MessageID(), sessionIDOrEmpty(m.session), tc)",
+		"registerAgentToolTopology(toolItem.MessageID(), tc)",
 		"m.loadNestedToolCalls(nestedMessageItems)",
 		"registerAgentToolTopology(",
 		"resolveAgentToolContainerID(",

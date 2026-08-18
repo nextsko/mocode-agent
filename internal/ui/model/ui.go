@@ -266,7 +266,6 @@ type UI struct {
 	// Agent status tracking
 	agentStatus       string    // Current agent status text (e.g., "thinking", "executing tool")
 	agentStatusTime   time.Time // When the status was last updated
-	agentToolParents  map[string]string
 	agentToolChildren map[string]string
 	todoContinuations map[string]*todoAutoContinueState
 	backgroundJobs    map[string]string
@@ -1055,7 +1054,7 @@ func (m *UI) reloadNestedToolsForItem(toolItem chat.ToolMessageItem) {
 
 	tc := toolItem.ToolCall()
 	var nestedTools []chat.ToolMessageItem
-	for _, childToolCallID := range m.registerAgentToolTopology(toolItem.MessageID(), sessionIDOrEmpty(m.session), tc) {
+	for _, childToolCallID := range m.registerAgentToolTopology(toolItem.MessageID(), tc) {
 		agentSessionID := m.com.Workspace.CreateAgentToolSessionID(toolItem.MessageID(), childToolCallID)
 		nestedMsgs, err := m.com.Workspace.ListMessages(context.Background(), agentSessionID)
 		if err != nil || len(nestedMsgs) == 0 {
@@ -1121,7 +1120,7 @@ func (m *UI) appendSessionMessage(msg message.Message) tea.Cmd {
 			}
 		}
 		for _, tc := range msg.ToolCalls() {
-			m.registerAgentToolTopology(msg.ID, msg.SessionID, tc)
+			m.registerAgentToolTopology(msg.ID, tc)
 		}
 		items := chat.ExtractMessageItems(m.com.Styles, &msg, nil)
 		for _, item := range items {
@@ -1216,7 +1215,7 @@ func (m *UI) updateSessionMessage(msg message.Message) tea.Cmd {
 
 	var items []chat.MessageItem
 	for _, tc := range msg.ToolCalls() {
-		m.registerAgentToolTopology(msg.ID, msg.SessionID, tc)
+		m.registerAgentToolTopology(msg.ID, tc)
 		existingToolItem := m.chat.MessageItem(tc.ID)
 		if toolItem, ok := existingToolItem.(chat.ToolMessageItem); ok {
 			existingToolCall := toolItem.ToolCall()
@@ -1266,15 +1265,11 @@ func (m *UI) handleChildSessionMessage(event pubsub.Event[message.Message]) tea.
 
 	// Check if this is an agent tool session and parse it.
 	childSessionID := event.Payload.SessionID
-	parentMessageID, toolCallID, ok := m.com.Workspace.ParseAgentToolSessionID(childSessionID)
+	_, toolCallID, ok := m.com.Workspace.ParseAgentToolSessionID(childSessionID)
 	if !ok {
 		return nil
 	}
 
-	// Resolve parent ownership for the child session. The sidebar/panel
-	// runtime tracking that consumed this value was removed; the mapping is
-	// kept for sub-agent topology wiring.
-	_ = m.parentSessionIDForChild(childSessionID, parentMessageID, toolCallID)
 	containerID := m.resolveAgentToolContainerID(toolCallID)
 	agentItem, _ := m.findAgentToolItem(containerID)
 
