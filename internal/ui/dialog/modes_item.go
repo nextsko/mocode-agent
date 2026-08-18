@@ -107,10 +107,10 @@ func (m *ModeItem) Render(width int) string {
 		badge = "current"
 	}
 	title := m.Title()
-	// Agent colour badge - use the modeID to get the agent style.
-	renderedTitle := styles.AgentBadgeStyleFor(m.modeID).Render(title)
+	// Agent badge — focused items get the badge style, others the accent style.
+	renderedTitle := styles.AgentBadgeStyle.Render(title)
 	if !m.focused {
-		renderedTitle = styles.AgentAccentStyleFor(m.modeID).Render(title)
+		renderedTitle = styles.AgentAccentStyle.Render(title)
 	}
 	titleWidth := lipgloss.Width(renderedTitle)
 	badgeWidth := lipgloss.Width(badge)

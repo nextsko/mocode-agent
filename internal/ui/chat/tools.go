@@ -318,7 +318,7 @@ func (t *baseToolMessageItem) RawRender(width int) string {
 
 		// Prepend agent badge if set.
 		if t.toolCall.AgentName != "" {
-			badge := styles.AgentBadgeStyleFor(t.toolCall.AgentName).Render(t.toolCall.AgentName)
+			badge := styles.AgentBadgeStyle.Render(t.toolCall.AgentName)
 			content = badge + "\n" + content
 		}
 

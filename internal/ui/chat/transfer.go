@@ -52,9 +52,9 @@ func (t *TransferToolRenderer) RenderTool(sty *styles.Styles, width int, opts *T
 		return defaultTransferRender(sty, opts.ToolCall, opts.Status)
 	}
 
-	// Render source → target with coloured badges.
-	sourceBadge := styles.AgentBadgeStyleFor(sourceAgent).Render(sourceAgent)
-	targetBadge := styles.AgentBadgeStyleFor(targetAgent).Render(targetAgent)
+	// Render source → target with badges.
+	sourceBadge := styles.AgentBadgeStyle.Render(sourceAgent)
+	targetBadge := styles.AgentBadgeStyle.Render(targetAgent)
 	arrow := sty.ToolCallSuccess.Render(" ─► ")
 
 	header := sourceBadge + arrow + targetBadge

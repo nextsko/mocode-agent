@@ -119,7 +119,7 @@ func (a *AssistantMessageItem) Render(width int) string {
 
 	// Agent badge above message.
 	if a.message.Sender != "" {
-		badge := styles.AgentBadgeStyleFor(a.message.Sender).Render(a.message.Sender)
+		badge := styles.AgentBadgeStyle.Render(a.message.Sender)
 		rendered = badge + "\n" + rendered
 	}
 
