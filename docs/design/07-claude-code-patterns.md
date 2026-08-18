@@ -877,7 +877,6 @@ func padLeft(s string, w int) string {
 | Fork 模式徽章（`⟳ fork`） | 0.5h | ⭐⭐⭐ |
 | AskUserQuestion 完整组件 | 4h | ⭐⭐⭐⭐⭐ |
 | AgentDetailDialog（选中查看详情） | 2h | ⭐⭐⭐⭐ |
-| Live + Committed 双层 panel 渲染 | 3h | ⭐⭐⭐⭐ |
 | Idle agent 折叠 | 1h | ⭐⭐⭐ |
 | AgentBadge 颜色分配 | 1h | ⭐⭐⭐ |
 | isConcurrencySafe 工具并行 | 4h | ⭐⭐⭐ |

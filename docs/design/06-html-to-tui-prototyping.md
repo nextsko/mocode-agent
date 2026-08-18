@@ -287,7 +287,7 @@ node extract-css-tokens.js prototype.css > ../internal/ui/styles/tokens.go
 | `width: 100%` | 占满父容器宽度 | TUI 必须显式计算 |
 | `height: 100vh` | 占满剩余垂直空间 | TUI 需用 layout.Fill() |
 | `display: flex; flex-direction: row` | `layout.Horizontal` | 用 ultraviolet layout |
-| `display: grid` | `layout.Split` 或 Panel 树 | Grid 在 TUI 难做 |
+| `display: grid` | `layout.Split` | Grid 在 TUI 难做 |
 | `overflow: scroll` | `list.List`（lazy render） | TUI 必须虚拟化 |
 
 ### 4.2 复杂组件的对应关系
@@ -298,7 +298,7 @@ node extract-css-tokens.js prototype.css > ../internal/ui/styles/tokens.go
 | Toast / Notification | `Toast` 单例 |
 | Dropdown | `completions` 自动补全 |
 | Tabs | `list` + 状态切换 |
-| Carousel | Panel 切换 + 动画 |
+| Carousel | `list` + 动画切换 |
 | Progress bar | `█ ░` 字符拼接 |
 | Avatar | 首字母 + 背景色 |
 | Tooltip | status bar 临时显示 |

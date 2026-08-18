@@ -175,13 +175,12 @@ return m, tea.Batch(
 
 ### 10. **子组件需要 styles 时，统一通过 `*common.Common` 注入**
 
-> 不要 `import styles` 到每个文件；统一由 `Common{ App, Styles, Panels }` 穿透。
+> 不要 `import styles` 到每个文件；统一由 `Common{ App, Styles }` 穿透。
 
 ```go
 type Common struct {
     App      *app.App
     Styles   *styles.Styles
-    Panels   *panel.View
 }
 ```
 
@@ -474,7 +473,6 @@ internal/ui/
 │   └── item.go            ← Item 接口
 ├── completions/           ← @ 自动补全
 ├── attachments/           ← 附件管理
-├── panel/                 ← Panel 树（tmux-like）
 ├── common/                ← Common struct + 助手
 ├── styles/                ← 所有样式
 │   ├── styles.go          ← 主 Styles struct

@@ -492,7 +492,6 @@ mocode 当前测试覆盖薄弱点：
 |------|--------|------|
 | `dialog/*` | 0% | 添加 HandleMsg 流程测试 |
 | `model/ui.go` | 极低 | 拆出可测的子函数 |
-| `panel/` | 0% | Tree 渲染 + 切换测试 |
 | `list/` | 0% | 滚动边界测试 |
 | 渲染输出（golden） | 0% | 添加 golden file |
 
@@ -518,7 +517,6 @@ Crush 在 `internal/agent/agenttest/` 提供了测试友好的 Coordinator 注�
 ⚠️ chat/         → 业务消息模型不同，需要适配
 ⚠️ dialog/       → Action 类型不同
 ⚠️ model/ui.go   → 业务逻辑差异大
-⚠️ panel/        → 简单，可保留
 ```
 
 ### 9.3 不应复用的部分

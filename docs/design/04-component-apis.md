@@ -300,25 +300,6 @@ func roundedEnumerator(lPadding, width int) tree.Enumerator {
 }
 ```
 
-#### Panel 注入（全局变量模式）
-
-```go
-// chat/tools.go
-var toolPanelView *panel.View
-var agentPanelResolver func(...) []panel.AgentPanelData
-
-func SetToolPanelView(pv *panel.View) { toolPanelView = pv }
-func SetAgentPanelResolver(resolver ...) { agentPanelResolver = resolver }
-```
-
-```go
-// ui.go 启动时
-chat.SetToolPanelView(com.Panels)
-chat.SetAgentPanelResolver(u.agentTaskPanelsForRender)
-```
-
-**设计模式**：`chat` 包不直接 `import` `panel`，通过全局 setter 注入，避免循环依赖。
-
 ---
 
 ### 2.5 `dialog/dialog.go`
@@ -384,38 +365,7 @@ const (
 
 ---
 
-### 2.7 `panel/panel.go`
-
-#### 树形结构
-
-```go
-type Panel struct {
-    ID        string
-    Title     string
-    Content   string
-    Direction Direction  // Vertical / Horizontal
-    Children  []*Panel
-    Sizes     []float64
-    Border    lipgloss.Style
-    Active    bool
-}
-
-func (p *Panel) IsLeaf() bool { return len(p.Children) == 0 }
-
-func (p *Panel) RenderAt(scr uv.Screen, area image.Rectangle) {
-    if p.IsLeaf() {
-        p.renderLeaf(scr, area)
-    } else {
-        p.renderSplit(scr, area)
-    }
-}
-```
-
-**技巧**：递归 + 双模式（leaf/split），支持任意嵌套。
-
----
-
-### 2.8 `list/list.go`
+### 2.7 `list/list.go`
 
 #### Lazy Rendering
 
@@ -453,7 +403,7 @@ func (l *List) ScrollBy(delta int) {
 
 ---
 
-### 2.9 `completions/completions.go`
+### 2.8 `completions/completions.go`
 
 #### Tiered Matching
 
@@ -481,7 +431,7 @@ func (c *Completions) filter(input string) []CompletionItem {
 
 ---
 
-### 2.10 `common/markdown.go`
+### 2.9 `common/markdown.go`
 
 #### Width-Keyed Cache
 
@@ -529,7 +479,7 @@ func init() {
 
 ---
 
-## 三、6 个"用得好"的 API 技巧
+## 三、5 个"用得好"的 API 技巧
 
 ### 技巧 A · 渲染器工厂 + 全局缓存
 
@@ -558,17 +508,7 @@ func (s *Styles) SetWidth(w int) {
 
 **技巧**：渲染时**先查缓存再算**，不在 setter 里清掉子组件缓存。
 
-### 技巧 C · 注入式全局变量（避免循环依赖）
-
-```go
-// chat 包不 import panel，但需要使用
-var toolPanelView *panel.View  // 由 ui 包启动时注入
-func SetToolPanelView(pv *panel.View) { toolPanelView = pv }
-```
-
-**适用**：双向依赖但不想反向 import 的场景。
-
-### 技巧 D · 接口返回 `any`，调用方 switch
+### 技巧 C · 接口返回 `any`，调用方 switch
 
 ```go
 type Dialog interface {
@@ -585,7 +525,7 @@ case dialog.ActionClose:          m.dialog.Close(d.ID())
 
 **技巧**：避免定义 30 个不同的返回值类型；调用方显式 switch 强制处理所有 case。
 
-### 技巧 E · 自定义渲染样式 + 边距计算
+### 技巧 D · 自定义渲染样式 + 边距计算
 
 ```go
 style := lipgloss.NewStyle().
@@ -604,7 +544,7 @@ result := style.Render(content)
 
 **技巧**：用 `GetHorizontalFrameSize/GetVerticalFrameSize` 算 padding+border 占用的像素。
 
-### 技巧 F · 自定义 IME 感知光标
+### 技巧 E · 自定义 IME 感知光标
 
 ```go
 func InputCursor(t *styles.Styles, cur *tea.Cursor) *tea.Cursor {
@@ -620,7 +560,7 @@ func InputCursor(t *styles.Styles, cur *tea.Cursor) *tea.Cursor {
 
 ---
 
-## 四、4 个"洞察"（来自 mocode vs crush 对比）
+## 四、2 个"洞察"（来自 mocode vs crush 对比）
 
 ### 洞察 1 · mocode 用 `time.Time` 作 ID；crush 用 string ID
 
@@ -640,41 +580,7 @@ anim.New(anim.Settings{
 
 **洞察**：stable ID 在重渲染时不会变化（动画持续），timestamp ID 会重复创建（动画闪烁）。
 
-### 洞察 2 · mocode 全局注入；crush 通过 common 注入
-
-```go
-// mocode：全局包变量
-var toolPanelView *panel.View
-func SetToolPanelView(pv *panel.View) { toolPanelView = pv }
-
-// crush：通过 *common.Common 字段传递
-type Common struct {
-    Panels *panel.View
-}
-// 调用：t.Common.Panels.Draw(...)
-```
-
-**洞察**：全局变量更简洁但**不可重入**（多个 UI 实例会冲突）；Common 注入更"显式"。
-
-### 洞察 3 · mocode Panel 用纯 string Content；crush Panel 持有 child components
-
-```go
-// mocode：panel.Content 是 string
-type Panel struct {
-    Content string
-    Children []*Panel
-}
-
-// crush：panel 可以持有 sub-model
-type Panel struct {
-    Content tea.Model
-    // ...
-}
-```
-
-**洞察**：纯 string 简单但无法内部交互；tea.Model 灵活但复杂。
-
-### 洞察 4 · mocode 鼠标事件主动过滤；crush 让 Bubble Tea 处理
+### 洞察 2 · mocode 鼠标事件主动过滤；crush 让 Bubble Tea 处理
 
 ```go
 // mocode：15ms 节流
@@ -690,7 +596,7 @@ func MouseEventFilter(...) tea.Cmd {
 
 ---
 
-## 五、设计点速查（10 条）
+## 五、设计点速查（9 条）
 
 | 设计点 | 出现位置 | 借鉴价值 |
 |--------|----------|----------|
@@ -699,7 +605,6 @@ func MouseEventFilter(...) tea.Cmd {
 | FNV + 长度前缀防碰撞 | `fnvFields` | ★★★★ |
 | 圆角 tree enumerator | `roundedEnumerator` | ★★★★ |
 | ForegroundGrad via uniseg | `grad.go` | ★★★★ |
-| 全局 setter 注入避免循环依赖 | `toolPanelView` | ★★★ |
 | Dialog Overlay 栈（只顶收消息） | `dialog.Overlay` | ★★★★★ |
 | Tiered search (分级匹配) | `completions` | ★★★★ |
 | 渲染前 log cache hit/miss | `MOCODE_RENDER_CACHE_DEBUG` | ★★★ |

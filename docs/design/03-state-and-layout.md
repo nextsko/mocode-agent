@@ -186,9 +186,7 @@ program.Send(notify.Notification)
 ui.Update(case pubsub.Event[notify.Notification])
   ↓
 ui.handleAgentNotification(n)
-  ├─ m.agentStatus = "executing bash..."
-  ├─ m.updateAgentRuntime(...) // 更新 runtime map
-  └─ side panel / pill 重渲染
+  └─ m.agentStatus = "executing bash..."
 ```
 
 ---

@@ -724,5 +724,5 @@ func shimmerText(width int, frame int, colors ...color.Color) string {
 | **语义字段名** | `Header.LogoGradFromColor` 而非 `Color1` |
 | **能力通过接口** | `Tree` 的 `Enumerator` 是函数式接口，便于自定义 |
 | **预渲染缓存** | 渐变字符按 width 缓存，避免每帧重算 |
-| **数据驱动** | Panel/Tree 的渲染只接收 string 数据，组件是"壳" |
+| **数据驱动** | Tree 的渲染只接收 string 数据，组件是"壳" |
 | **动画降级** | 静态渐变 + 流光动画两套方案，匹配不同重要级 |

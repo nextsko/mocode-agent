@@ -1045,45 +1045,6 @@ func statusGlyph(state string, sty *styles.Styles) (string, color.Color) {
 }
 ```
 
-### 9.3 Live + Committed 双层
-
-```go
-type AgentPanelView struct {
-    mu        sync.RWMutex
-    live      map[string]*TeammateRow
-    committed []string  // 已完成摘要
-    visible   bool
-}
-
-func (v *AgentPanelView) Render(width int) string {
-    if !v.visible { return "" }
-    
-    var b strings.Builder
-    
-    // Live 阶段
-    for _, row := range v.live {
-        b.WriteString(row.Render(width))
-        b.WriteString("\n")
-    }
-    
-    // 折叠 idle
-    if len(v.live) > 6 {
-        b.WriteString(fmt.Sprintf("... and %d more agents (press 'e' to expand)\n", len(v.live)-5))
-    }
-    
-    // Committed 阶段（只渲染一次，不在每帧重绘）
-    if len(v.committed) > 0 {
-        b.WriteString("\n─── History ───\n")
-        for _, summary := range v.committed {
-            b.WriteString(summary)
-            b.WriteString("\n")
-        }
-    }
-    
-    return b.String()
-}
-```
-
 ---
 
 ## 十、可落地的改进清单
@@ -1094,7 +1055,6 @@ func (v *AgentPanelView) Render(width int) string {
 | TaskBoard 实现 | 3h | ⭐⭐⭐⭐⭐ |
 | Teammate 子进程 spawn | 6h | ⭐⭐⭐⭐ |
 | AgentsViewDialog（← 键） | 4h | ⭐⭐⭐⭐⭐ |
-| Idle agent 折叠 | 1h | ⭐⭐⭐ |
 | Aggregate row renderer | 2h | ⭐⭐⭐⭐ |
 | Plan approval flow | 4h | ⭐⭐⭐ |
 | Permission bubble | 3h | ⭐⭐⭐ |
