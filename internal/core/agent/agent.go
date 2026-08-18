@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
@@ -111,6 +112,12 @@ type sessionAgent struct {
 
 	messageQueue   *csync.Map[string, []SessionAgentCall]
 	activeRequests *csync.Map[string, context.CancelFunc]
+
+	// runMu guards busy-entry and queue transitions in the Run dispatcher
+	// loop. It is only held across map operations — never across model/IO
+	// calls — to make enqueue-vs-pop atomic and eliminate the check-then-set
+	// and release-then-pop races the previous recursive dispatch had.
+	runMu sync.Mutex
 }
 
 type SessionAgentOptions struct {

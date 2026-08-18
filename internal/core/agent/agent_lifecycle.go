@@ -17,15 +17,45 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/tools"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/domain/session/sessionexport"
 	"github.com/nextsko/mocode-agent/internal/util/errcoll"
 	"github.com/nextsko/mocode-agent/internal/util/ext"
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
-	"github.com/nextsko/mocode-agent/internal/core/tools"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 )
 
+// turnOutcome describes how a single turn ended so that Run's dispatcher
+// loop can decide what happens next. runTurn never mutates the busy entry
+// or the prompt queue; every dispatch-state transition happens in Run under
+// runMu.
+type turnOutcome struct {
+	result *fantasy.AgentResult
+	err    error
+
+	// ctxTooLarge is set when the provider rejected the request because the
+	// context window was exceeded. The dispatcher releases the busy entry,
+	// summarizes the session, and re-dispatches retryCall as the next turn.
+	ctxTooLarge bool
+	retryCall   *SessionAgentCall
+
+	// summarize is set when the turn hit the context-window stop condition.
+	// The dispatcher releases the busy entry and runs Summarize before
+	// continuing. When hadToolCalls is set, a continuation call is appended
+	// to the queue tail (user-queued prompts still run first).
+	summarize    bool
+	hadToolCalls bool
+
+	// shortCircuit is set when the BeforeAgent callback returned a result or
+	// error; Run must return immediately without dispatching further turns.
+	shortCircuit bool
+}
+
+// Run executes a prompt as one or more strictly serialized turns: the
+// in-flight turn is never hijacked and queued prompts only start at turn
+// boundaries. All busy-entry and queue mutations happen in short critical
+// sections under runMu (never across model/IO calls).
 func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy.AgentResult, error) {
 	if call.Prompt == "" && !message.ContainsTextAttachment(call.Attachments) {
 		return nil, ErrEmptyPrompt
@@ -34,20 +64,211 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 		return nil, ErrSessionMissing
 	}
 
-	// BeforeAgent callback — may skip execution entirely.
-	if result, err := a.callbacks.RunBeforeAgent(ctx, &call); result != nil || err != nil {
-		return result, err
+	sessionID := call.SessionID
+	runCtx := context.WithValue(ctx, tools.SessionIDContextKey, sessionID)
+	runCtx = errcoll.WithContext(runCtx, a.errorCollector)
+
+	var (
+		genCtx      context.Context
+		cancelTurn  context.CancelFunc
+		busyOwned   bool
+		current     = call
+		haveCurrent = true
+		lastCall    = call
+		lastResult  *fantasy.AgentResult
+	)
+	defer func() {
+		// Panic safety net: never leak a busy entry. Normal paths clear
+		// busyOwned inside the loop's critical sections, so a concurrent Run
+		// that legitimately re-marked busy is never clobbered here.
+		if busyOwned {
+			a.runMu.Lock()
+			a.activeRequests.Del(sessionID)
+			if cancelTurn != nil {
+				cancelTurn()
+			}
+			a.runMu.Unlock()
+		}
+	}()
+
+	releaseBusy := func() {
+		a.runMu.Lock()
+		a.activeRequests.Del(sessionID)
+		if cancelTurn != nil {
+			cancelTurn()
+		}
+		a.runMu.Unlock()
+		busyOwned = false
 	}
 
-	// Queue the message if busy
-	if a.IsSessionBusy(call.SessionID) {
-		existing, ok := a.messageQueue.Get(call.SessionID)
-		if !ok {
-			existing = []SessionAgentCall{}
+	for {
+		if !busyOwned {
+			// Acquire-or-enqueue critical section: either this loop already
+			// owns the next turn (busyOwned handed over by the end-of-turn
+			// section below) or we atomically decide busy-vs-queue.
+			a.runMu.Lock()
+			var ok bool
+			genCtx, cancelTurn, ok = a.beginTurnLocked(sessionID, runCtx)
+			if !ok {
+				if haveCurrent {
+					// Busy: queue the call and return silently. The running
+					// dispatcher picks it up at its next turn boundary.
+					a.appendQueueLocked(sessionID, current)
+					a.runMu.Unlock()
+					return nil, nil
+				}
+				// Continuation lost the race to another Run: that dispatcher
+				// owns the queue now; nothing more for us to do here.
+				a.runMu.Unlock()
+				break
+			}
+			if !haveCurrent {
+				// Continuation mode (post-summarize): the next call comes
+				// from the queue head; user-queued prompts run first.
+				next, hasNext := a.popQueueLocked(sessionID)
+				if !hasNext {
+					a.activeRequests.Del(sessionID)
+					cancelTurn()
+					a.runMu.Unlock()
+					break
+				}
+				current = next
+			}
+			busyOwned = true
+			a.runMu.Unlock()
 		}
-		existing = append(existing, call)
-		a.messageQueue.Set(call.SessionID, existing)
-		return nil, nil
+
+		outcome := a.runTurn(runCtx, genCtx, current)
+		lastCall, lastResult = current, outcome.result
+
+		switch {
+		case outcome.ctxTooLarge:
+			// Context window exceeded: release busy so Summarize can run,
+			// then re-dispatch the retry prompt as the next turn. The lock
+			// is taken fresh at the top of the loop, so re-entry cannot
+			// deadlock; if another Run won the race the retry is queued.
+			releaseBusy()
+			if _, summarizeErr := a.Summarize(runCtx, sessionID, current.ProviderOptions); summarizeErr != nil {
+				slog.Error("Failed to summarize after context-too-large error", "error", summarizeErr)
+				return nil, outcome.err
+			}
+			current, haveCurrent = *outcome.retryCall, true
+			continue
+
+		case outcome.shortCircuit:
+			releaseBusy()
+			return outcome.result, outcome.err
+
+		case outcome.err != nil:
+			// Preserve existing semantics: a failed turn (including user
+			// cancel) returns immediately; queued prompts survive for the
+			// next dispatch and RunAfterAgent does not fire.
+			releaseBusy()
+			return outcome.result, outcome.err
+
+		case outcome.summarize:
+			// Context threshold reached mid-work: release busy, summarize,
+			// then continue from the queue head.
+			releaseBusy()
+			if _, summarizeErr := a.Summarize(runCtx, sessionID, current.ProviderOptions); summarizeErr != nil {
+				return nil, summarizeErr
+			}
+			if outcome.hadToolCalls {
+				continuation := current
+				continuation.Prompt = fmt.Sprintf("The previous session was interrupted because it got too long, the initial user request was: `%s`", current.Prompt)
+				a.runMu.Lock()
+				a.appendQueueLocked(sessionID, continuation)
+				a.runMu.Unlock()
+			}
+			current, haveCurrent = SessionAgentCall{}, false
+			continue
+		}
+
+		// Plain success: atomic end-of-turn — release, pop the next queued
+		// call and re-mark busy in one critical section so a concurrent Run
+		// can neither lose its enqueue nor steal the dispatch.
+		a.runMu.Lock()
+		a.activeRequests.Del(sessionID)
+		cancelTurn()
+		next, hasNext := a.popQueueLocked(sessionID)
+		if !hasNext {
+			a.runMu.Unlock()
+			busyOwned = false
+			break
+		}
+		var ok bool
+		genCtx, cancelTurn, ok = a.beginTurnLocked(sessionID, runCtx)
+		if !ok {
+			// Defensive: unreachable while holding runMu (we just deleted
+			// the busy entry). Keep FIFO order by pushing back to the head.
+			a.pushFrontQueueLocked(sessionID, next)
+			a.runMu.Unlock()
+			busyOwned = false
+			return nil, nil
+		}
+		current = next
+		a.runMu.Unlock()
+	}
+
+	// The queue is exhausted: fire the AfterAgent callback exactly once with
+	// the final turn's call and result.
+	return a.callbacks.RunAfterAgent(runCtx, &lastCall, lastResult, nil)
+}
+
+// beginTurnLocked marks the session busy by registering a fresh cancel
+// function in activeRequests. It must be called with a.runMu held and
+// returns ok=false when another turn already owns the session.
+func (a *sessionAgent) beginTurnLocked(sessionID string, ctx context.Context) (context.Context, context.CancelFunc, bool) {
+	if _, busy := a.activeRequests.Get(sessionID); busy {
+		return nil, nil, false
+	}
+	genCtx, cancel := context.WithCancel(ctx)
+	a.activeRequests.Set(sessionID, cancel)
+	return genCtx, cancel, true
+}
+
+// appendQueueLocked appends a call to the session's prompt queue. It must be
+// called with a.runMu held so enqueue-vs-pop is atomic.
+func (a *sessionAgent) appendQueueLocked(sessionID string, call SessionAgentCall) {
+	queue, _ := a.messageQueue.Get(sessionID)
+	queue = append(queue, call)
+	a.messageQueue.Set(sessionID, queue)
+}
+
+// pushFrontQueueLocked prepends a call to the session's prompt queue,
+// preserving FIFO order. It must be called with a.runMu held.
+func (a *sessionAgent) pushFrontQueueLocked(sessionID string, call SessionAgentCall) {
+	queue, _ := a.messageQueue.Get(sessionID)
+	queue = append([]SessionAgentCall{call}, queue...)
+	a.messageQueue.Set(sessionID, queue)
+}
+
+// popQueueLocked removes and returns the head of the session's prompt queue.
+// It must be called with a.runMu held.
+func (a *sessionAgent) popQueueLocked(sessionID string) (SessionAgentCall, bool) {
+	queue, ok := a.messageQueue.Get(sessionID)
+	if !ok || len(queue) == 0 {
+		a.messageQueue.Del(sessionID)
+		return SessionAgentCall{}, false
+	}
+	next := queue[0]
+	queue = queue[1:]
+	if len(queue) == 0 {
+		a.messageQueue.Del(sessionID)
+	} else {
+		a.messageQueue.Set(sessionID, queue)
+	}
+	return next, true
+}
+
+// runTurn executes a single user turn end-to-end: BeforeAgent callback,
+// user-message persistence, model streaming, finish handling and the
+// TypeAgentFinished notification. It must be called with the session marked
+// busy (genCtx/cancel registered by the dispatcher in Run).
+func (a *sessionAgent) runTurn(ctx context.Context, genCtx context.Context, call SessionAgentCall) turnOutcome {
+	// BeforeAgent callback — may skip execution entirely.
+	if result, err := a.callbacks.RunBeforeAgent(ctx, &call); result != nil || err != nil {
+		return turnOutcome{result: result, err: err, shortCircuit: true}
 	}
 
 	// Send thinking notification
@@ -81,7 +302,7 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 
 	// BeforeModel callback — may modify system prompt.
 	if err := a.callbacks.RunBeforeModel(ctx, &call, &systemPrompt); err != nil {
-		return nil, err
+		return turnOutcome{err: err}
 	}
 
 	if len(agentTools) > 0 {
@@ -99,12 +320,12 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 	sessionLock := sync.Mutex{}
 	currentSession, err := a.sessions.Get(ctx, call.SessionID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get session: %w", err)
+		return turnOutcome{err: fmt.Errorf("failed to get session: %w", err)}
 	}
 
 	msgs, err := a.getSessionMessages(ctx, currentSession)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get session messages: %w", err)
+		return turnOutcome{err: fmt.Errorf("failed to get session messages: %w", err)}
 	}
 
 	var wg sync.WaitGroup
@@ -120,20 +341,8 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 	// Add the user message to the session.
 	_, err = a.createUserMessage(ctx, call)
 	if err != nil {
-		return nil, err
+		return turnOutcome{err: err}
 	}
-
-	// Add the session to the context.
-	ctx = context.WithValue(ctx, tools.SessionIDContextKey, call.SessionID)
-
-	// Add the error collector to the context for tool error recording.
-	ctx = errcoll.WithContext(ctx, a.errorCollector)
-
-	genCtx, cancel := context.WithCancel(ctx)
-	a.activeRequests.Set(call.SessionID, cancel)
-
-	defer cancel()
-	defer a.activeRequests.Del(call.SessionID)
 
 	history, files := a.preparePrompt(msgs, largeModel.CatwalkCfg.SupportsImages, call.Attachments...)
 
@@ -167,15 +376,8 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 			// Use latest tools (updated by SetTools when MCP tools change).
 			prepared.Tools = a.tools.Copy()
 
-			queuedCalls, _ := a.messageQueue.Get(call.SessionID)
-			a.messageQueue.Del(call.SessionID)
-			for _, queued := range queuedCalls {
-				userMessage, createErr := a.createUserMessage(callContext, queued)
-				if createErr != nil {
-					return callContext, prepared, createErr
-				}
-				prepared.Messages = append(prepared.Messages, userMessage.ToAIMessage()...)
-			}
+			// NOTE: queued prompts are intentionally NOT drained into the
+			// in-flight turn — they only start at turn boundaries (see Run).
 
 			prepared.Messages = a.workaroundProviderMediaLimitations(prepared.Messages, largeModel)
 
@@ -419,7 +621,7 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 	if err != nil {
 		isCancelErr := errors.Is(err, context.Canceled)
 		if currentAssistant == nil {
-			return result, err
+			return turnOutcome{result: result, err: err}
 		}
 		// Ensure we finish thinking on error to close the reasoning state.
 		currentAssistant.FinishThinking()
@@ -427,7 +629,7 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 		// INFO: we use the parent context here because the genCtx has been cancelled.
 		msgs, createErr := a.messages.List(ctx, currentAssistant.SessionID)
 		if createErr != nil {
-			return nil, createErr
+			return turnOutcome{err: createErr}
 		}
 		for _, tc := range toolCalls {
 			if !tc.Finished {
@@ -436,7 +638,7 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 				currentAssistant.AddToolCall(tc)
 				updateErr := a.messages.Update(ctx, *currentAssistant)
 				if updateErr != nil {
-					return nil, updateErr
+					return turnOutcome{err: updateErr}
 				}
 			}
 
@@ -474,7 +676,7 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 				},
 			})
 			if createErr != nil {
-				return nil, createErr
+				return turnOutcome{err: createErr}
 			}
 		}
 		var fantasyErr *fantasy.Error
@@ -502,7 +704,7 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 		// cancelled.
 		updateErr := a.messages.Update(ctx, *currentAssistant)
 		if updateErr != nil {
-			return nil, updateErr
+			return turnOutcome{err: updateErr}
 		}
 		if ctxTooLarge {
 			slog.Warn(
@@ -511,25 +713,13 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 				"max_tokens", providerErr.ContextMaxTokens,
 				"used_tokens", providerErr.ContextUsedTokens,
 			)
-			a.activeRequests.Del(call.SessionID)
-			cancel()
-			if _, summarizeErr := a.Summarize(ctx, call.SessionID, call.ProviderOptions); summarizeErr != nil {
-				slog.Error("Failed to summarize after context-too-large error", "error", summarizeErr)
-				return nil, err
-			}
-			// Re-queue the original prompt so the next turn picks it up
-			// after summarization compresses history.
-			existing, ok := a.messageQueue.Get(call.SessionID)
-			if !ok {
-				existing = []SessionAgentCall{}
-			}
+			// Busy release + Summarize + retry re-dispatch happen in the
+			// dispatcher loop (Run) so they stay atomic with queue dispatch.
 			retryCall := call
 			retryCall.Prompt = fmt.Sprintf("The previous turn was interrupted because the context window was exceeded. Please continue with the original request: `%s`", call.Prompt)
-			existing = append(existing, retryCall)
-			a.messageQueue.Set(call.SessionID, existing)
-			return nil, nil
+			return turnOutcome{ctxTooLarge: true, retryCall: &retryCall, err: err}
 		}
-		return nil, err
+		return turnOutcome{err: err}
 	}
 
 	// Send notification that agent has finished its turn (skip for
@@ -543,35 +733,12 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 	}
 
 	if shouldSummarize {
-		a.activeRequests.Del(call.SessionID)
-		if _, summarizeErr := a.Summarize(genCtx, call.SessionID, call.ProviderOptions); summarizeErr != nil {
-			return nil, summarizeErr
-		}
-		// If the agent wasn't done...
-		if len(currentAssistant.ToolCalls()) > 0 {
-			existing, ok := a.messageQueue.Get(call.SessionID)
-			if !ok {
-				existing = []SessionAgentCall{}
-			}
-			call.Prompt = fmt.Sprintf("The previous session was interrupted because it got too long, the initial user request was: `%s`", call.Prompt)
-			existing = append(existing, call)
-			a.messageQueue.Set(call.SessionID, existing)
-		}
+		// Busy release + Summarize + continuation enqueue happen in the
+		// dispatcher loop (Run) so they stay atomic with queue dispatch.
+		return turnOutcome{result: result, summarize: true, hadToolCalls: len(currentAssistant.ToolCalls()) > 0}
 	}
 
-	// Release active request before processing queued messages.
-	a.activeRequests.Del(call.SessionID)
-	cancel()
-
-	queuedMessages, ok := a.messageQueue.Get(call.SessionID)
-	if !ok || len(queuedMessages) == 0 {
-		// AfterAgent callback — may replace result.
-		return a.callbacks.RunAfterAgent(ctx, &call, result, err)
-	}
-	// There are queued messages restart the loop.
-	firstQueuedMessage := queuedMessages[0]
-	a.messageQueue.Set(call.SessionID, queuedMessages[1:])
-	return a.Run(ctx, firstQueuedMessage)
+	return turnOutcome{result: result}
 }
 
 func (a *sessionAgent) Summarize(ctx context.Context, sessionID string, opts fantasy.ProviderOptions) (string, error) {
@@ -708,24 +875,26 @@ func (a *sessionAgent) Summarize(ctx context.Context, sessionID string, opts fan
 }
 
 func (a *sessionAgent) Cancel(sessionID string) {
-	// Cancel regular requests. Don't use Take() here - we need the entry to
-	// remain in activeRequests so IsBusy() returns true until the goroutine
-	// fully completes (including error handling that may access the DB).
-	// The defer in processRequest will clean up the entry.
+	// Cancel active requests (regular turns and Summarize both register
+	// under the bare sessionID). Don't use Take() here - we need the entry
+	// to remain in activeRequests so IsBusy() returns true until the
+	// goroutine fully completes (including error handling that may access
+	// the DB). The dispatcher loop in Run releases the entry at the end of
+	// each turn, on error returns, and via its panic safety net.
 	if cancel, ok := a.activeRequests.Get(sessionID); ok && cancel != nil {
 		slog.Debug("Request cancellation initiated", "session_id", sessionID)
 		cancel()
 	}
 
-	// Also check for summarize requests.
-	if cancel, ok := a.activeRequests.Get(sessionID + "-summarize"); ok && cancel != nil {
-		slog.Debug("Summarize cancellation initiated", "session_id", sessionID)
-		cancel()
-	}
-
+	// Cancel also clears the queue: the running dispatcher pops an empty
+	// queue at its turn boundary and exits without starting further turns.
+	// Hold runMu so a concurrent enqueue cannot race this clear (its call
+	// would otherwise be deleted before any dispatcher sees it).
 	if a.QueuedPrompts(sessionID) > 0 {
 		slog.Debug("Clearing queued prompts", "session_id", sessionID)
+		a.runMu.Lock()
 		a.messageQueue.Del(sessionID)
+		a.runMu.Unlock()
 	}
 }
 
@@ -751,7 +920,9 @@ func (a *sessionAgent) CancelAll() {
 func (a *sessionAgent) ClearQueue(sessionID string) {
 	if a.QueuedPrompts(sessionID) > 0 {
 		slog.Debug("Clearing queued prompts", "session_id", sessionID)
+		a.runMu.Lock()
 		a.messageQueue.Del(sessionID)
+		a.runMu.Unlock()
 	}
 }
 
