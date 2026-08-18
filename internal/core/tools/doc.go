@@ -3,44 +3,54 @@
 //
 // # Directory is the architecture (目录即结构)
 //
-// The layout of this tree IS the architecture. Like a Next.js app where
-// app/<route>/page.tsx is the route, here the directory tells you what a
-// file is for — no registration file to hunt down:
+// The layout of this tree IS the architecture — the three-directory contract
+// (core / internalx / external) maps one-to-one onto the capability model:
 //
-//	tools/                  one builtin tool per file (fetch.go → fetch tool)
-//	  registry.go           the composition point: plugin blocks in build order
-//	  contracts.go          the target Tool/ToolContext/ToolResult contracts
+//	tools/                  composition + contracts only (no tool impls)
+//	  registry.go           THE composition point: plugin blocks in order
+//	  registry_filter.go    post-Build filtering
+//	  contracts.go          target Tool/ToolContext/ToolResult contracts
+//	  runtime.go result.go  runtime dep-set plumbing
+//	  tools.go              façade: re-exports keep tools.X paths stable
+//	  doc.go                this file — the single structure document
+//
+//	core/                   CORE tools (runnable with zero externals)
+//	  fs/                   file tools: edit multiedit write view read_files
+//	                        ls glob grep
+//	  shell/                bash + background jobs: bash bash_safe job_input
+//	                        job_kill job_output
+//	  web/                  web→md tools: fetch crawl web_fetch web_search
+//	                        download download_docs sourcegraph
+//	                        (+ crawler/ shared crawling foundation)
+//
+//	internalx/              INTERNAL tools (agent-adjacent capabilities)
+//	  lsp/                  LSP tools + manager (+ lsputil, references)
+//	  agent/                think todos transfer diagnostics mocode_info
+//	                        mocode_logs session_export session_summary
+//	                        session_search message_export
 //	  filter/               composable predicates applied after Build
-//	  nethttp/              THE outbound-HTTP port (interface block)
-//	  net/                  web tools: fetch, crawl, web_fetch, web_search,
-//	                        download, download_docs, sourcegraph
-//	  ssh/                  ssh_exec, ssh_upload, ssh_download, ssh_list_hosts
-//	  gitea/                gitea_issues, gitea_pulls, gitea_notifications
-//	  gitops/               git_plan_commits, git_execute_commits
-//	  wechat/               send_wechat_file/image, screenshot_to_wechat
-//	                        (built by the coordinator, not the registry)
+//	  modes/                (future, P6) moa | team | tree agent modes
+//	  domain/               (future, P6) domain tools
+//
+//	external/               EXTERNAL systems
 //	  mcp/                  MCP bridge: sessions, transports, meta tools
-//	                        (list/read_mcp_resources, mcp-tools adapter)
-//	  lsp/                  LSP manager and its tools
-//	  plugins/<x>common/    shared library for one tool category
-//	    netcommon/          fetch/search helpers all web tools share
-//	    searchcommon/       ripgrep/pure-Go search stack (shared by grep,
-//	                        glob, lsp references)
+//	  connector/            the Connector port (systems plug in here)
+//	  nethttp/              THE outbound-HTTP port (interface block)
+//	  systems/              ssh gitea gitops wechat
+//	  plugins/              shared libs per category
+//	    netcommon/          fetch/search providers all web tools share
+//	    searchcommon/       ripgrep/pure-Go search stack (grep, glob,
+//	                        lsp references)
 //	    sshcommon/          SSH connection pool + exec helpers
 //	    giteacommon/        tea CLI plumbing
+//	    gitopscommon/       git commit classification
 //
-// Root-level files are the fs/shell/session core that every runtime needs
-// (edit, view, bash, job_*, todos, ...). This is deliberate: the file tools
-// share one dependency set (permissions + filetracker + history) wired by a
-// single plugin block, so splitting them would cut a cohesive unit — they
-// stay until the contracts adapter lands. Everything with an external-system
-// affinity lives in its category directory; the façade (tools.go) re-exports
-// the stable tools.X symbols so consumers outside the tree are insulated
-// from the layout.
-//
-// A file in tools/ root exports New<Tool>Tool(deps...) fantasy.AgentTool
-// constructors and one <Tool>ToolName constant. A plugin block in
-// registry.go wires exactly those constructors with the ports it needs.
+// A tool file exports New<Tool>Tool(deps...) constructors plus one
+// <Tool>ToolName constant with its .md description sibling. A plugin block
+// in registry.go wires exactly those constructors with the ports it needs.
+// The façade (tools.go) re-exports the stable tools.X symbols so consumers
+// outside the tree are insulated from the layout — types MUST use
+// `type X = pkg.X` (identity preserved for UI type switches).
 //
 // # SysML view: blocks, ports, constraints
 //
@@ -88,7 +98,8 @@
 //
 // # Adding a new tool
 //
-//  1. Create <tool>.go next to its siblings, export New<Tool>Tool(...) and
+//  1. Place <tool>.go in the matching category directory (core/internalx/
+//     external by the affinity table), export New<Tool>Tool(...) and
 //     <Tool>ToolName, embed <tool>.md for the description.
 //  2. Add the descriptor + wiring to the matching plugin block in
 //     registry.go (that file is the single composition point).

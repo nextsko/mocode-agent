@@ -71,7 +71,7 @@ type packageRule struct {
 // lists in sync.
 var packageRules = []packageRule{
 	{
-		pkg: "github.com/nextsko/mocode-agent/internal/core/tools/nethttp",
+		pkg: "github.com/nextsko/mocode-agent/internal/core/tools/external/nethttp",
 		forbidden: []string{
 			"charm.land/fantasy",
 			"charm.land/catwalk",
@@ -80,7 +80,7 @@ var packageRules = []packageRule{
 		},
 	},
 	{
-		pkg: "github.com/nextsko/mocode-agent/internal/core/tools/plugins/netcommon",
+		pkg: "github.com/nextsko/mocode-agent/internal/core/tools/external/plugins/netcommon",
 		forbidden: []string{
 			"charm.land/fantasy",
 			"charm.land/catwalk",
