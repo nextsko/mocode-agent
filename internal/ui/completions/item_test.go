@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
 	"github.com/sahilm/fuzzy"
 	"github.com/stretchr/testify/require"
 )
@@ -17,11 +18,11 @@ func TestSplitMatchIndexes(t *testing.T) {
 }
 
 func TestHighlightRunes(t *testing.T) {
-	out := highlightRunes("abc", map[int]bool{1: true}, nil, nil, false)
+	out := highlightRunes("abc", map[int]bool{1: true}, lipgloss.NewStyle(), lipgloss.NewStyle(), false)
 	require.Contains(t, out, "\x1b[1mb\x1b[22m", "hit rune bolded")
 	require.True(t, strings.HasPrefix(out, "a"))
 	require.True(t, strings.HasSuffix(out, "c"))
 
 	// No hits → untouched.
-	require.Equal(t, "abc", highlightRunes("abc", nil, nil, nil, false))
+	require.Equal(t, "abc", highlightRunes("abc", nil, lipgloss.NewStyle(), lipgloss.NewStyle(), false))
 }
