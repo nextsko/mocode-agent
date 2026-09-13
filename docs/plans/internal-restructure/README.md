@@ -57,13 +57,14 @@
 | R4d | **四主题分批 commit**（bg-jobs/subagent-ui/ask-user/restructure，工作入版本保护）；上帝文件批次：`ui_dialogs` 892→231+471（actions）+206（openers）、`chat` 872→500+205（scroll）+180（msgs）、`app` 853→658+207（store services）。quickstyle 三次脚本尝试后判定为**声明式样式表**（上游 crush 同为 1051 行单文件），拆分收益低于风险，维持同构不拆 |
 | R4e | `plugins/*common` → `common/{gitea,gitops,net,search,ssh}`（共享库命名正名，21 处引用重写）；`wechat/bot` 746→405+353（media 域）、`diffview` 726→643+85（builders 域）、`question_form` 719→383+345（draw 域）；`handleDialogAction` 471 判定为宽浅路由表（40+ case 平均 10 行）记档不拆 |
 | R4f | **agent 根分包落地**：sessionAgent 全家（14 文件：session/run/queue/control/model/convert/prompt/turn_callbacks/callbacks/event/errors + 5 测试）迁 `core/agent/lifecycle/`；根包保留 API 面——type alias + `NewSessionAgent`/`Err*` 转发，**全部调用方零改动**；agent 根现只剩编排域（coordinator×7）与工具域（agent_tool/agentic_fetch/agent_tool_context），平铺 22→12 文件 |
+| R4g | **coordinator 域分包收官**：11 实现文件+4 测试+3 模板迁 `core/agent/coordinator/`，struct 导出为 `coordinator.Coordinator`（隐式实现根接口）；agent 根最终收敛为 **2 文件纯 API 门面**（agent.go alias/转发 + coordinator_api.go 接口），从最初 22 文件平铺 → 门面 + 9 个职责子包（lifecycle/coordinator/notify/failover/toolutil/jobs/loopdetect/messages/summary/ctxcompress/prompt/subagent_cards/templates） |
 
 验证：全仓 build/vet/test 绿。R4b 教训：switch 内提取必须保留 case 标签转发（裸 if 插入会静默丢失事件路由，测试当场抓出）。
 
 验证：全仓 build/vet/test 绿。工具沉淀：`scripts/gosplit.ps1`（切块函数，需同进程 dot-source）。
 
 ## R4 剩余蓝图（按序）
-1. ~~agent 根完全分包~~（R4f 完成 lifecycle 域；coordinator 域可同法后续分包——alias 面已验证）
+1. ~~agent 根完全分包~~（R4f lifecycle + R4g coordinator 双双完成）
 2. 残余 >350（收益递减区，按需）：quickstyle 964（已判定不拆）、ui.go 718、config.go 691、permissions.go 690、admin/server 677、wechat/channel 677、question_choice_base 668、app.go 658、diffview 643
 
 ## 相关
