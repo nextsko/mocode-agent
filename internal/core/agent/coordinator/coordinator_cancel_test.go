@@ -1,4 +1,4 @@
-package agent
+package coordinator
 
 import (
 	"testing"
@@ -9,9 +9,9 @@ import (
 // TestCoordinatorCancelSubagent_NoopOnEmpty 验证 CancelSubagent 对空 ID
 // 是 no-op，不会 panic。
 func TestCoordinatorCancelSubagent_NoopOnEmpty(t *testing.T) {
-	// 不能直接构造 coordinator（依赖太多），改用 nil 行为测试。
+	// 不能直接构造 Coordinator（依赖太多），改用 nil 行为测试。
 	// 重点是：CancelSubagent("") 不调用任何下游 cancel。
-	var c *coordinator
+	var c *Coordinator
 	if c != nil {
 		// 不会执行到这里，但保留对称性。
 		c.CancelSubagent("")

@@ -1,4 +1,4 @@
-package agent
+package coordinator
 
 import (
 	"context"
@@ -119,7 +119,7 @@ const (
 	AgentToolName = "agent"
 )
 
-func (c *coordinator) agentTool(ctx context.Context) (fantasy.AgentTool, error) {
+func (c *Coordinator) agentTool(ctx context.Context) (fantasy.AgentTool, error) {
 	defaultAgent, err := c.buildSubAgent(ctx, config.AgentTask, false)
 	if err != nil {
 		return nil, err
@@ -164,7 +164,7 @@ func (c *coordinator) agentTool(ctx context.Context) (fantasy.AgentTool, error) 
 		}), nil
 }
 
-func (c *coordinator) buildSubAgent(ctx context.Context, agentID string, allowEdit bool) (SessionAgent, error) {
+func (c *Coordinator) buildSubAgent(ctx context.Context, agentID string, allowEdit bool) (SessionAgent, error) {
 	if agentID == "" {
 		agentID = config.AgentTask
 	}
@@ -191,7 +191,7 @@ type subAgentBatchParams struct {
 	Tasks          []AgentTaskParams
 }
 
-func (c *coordinator) runSubAgentBatch(ctx context.Context, params subAgentBatchParams) (fantasy.ToolResponse, error) {
+func (c *Coordinator) runSubAgentBatch(ctx context.Context, params subAgentBatchParams) (fantasy.ToolResponse, error) {
 	// If any task has dependencies, use DAG scheduler.
 	hasDeps := false
 	for _, t := range params.Tasks {
@@ -207,7 +207,7 @@ func (c *coordinator) runSubAgentBatch(ctx context.Context, params subAgentBatch
 }
 
 // runSubAgentParallel runs all tasks concurrently (no dependencies).
-func (c *coordinator) runSubAgentParallel(ctx context.Context, params subAgentBatchParams) (fantasy.ToolResponse, error) {
+func (c *Coordinator) runSubAgentParallel(ctx context.Context, params subAgentBatchParams) (fantasy.ToolResponse, error) {
 	type batchEntry struct {
 		idx      int
 		task     AgentTaskParams
@@ -324,7 +324,7 @@ func firstLine(s string) string {
 // runSubAgentDAG executes tasks respecting the DependsOn DAG.
 // It runs tasks in phases: each phase executes all ready tasks in parallel,
 // then advances to the next phase. Failed/errored tasks block their dependents.
-func (c *coordinator) runSubAgentDAG(ctx context.Context, params subAgentBatchParams) (fantasy.ToolResponse, error) {
+func (c *Coordinator) runSubAgentDAG(ctx context.Context, params subAgentBatchParams) (fantasy.ToolResponse, error) {
 	n := len(params.Tasks)
 	if n == 0 {
 		return fantasy.NewTextResponse("No tasks to run."), nil

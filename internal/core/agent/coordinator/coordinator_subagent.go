@@ -1,4 +1,4 @@
-package agent
+package coordinator
 
 import (
 	"context"
@@ -11,18 +11,18 @@ import (
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 )
 
-func (c *coordinator) QueuedPrompts(sessionID string) int {
+func (c *Coordinator) QueuedPrompts(sessionID string) int {
 	return c.currentAgent.QueuedPrompts(sessionID)
 }
 
-func (c *coordinator) QueuedPromptsList(sessionID string) []string {
+func (c *Coordinator) QueuedPromptsList(sessionID string) []string {
 	return c.currentAgent.QueuedPromptsList(sessionID)
 }
 
 // SummarizeWithPath returns the export path of the saved summary alongside
 // any error. The path is the on-disk location written by sessionexport,
 // which is what the TUI renders in the completion InfoMsg.
-func (c *coordinator) SummarizeWithPath(ctx context.Context, sessionID string) (string, error) {
+func (c *Coordinator) SummarizeWithPath(ctx context.Context, sessionID string) (string, error) {
 	providerCfg, ok := c.cfg.Config().Providers.Get(c.currentAgent.Model().ModelCfg.Provider)
 	if !ok {
 		return "", errModelProviderNotConfigured
@@ -30,7 +30,7 @@ func (c *coordinator) SummarizeWithPath(ctx context.Context, sessionID string) (
 	return c.currentAgent.Summarize(ctx, sessionID, getProviderOptions(c.currentAgent.Model(), providerCfg))
 }
 
-func (c *coordinator) Summarize(ctx context.Context, sessionID string) error {
+func (c *Coordinator) Summarize(ctx context.Context, sessionID string) error {
 	_, err := c.SummarizeWithPath(ctx, sessionID)
 	return err
 }
@@ -39,7 +39,7 @@ func (c *coordinator) Summarize(ctx context.Context, sessionID string) error {
 // sessionID onto the summary queue and immediately runs the drain,
 // rather than waiting for the next Run() defer (which only fires for
 // tool-driven scheduling). Used by the /summary slash command path.
-func (c *coordinator) EnqueueSummaryAndDrain(sessionID string) {
+func (c *Coordinator) EnqueueSummaryAndDrain(sessionID string) {
 	if sessionID == "" {
 		return
 	}
@@ -50,14 +50,14 @@ func (c *coordinator) EnqueueSummaryAndDrain(sessionID string) {
 // SummarySubscribe implements Coordinator. It exposes the channel of
 // SummaryCompletedMsg events published by the asynchronous summary
 // goroutine so the composition root can forward them into app.events.
-func (c *coordinator) SummarySubscribe(ctx context.Context) <-chan pubsub.Event[SummaryCompletedMsg] {
+func (c *Coordinator) SummarySubscribe(ctx context.Context) <-chan pubsub.Event[SummaryCompletedMsg] {
 	return c.summaryDone.Subscribe(ctx)
 }
 
 // runSubAgent runs a sub-agent and handles session management and cost accumulation.
 // It creates a sub-session, runs the agent with the given prompt, and propagates
 // the cost to the parent session.
-func (c *coordinator) runSubAgent(ctx context.Context, params subAgentParams) (fantasy.ToolResponse, error) {
+func (c *Coordinator) runSubAgent(ctx context.Context, params subAgentParams) (fantasy.ToolResponse, error) {
 	resp, _, err := c.runSubAgentWithMeta(ctx, params)
 	return resp, err
 }
@@ -65,7 +65,7 @@ func (c *coordinator) runSubAgent(ctx context.Context, params subAgentParams) (f
 // runSubAgentWithMeta is the metadata-returning variant of runSubAgent. It is
 // used by the parallel and DAG batch runners so they can populate
 // TaskResult.DurationMs and TaskResult.Usage on each envelope.
-func (c *coordinator) runSubAgentWithMeta(ctx context.Context, params subAgentParams) (fantasy.ToolResponse, subAgentResult, error) {
+func (c *Coordinator) runSubAgentWithMeta(ctx context.Context, params subAgentParams) (fantasy.ToolResponse, subAgentResult, error) {
 	startTime := time.Now()
 
 	// Create sub-session
@@ -185,7 +185,7 @@ func (c *coordinator) runSubAgentWithMeta(ctx context.Context, params subAgentPa
 // cancellation should not gate emission. It is part of the signature so
 // future refinements (e.g. honouring a parent ctx when bridging to a
 // downstream that may block) can adopt it without churning call sites.
-func (c *coordinator) publishSubagentCompleted(
+func (c *Coordinator) publishSubagentCompleted(
 	_ context.Context, // reserved for future cancellation propagation; see doc comment
 	params subAgentParams,
 	status notify.SubagentStatus,
@@ -216,7 +216,7 @@ func (c *coordinator) publishSubagentCompleted(
 
 // updateParentSessionCost accumulates the cost from a child session to its parent session.
 // Uses atomic increment to prevent lost updates when multiple sub-agents run concurrently.
-func (c *coordinator) updateParentSessionCost(ctx context.Context, childSessionID, parentSessionID string) error {
+func (c *Coordinator) updateParentSessionCost(ctx context.Context, childSessionID, parentSessionID string) error {
 	childSession, err := c.sessions.Get(ctx, childSessionID)
 	if err != nil {
 		return fmt.Errorf("get child session: %w", err)

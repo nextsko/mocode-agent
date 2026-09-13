@@ -6,7 +6,23 @@
 package agent
 
 import (
+	"context"
+
+	"github.com/nextsko/mocode-agent/internal/core/agent/coordinator"
 	"github.com/nextsko/mocode-agent/internal/core/agent/lifecycle"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/core/question"
+	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
+	"github.com/nextsko/mocode-agent/internal/domain/filetracker"
+	"github.com/nextsko/mocode-agent/internal/domain/history"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/store"
+	"github.com/nextsko/mocode-agent/internal/util/errcoll"
+	"github.com/nextsko/mocode-agent/internal/util/pubsub"
+
+	agentnotify "github.com/nextsko/mocode-agent/internal/core/agent/notify"
 )
 
 const DefaultSessionName = lifecycle.DefaultSessionName
@@ -41,3 +57,34 @@ var (
 	// ErrRequestCancelled is returned when the request was cancelled mid-run.
 	ErrRequestCancelled = lifecycle.ErrRequestCancelled
 )
+
+// SummaryCompletedMsg is the payload of the async summary completion event (alias).
+type SummaryCompletedMsg = coordinator.SummaryCompletedMsg
+
+// Coordinator-owned tool symbols (aliases).
+type (
+	AgentParams     = coordinator.AgentParams
+	AgentTaskParams = coordinator.AgentTaskParams
+	TaskResult      = coordinator.TaskResult
+	TaskUsage       = coordinator.TaskUsage
+)
+
+const AgentToolName = coordinator.AgentToolName
+
+// NewCoordinator builds the default coordinator (forwarded constructor).
+func NewCoordinator(
+	ctx context.Context,
+	cfg *config.ConfigStore,
+	sessions session.Service,
+	messages message.Service,
+	permissions permission.Service,
+	questions question.Service,
+	history history.Service,
+	filetracker filetracker.Service,
+	lspManager *lsp.Manager,
+	notify pubsub.Publisher[agentnotify.Notification],
+	errorCollector *errcoll.Collector,
+	sessionSearch *store.SessionSearch,
+) (Coordinator, error) {
+	return coordinator.New(ctx, cfg, sessions, messages, permissions, questions, history, filetracker, lspManager, notify, errorCollector, sessionSearch)
+}

@@ -1,4 +1,4 @@
-package agent
+package coordinator
 
 import (
 	"context"
@@ -11,13 +11,13 @@ import (
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
 
-func (c *coordinator) Cancel(sessionID string) {
+func (c *Coordinator) Cancel(sessionID string) {
 	c.currentAgent.Cancel(sessionID)
 }
 
 // InjectGuidance implements Coordinator: mid-turn steering for the RUNNING
 // turn of the session's current agent.
-func (c *coordinator) InjectGuidance(ctx context.Context, sessionID, text string) error {
+func (c *Coordinator) InjectGuidance(ctx context.Context, sessionID, text string) error {
 	if err := c.readyWg.Wait(); err != nil {
 		return err
 	}
@@ -26,7 +26,7 @@ func (c *coordinator) InjectGuidance(ctx context.Context, sessionID, text string
 
 // ForceRun implements Coordinator: preempt the session with prompt jumping
 // the queue head. The interrupted turn hands dispatch straight to it.
-func (c *coordinator) ForceRun(ctx context.Context, sessionID, prompt string, attachments ...message.Attachment) error {
+func (c *Coordinator) ForceRun(ctx context.Context, sessionID, prompt string, attachments ...message.Attachment) error {
 	if err := c.readyWg.Wait(); err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func (c *coordinator) ForceRun(ctx context.Context, sessionID, prompt string, at
 // unknown (already completed, never registered, or never ran in this
 // process) the call is a silent no-op — that matches the behaviour of
 // sessionAgent.Cancel for arbitrary session IDs.
-func (c *coordinator) CancelSubagent(subagentID string) {
+func (c *Coordinator) CancelSubagent(subagentID string) {
 	if subagentID == "" || c.subagentIndex == nil {
 		return
 	}
@@ -58,14 +58,14 @@ func (c *coordinator) CancelSubagent(subagentID string) {
 	c.currentAgent.Cancel(subSessionID)
 }
 
-func (c *coordinator) CancelAll() {
+func (c *Coordinator) CancelAll() {
 	c.currentAgent.CancelAll()
 }
 
 // Close drains the coordinator's tool registry, closing plugin-owned
 // resources such as the shared SSH connection pool. Safe to call once at
 // shutdown; Build after Close recreates lazily-startable state.
-func (c *coordinator) Close(ctx context.Context) error {
+func (c *Coordinator) Close(ctx context.Context) error {
 	if c.toolRegistry == nil {
 		return nil
 	}
@@ -76,24 +76,24 @@ func (c *coordinator) Close(ctx context.Context) error {
 	return nil
 }
 
-func (c *coordinator) ClearQueue(sessionID string) {
+func (c *Coordinator) ClearQueue(sessionID string) {
 	c.currentAgent.ClearQueue(sessionID)
 }
 
-func (c *coordinator) IsBusy() bool {
+func (c *Coordinator) IsBusy() bool {
 	return c.currentAgent.IsBusy()
 }
 
-func (c *coordinator) IsSessionBusy(sessionID string) bool {
+func (c *Coordinator) IsSessionBusy(sessionID string) bool {
 	return c.currentAgent.IsSessionBusy(sessionID)
 }
 
-func (c *coordinator) isUnauthorized(err error) bool {
+func (c *Coordinator) isUnauthorized(err error) bool {
 	var providerErr *fantasy.ProviderError
 	return errors.As(err, &providerErr) && providerErr.StatusCode == http.StatusUnauthorized
 }
 
-func (c *coordinator) refreshOAuth2Token(ctx context.Context, providerCfg config.ProviderConfig) error {
+func (c *Coordinator) refreshOAuth2Token(ctx context.Context, providerCfg config.ProviderConfig) error {
 	if err := c.cfg.RefreshOAuthToken(ctx, config.ScopeGlobal, providerCfg.ID); err != nil {
 		slog.Error("Failed to refresh OAuth token after 401 error", "provider", providerCfg.ID, "error", err)
 		return err
@@ -104,7 +104,7 @@ func (c *coordinator) refreshOAuth2Token(ctx context.Context, providerCfg config
 	return nil
 }
 
-func (c *coordinator) refreshApiKeyTemplate(ctx context.Context, providerCfg config.ProviderConfig) error {
+func (c *Coordinator) refreshApiKeyTemplate(ctx context.Context, providerCfg config.ProviderConfig) error {
 	newAPIKey, err := c.cfg.Resolve(providerCfg.APIKeyTemplate)
 	if err != nil {
 		slog.Error("Failed to re-resolve API key after 401 error", "provider", providerCfg.ID, "error", err)

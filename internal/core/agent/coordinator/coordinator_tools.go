@@ -1,4 +1,4 @@
-package agent
+package coordinator
 
 import (
 	"bytes"
@@ -21,6 +21,7 @@ import (
 	"charm.land/fantasy/providers/openrouter"
 	"charm.land/fantasy/providers/vercel"
 	"github.com/nextsko/mocode-agent/internal/core/agent/failover"
+	"github.com/nextsko/mocode-agent/internal/core/agent/lifecycle"
 	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/shellruntime/screencap"
@@ -208,14 +209,14 @@ func mergeCallOptions(model Model, cfg config.ProviderConfig) (fantasy.ProviderO
 	return modelOptions, temp, topP, topK, freqPenalty, presPenalty
 }
 
-func (c *coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, agent config.Agent, isSubAgent bool) (SessionAgent, error) {
+func (c *Coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, agent config.Agent, isSubAgent bool) (SessionAgent, error) {
 	large, small, err := c.buildAgentModels(ctx, isSubAgent)
 	if err != nil {
 		return nil, err
 	}
 
 	largeProviderCfg, _ := c.cfg.Config().Providers.Get(large.ModelCfg.Provider)
-	result := NewSessionAgent(SessionAgentOptions{
+	result := lifecycle.NewSessionAgent(lifecycle.SessionAgentOptions{
 		LargeModel:           large,
 		SmallModel:           small,
 		SystemPromptPrefix:   largeProviderCfg.SystemPromptPrefix,
@@ -252,7 +253,7 @@ func (c *coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, age
 	return result, nil
 }
 
-func (c *coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isSubAgent bool) ([]fantasy.AgentTool, error) {
+func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isSubAgent bool) ([]fantasy.AgentTool, error) {
 	// ── coordinator-owned tools (call back into coordinator state) ───────────
 	var allTools []fantasy.AgentTool
 	if slices.Contains(agentCfg.AllowedTools, AgentToolName) {
@@ -392,7 +393,7 @@ func (c *coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 }
 
 // TODO: when we support multiple agents we need to change this so that we pass in the agent specific model config
-func (c *coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Model, Model, error) {
+func (c *Coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Model, Model, error) {
 	largeModelCfg, ok := c.cfg.Config().Models[config.SelectedModelTypeLarge]
 	if !ok {
 		return Model{}, Model{}, errLargeModelNotSelected
@@ -491,7 +492,7 @@ func (c *coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Mo
 // provider config, build provider, resolve model id) for the fallback, then
 // wraps the two with failover.New. When no fallback is declared the primary is
 // returned unchanged, preserving existing behavior.
-func (c *coordinator) withFailover(ctx context.Context, primary fantasy.LanguageModel, cfg config.SelectedModel) (fantasy.LanguageModel, error) {
+func (c *Coordinator) withFailover(ctx context.Context, primary fantasy.LanguageModel, cfg config.SelectedModel) (fantasy.LanguageModel, error) {
 	if cfg.Fallback == nil {
 		return primary, nil
 	}

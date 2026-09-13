@@ -1,4 +1,4 @@
-package agent
+package coordinator
 
 import (
 	"encoding/json"

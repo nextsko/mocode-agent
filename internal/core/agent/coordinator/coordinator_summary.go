@@ -1,4 +1,4 @@
-package agent
+package coordinator
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 )
 
-func (c *coordinator) drainQueuedSummaries() {
+func (c *Coordinator) drainQueuedSummaries() {
 	for _, sessionID := range c.summaryQueue.Drain() {
 		go func() {
 			path, err := c.SummarizeWithPath(context.Background(), sessionID)

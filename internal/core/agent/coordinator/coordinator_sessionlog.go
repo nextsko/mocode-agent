@@ -1,4 +1,4 @@
-package agent
+package coordinator
 
 import (
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"

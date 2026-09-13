@@ -1,4 +1,4 @@
-package agent
+package coordinator
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 
 	"charm.land/fantasy"
 
+	"github.com/nextsko/mocode-agent/internal/core/agent/lifecycle"
 	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/tools"
@@ -50,7 +51,7 @@ func validateAgenticFetchParams(ctx context.Context, params tools.AgenticFetchPa
 //go:embed templates/agentic_fetch_prompt.md.tpl
 var agenticFetchPromptTmpl []byte
 
-func (c *coordinator) agenticFetchTool(_ context.Context, client *http.Client) (fantasy.AgentTool, error) {
+func (c *Coordinator) agenticFetchTool(_ context.Context, client *http.Client) (fantasy.AgentTool, error) {
 	if client == nil {
 		client = c.cfg.Config().HTTPClient(c.cfg.Resolver(), 30*time.Second)
 	}
@@ -169,7 +170,7 @@ func (c *coordinator) agenticFetchTool(_ context.Context, client *http.Client) (
 			// side; firing hooks again for every inner tool call would run
 			// the user's hooks N times per delegated turn.
 
-			agent := NewSessionAgent(SessionAgentOptions{
+			agent := lifecycle.NewSessionAgent(lifecycle.SessionAgentOptions{
 				LargeModel:           small, // Use small model for both (fetch doesn't need large)
 				SmallModel:           small,
 				SystemPromptPrefix:   smallProviderCfg.SystemPromptPrefix,
