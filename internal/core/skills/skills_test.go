@@ -2,6 +2,7 @@ package skills
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -463,6 +464,33 @@ func TestDiscoverBuiltin(t *testing.T) {
 		}
 	}
 	require.True(t, foundRulebook, "docs-rulebook builtin skill not found")
+}
+
+// TestAllBuiltinSkillsValid guards against silently dropped skills: every
+// embedded SKILL.md must parse and validate. A malformed front matter (e.g. an
+// unquoted plain scalar containing ": ") previously made a skill disappear with
+// only a log warning.
+func TestAllBuiltinSkillsValid(t *testing.T) {
+	t.Parallel()
+
+	var paths []string
+	err := fs.WalkDir(builtinFS, "builtin", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !d.IsDir() && d.Name() == SkillFileName {
+			paths = append(paths, path)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, paths)
+
+	_, states := DiscoverBuiltinWithStates()
+	for _, s := range states {
+		require.NotEqual(t, StateError, s.State, "builtin skill failed to load: %s (%v)", s.Path, s.Err)
+	}
+	require.Len(t, DiscoverBuiltin(), len(paths), "some builtin SKILL.md files were dropped")
 }
 
 func TestDeduplicate(t *testing.T) {
