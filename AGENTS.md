@@ -540,7 +540,8 @@ instance of "follow the repository first"; the plan mode prompt embeds it too.
 
 Beyond the default modes, mocode ships **specialist roles** (switch via the mode
 picker / `Ctrl+G`): `architect`, `frontend`, `backend`, `designer`, `qa`,
-`ai-engineer`. Each role loads the relevant builtin skills:
+`ai-engineer`, `mobile`, `devops`, `researcher`, `writer`. Each role loads the
+relevant builtin skills:
 
 | Role | Primary skills |
 |------|----------------|
@@ -550,6 +551,10 @@ picker / `Ctrl+G`): `architect`, `frontend`, `backend`, `designer`, `qa`,
 | `designer` | design-taste-frontend, web-design-guidelines |
 | `qa` | code-review-and-quality, verification-before-completion, incremental-implementation, investigate-first |
 | `ai-engineer` | rig-core-llm-integration, multi-agent-orchestration, streaming, observability |
+| `mobile` | tauri, rust-backend, rust-android-apk, ui-replication |
+| `devops` | observability, lean-build, security-and-hardening, shipping-gitea-prs, triage |
+| `researcher` | project-teardown, reverse-engineering-docs, fromsko-research, investigate-first, handoff |
+| `writer` | docs-rulebook, writing-plans, report-writer, common-rulebook, to-spec |
 
 Builtin skills live in `internal/core/skills/builtin/<name>/SKILL.md`; the front
 matter `name` **must equal the directory name**. Role prompts live in
