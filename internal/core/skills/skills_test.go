@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/require"
 )
@@ -337,6 +338,22 @@ func TestToPromptXMLEmpty(t *testing.T) {
 	require.Empty(t, ToPromptXML([]*Skill{}))
 }
 
+func TestSkillGist(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, "a b c", SkillGist("  a\n b   c "))
+	require.Equal(t, "", SkillGist(""))
+
+	long := strings.Repeat("word ", 60)
+	got := SkillGist(long)
+	require.LessOrEqual(t, utf8.RuneCountInString(got), skillGistMax+1, "gist must be capped (excluding ellipsis)")
+	require.True(t, strings.HasSuffix(got, "…"), "truncated gist must end with an ellipsis")
+	require.False(t, strings.Contains(got, "  "), "gist must have collapsed whitespace")
+
+	short := "Use when 用 X 做 Y。"
+	require.Equal(t, short, SkillGist(short), "short gists are returned verbatim")
+}
+
 func TestEscape(t *testing.T) {
 	t.Parallel()
 
@@ -365,7 +382,7 @@ func TestEscape(t *testing.T) {
 	}
 }
 
-func TestToPromptXMLBuiltinType(t *testing.T) {
+func TestToPromptXMLOmitsDerivableLocation(t *testing.T) {
 	t.Parallel()
 
 	skills := []*Skill{
@@ -373,8 +390,10 @@ func TestToPromptXMLBuiltinType(t *testing.T) {
 		{Name: "user-skill", Description: "A user skill.", SkillFilePath: "/home/user/.config/mocode/skills/user-skill/SKILL.md"},
 	}
 	xml := ToPromptXML(skills)
-	require.Contains(t, xml, "<type>builtin</type>")
-	require.Equal(t, 1, strings.Count(xml, "<type>builtin</type>"))
+	// builtin location is derivable from the name, so it is omitted; user skills keep it.
+	require.NotContains(t, xml, "mocode://skills/builtin-skill/SKILL.md")
+	require.Contains(t, xml, "/home/user/.config/mocode/skills/user-skill/SKILL.md")
+	require.NotContains(t, xml, "<type>")
 }
 
 func TestParseContent(t *testing.T) {
