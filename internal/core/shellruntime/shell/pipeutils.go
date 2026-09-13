@@ -20,15 +20,17 @@ import (
 // Long option names that appear in more than one command, hoisted to constants
 // so the linter does not see repeated string literals.
 const (
-	flagBytes = "--bytes"
-	flagLines = "--lines"
+	flagBytes      = "--bytes"
+	flagLines      = "--lines"
+	flagIgnoreCase = "--ignore-case"
+	flagQuiet      = "--quiet"
 )
 
 // This file implements the "Layer 3" cross-platform parity utilities: plain
-// stream filters plus `fd`, which the model frequently uses but which the
+// stream filters plus `fd`/`rg`, which the model frequently uses but which the
 // upstream moreinterp/coreutils middleware does not provide (notably on
-// Windows, where no system `head`/`tail`/`wc`/`tee`/`sort`/`uniq`/`cut`/`tr`/`fd`
-// exist). `fd` prefers a real binary when installed (see fd.go).
+// Windows, where no system `head`/`tail`/`wc`/`tee`/`sort`/`uniq`/`cut`/`tr`/`fd`/`rg`
+// exist). `fd` and `rg` prefer a real binary when installed (see fd.go, rg.go).
 //
 // Deliberately NOT implemented here (routed to dedicated tools instead):
 // grep/find/cat/ls (structured tools), sed/awk (edit / ts_run / py_run).
@@ -55,6 +57,7 @@ var pipeCommands = map[string]func(pipeEnv, []string) error{
 	"cut":  runCut,
 	"tr":   runTr,
 	"fd":   runFd,
+	"rg":   runRg,
 }
 
 // pipeUtilsHandler returns an interpreter middleware that resolves the commands
@@ -69,8 +72,8 @@ func pipeUtilsHandler(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 		if !ok {
 			return next(ctx, args)
 		}
-		// Prefer a real `fd` binary when installed so behavior matches the host.
-		if args[0] == "fd" && hostFdPath() != "" {
+		// Prefer a real `fd`/`rg` binary when installed so behavior matches the host.
+		if (args[0] == "fd" && hostFdPath() != "") || (args[0] == "rg" && hostRgPath() != "") {
 			return next(ctx, args)
 		}
 		hc := interp.HandlerCtx(ctx)
@@ -166,7 +169,7 @@ func runHead(env pipeEnv, args []string) error {
 		case a == "--":
 			files = append(files, args[i+1:]...)
 			i = len(args)
-		case a == "-q" || a == "--quiet" || a == "--silent":
+		case a == "-q" || a == flagQuiet || a == "--silent":
 			quiet = true
 		case a == "-v" || a == "--verbose":
 			verbose = true
@@ -348,7 +351,7 @@ func runTail(env pipeEnv, args []string) error {
 		case a == "--":
 			files = append(files, args[i+1:]...)
 			i = len(args)
-		case a == "-q" || a == "--quiet" || a == "--silent":
+		case a == "-q" || a == flagQuiet || a == "--silent":
 			quiet = true
 		case a == "-v" || a == "--verbose":
 			verbose = true
@@ -707,7 +710,7 @@ func runSort(env pipeEnv, args []string) error {
 				reverse = true
 			case "--unique":
 				unique = true
-			case "--ignore-case":
+			case flagIgnoreCase:
 				fold = true
 			default:
 				return pipeErr(name, fmt.Sprintf("unrecognized option %q", a), env.stderr)

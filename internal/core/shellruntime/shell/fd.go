@@ -235,7 +235,7 @@ func parseFdArgs(args []string) (fdOptions, error) {
 			opts.absolute = true
 		case a == "-g" || a == "--glob":
 			opts.glob = true
-		case a == "-i" || a == "--ignore-case":
+		case a == "-i" || a == flagIgnoreCase:
 			opts.ignoreCase = true
 		case a == "-s" || a == "--case-sensitive":
 			opts.caseSensitive = true

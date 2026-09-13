@@ -40,11 +40,12 @@ import (
 //   - upstream Go coreutils (MOCODE_CORE_UTILS):
 //     cat chmod cp find ls mkdir mv rm touch xargs base64 gzip mktemp shasum tar
 //   - this package's stream utilities (MOCODE_PIPE_UTILS, pipeutils.go):
-//     head tail wc tee sort uniq cut tr fd
-//     (`fd` forwards to a real `fd` binary when one is installed, and otherwise
-//     falls back to a built-in gitignore-aware walker; see fd.go)
+//     head tail wc tee sort uniq cut tr fd rg
+//     (`fd` and `rg` forward to a real binary when one is installed, and
+//     otherwise fall back to built-in gitignore-aware implementations; see
+//     fd.go and rg.go)
 //
-// Still NOT provided: grep, rg, sed and awk. They resolve to system binaries
+// Still NOT provided: grep, sed and awk. They resolve to system binaries
 // where they exist (macOS/Linux) and fail with `executable file not found in
 // $PATH` on Windows; callers route that work to dedicated tools instead (the
 // grep tool, edit, ts_run/py_run). The bash tool appends a routing hint when it
