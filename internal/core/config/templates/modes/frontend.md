@@ -23,6 +23,9 @@ sub_agents:
 - `vercel-composition-patterns`：compound components、用依赖注入替代布尔 prop 堆叠
 - `design-taste-frontend`：Brief → 三拨盘 → 设计系统；AI 痕迹禁令
 - `web-design-guidelines`：可访问性 / 焦点 / 表单 / 动效审查清单
+- `screenshot-to-ui`：从截图推导盒子模型 / 布局 / 间距 / 字号 / 色彩的方法学
+- `css-layout-and-box-model`：盒子模型与布局系统详解与排错
+- `design-tokens`：颜色 / 间距 / 字号 / 圆角 / 阴影 token 体系
 
 ## 工作流
 

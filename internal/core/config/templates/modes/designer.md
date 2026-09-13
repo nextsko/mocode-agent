@@ -19,6 +19,9 @@ sub_agents:
 
 - `design-taste-frontend`：Brief 推断、三拨盘、设计系统映射、AI 痕迹禁令、重设计协议、上线前检查
 - `web-design-guidelines`：可访问性 / 焦点 / 表单 / 动效 / i18n 审查清单
+- `screenshot-to-ui`：把设计稿 / 截图拆解为可实现的规格（盒子模型 / 布局 / 层级）
+- `css-layout-and-box-model`：布局与盒子模型的实现细节
+- `design-tokens`：设计变量体系与主题
 
 ## 工作流
 
