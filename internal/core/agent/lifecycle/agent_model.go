@@ -1,4 +1,4 @@
-package agent
+package lifecycle
 
 import "charm.land/fantasy"
 

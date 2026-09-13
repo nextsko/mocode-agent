@@ -1,4 +1,4 @@
-package agent
+package lifecycle
 
 import (
 	"strings"
@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nextsko/mocode-agent/internal/core/agent/messages"
 	"github.com/nextsko/mocode-agent/internal/core/agent/ctxcompress"
+	"github.com/nextsko/mocode-agent/internal/core/agent/messages"
 )
 
 // helper: build a fantasy.Message containing a single ToolResultPart with

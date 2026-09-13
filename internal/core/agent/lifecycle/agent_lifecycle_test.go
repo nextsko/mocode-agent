@@ -1,4 +1,4 @@
-package agent
+package lifecycle
 
 import (
 	"context"
@@ -471,8 +471,8 @@ func TestRunQueueDrainOrder_ABCWithSingleAfterAgent(t *testing.T) {
 	releaseA := make(chan struct{})
 	large := &scriptedModel{script: []scriptedResponse{
 		{until: releaseA}, // turn A blocks until B and C are queued
-		{text: "B ok"},   // turn B
-		{text: "C ok"},   // turn C
+		{text: "B ok"},    // turn B
+		{text: "C ok"},    // turn C
 	}}
 	small := &scriptedModel{script: []scriptedResponse{{text: "Title"}}}
 	agent, sessions, _ := newLifecycleTestAgent(t, large, small, nil, callbacks)

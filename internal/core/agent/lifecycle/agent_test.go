@@ -2,7 +2,7 @@
 
 // TODO: reimplement using file-based store
 
-package agent
+package lifecycle
 
 import (
 	"fmt"
@@ -20,11 +20,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/messages"
-	"github.com/nextsko/mocode-agent/internal/domain/session"
-	"github.com/nextsko/mocode-agent/internal/core/agent/messages"
-	"github.com/nextsko/mocode-agent/internal/domain/session/message"
-	"github.com/nextsko/mocode-agent/internal/core/agent/messages"
 	"github.com/nextsko/mocode-agent/internal/core/tools"
+	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 
 	_ "github.com/joho/godotenv/autoload"
 )
