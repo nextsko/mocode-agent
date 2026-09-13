@@ -26,6 +26,8 @@ sub_agents:
 - `screenshot-to-ui`：从截图推导盒子模型 / 布局 / 间距 / 字号 / 色彩的方法学
 - `css-layout-and-box-model`：盒子模型与布局系统详解与排错
 - `design-tokens`：颜色 / 间距 / 字号 / 圆角 / 阴影 token 体系
+- `responsive-design`：断点 / 流式布局 / 容器查询 / 重排模式
+- `motion-design`：动效与微交互
 
 ## 工作流
 

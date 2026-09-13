@@ -22,6 +22,8 @@ sub_agents:
 - `screenshot-to-ui`：把设计稿 / 截图拆解为可实现的规格（盒子模型 / 布局 / 层级）
 - `css-layout-and-box-model`：布局与盒子模型的实现细节
 - `design-tokens`：设计变量体系与主题
+- `responsive-design`：断点 / 流式布局 / 容器查询 / 重排模式
+- `motion-design`：动效与微交互（时长 / 缓动 / perf / 无障碍）
 
 ## 工作流
 
