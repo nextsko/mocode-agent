@@ -10,6 +10,7 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/components"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
 	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
@@ -102,13 +103,24 @@ func (m *UI) renderEditorView(width int) string {
 	if len(m.attachments.List()) > 0 {
 		attachmentsView = m.attachments.Render(width)
 	}
+	// Prime-agent style sub-agent summary box (only when sub-agents ran).
+	running, done := m.chat.SubagentCounts()
+	summaryBox := components.RenderSubagentSummary(m.com.Styles, components.SubagentCounts{
+		Running: running,
+		Done:    done,
+	}, width)
 	separator := m.com.Styles.Header.Separator.Render(strings.Repeat("─", max(0, width)))
-	return strings.Join([]string{
+	parts := make([]string, 0, 5)
+	if summaryBox != "" {
+		parts = append(parts, summaryBox)
+	}
+	parts = append(parts,
 		separator,
 		attachmentsView,
 		m.textarea.View(),
 		"", // margin at bottom of editor
-	}, "\n")
+	)
+	return strings.Join(parts, "\n")
 }
 
 func (m *UI) applyTheme(s styles.Styles) {

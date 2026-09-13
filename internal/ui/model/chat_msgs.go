@@ -198,7 +198,13 @@ func (m *Chat) MessageItem(id string) chat.MessageItem {
 // surfaced in the status line.
 
 func (m *Chat) CountRunningAgentTools() int {
-	n := 0
+	running, _ := m.SubagentCounts()
+	return running
+}
+
+// SubagentCounts tallies Agent tool calls by lifecycle state for the
+// summary box above the editor.
+func (m *Chat) SubagentCounts() (running, done int) {
 	for i := 0; i < m.list.Len(); i++ {
 		item, ok := m.list.ItemAt(i).(chat.MessageItem)
 		if !ok {
@@ -207,11 +213,13 @@ func (m *Chat) CountRunningAgentTools() int {
 		if at, ok := item.(*chat.AgentToolMessageItem); ok {
 			switch at.Status() {
 			case chat.ToolStatusRunning, chat.ToolStatusAwaitingPermission:
-				n++
+				running++
+			case chat.ToolStatusSuccess, chat.ToolStatusError, chat.ToolStatusCanceled:
+				done++
 			}
 		}
 	}
-	return n
+	return running, done
 }
 
 // ToggleExpandedSelectedItem expands the selected message item if it is expandable.

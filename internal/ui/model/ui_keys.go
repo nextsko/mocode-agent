@@ -93,6 +93,14 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 			})
 			return true
 		}
+		// Ctrl+G: open the agents/modes dialog — the action target of the
+		// sub-agent summary box rendered above the editor.
+		if msg.String() == "ctrl+g" && m.hasSession() {
+			if cmd := m.openModesDialog(); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+			return true
+		}
 		return false
 	}
 
