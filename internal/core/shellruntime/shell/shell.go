@@ -30,12 +30,27 @@ import (
 )
 
 // The shell engine is always mvdan/sh (a Go-implemented POSIX-compatible
-// interpreter), which makes core utils (ls, cat, grep, head, tail, find, sed,
-// awk) available on every platform including Windows — no system shell is
-// invoked. This is intentional: it keeps tool behavior identical across
-// platforms. If Windows-native capabilities (registry, WMI, services) are
-// needed later, add a separate PowerShell tool rather than a ShellType switch
-// here; the current design deliberately has a single execution backend.
+// interpreter) — no system shell is invoked, which keeps behavior identical
+// across platforms.
+//
+// Cross-platform command coverage is PARTIAL but extensible. POSIX builtins are
+// always available; two optional middleware layers add more, both enabled by
+// default on Windows only (see coreutils.go):
+//
+//   - upstream Go coreutils (MOCODE_CORE_UTILS):
+//     cat chmod cp find ls mkdir mv rm touch xargs base64 gzip mktemp shasum tar
+//   - this package's stream utilities (MOCODE_PIPE_UTILS, pipeutils.go):
+//     head tail wc tee sort uniq cut tr
+//
+// Still NOT provided: grep, rg, sed and awk. They resolve to system binaries
+// where they exist (macOS/Linux) and fail with `executable file not found in
+// $PATH` on Windows; callers route that work to dedicated tools instead (the
+// grep tool, edit, ts_run/py_run). The bash tool appends a routing hint when it
+// detects a missing command.
+//
+// If Windows-native capabilities (registry, WMI, services) are needed later,
+// add a separate PowerShell tool rather than a ShellType switch here; the
+// current design deliberately has a single execution backend.
 
 // shellErrorToolName is the tool name used when recording shell execution
 // failures from this package.
@@ -363,8 +378,11 @@ func (s *Shell) execHandlers() []func(next interp.ExecHandlerFunc) interp.ExecHa
 		s.builtinHandler(),
 		s.blockHandler(),
 	}
-	if useGoCoreUtils {
+	if goCoreUtilsEnabled() {
 		handlers = append(handlers, coreutils.ExecHandler)
+	}
+	if pipeUtilsEnabled() {
+		handlers = append(handlers, pipeUtilsHandler)
 	}
 	return handlers
 }
