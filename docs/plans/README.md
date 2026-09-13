@@ -31,7 +31,9 @@ plans/
 │   ├── 03-implementation-plan.md
 │   ├── 04-pubsub-integration.md
 │   └── 05-testing-matrix.md
-└── shell-parity/                      # bash 工具跨平台命令补齐（head/grep 等在 Windows 缺失）
+├── shell-parity/                      # bash 工具跨平台命令补齐（head/grep 等在 Windows 缺失）
+│   └── README.md
+└── subagent-summary-box/              # 子代理摘要盒遮挡输入框与完成后自动隐藏
     └── README.md
 ```
 
@@ -86,6 +88,14 @@ bash 工具在 Windows 上缺失 `head`/`grep`/`sed` 等 Unix 文本工具（mvd
 | 文件 | 主题 |
 |------|------|
 | README.md | 根因（coreutils 覆盖集）、命令「实现 vs 路由」分界线、L3 分阶段计划与语义坑（早退/EPIPE、CRLF、字节 vs 字符）|
+
+### subagent-summary-box/
+
+TUI 子代理摘要盒的两个 bug：布局高度未计入盒子导致主输入框被裁；`SubagentCounts` 用永不更新的原始状态导致「完成后仍显示 running」。修复 + 自动隐藏。
+
+| 文件 | 主题 |
+|------|------|
+| README.md | 两个根因（编辑器高度记账 / `Status()` vs `EffectiveStatus()`）、修复与回归测试 |
 
 ## 添加新计划时的规范
 

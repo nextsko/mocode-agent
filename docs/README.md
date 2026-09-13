@@ -67,3 +67,4 @@
 | plans/summary-async/04 | [plans/summary-async/04-pubsub-integration.md](plans/summary-async/04-pubsub-integration.md) | 接入 app.events 总线：SummaryCompletedMsg + setupSubscriber 范式 |
 | plans/summary-async/05 | [plans/summary-async/05-testing-matrix.md](plans/summary-async/05-testing-matrix.md) | 单元/集成/UI/端到端测试矩阵 + V1–V4 手动验证步骤 |
 | plans/shell-parity | [plans/shell-parity/README.md](plans/shell-parity/README.md) | bash 工具跨平台命令补齐（L1 注释修正 / L2 路由提示 / L3 流式工具实现计划）|
+| plans/subagent-summary-box | [plans/subagent-summary-box/README.md](plans/subagent-summary-box/README.md) | 子代理摘要盒遮挡主输入框 + 完成后自动隐藏（编辑器高度记账 / EffectiveStatus 根因）|
