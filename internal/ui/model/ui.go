@@ -708,7 +708,9 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case uiFocusEditor:
 		// Textarea placeholder logic
 		if m.isAgentBusy() {
-			m.textarea.Placeholder = m.workingPlaceholder
+			// Busy: surface the send-mode triad so ctrl/alt+enter are
+			// discoverable exactly when they matter.
+			m.textarea.Placeholder = m.workingPlaceholder + "  (enter 排队 · ctrl+enter 引导 · alt+enter 强制)"
 		} else {
 			m.textarea.Placeholder = m.readyPlaceholder
 		}
