@@ -7,8 +7,11 @@ import (
 
 	"charm.land/bubbles/v2/textarea"
 
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/chat"
 	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/components"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
 )
 
 // testMessageItem is a minimal chat item used to populate the chat list
@@ -77,6 +80,29 @@ func TestUpdateLayoutAndSize_EditorGrowthShrinksChat(t *testing.T) {
 
 	if got := u.layout.main.Dy(); got >= initialChatHeight {
 		t.Fatalf("expected chat to shrink: got %d, want < %d", got, initialChatHeight)
+	}
+}
+
+func TestEditorReservesSubagentSummaryHeight(t *testing.T) {
+	t.Parallel()
+
+	// Baseline layout: no sub-agent has run, so the summary box is absent.
+	u := newTestUI()
+	u.updateLayoutAndSize()
+	baseEditor := u.layout.editor.Dy()
+	baseMain := u.layout.main.Dy()
+
+	// A single running Agent tool call makes the summary box appear.
+	sty := styles.ThemeForProvider("")
+	tc := message.ToolCall{ID: "tc1", Name: "agent", Input: `{"prompt":"x"}`}
+	u.chat.SetMessages(chat.NewAgentToolMessageItem(&sty, tc, nil, false))
+	u.updateLayoutAndSize()
+
+	if got, want := u.layout.editor.Dy(), baseEditor+components.SummaryHeight; got != want {
+		t.Fatalf("editor height = %d, want %d (base %d + summary %d)", got, want, baseEditor, components.SummaryHeight)
+	}
+	if got, want := u.layout.main.Dy(), baseMain-components.SummaryHeight; got != want {
+		t.Fatalf("chat height = %d, want %d (summary box must steal rows from the chat)", got, want)
 	}
 }
 

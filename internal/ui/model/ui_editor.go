@@ -98,6 +98,21 @@ func (m *UI) yoloPromptFunc(info textarea.PromptInfo) string {
 	return t.Editor.PromptYoloDotsBlurred.Render()
 }
 
+// subagentSummaryHeight returns the number of rows the sub-agent summary box
+// occupies above the editor, or 0 when no sub-agent has run. It must stay in
+// sync with renderEditorView so generateLayout reserves enough space and the
+// input line is never clipped.
+func (m *UI) subagentSummaryHeight() int {
+	if m.chat == nil {
+		return 0
+	}
+	running, done := m.chat.SubagentCounts()
+	if running+done == 0 {
+		return 0
+	}
+	return components.SummaryHeight
+}
+
 func (m *UI) renderEditorView(width int) string {
 	var attachmentsView string
 	if len(m.attachments.List()) > 0 {
@@ -114,7 +129,8 @@ func (m *UI) renderEditorView(width int) string {
 	if summaryBox != "" {
 		parts = append(parts, summaryBox)
 	}
-	parts = append(parts,
+	parts = append(
+		parts,
 		separator,
 		attachmentsView,
 		m.textarea.View(),

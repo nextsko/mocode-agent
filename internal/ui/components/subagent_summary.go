@@ -15,6 +15,11 @@ type SubagentCounts struct {
 	Done    int
 }
 
+// SummaryHeight is the number of rows RenderSubagentSummary emits (top border,
+// body, bottom border). The layout reserves this many rows above the editor
+// whenever the box is shown, so the input line is not clipped.
+const SummaryHeight = 3
+
 // Total reports how many sub-agent invocations are tracked.
 func (c SubagentCounts) Total() int { return c.Running + c.Done }
 

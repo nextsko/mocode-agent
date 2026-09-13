@@ -45,8 +45,11 @@ func (m *UI) generateLayout(w, h int) uiLayout {
 
 	// The help height
 	helpHeight := 1
-	// The editor height: textarea height + margin for attachments and bottom spacing.
-	editorHeight := m.textarea.Height() + editorHeightMargin
+	// The editor height: textarea height + margin for the divider, attachments
+	// row and bottom spacing, plus the sub-agent summary box when it is shown.
+	// Omitting the summary box height would let the editor overflow its rect
+	// and clip the input line.
+	editorHeight := m.textarea.Height() + editorHeightMargin + m.subagentSummaryHeight()
 	// The sidebar width
 	sidebarWidth := 30
 	// The header height
