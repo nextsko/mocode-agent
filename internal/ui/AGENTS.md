@@ -198,3 +198,12 @@ through all components that need access to app state or styles.
 - Dialog messages are intercepted first in `Update` before other routing.
 - Focus state determines key event routing: `uiFocusEditor` sends keys to
   the textarea, `uiFocusMain` sends them to the chat list.
+- **Editor height must match what `renderEditorView` actually emits.**
+  `generateLayout` reserves `textarea.Height() + editorHeightMargin`; every row
+  rendered above/below the textarea (sub-agent summary box, attachments,
+  divider) must be added to that sum. Otherwise the editor overflows its
+  rectangle and the **input line gets clipped**. See `subagentSummaryHeight()`.
+- **Use `EffectiveStatus()` (not `Status()`) to detect tool completion.** The
+  raw `status` field is only ever set to `Running`/`AwaitingPermission` and is
+  **not** updated when a result arrives; `computeStatus()`/`EffectiveStatus()`
+  derive success/error from the result. Example: the sub-agent summary counts.

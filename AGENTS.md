@@ -490,6 +490,34 @@ or tool descriptions:
 - **All providers**: after any external process modifies a file (build,
   formatter, another tool), re-read before editing.
 
+## Shell Tool: Cross-Platform Command Coverage
+
+The `bash` tool runs on a Go shell interpreter (mvdan/sh), **not** the host
+shell, so command coverage is layered and platform-dependent:
+
+| Layer | Provides | Enabled by |
+|-------|----------|-----------|
+| POSIX builtins | `echo`, `printf`, `cd`, … | always |
+| Go coreutils (upstream) | `cat chmod cp find ls mkdir mv rm touch xargs base64 gzip mktemp shasum tar` | `MOCODE_CORE_UTILS` (default: Windows only) |
+| Stream utils (`internal/core/shellruntime/shell/pipeutils.go`) | `head tail wc tee sort uniq cut tr` | `MOCODE_PIPE_UTILS` (default: Windows only) |
+
+**Not provided:** `grep`, `rg`, `sed`, `awk`. On macOS/Linux they resolve to
+system binaries; on Windows they fail with `executable file not found in $PATH`.
+The bash tool appends a **routing hint** when it detects a missing command,
+pointing at the dedicated tool (`grep`, `view`, `glob`, `edit`, `ts_run`/`py_run`).
+
+Guidance for agents and prompt/tool authors:
+
+- Prefer dedicated tools over shell text utilities: **search → `grep` tool,
+  preview → `view`, list → `glob`/`ls`, transform → `ts_run`/`py_run`**.
+- `… | head -20`, `… | tail`, `… | wc -l` now work on Windows and are fine for
+  **command output**; do not use them to inspect files (use `view`).
+
+See [docs/plans/shell-parity/README.md](docs/plans/shell-parity/README.md) for
+the design and the "implement vs route" boundary. This **supersedes** the
+earlier note in "Provider Behavior Observations" that discouraged `head`/`tail`
+outright — they are acceptable for pipelines now; steer only file inspection.
+
 ## Active Refactor Plan
 
 Before non-trivial TUI changes, read `internal/ui/AGENTS.md`. Optional local
