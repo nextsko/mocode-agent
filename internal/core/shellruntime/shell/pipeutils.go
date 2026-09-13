@@ -25,9 +25,10 @@ const (
 )
 
 // This file implements the "Layer 3" cross-platform parity utilities: plain
-// stream filters that the model frequently pipes to but which the upstream
-// moreinterp/coreutils middleware does not provide (notably on Windows, where
-// no system `head`/`tail`/`wc`/`tee`/`sort`/`uniq`/`cut`/`tr` exist).
+// stream filters plus `fd`, which the model frequently uses but which the
+// upstream moreinterp/coreutils middleware does not provide (notably on
+// Windows, where no system `head`/`tail`/`wc`/`tee`/`sort`/`uniq`/`cut`/`tr`/`fd`
+// exist). `fd` prefers a real binary when installed (see fd.go).
 //
 // Deliberately NOT implemented here (routed to dedicated tools instead):
 // grep/find/cat/ls (structured tools), sed/awk (edit / ts_run / py_run).
@@ -53,6 +54,7 @@ var pipeCommands = map[string]func(pipeEnv, []string) error{
 	"uniq": runUniq,
 	"cut":  runCut,
 	"tr":   runTr,
+	"fd":   runFd,
 }
 
 // pipeUtilsHandler returns an interpreter middleware that resolves the commands
@@ -65,6 +67,10 @@ func pipeUtilsHandler(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 		}
 		run, ok := pipeCommands[args[0]]
 		if !ok {
+			return next(ctx, args)
+		}
+		// Prefer a real `fd` binary when installed so behavior matches the host.
+		if args[0] == "fd" && hostFdPath() != "" {
 			return next(ctx, args)
 		}
 		hc := interp.HandlerCtx(ctx)

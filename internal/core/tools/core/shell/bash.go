@@ -232,23 +232,31 @@ var shellMissingCommandREs = []*regexp.Regexp{
 // model should use for that job instead. Only utilities that have a
 // first-class tool are listed, so a genuinely absent dependency (e.g. `tea`)
 // produces no hint.
+// Shared routing-hint fragments, hoisted so the linter does not see repeated
+// string literals across the routing table.
+const (
+	hintGrepTool   = "use the `grep` tool"
+	hintRunSandbox = "use `ts_run`/`py_run`"
+)
+
 var shellCommandRouting = map[string]string{
-	"grep":  "use the `grep` tool (regex search that honors ignore files)",
-	"egrep": "use the `grep` tool",
-	"fgrep": "use the `grep` tool",
-	"rg":    "use the `grep` tool",
+	"grep":  hintGrepTool + " (regex search that honors ignore files)",
+	"egrep": hintGrepTool,
+	"fgrep": hintGrepTool,
+	"rg":    hintGrepTool,
 	"head":  "use the `view` tool with `limit` to preview files (bash output is auto-truncated)",
 	"tail":  "use the `view` tool with `offset`; finished background jobs already report the tail",
 	"cat":   "use the `view` or `read_files` tool",
 	"find":  "use the `glob` tool",
+	"fd":    "use the `glob` tool",
 	"ls":    "use the `ls` tool",
-	"sed":   "use the `edit` tool for file changes, or `ts_run`/`py_run` for text transforms",
-	"awk":   "use `ts_run`/`py_run` for text processing",
-	"wc":    "use `ts_run`/`py_run`, or the `grep` tool for counts",
-	"sort":  "use `ts_run`/`py_run`",
-	"uniq":  "use `ts_run`/`py_run`",
-	"cut":   "use `ts_run`/`py_run`",
-	"tr":    "use `ts_run`/`py_run`",
+	"sed":   "use the `edit` tool for file changes, or " + hintRunSandbox + " for text transforms",
+	"awk":   hintRunSandbox + " for text processing",
+	"wc":    hintRunSandbox + ", or the `grep` tool for counts",
+	"sort":  hintRunSandbox,
+	"uniq":  hintRunSandbox,
+	"cut":   hintRunSandbox,
+	"tr":    hintRunSandbox,
 }
 
 // missingShellCommand returns the lower-cased command name reported as missing
