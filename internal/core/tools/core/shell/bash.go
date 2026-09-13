@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html/template"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -218,18 +219,67 @@ func classifyCommandError(stderr string) errcoll.ErrorCategory {
 	}
 }
 
-// isRecoverableCommandError reports whether the shell error is something the
-// model can reasonably recover from (e.g. a missing cross-platform command)
-// rather than an internal failure that should abort the turn.
-func isRecoverableCommandError(stderr string, execErr error) bool {
-	if execErr == nil {
-		return false
+// shellMissingCommandREs extract the offending command name from the various
+// "not found" diagnostics emitted by mvdan/sh, POSIX shells and Windows cmd.
+// The first capture group is always the command name.
+var shellMissingCommandREs = []*regexp.Regexp{
+	regexp.MustCompile(`([A-Za-z0-9_.-]+)"?\s*:\s*executable file not found`),
+	regexp.MustCompile(`([A-Za-z0-9_.-]+):\s*command not found`),
+	regexp.MustCompile(`(?i)'([^']+)' is not recognized`),
+}
+
+// shellCommandRouting maps a missing shell utility to the dedicated tool the
+// model should use for that job instead. Only utilities that have a
+// first-class tool are listed, so a genuinely absent dependency (e.g. `tea`)
+// produces no hint.
+var shellCommandRouting = map[string]string{
+	"grep":  "use the `grep` tool (regex search that honors ignore files)",
+	"egrep": "use the `grep` tool",
+	"fgrep": "use the `grep` tool",
+	"rg":    "use the `grep` tool",
+	"head":  "use the `view` tool with `limit` to preview files (bash output is auto-truncated)",
+	"tail":  "use the `view` tool with `offset`; finished background jobs already report the tail",
+	"cat":   "use the `view` or `read_files` tool",
+	"find":  "use the `glob` tool",
+	"ls":    "use the `ls` tool",
+	"sed":   "use the `edit` tool for file changes, or `ts_run`/`py_run` for text transforms",
+	"awk":   "use `ts_run`/`py_run` for text processing",
+	"wc":    "use `ts_run`/`py_run`, or the `grep` tool for counts",
+	"sort":  "use `ts_run`/`py_run`",
+	"uniq":  "use `ts_run`/`py_run`",
+	"cut":   "use `ts_run`/`py_run`",
+	"tr":    "use `ts_run`/`py_run`",
+}
+
+// missingShellCommand returns the lower-cased command name reported as missing
+// in stderr, or "" when none of the known "not found" diagnostics match.
+func missingShellCommand(stderr string) string {
+	for _, re := range shellMissingCommandREs {
+		if m := re.FindStringSubmatch(stderr); m != nil {
+			return strings.ToLower(m[1])
+		}
 	}
-	lower := strings.ToLower(stderr)
-	return strings.Contains(lower, "command not found") ||
-		strings.Contains(lower, "is not recognized") ||
-		strings.Contains(lower, "cannot find") ||
-		(strings.Contains(lower, "the term") && strings.Contains(lower, "not recognized"))
+	return ""
+}
+
+// commandRoutingHint returns an actionable hint when a command failed because a
+// common Unix utility is unavailable in this cross-platform shell, pointing the
+// model at the dedicated tool for that job. It returns "" when stderr carries
+// no *routable* missing command, so unrelated failures stay untouched.
+func commandRoutingHint(stderr string) string {
+	cmd := missingShellCommand(stderr)
+	if cmd == "" {
+		return ""
+	}
+	advice, ok := shellCommandRouting[cmd]
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf(
+		"hint: this shell has no `%s` (no system binary and no built-in) — %s. "+
+			"Prefer dedicated tools over Unix text utilities in a pipeline.",
+		cmd, advice,
+	)
 }
 
 func NewBashTool(permissions permission.Service, workingDir string, attribution *config.Attribution, modelName string) fantasy.AgentTool {
@@ -492,6 +542,13 @@ func formatOutput(stdout, stderr string, execErr error) string {
 	interrupted := shell.IsInterrupt(execErr)
 	exitCode := shell.ExitCode(execErr)
 
+	// Detect a missing-command failure on the *original* stderr so the routing
+	// hint never loses the diagnostic to truncation.
+	routingHint := ""
+	if execErr != nil {
+		routingHint = commandRoutingHint(stderr)
+	}
+
 	stdout = truncateOutput(stdout)
 	stderr = truncateOutput(stderr)
 
@@ -510,6 +567,13 @@ func formatOutput(stdout, stderr string, execErr error) string {
 			errorMessage += "\n"
 		}
 		errorMessage += fmt.Sprintf("Exit code %d", exitCode)
+	}
+
+	if routingHint != "" {
+		if errorMessage != "" {
+			errorMessage += "\n\n"
+		}
+		errorMessage += routingHint
 	}
 
 	hasBothOutputs := stdout != "" && stderr != ""
