@@ -1,6 +1,15 @@
 ---
 name: rust-android-apk
-description: Build a Rust application into an Android APK and run it on an emulator or device. Use whenever the user wants Rust code to run on Android — packaging Rust as an APK, cross-compiling Rust for Android, Tauri v2 mobile/Android setup, `tauri android init` or `tauri android build` troubleshooting, Android emulator/AVD setup without Android Studio, NDK/Gradle errors during Rust-Android builds, or signing Rust-built Android APKs. Covers the full path: toolchain detection → emulator provisioning → project init → Rust core + frontend → cross-compile → packaging → signing → deploy → verify. Distilled from a verified end-to-end Tauri v2 build on Windows.
+description: >-
+  Build a Rust application into an Android APK and run it on an emulator or
+  device. Use whenever the user wants Rust code to run on Android — packaging
+  Rust as an APK, cross-compiling Rust for Android, Tauri v2 mobile/Android
+  setup, `tauri android init` or `tauri android build` troubleshooting, Android
+  emulator/AVD setup without Android Studio, NDK/Gradle errors during
+  Rust-Android builds, or signing Rust-built Android APKs. Covers the full path:
+  toolchain detection → emulator provisioning → project init → Rust core +
+  frontend → cross-compile → packaging → signing → deploy → verify. Distilled
+  from a verified end-to-end Tauri v2 build on Windows.
 ---
 
 # Rust → Android APK (via Tauri v2)
