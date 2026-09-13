@@ -9,6 +9,7 @@ import (
 
 	"charm.land/fantasy"
 
+	"github.com/nextsko/mocode-agent/internal/core/agent/messages"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
@@ -71,7 +72,7 @@ If not, please feel free to ignore. Again do not mention this message to the use
 		}
 		distanceFromEnd := totalMsgs - i - 1
 		if m.Role == message.Tool {
-			if msg, ok := filterOrphanedToolResults(m, knownToolCallIDs); ok {
+			if msg, ok := messages.FilterOrphanedToolResults(m, knownToolCallIDs); ok {
 				// Build toolCallID → toolName map from the original message
 				// parts so the compressor can apply tool-specific rules.
 				toolNames := make(map[string]string, len(m.ToolResults()))
@@ -86,12 +87,12 @@ If not, please feel free to ignore. Again do not mention this message to the use
 		}
 		aiMsgs := m.ToAIMessage()
 		if !supportsImages {
-			aiMsgs = filterImagePartsFromMessages(aiMsgs)
+			aiMsgs = messages.FilterImagePartsFromMessages(aiMsgs)
 		}
 		history = append(history, aiMsgs...)
 
 		if m.Role == message.Assistant {
-			if msg, ok := syntheticToolResultsForOrphanedCalls(m, knownToolResultIDs); ok {
+			if msg, ok := messages.SyntheticToolResultsForOrphanedCalls(m, knownToolResultIDs); ok {
 				history = append(history, msg)
 			}
 		}

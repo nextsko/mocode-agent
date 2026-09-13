@@ -1,4 +1,4 @@
-package agent
+package loopdetect
 
 import (
 	"crypto/sha256"
@@ -9,14 +9,14 @@ import (
 )
 
 const (
-	loopDetectionWindowSize = 10
-	loopDetectionMaxRepeats = 5
+	LoopDetectionWindowSize = 10
+	LoopDetectionMaxRepeats = 5
 )
 
-// hasRepeatedToolCalls checks whether the agent is stuck in a loop by looking
+// HasRepeatedToolCalls checks whether the agent is stuck in a loop by looking
 // at recent steps. It examines the last windowSize steps and returns true if
 // any tool-call signature appears more than maxRepeats times.
-func hasRepeatedToolCalls(steps []fantasy.StepResult, windowSize, maxRepeats int) bool {
+func HasRepeatedToolCalls(steps []fantasy.StepResult, windowSize, maxRepeats int) bool {
 	if len(steps) < windowSize {
 		return false
 	}

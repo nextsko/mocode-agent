@@ -1,4 +1,4 @@
-package agent
+package messages
 
 import (
 	"errors"
@@ -13,7 +13,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
 
-func extractToolResultText(tr fantasy.ToolResultPart) string {
+func ExtractToolResultText(tr fantasy.ToolResultPart) string {
 	if r, ok := fantasy.AsToolResultOutputType[fantasy.ToolResultOutputContentText](tr.Output); ok {
 		return r.Text
 	}
@@ -23,16 +23,16 @@ func extractToolResultText(tr fantasy.ToolResultPart) string {
 	return ""
 }
 
-func isToolResultError(tr fantasy.ToolResultPart) bool {
+func IsToolResultError(tr fantasy.ToolResultPart) bool {
 	_, ok := fantasy.AsToolResultOutputType[fantasy.ToolResultOutputContentError](tr.Output)
 	return ok
 }
 
-func setToolResultText(tr *fantasy.ToolResultPart, text string) {
+func SetToolResultText(tr *fantasy.ToolResultPart, text string) {
 	tr.Output = fantasy.ToolResultOutputContentText{Text: text}
 }
 
-func filterImagePartsFromMessages(msgs []fantasy.Message) []fantasy.Message {
+func FilterImagePartsFromMessages(msgs []fantasy.Message) []fantasy.Message {
 	var result []fantasy.Message
 	for _, msg := range msgs {
 		var filteredParts []fantasy.MessagePart
@@ -50,11 +50,11 @@ func filterImagePartsFromMessages(msgs []fantasy.Message) []fantasy.Message {
 	return result
 }
 
-// filterEmptyContentMessages drops any messages with empty content arrays.
+// FilterEmptyContentMessages drops any messages with empty content arrays.
 // Sending {"content": []} to LLM APIs causes "messages.content.type is
 // invalid" errors. System messages are preserved (they use a string content
 // field, not an array).
-func filterEmptyContentMessages(msgs []fantasy.Message) []fantasy.Message {
+func FilterEmptyContentMessages(msgs []fantasy.Message) []fantasy.Message {
 	filtered := msgs[:0]
 	for _, msg := range msgs {
 		if msg.Role != fantasy.MessageRoleSystem && len(msg.Content) == 0 {
@@ -69,7 +69,7 @@ func filterEmptyContentMessages(msgs []fantasy.Message) []fantasy.Message {
 	return filtered
 }
 
-func filterOrphanedToolResults(m message.Message, knownToolCallIDs map[string]struct{}) (fantasy.Message, bool) {
+func FilterOrphanedToolResults(m message.Message, knownToolCallIDs map[string]struct{}) (fantasy.Message, bool) {
 	aiMsgs := m.ToAIMessage()
 	if len(aiMsgs) == 0 {
 		return fantasy.Message{}, false
@@ -98,7 +98,7 @@ func filterOrphanedToolResults(m message.Message, knownToolCallIDs map[string]st
 	return msg, true
 }
 
-func syntheticToolResultsForOrphanedCalls(m message.Message, knownToolResultIDs map[string]struct{}) (fantasy.Message, bool) {
+func SyntheticToolResultsForOrphanedCalls(m message.Message, knownToolResultIDs map[string]struct{}) (fantasy.Message, bool) {
 	var syntheticParts []fantasy.MessagePart
 	for _, tc := range m.ToolCalls() {
 		if _, hasResult := knownToolResultIDs[tc.ID]; hasResult {
@@ -125,7 +125,7 @@ func syntheticToolResultsForOrphanedCalls(m message.Message, knownToolResultIDs 
 	}, true
 }
 
-func buildSummaryPrompt(todos []session.Todo) string {
+func BuildSummaryPrompt(todos []session.Todo) string {
 	var sb strings.Builder
 	sb.WriteString("请基于上面的完整会话生成一份中文标准会话摘要。")
 	sb.WriteString("\n\n要求：")
@@ -157,7 +157,7 @@ func buildSummaryPrompt(todos []session.Todo) string {
 	return sb.String()
 }
 
-func providerRetryLogFields(err *fantasy.ProviderError, delay time.Duration) []any {
+func ProviderRetryLogFields(err *fantasy.ProviderError, delay time.Duration) []any {
 	fields := []any{
 		"retry_delay", delay.String(),
 	}
@@ -174,14 +174,14 @@ func providerRetryLogFields(err *fantasy.ProviderError, delay time.Duration) []a
 	return fields
 }
 
-// buildTodoNudge produces a system-message reminder of open todos, injected at
+// BuildTodoNudge produces a system-message reminder of open todos, injected at
 // each model step (PrepareStep) to nudge the agent toward finishing pending or
 // in-progress items before declaring itself done. This is the soft variant of
 // trpc-agent-go's todoenforcer: it cannot hard-block "Done" (that needs
 // model-step Done-flipping inside the fantasy loop), but surfacing open work at
 // every step empirically reduces early-exit failures. Returns "" when there is
 // nothing open, so the caller injects nothing.
-func buildTodoNudge(todos []session.Todo) string {
+func BuildTodoNudge(todos []session.Todo) string {
 	var open []session.Todo
 	for _, t := range todos {
 		if t.Status != session.TodoStatusCompleted {

@@ -19,8 +19,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nextsko/mocode-agent/internal/core/agent/messages"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
+	"github.com/nextsko/mocode-agent/internal/core/agent/messages"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/core/agent/messages"
 	"github.com/nextsko/mocode-agent/internal/core/tools"
 
 	_ "github.com/joho/godotenv/autoload"
@@ -659,7 +662,7 @@ func BenchmarkBuildSummaryPrompt(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for range b.N {
-				_ = buildSummaryPrompt(todos)
+				_ = messages.BuildSummaryPrompt(todos)
 			}
 		})
 	}
@@ -805,12 +808,12 @@ func TestPreparePrompt_OrphanedToolUseMixed(t *testing.T) {
 
 func TestProviderRetryLogFields(t *testing.T) {
 	t.Run("nil provider error", func(t *testing.T) {
-		fields := providerRetryLogFields(nil, 2*time.Second)
+		fields := messages.ProviderRetryLogFields(nil, 2*time.Second)
 		require.Equal(t, []any{"retry_delay", "2s"}, fields)
 	})
 
 	t.Run("provider error with title and message", func(t *testing.T) {
-		fields := providerRetryLogFields(&fantasy.ProviderError{
+		fields := messages.ProviderRetryLogFields(&fantasy.ProviderError{
 			StatusCode: 429,
 			Title:      "rate limit",
 			Message:    "too many requests",
@@ -824,7 +827,7 @@ func TestProviderRetryLogFields(t *testing.T) {
 	})
 
 	t.Run("provider error without optional strings", func(t *testing.T) {
-		fields := providerRetryLogFields(&fantasy.ProviderError{
+		fields := messages.ProviderRetryLogFields(&fantasy.ProviderError{
 			StatusCode: 503,
 		}, time.Second)
 		require.Equal(t, []any{

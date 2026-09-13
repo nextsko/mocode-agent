@@ -1,4 +1,4 @@
-package agent
+package messages
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 )
 
 func TestBuildTodoNudge_EmptyWhenNoTodos(t *testing.T) {
-	if got := buildTodoNudge(nil); got != "" {
+	if got := BuildTodoNudge(nil); got != "" {
 		t.Fatalf("expected empty nudge for no todos, got %q", got)
 	}
 }
@@ -17,7 +17,7 @@ func TestBuildTodoNudge_EmptyWhenAllCompleted(t *testing.T) {
 		{Content: "done thing", Status: session.TodoStatusCompleted},
 		{Content: "also done", Status: session.TodoStatusCompleted},
 	}
-	if got := buildTodoNudge(todos); got != "" {
+	if got := BuildTodoNudge(todos); got != "" {
 		t.Fatalf("expected empty nudge when all completed, got %q", got)
 	}
 }
@@ -28,7 +28,7 @@ func TestBuildTodoNudge_ListsPendingAndInProgress(t *testing.T) {
 		{Content: "still pending", Status: session.TodoStatusPending, ActiveForm: "Working on pending"},
 		{Content: "in progress one", Status: session.TodoStatusInProgress},
 	}
-	got := buildTodoNudge(todos)
+	got := BuildTodoNudge(todos)
 	if got == "" {
 		t.Fatal("expected non-empty nudge with open todos")
 	}
@@ -56,7 +56,7 @@ func TestBuildTodoNudge_PrefersActiveForm(t *testing.T) {
 	todos := []session.Todo{
 		{Content: "raw content", Status: session.TodoStatusPending, ActiveForm: "active form text"},
 	}
-	got := buildTodoNudge(todos)
+	got := BuildTodoNudge(todos)
 	if !contains(got, "active form text") {
 		t.Fatalf("nudge should prefer active_form over content: %q", got)
 	}

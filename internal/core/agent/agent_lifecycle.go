@@ -12,11 +12,9 @@ import (
 
 	"charm.land/fantasy"
 	"charm.land/fantasy/providers/anthropic"
-	"charm.land/fantasy/providers/google"
-	"charm.land/fantasy/providers/openai"
 
+	"github.com/nextsko/mocode-agent/internal/core/agent/messages"
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
-	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/tools"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
@@ -184,7 +182,7 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 			continue
 		}
 
-		// Plain success: atomic end-of-turn — release, pop the next queued
+		// Plain success: atomic end-of-turn 鈥?release, pop the next queued
 		// call and re-mark busy in one critical section so a concurrent Run
 		// can neither lose its enqueue nor steal the dispatch.
 		a.runMu.Lock()
@@ -227,46 +225,12 @@ func (a *sessionAgent) beginTurnLocked(sessionID string, ctx context.Context) (c
 	return genCtx, cancel, true
 }
 
-// appendQueueLocked appends a call to the session's prompt queue. It must be
-// called with a.runMu held so enqueue-vs-pop is atomic.
-func (a *sessionAgent) appendQueueLocked(sessionID string, call SessionAgentCall) {
-	queue, _ := a.messageQueue.Get(sessionID)
-	queue = append(queue, call)
-	a.messageQueue.Set(sessionID, queue)
-}
-
-// pushFrontQueueLocked prepends a call to the session's prompt queue,
-// preserving FIFO order. It must be called with a.runMu held.
-func (a *sessionAgent) pushFrontQueueLocked(sessionID string, call SessionAgentCall) {
-	queue, _ := a.messageQueue.Get(sessionID)
-	queue = append([]SessionAgentCall{call}, queue...)
-	a.messageQueue.Set(sessionID, queue)
-}
-
-// popQueueLocked removes and returns the head of the session's prompt queue.
-// It must be called with a.runMu held.
-func (a *sessionAgent) popQueueLocked(sessionID string) (SessionAgentCall, bool) {
-	queue, ok := a.messageQueue.Get(sessionID)
-	if !ok || len(queue) == 0 {
-		a.messageQueue.Del(sessionID)
-		return SessionAgentCall{}, false
-	}
-	next := queue[0]
-	queue = queue[1:]
-	if len(queue) == 0 {
-		a.messageQueue.Del(sessionID)
-	} else {
-		a.messageQueue.Set(sessionID, queue)
-	}
-	return next, true
-}
-
 // runTurn executes a single user turn end-to-end: BeforeAgent callback,
 // user-message persistence, model streaming, finish handling and the
 // TypeAgentFinished notification. It must be called with the session marked
 // busy (genCtx/cancel registered by the dispatcher in Run).
 func (a *sessionAgent) runTurn(ctx context.Context, genCtx context.Context, call SessionAgentCall) turnOutcome {
-	// BeforeAgent callback — may skip execution entirely.
+	// BeforeAgent callback 鈥?may skip execution entirely.
 	if result, err := a.callbacks.RunBeforeAgent(ctx, &call); result != nil || err != nil {
 		return turnOutcome{result: result, err: err, shortCircuit: true}
 	}
@@ -300,7 +264,7 @@ func (a *sessionAgent) runTurn(ctx context.Context, genCtx context.Context, call
 		systemPrompt += "\n\n<mcp-instructions>\n" + s + "\n</mcp-instructions>"
 	}
 
-	// BeforeModel callback — may modify system prompt.
+	// BeforeModel callback 鈥?may modify system prompt.
 	if err := a.callbacks.RunBeforeModel(ctx, &call, &systemPrompt); err != nil {
 		return turnOutcome{err: err}
 	}
@@ -356,6 +320,18 @@ func (a *sessionAgent) runTurn(ctx context.Context, genCtx context.Context, call
 	if call.MaxOutputTokens > 0 {
 		maxOutputTokens = &call.MaxOutputTokens
 	}
+	// Shared mutable state for the stream callbacks (see agent_turn_callbacks.go).
+	ts := &turnState{
+		call:            call,
+		largeModel:      largeModel,
+		parentCtx:       ctx,
+		genCtx:          genCtx,
+		promptPrefix:    promptPrefix,
+		assistant:       &currentAssistant,
+		currentSession:  &currentSession,
+		sessionLock:     &sessionLock,
+		shouldSummarize: &shouldSummarize,
+	}
 	result, err := agent.Stream(genCtx, fantasy.AgentStreamCall{
 		Prompt:           message.PromptWithTextAttachments(call.Prompt, call.Attachments),
 		Files:            files,
@@ -367,252 +343,19 @@ func (a *sessionAgent) runTurn(ctx context.Context, genCtx context.Context, call
 		PresencePenalty:  call.PresencePenalty,
 		TopK:             call.TopK,
 		FrequencyPenalty: call.FrequencyPenalty,
-		PrepareStep: func(callContext context.Context, options fantasy.PrepareStepFunctionOptions) (_ context.Context, prepared fantasy.PrepareStepResult, err error) {
-			prepared.Messages = options.Messages
-			for i := range prepared.Messages {
-				prepared.Messages[i].ProviderOptions = nil
-			}
-
-			// Use latest tools (updated by SetTools when MCP tools change).
-			prepared.Tools = a.tools.Copy()
-
-			// NOTE: queued prompts are intentionally NOT drained into the
-			// in-flight turn — they only start at turn boundaries (see Run).
-
-			prepared.Messages = a.workaroundProviderMediaLimitations(prepared.Messages, largeModel)
-
-			// Final safety: drop messages with empty content arrays to
-			// prevent "messages.content.type is invalid" API errors.
-			prepared.Messages = filterEmptyContentMessages(prepared.Messages)
-
-			lastSystemRoleInx := 0
-			systemMessageUpdated := false
-			for i, msg := range prepared.Messages {
-				// Only add cache control to the last message.
-				if msg.Role == fantasy.MessageRoleSystem {
-					lastSystemRoleInx = i
-				} else if !systemMessageUpdated {
-					prepared.Messages[lastSystemRoleInx].ProviderOptions = a.getCacheControlOptions()
-					systemMessageUpdated = true
-				}
-				// Than add cache control to the last 2 messages.
-				if i > len(prepared.Messages)-3 {
-					prepared.Messages[i].ProviderOptions = a.getCacheControlOptions()
-				}
-			}
-
-			if promptPrefix != "" {
-				prepared.Messages = append([]fantasy.Message{fantasy.NewSystemMessage(promptPrefix)}, prepared.Messages...)
-			}
-
-			// Todo nudge: surface open todos at each model step so the agent is
-			// reminded to finish pending/in-progress items before declaring done.
-			// Re-fetch the session for fresh todo state (the todos tool may have
-			// updated it mid-run). Best-effort: a fetch failure just skips the nudge.
-			if nudgedSession, nudgeErr := a.sessions.Get(callContext, call.SessionID); nudgeErr == nil {
-				if nudge := buildTodoNudge(nudgedSession.Todos); nudge != "" {
-					prepared.Messages = append([]fantasy.Message{fantasy.NewSystemMessage(nudge)}, prepared.Messages...)
-				}
-			}
-
-			var assistantMsg message.Message
-			assistantMsg, err = a.messages.Create(callContext, call.SessionID, message.CreateMessageParams{
-				Role:     message.Assistant,
-				Parts:    []message.ContentPart{},
-				Model:    largeModel.ModelCfg.Model,
-				Provider: largeModel.ModelCfg.Provider,
-			})
-			if err != nil {
-				return callContext, prepared, err
-			}
-			callContext = context.WithValue(callContext, tools.MessageIDContextKey, assistantMsg.ID)
-			callContext = context.WithValue(callContext, tools.SupportsImagesContextKey, largeModel.CatwalkCfg.SupportsImages)
-			callContext = context.WithValue(callContext, tools.ModelNameContextKey, largeModel.CatwalkCfg.Name)
-			currentAssistant = &assistantMsg
-			return callContext, prepared, err
-		},
-		OnReasoningStart: func(id string, reasoning fantasy.ReasoningContent) error {
-			currentAssistant.AppendReasoningContent(reasoning.Text)
-			return a.messages.Update(genCtx, *currentAssistant)
-		},
-		OnReasoningDelta: func(id string, text string) error {
-			currentAssistant.AppendReasoningContent(text)
-			return a.messages.Update(genCtx, *currentAssistant)
-		},
-		OnReasoningEnd: func(id string, reasoning fantasy.ReasoningContent) error {
-			// Record the reasoning trace for the evolution/observability layer.
-			if lg := toolutil.GetSessionLogger(ctx); lg != nil && reasoning.Text != "" {
-				lg.LogThink("reasoning", truncateForLog(reasoning.Text), toolutil.SessionLogMeta{})
-			}
-			// handle anthropic signature
-			if anthropicData, ok := reasoning.ProviderMetadata[anthropic.Name]; ok {
-				if reasoning, ok := anthropicData.(*anthropic.ReasoningOptionMetadata); ok {
-					currentAssistant.AppendReasoningSignature(reasoning.Signature)
-				}
-			}
-			if googleData, ok := reasoning.ProviderMetadata[google.Name]; ok {
-				if reasoning, ok := googleData.(*google.ReasoningMetadata); ok {
-					currentAssistant.AppendThoughtSignature(reasoning.Signature, reasoning.ToolID)
-				}
-			}
-			if openaiData, ok := reasoning.ProviderMetadata[openai.Name]; ok {
-				if reasoning, ok := openaiData.(*openai.ResponsesReasoningMetadata); ok {
-					currentAssistant.SetReasoningResponsesData(reasoning)
-				}
-			}
-			currentAssistant.FinishThinking()
-			return a.messages.Update(genCtx, *currentAssistant)
-		},
-		OnTextDelta: func(id string, text string) error {
-			// Strip leading newline from initial text content. This is is
-			// particularly important in non-interactive mode where leading
-			// newlines are very visible.
-			if len(currentAssistant.Parts) == 0 {
-				text = strings.TrimPrefix(text, "\n")
-			}
-
-			currentAssistant.AppendContent(text)
-			return a.messages.Update(genCtx, *currentAssistant)
-		},
-		OnToolInputStart: func(id string, toolName string) error {
-			// Send tool executing notification
-			if !call.NonInteractive && a.notify != nil {
-				a.notify.Publish(pubsub.CreatedEvent, notify.Notification{
-					SessionID: call.SessionID,
-					Type:      notify.TypeAgentToolExecuting,
-					ToolName:  toolName,
-				})
-			}
-
-			toolCall := message.ToolCall{
-				ID:               id,
-				Name:             toolName,
-				ProviderExecuted: false,
-				Finished:         false,
-			}
-			currentAssistant.AddToolCall(toolCall)
-			// Use parent ctx instead of genCtx to ensure the update succeeds
-			// even if the request is canceled mid-stream
-			return a.messages.Update(ctx, *currentAssistant)
-		},
-		OnRetry: func(err *fantasy.ProviderError, delay time.Duration) {
-			slog.Warn("Provider request failed, retrying", providerRetryLogFields(err, delay)...)
-		},
-		OnToolCall: func(tc fantasy.ToolCallContent) error {
-			toolCall := message.ToolCall{
-				ID:               tc.ToolCallID,
-				Name:             tc.ToolName,
-				Input:            tc.Input,
-				ProviderExecuted: false,
-				Finished:         true,
-			}
-			currentAssistant.AddToolCall(toolCall)
-			// Record the tool invocation for the evolution/observability layer.
-			if lg := toolutil.GetSessionLogger(ctx); lg != nil {
-				lg.LogToolCall("tool_call", tc.ToolName+": "+truncateForLog(tc.Input), toolutil.SessionLogMeta{
-					ToolName: tc.ToolName, ToolCallID: tc.ToolCallID,
-				})
-			}
-			// Use parent ctx instead of genCtx to ensure the update succeeds
-			// even if the request is canceled mid-stream
-			return a.messages.Update(ctx, *currentAssistant)
-		},
-		OnToolResult: func(result fantasy.ToolResultContent) error {
-			toolResult := a.convertToToolResult(result)
-
-			// Record tool results (and errors) for the evolution/observability layer.
-			if lg := toolutil.GetSessionLogger(ctx); lg != nil {
-				if toolResult.IsError {
-					lg.LogBug("tool_error", result.ToolName+": "+truncateForLog(toolResult.Content), toolutil.SessionLogMeta{
-						ToolName: result.ToolName, ToolCallID: toolResult.ToolCallID, ErrorType: "tool_execution",
-					})
-				} else {
-					lg.LogToolCall("tool_result", result.ToolName+": "+truncateForLog(toolResult.Content), toolutil.SessionLogMeta{
-						ToolName: result.ToolName, ToolCallID: toolResult.ToolCallID,
-					})
-				}
-			}
-
-			// Use parent ctx instead of genCtx to ensure the message is created
-			// even if the request is canceled mid-stream
-			_, createMsgErr := a.messages.Create(ctx, currentAssistant.SessionID, message.CreateMessageParams{
-				Role: message.Tool,
-				Parts: []message.ContentPart{
-					toolResult,
-				},
-			})
-			return createMsgErr
-		},
-		OnStepFinish: func(stepResult fantasy.StepResult) error {
-			finishReason := message.FinishReasonUnknown
-			switch stepResult.FinishReason {
-			case fantasy.FinishReasonLength:
-				finishReason = message.FinishReasonMaxTokens
-			case fantasy.FinishReasonStop:
-				finishReason = message.FinishReasonEndTurn
-			case fantasy.FinishReasonToolCalls:
-				finishReason = message.FinishReasonToolUse
-			}
-			// If a tool result halted the turn (e.g. a hook halt or a
-			// permission denial), the step ends on FinishReasonToolCalls but
-			// the model will not be called again. Treat it as the end of the
-			// turn so the UI can render the assistant footer.
-			if finishReason == message.FinishReasonToolUse {
-				for _, tr := range stepResult.Content.ToolResults() {
-					if tr.StopTurn {
-						finishReason = message.FinishReasonEndTurn
-						break
-					}
-				}
-			}
-			currentAssistant.AddFinish(finishReason, "", "")
-			sessionLock.Lock()
-			defer sessionLock.Unlock()
-
-			updatedSession, getSessionErr := a.sessions.Get(ctx, call.SessionID)
-			if getSessionErr != nil {
-				return getSessionErr
-			}
-			a.updateSessionUsage(largeModel, &updatedSession, stepResult.Usage, a.openrouterCost(stepResult.ProviderMetadata))
-			_, sessionErr := a.sessions.Save(ctx, updatedSession)
-			if sessionErr != nil {
-				return sessionErr
-			}
-			currentSession = updatedSession
-			// Record per-step token usage for the evolution/observability layer.
-			if lg := toolutil.GetSessionLogger(ctx); lg != nil {
-				lg.LogInfo("step_usage", fmt.Sprintf("finish=%s in=%d out=%d cache_read=%d cache_create=%d",
-					finishReason, stepResult.Usage.InputTokens, stepResult.Usage.OutputTokens,
-					stepResult.Usage.CacheReadTokens, stepResult.Usage.CacheCreationTokens),
-					toolutil.SessionLogMeta{AgentID: largeModel.ModelCfg.Model})
-			}
-			return a.messages.Update(genCtx, *currentAssistant)
-		},
+		PrepareStep:      a.prepareStep(ts),
+		OnReasoningStart: a.onReasoningStart(ts),
+		OnReasoningDelta: a.onReasoningDelta(ts),
+		OnReasoningEnd:   a.onReasoningEnd(ts),
+		OnTextDelta:      a.onTextDelta(ts),
+		OnToolInputStart: a.onToolInputStart(ts),
+		OnRetry:          a.onRetry(),
+		OnToolCall:       a.onToolCall(ts),
+		OnToolResult:     a.onToolResult(ts),
+		OnStepFinish:     a.onStepFinish(ts),
 		StopWhen: []fantasy.StopCondition{
-			func(_ []fantasy.StepResult) bool {
-				cw := int64(largeModel.CatwalkCfg.ContextWindow)
-				// If context window is unknown (0), skip auto-summarize
-				// to avoid immediately truncating custom/local models.
-				if cw == 0 {
-					return false
-				}
-				tokens := currentSession.CompletionTokens + currentSession.PromptTokens
-				remaining := cw - tokens
-				var threshold int64
-				if cw > largeContextWindowThreshold {
-					threshold = largeContextWindowBuffer
-				} else {
-					threshold = int64(float64(cw) * smallContextWindowRatio)
-				}
-				if (remaining <= threshold) && !a.disableAutoSummarize {
-					shouldSummarize = true
-					return true
-				}
-				return false
-			},
-			func(steps []fantasy.StepResult) bool {
-				return hasRepeatedToolCalls(steps, loopDetectionWindowSize, loopDetectionMaxRepeats)
-			},
+			a.contextWindowStop(ts),
+			loopStopCondition,
 		},
 	})
 
@@ -785,7 +528,7 @@ func (a *sessionAgent) Summarize(ctx context.Context, sessionID string, opts fan
 		return "", err
 	}
 
-	summaryPromptText := buildSummaryPrompt(currentSession.Todos)
+	summaryPromptText := messages.BuildSummaryPrompt(currentSession.Todos)
 
 	resp, err := agent.Stream(genCtx, fantasy.AgentStreamCall{
 		Prompt:          summaryPromptText,
@@ -872,123 +615,4 @@ func (a *sessionAgent) Summarize(ctx context.Context, sessionID string, opts fan
 		summaryPath = result.Path
 	}
 	return summaryPath, nil
-}
-
-func (a *sessionAgent) Cancel(sessionID string) {
-	// Cancel active requests (regular turns and Summarize both register
-	// under the bare sessionID). Don't use Take() here - we need the entry
-	// to remain in activeRequests so IsBusy() returns true until the
-	// goroutine fully completes (including error handling that may access
-	// the DB). The dispatcher loop in Run releases the entry at the end of
-	// each turn, on error returns, and via its panic safety net.
-	if cancel, ok := a.activeRequests.Get(sessionID); ok && cancel != nil {
-		slog.Debug("Request cancellation initiated", "session_id", sessionID)
-		cancel()
-	}
-
-	// Cancel also clears the queue: the running dispatcher pops an empty
-	// queue at its turn boundary and exits without starting further turns.
-	// Hold runMu so a concurrent enqueue cannot race this clear (its call
-	// would otherwise be deleted before any dispatcher sees it).
-	if a.QueuedPrompts(sessionID) > 0 {
-		slog.Debug("Clearing queued prompts", "session_id", sessionID)
-		a.runMu.Lock()
-		a.messageQueue.Del(sessionID)
-		a.runMu.Unlock()
-	}
-}
-
-func (a *sessionAgent) CancelAll() {
-	if !a.IsBusy() {
-		return
-	}
-	for key := range a.activeRequests.Seq2() {
-		a.Cancel(key) // key is sessionID
-	}
-
-	timeout := time.After(5 * time.Second)
-	for a.IsBusy() {
-		select {
-		case <-timeout:
-			return
-		default:
-			time.Sleep(200 * time.Millisecond)
-		}
-	}
-}
-
-func (a *sessionAgent) ClearQueue(sessionID string) {
-	if a.QueuedPrompts(sessionID) > 0 {
-		slog.Debug("Clearing queued prompts", "session_id", sessionID)
-		a.runMu.Lock()
-		a.messageQueue.Del(sessionID)
-		a.runMu.Unlock()
-	}
-}
-
-func (a *sessionAgent) IsBusy() bool {
-	var busy bool
-	for cancelFunc := range a.activeRequests.Seq() {
-		if cancelFunc != nil {
-			busy = true
-			break
-		}
-	}
-	return busy
-}
-
-func (a *sessionAgent) IsSessionBusy(sessionID string) bool {
-	_, busy := a.activeRequests.Get(sessionID)
-	return busy
-}
-
-func (a *sessionAgent) QueuedPrompts(sessionID string) int {
-	l, ok := a.messageQueue.Get(sessionID)
-	if !ok {
-		return 0
-	}
-	return len(l)
-}
-
-func (a *sessionAgent) QueuedPromptsList(sessionID string) []string {
-	l, ok := a.messageQueue.Get(sessionID)
-	if !ok {
-		return nil
-	}
-	prompts := make([]string, len(l))
-	for i, call := range l {
-		prompts[i] = call.Prompt
-	}
-	return prompts
-}
-
-func (a *sessionAgent) SetModels(large Model, small Model) {
-	a.largeModel.Set(large)
-	a.smallModel.Set(small)
-}
-
-func (a *sessionAgent) SetTools(tools []fantasy.AgentTool) {
-	a.tools.SetSlice(tools)
-}
-
-func (a *sessionAgent) SetSystemPrompt(systemPrompt string) {
-	a.systemPrompt.Set(systemPrompt)
-}
-
-func (a *sessionAgent) SystemPrompt() string {
-	return a.systemPrompt.Get()
-}
-
-func (a *sessionAgent) Model() Model {
-	return a.largeModel.Get()
-}
-
-// SmallModel returns the configured small model (used for cheap auxiliary
-// calls like the /evo lesson distiller). It is a zero-value Model when the
-// small model was never built, whose Model field is nil.
-func (a *sessionAgent) SmallModel() Model {
-	if a.smallModel == nil {
-		return Model{}
-	}
-	return a.smallModel.Get()
 }

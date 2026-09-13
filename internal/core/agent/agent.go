@@ -165,21 +165,21 @@ func NewSessionAgent(
 // result message. Tool results are often the biggest consumers of context
 // window tokens, so compressing older ones yields significant savings.
 
-// extractToolResultText extracts the text content from a ToolResultPart.
+// ExtractToolResultText extracts the text content from a ToolResultPart.
 
-// isToolResultError returns true if the tool result is an error.
+// IsToolResultError returns true if the tool result is an error.
 
-// setToolResultText replaces the text content in a ToolResultPart.
+// SetToolResultText replaces the text content in a ToolResultPart.
 // model does not support images. This prevents API errors when switching from
 // an image-capable model to one that doesn't support images.
 
-// filterOrphanedToolResults converts a tool message to a fantasy.Message,
+// FilterOrphanedToolResults converts a tool message to a fantasy.Message,
 // dropping any tool result parts whose tool_call_id has no matching tool call
 // in the known set. An orphaned result causes API validation to fail on every
 // subsequent turn, permanently locking the session. Returns the filtered
 // message and true if at least one valid part remains.
 
-// syntheticToolResultsForOrphanedCalls returns a tool message containing
+// SyntheticToolResultsForOrphanedCalls returns a tool message containing
 // synthetic tool results for any tool calls in the assistant message that
 // have no matching result in knownToolResultIDs. LLM APIs require every
 // tool_use to be immediately followed by a tool_result; an interrupted
@@ -213,6 +213,6 @@ func NewSessionAgent(
 //	BEFORE: [tool result: image data]
 //	AFTER:  [tool result: "Image loaded - see attached"], [user: image attachment]
 
-// buildSummaryPrompt constructs the prompt text for session summarization.
+// BuildSummaryPrompt constructs the prompt text for session summarization.
 // The output follows the Obsidian + YAML frontmatter format defined in
 // templates/summary.md for both human readability and machine parsing.

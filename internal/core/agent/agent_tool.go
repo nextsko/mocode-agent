@@ -177,7 +177,7 @@ func (c *coordinator) buildSubAgent(ctx context.Context, agentID string, allowEd
 	} else {
 		agentCfg.AllowedTools = withEditAgentTools(agentCfg.AllowedTools)
 	}
-	agentPrompt, err := promptForAgent(agentCfg, prompt.WithWorkingDir(c.cfg.WorkingDir()))
+	agentPrompt, err := prompt.PromptForAgent(agentCfg, prompt.WithWorkingDir(c.cfg.WorkingDir()))
 	if err != nil {
 		return nil, err
 	}
