@@ -3,7 +3,10 @@ package model
 import (
 	"testing"
 
+	"charm.land/catwalk/pkg/catwalk"
 	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/ui/dialog"
+	"github.com/nextsko/mocode-agent/internal/util/csync"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,6 +18,19 @@ func newArgTestUI(t *testing.T) *UI {
 			"coder": {ID: "coder", Name: "Code", Description: "Write code"},
 			"plan":  {ID: "plan", Name: "SK Plan", Description: "Plan mode"},
 			"task":  {ID: "task", Name: "Task", Disabled: true},
+		},
+	})
+	// Provider with models for /model argument completion.
+	cfg := ui.com.Config()
+	if cfg.Providers == nil {
+		cfg.Providers = csync.NewMap[string, config.ProviderConfig]()
+	}
+	cfg.Providers.Set("testprov", config.ProviderConfig{
+		ID:   "testprov",
+		Name: "Test Provider",
+		Models: []catwalk.Model{
+			{ID: "model-a", Name: "Model A"},
+			{ID: "model-b"},
 		},
 	})
 	ui.session = nil
@@ -46,6 +62,20 @@ func TestSlashArgCompletion_AgentsModes(t *testing.T) {
 	require.False(t, ok)
 	_, _, ok = ui.slashArgCompletionGroups("/agents plan extra")
 	require.False(t, ok, "one argument only")
-	_, _, ok = ui.slashArgCompletionGroups("/model pro")
+
+	// /model argument completion lists configured provider models.
+	groups, q, ok = ui.slashArgCompletionGroups("/model ")
+	require.True(t, ok)
+	require.Equal(t, "", q)
+	require.Equal(t, "Models", groups[0].Label)
+	require.NotEmpty(t, groups[0].Items, "at least one model from config")
+	first := groups[0].Items[0]
+	require.Contains(t, first.Command, "/model ")
+	msg, isModel := first.Msg.(dialog.ActionSelectModel)
+	require.True(t, isModel, "selection dispatches a model switch")
+	require.NotEmpty(t, msg.Model.Provider)
+	require.NotEmpty(t, msg.Model.Model)
+
+	_, _, ok = ui.slashArgCompletionGroups("/unknown x")
 	require.False(t, ok, "unknown command has no arg completion yet")
 }

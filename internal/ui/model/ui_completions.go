@@ -120,6 +120,44 @@ func (m *UI) slashArgCompletionGroups(input string) (groups []completions.SlashG
 			return nil, "", false
 		}
 		return []completions.SlashGroup{{Label: "Modes", Items: items}}, argQuery, true
+
+	case "model", "models":
+		cfg := m.com.Config()
+		if cfg == nil {
+			return nil, "", false
+		}
+		// Model type follows the coder agent's current selection so the
+		// switch lands on the slot the user actually sees.
+		modelType := config.SelectedModelTypeLarge
+		if agentCfg, ok := cfg.Agents[config.AgentCoder]; ok && agentCfg.Model != "" {
+			modelType = agentCfg.Model
+		}
+		items := make([]completions.SlashCompletionValue, 0, 16)
+		for providerID, p := range cfg.Providers.Seq2() {
+			if p.Disable {
+				continue
+			}
+			provider := p.ToProvider()
+			for _, model := range p.Models {
+				if model.ID == "" {
+					continue
+				}
+				desc := cmp.Or(model.Name, model.ID)
+				items = append(items, completions.SlashCompletionValue{
+					Command: "/model " + providerID + "/" + model.ID,
+					Desc:    desc,
+					Msg: dialog.ActionSelectModel{
+						Provider:  provider,
+						Model:     config.SelectedModel{Provider: providerID, Model: model.ID},
+						ModelType: modelType,
+					},
+				})
+			}
+		}
+		if len(items) == 0 {
+			return nil, "", false
+		}
+		return []completions.SlashGroup{{Label: "Models", Items: items}}, argQuery, true
 	}
 	return nil, "", false
 }
