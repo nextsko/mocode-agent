@@ -194,6 +194,14 @@ func (w *gatewayButlerWorkspace) AgentRun(ctx context.Context, sessionID, prompt
 	return w.ws.AgentRun(ctx, sessionID, prompt)
 }
 
+func (w *gatewayButlerWorkspace) AgentInjectGuidance(ctx context.Context, sessionID, text string) error {
+	return w.ws.AgentInjectGuidance(ctx, sessionID, text)
+}
+
+func (w *gatewayButlerWorkspace) AgentForceRun(ctx context.Context, sessionID, prompt string) error {
+	return w.ws.AgentForceRun(ctx, sessionID, prompt)
+}
+
 func (w *gatewayButlerWorkspace) ListMessages(ctx context.Context, sessionID string) ([]wechat.MsgInfo, error) {
 	msgs, err := w.ws.ListMessages(ctx, sessionID)
 	if err != nil {

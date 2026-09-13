@@ -25,6 +25,10 @@ type ButlerWorkspace interface {
 	AgentRun(ctx context.Context, sessionID, prompt string) error
 	ListMessages(ctx context.Context, sessionID string) ([]MsgInfo, error)
 	AgentIsSessionBusy(ctx context.Context, sessionID string) bool
+	// AgentInjectGuidance steers the RUNNING turn (send-mode: inject).
+	AgentInjectGuidance(ctx context.Context, sessionID, text string) error
+	// AgentForceRun preempts the session (send-mode: force).
+	AgentForceRun(ctx context.Context, sessionID, prompt string) error
 }
 
 // SessionInfo is a lightweight session summary.
@@ -307,9 +311,83 @@ func (h *llmButlerHandler) handleButlerSlash(ctx context.Context, userID, text s
 			return "用法: /delete <会话ID>"
 		}
 		return h.deleteSession(ctx, args)
+	case "/guide":
+		if args == "" {
+			return "用法: /guide <引导内容> — 注入运行中的对话，不打断当前任务"
+		}
+		return h.handleGuide(ctx, userID, args)
+	case "/force":
+		if args == "" {
+			return "用法: /force <内容> — 打断当前任务并立即执行"
+		}
+		return h.handleForce(ctx, userID, args)
 	default:
 		return fmt.Sprintf("未知命令: %s", cmd)
 	}
+}
+
+// handleGuide injects mid-turn guidance into the RUNNING session (send-mode:
+// inject). When idle the text is simply stored as the next context.
+func (h *llmButlerHandler) handleGuide(ctx context.Context, userID, text string) string {
+	if h.ctx.Workspace == nil {
+		return "❌ 系统未就绪"
+	}
+	if err := h.ensureSession(ctx, userID); err != nil {
+		return butlerInitFailReply
+	}
+	sessID := h.butlerSessionID(userID)
+	if sessID == "" {
+		return butlerInitFailReply
+	}
+	if err := h.ctx.Workspace.AgentInjectGuidance(ctx, sessID, text); err != nil {
+		slog.Error("Butler inject guidance failed", "userID", userID, "error", err)
+		return "❌ 注入失败: " + err.Error()
+	}
+	if !h.ctx.Workspace.AgentIsSessionBusy(ctx, sessID) {
+		return "💬 已存入会话记录（当前空闲，下次对话生效）。"
+	}
+	return "💬 引导已注入运行中的对话。"
+}
+
+// handleForce preempts the session with the prompt (send-mode: force) and
+// waits for the forced turn's reply like a normal run.
+func (h *llmButlerHandler) handleForce(ctx context.Context, userID, text string) string {
+	if h.ctx.Workspace == nil {
+		return "❌ 系统未就绪"
+	}
+	if err := h.ensureSession(ctx, userID); err != nil {
+		return butlerInitFailReply
+	}
+	sessID := h.butlerSessionID(userID)
+	if sessID == "" {
+		return butlerInitFailReply
+	}
+
+	stopTyping := h.ctx.Channel.StartTyping(ctx, userID)
+	defer stopTyping()
+
+	runCtx, cancel := context.WithTimeout(ctx, butlerAgentTimeout)
+	defer cancel()
+
+	beforeCount, err := h.messageCount(runCtx, sessID)
+	if err != nil {
+		return butlerErrorReply
+	}
+	if err := h.ctx.Workspace.AgentForceRun(runCtx, sessID, text); err != nil {
+		slog.Error("Butler AgentForceRun failed", "userID", userID, "error", err)
+		return butlerErrorReply
+	}
+	reply, err := h.waitForAssistantReply(runCtx, sessID, beforeCount)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return butlerTimeoutReply
+		}
+		return butlerErrorReply
+	}
+	if reply == "" {
+		return "⚡ 已打断并执行完成。"
+	}
+	return "⚡ " + reply
 }
 
 func (h *llmButlerHandler) switchSession(ctx context.Context, userID, sessionID string) string {

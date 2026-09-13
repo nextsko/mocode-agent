@@ -2,6 +2,7 @@ package wechat
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -14,6 +15,8 @@ type mockButlerWorkspace struct {
 	messages map[string][]MsgInfo
 	busy     map[string]bool
 	created  []string
+	guidance []string
+	forced   []string
 }
 
 func newMockButlerWorkspace() *mockButlerWorkspace {
@@ -77,6 +80,23 @@ func (m *mockButlerWorkspace) AgentIsSessionBusy(_ context.Context, sessionID st
 	return m.busy[sessionID]
 }
 
+func (m *mockButlerWorkspace) AgentInjectGuidance(_ context.Context, sessionID, text string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.guidance = append(m.guidance, sessionID+"|"+text)
+	m.messages[sessionID] = append(m.messages[sessionID], MsgInfo{Role: "user", Content: text})
+	return nil
+}
+
+func (m *mockButlerWorkspace) AgentForceRun(_ context.Context, sessionID, prompt string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.forced = append(m.forced, sessionID+"|"+prompt)
+	m.messages[sessionID] = append(m.messages[sessionID], MsgInfo{Role: "user", Content: prompt})
+	m.messages[sessionID] = append(m.messages[sessionID], MsgInfo{Role: "assistant", Content: "forced:" + prompt})
+	return nil
+}
+
 func (m *mockButlerWorkspace) setBusy(sessionID string, busy bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -129,6 +149,39 @@ func TestButlerPerUserSession(t *testing.T) {
 	bob := h.butlerSessionID("bob")
 	if alice == "" || bob == "" || alice == bob {
 		t.Fatalf("expected distinct sessions, alice=%q bob=%q", alice, bob)
+	}
+}
+
+func TestButlerGuideAndForceCommands(t *testing.T) {
+	t.Parallel()
+	ws := newMockButlerWorkspace()
+	ch := New()
+	h := newButlerHandler(&ButlerContext{Channel: ch, Workspace: ws})
+
+	// Empty args return usage hints.
+	if got := h.handleButlerSlash(context.Background(), "u1", "/guide"); !strings.Contains(got, "用法") {
+		t.Fatalf("guide usage hint missing: %q", got)
+	}
+	if got := h.handleButlerSlash(context.Background(), "u1", "/force"); !strings.Contains(got, "用法") {
+		t.Fatalf("force usage hint missing: %q", got)
+	}
+
+	// Guide while idle stores the guidance.
+	got := h.handleButlerSlash(context.Background(), "u1", "/guide 优先选方案B")
+	if !strings.Contains(got, "会话记录") && !strings.Contains(got, "注入") {
+		t.Fatalf("guide idle reply unexpected: %q", got)
+	}
+	if len(ws.guidance) != 1 || !strings.Contains(ws.guidance[0], "优先选方案B") {
+		t.Fatalf("guidance not recorded: %v", ws.guidance)
+	}
+
+	// Force runs immediately and produces the forced reply.
+	got = h.handleButlerSlash(context.Background(), "u1", "/force 立即重构")
+	if !strings.Contains(got, "立即重构") {
+		t.Fatalf("force reply unexpected: %q", got)
+	}
+	if len(ws.forced) != 1 || !strings.Contains(ws.forced[0], "立即重构") {
+		t.Fatalf("force not recorded: %v", ws.forced)
 	}
 }
 

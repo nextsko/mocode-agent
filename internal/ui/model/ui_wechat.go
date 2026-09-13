@@ -94,6 +94,14 @@ func (w *tuiButlerWorkspace) AgentRun(ctx context.Context, id, prompt string) er
 	return w.ws.AgentRun(ctx, id, prompt)
 }
 
+func (w *tuiButlerWorkspace) AgentInjectGuidance(ctx context.Context, id, text string) error {
+	return w.ws.AgentInjectGuidance(ctx, id, text)
+}
+
+func (w *tuiButlerWorkspace) AgentForceRun(ctx context.Context, id, prompt string) error {
+	return w.ws.AgentForceRun(ctx, id, prompt)
+}
+
 func (w *tuiButlerWorkspace) ListMessages(ctx context.Context, id string) ([]wechat.MsgInfo, error) {
 	msgs, err := w.ws.ListMessages(ctx, id)
 	if err != nil {
