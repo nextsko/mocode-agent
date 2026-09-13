@@ -1,6 +1,6 @@
 # sandbox-and-mru — TS/uv 双沙箱工具 + slash MRU
 
-> 状态：执行中
+> 状态：已完成（2026-09-13）
 > 创建：2026-09-13
 > 范围：`tools/core/sandbox/`（新）、`ui/completions`（MRU）
 > 参考：grok-build `xai-grok-sandbox`（内核级 profile，本次取其 profile/超时/输出有界思想做语言级轻量版）；`xai-grok-pager/src/slash/mru.rs`（MRU 排序）
