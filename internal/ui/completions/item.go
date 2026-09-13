@@ -69,6 +69,7 @@ type SlashCompletionItem struct {
 	value   SlashCompletionValue
 	focused bool
 	cache   map[int]string
+	match   fuzzy.Match
 
 	t *styles.Styles
 }
@@ -103,11 +104,16 @@ func (s *SlashCompletionItem) SetFocused(focused bool) {
 	s.focused = focused
 }
 
-// SetMatch implements [list.MatchSettable] (no-op).
-func (s *SlashCompletionItem) SetMatch(_ fuzzy.Match) { s.cache = nil }
+// SetMatch implements [list.MatchSettable]: stores the fuzzy match so Render
+// can highlight the matched characters (grok-build's indices idea).
+func (s *SlashCompletionItem) SetMatch(m fuzzy.Match) {
+	s.cache = nil
+	s.match = m
+}
 
 // Render implements [list.Item] using the same two-column layout as CommandItem:
-// bold label (command) on the left, dim description on the right.
+// bold label (command) on the left, dim description on the right, with the
+// fuzzy-matched characters highlighted.
 func (s *SlashCompletionItem) Render(width int) string {
 	if s.cache == nil {
 		s.cache = make(map[int]string)
@@ -128,13 +134,20 @@ func (s *SlashCompletionItem) Render(width int) string {
 	descWidth := max(0, lineWidth-labelWidth-len(labelGap))
 	desc := ansi.Truncate(s.desc, descWidth, "\u2026")
 
+	// Split the fuzzy match indexes (computed over Filter() =
+	// command + " " + desc) into per-column highlight sets.
+	cmdHits, descHits := splitMatchIndexes(s.match, len(s.command))
+
 	var row string
 	if s.focused {
+		label = highlightRunes(label, cmdHits, lipgloss.NewStyle(), lipgloss.NewStyle(), false)
 		gap := strings.Repeat(" ", max(0, lineWidth-lipgloss.Width(label)-len(labelGap)-lipgloss.Width(desc)))
 		row = label + labelGap + desc + gap
 	} else {
 		renderedLabel := s.t.Dialog.TitleText.Render(label)
+		renderedLabel = highlightRunes(renderedLabel, cmdHits, s.t.Dialog.TitleText, s.t.Completions.Match, true)
 		renderedDesc := s.t.Dialog.ListItem.InfoBlurred.Render(desc)
+		renderedDesc = highlightRunes(renderedDesc, descHits, s.t.Dialog.ListItem.InfoBlurred, s.t.Completions.Match, true)
 		gap := strings.Repeat(" ", max(0, lineWidth-lipgloss.Width(label)-len(labelGap)-lipgloss.Width(desc)))
 		row = renderedLabel + labelGap + renderedDesc + gap
 	}
@@ -142,6 +155,61 @@ func (s *SlashCompletionItem) Render(width int) string {
 	result := style.Render(row)
 	s.cache[width] = result
 	return result
+}
+
+// splitMatchIndexes maps fuzzy indexes over "command desc" onto the two
+// columns: the separator space is skipped.
+func splitMatchIndexes(m fuzzy.Match, cmdLen int) (cmdHits, descHits map[int]bool) {
+	cmdHits, descHits = map[int]bool{}, map[int]bool{}
+	for _, idx := range m.MatchedIndexes {
+		switch {
+		case idx < cmdLen:
+			cmdHits[idx] = true
+		case idx > cmdLen: // idx == cmdLen is the separator space
+			descHits[idx-cmdLen-1] = true
+		}
+	}
+	return cmdHits, descHits
+}
+
+// highlightRunes renders text with the fuzzy-hit runes emphasized. When
+// styled is false (focused row) it falls back to bolding the hits.
+func highlightRunes(text string, hits map[int]bool, base, match lipgloss.Style, styled bool) string {
+	if len(hits) == 0 {
+		return text
+	}
+	var b strings.Builder
+	var seg strings.Builder
+	hitRun := false
+	i := 0
+	flush := func() {
+		if seg.Len() == 0 {
+			return
+		}
+		out := seg.String()
+		if hitRun {
+			if styled {
+				out = match.Render(out)
+			} else {
+				out = "\x1b[1m" + out + "\x1b[22m" // bold fallback
+			}
+		} else if styled {
+			out = base.Render(out)
+		}
+		b.WriteString(out)
+		seg.Reset()
+	}
+	for _, r := range text {
+		isHit := hits[i]
+		if isHit != hitRun {
+			flush()
+			hitRun = isHit
+		}
+		seg.WriteRune(r)
+		i++
+	}
+	flush()
+	return b.String()
 }
 
 // Ensure SlashCompletionItem implements the required interfaces.
