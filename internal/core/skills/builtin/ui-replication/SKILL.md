@@ -89,3 +89,6 @@ playwright-cli close
 - `vercel-react-best-practices`：React 组件性能与重渲染优化。
 - `playwright-cli`：截图、快照、元素属性与视觉比对命令。
 - `bun`：包管理与脚本执行。
+- `screenshot-to-ui`：从截图推导盒子模型 / 布局 / 间距 / 字号 / 色彩的方法学。
+- `css-layout-and-box-model`：盒子模型与布局系统详解与排错。
+- `design-tokens`：把量到的值固化为 token 体系。
