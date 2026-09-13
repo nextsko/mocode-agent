@@ -535,3 +535,23 @@ baseline: `docs/dev-notes/structure-governance-baseline.md`.
 `plans/NN-*-plan.md`, `MASTER_PLAN.md`, archive-on-completion). This repo's own
 convention (`docs/plans/<topic>/README.md` + `docs/README.md` index) is an
 instance of "follow the repository first"; the plan mode prompt embeds it too.
+
+## Specialist Roles & Builtin Skills
+
+Beyond the default modes, mocode ships **specialist roles** (switch via the mode
+picker / `Ctrl+G`): `architect`, `frontend`, `backend`, `designer`, `qa`,
+`ai-engineer`. Each role loads the relevant builtin skills:
+
+| Role | Primary skills |
+|------|----------------|
+| `architect` | codebase-design, domain-modeling, improve-codebase-architecture, safe-refactor |
+| `frontend` | vercel-react-best-practices, vercel-composition-patterns, design-taste-frontend, web-design-guidelines |
+| `backend` | rust-backend, runtime, streaming, observability, security-and-hardening |
+| `designer` | design-taste-frontend, web-design-guidelines |
+| `qa` | code-review-and-quality, verification-before-completion, incremental-implementation, investigate-first |
+| `ai-engineer` | rig-core-llm-integration, multi-agent-orchestration, streaming, observability |
+
+Builtin skills live in `internal/core/skills/builtin/<name>/SKILL.md`; the front
+matter `name` **must equal the directory name**. Role prompts live in
+`internal/core/config/templates/modes/<id>.md`. Both are embedded at build time,
+so a rebuild + restart is required for changes to take effect.
