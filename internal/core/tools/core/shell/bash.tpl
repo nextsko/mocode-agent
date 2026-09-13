@@ -21,6 +21,7 @@ Tool selection (don't reflexively reach for bash):
 - SEARCHING code: use the `grep` tool (faster, structured output, respects ignore patterns). Don't `bash grep` or `bash rg`.
 - READING files: use `view` or `read_files`. Don't `bash cat`, `bash head`, or `bash tail` — they hide line numbers and don't count as "read" for editing.
 - LISTING files: use `ls` or `glob` tools. Don't `bash ls` or `bash find`.
+- COMPUTING / data processing / verifying a snippet: use `ts_run` (TypeScript/JS) or `py_run` (Python, with ephemeral deps). They run in isolated sandboxes with timeouts and bounded output — safer and cleaner than bash one-liners. Don't write `node -e` or `python -c` via bash.
 - EXECUTING commands (build, test, git, install, run scripts): use `bash` — that's what it's for.
 The dedicated tools give better results and work identically across platforms. Bash is for command execution, not file inspection.
 - Chain with ';' or '&&', avoid newlines except in quoted strings
