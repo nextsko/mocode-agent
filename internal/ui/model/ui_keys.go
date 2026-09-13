@@ -156,6 +156,9 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 							cmds = append(cmds, cmd)
 						}
 						m.closeCompletions()
+						// MRU: remember the accepted command so the bare "/"
+						// menu surfaces it first next time (grok-build idea).
+						completions.RecordSlashUse(msg.Value.Command)
 						if msg.Value.Msg != nil {
 							// Handle the action directly without going through the message
 							// queue, so it works even when no dialog is currently open.

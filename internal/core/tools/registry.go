@@ -11,6 +11,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/question"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
 	fs "github.com/nextsko/mocode-agent/internal/core/tools/core/fs"
+	"github.com/nextsko/mocode-agent/internal/core/tools/core/sandbox"
 	agentquestion "github.com/nextsko/mocode-agent/internal/core/tools/core/question"
 	shell "github.com/nextsko/mocode-agent/internal/core/tools/core/shell"
 	"github.com/nextsko/mocode-agent/internal/core/tools/core/web"
@@ -157,6 +158,7 @@ func (r *Registry) Build(ctx context.Context, deps ToolDeps) []fantasy.AgentTool
 func standardPlugins() []ToolPlugin {
 	return []ToolPlugin{
 		execPlugin{},
+		sandboxPlugin{},
 		questionPlugin{},
 		filePlugin{},
 		searchPlugin{},
@@ -169,6 +171,26 @@ func standardPlugins() []ToolPlugin {
 		giteaPlugin{},
 		gitOpsPlugin{},
 		&sshPlugin{},
+	}
+}
+
+// ─── builtin/sandbox ─────────────────────────────────────────────────────────
+
+// sandboxPlugin exposes the isolated code-execution tools (ts_run / py_run):
+// temp working dir, wall-clock timeout, bounded output, uv ephemeral deps.
+type sandboxPlugin struct{}
+
+func (sandboxPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: sandbox.TsRunToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
+		{Name: sandbox.PyRunToolName, Kind: ToolKindBuiltin, Category: CategoryExec},
+	}
+}
+
+func (sandboxPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	return []fantasy.AgentTool{
+		sandbox.NewTsRunTool(deps.Permissions, deps.Cfg.WorkingDir()),
+		sandbox.NewPyRunTool(deps.Permissions, deps.Cfg.WorkingDir()),
 	}
 }
 

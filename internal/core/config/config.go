@@ -539,6 +539,8 @@ func allToolNames() []string {
 		"job_input",
 		"job_kill",
 		"question",
+		"ts_run",
+		"py_run",
 		"download",
 		"edit",
 		"multiedit",

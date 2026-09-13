@@ -1,15 +1,17 @@
 package tools
 
 import (
-	web "github.com/nextsko/mocode-agent/internal/core/tools/core/web"
 	agentquestion "github.com/nextsko/mocode-agent/internal/core/tools/core/question"
+	"github.com/nextsko/mocode-agent/internal/core/tools/core/sandbox"
+	web "github.com/nextsko/mocode-agent/internal/core/tools/core/web"
 
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitea"
 	"slices"
 	"sort"
 	"testing"
 
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/ssh"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitea"
+
+	sshcommon "github.com/nextsko/mocode-agent/internal/core/tools/external/common/ssh"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,6 +27,8 @@ var knownAllToolNames = []string{
 	JobInputToolName,
 	JobKillToolName,
 	agentquestion.QuestionToolName,
+	sandbox.TsRunToolName,
+	sandbox.PyRunToolName,
 	DownloadToolName,
 	EditToolName,
 	MultiEditToolName,

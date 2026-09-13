@@ -199,6 +199,26 @@ func (m *UI) slashCompletionGroups() []completions.SlashGroup {
 		{Label: "Admin", Items: adminItems},
 	}
 
+	// MRU ordering (grok-build idea): inside each group, recently used
+	// commands float to the top so the bare "/" menu reflects habit.
+	for i := range groups {
+		if len(groups[i].Items) < 2 {
+			continue
+		}
+		cmds := make([]string, len(groups[i].Items))
+		byCmd := map[string]completions.SlashCompletionValue{}
+		for j, it := range groups[i].Items {
+			cmds[j] = it.Command
+			byCmd[it.Command] = it
+		}
+		ordered := completions.SortByMRU(cmds)
+		sorted := make([]completions.SlashCompletionValue, len(ordered))
+		for j, c := range ordered {
+			sorted[j] = byCmd[c]
+		}
+		groups[i].Items = sorted
+	}
+
 	// ── Custom commands ────────────────────────────────────────────────────
 	if len(m.customCommands) > 0 {
 		customItems := make([]completions.SlashCompletionValue, 0, len(m.customCommands))
