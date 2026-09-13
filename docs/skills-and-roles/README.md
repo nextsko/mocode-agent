@@ -1,6 +1,6 @@
 # 助手角色 & 内置 Skill 总览
 
-> mocode 内置 **10 个专家角色**（模式）与 **91 个内置 skill** 的可浏览索引。
+> mocode 内置 **10 个专家角色**（模式）与 **97 个内置 skill** 的可浏览索引。
 > 权威来源：角色 = `internal/core/config/templates/modes/*.md`；skill = `internal/core/skills/builtin/<name>/SKILL.md`（front matter `name` 必须等于目录名）。
 > 首次构建/重启后生效。
 
@@ -13,9 +13,9 @@
 | 角色 | id | 定位 | 主导 skill |
 |------|----|------|-----------|
 | Architect | `architect` | 深模块设计、领域建模与架构演进 | codebase-design, domain-modeling, improve-codebase-architecture, safe-refactor |
-| Frontend | `frontend` | React/Next 性能、组合式组件与可用性 | vercel-react-best-practices, vercel-composition-patterns, design-taste-frontend, web-design-guidelines |
+| Frontend | `frontend` | React/Next 性能、组合式组件与可用性 | vercel-react-best-practices, vercel-composition-patterns, design-taste-frontend, web-design-guidelines, screenshot-to-ui, css-layout-and-box-model, design-tokens |
 | Backend | `backend` | 异步并发、序列化、错误处理与可观测 | rust-backend, runtime, streaming, observability, security-and-hardening |
-| Designer | `designer` | 体验与视觉品味（反模板化） | design-taste-frontend, web-design-guidelines |
+| Designer | `designer` | 体验与视觉品味（反模板化） | design-taste-frontend, web-design-guidelines, screenshot-to-ui, css-layout-and-box-model, design-tokens |
 | QA | `qa` | 五轴评审、证据优先、完成即可验证 | code-review-and-quality, verification-before-completion, incremental-implementation, investigate-first |
 | AI Engineer | `ai-engineer` | 模型集成、流式、多智能体编排与可观测 | rig-core-llm-integration, multi-agent-orchestration, streaming, observability |
 | Mobile | `mobile` | Tauri/跨端 WebView + Rust 后端 + 原生打包 | tauri, rust-backend, rust-android-apk, ui-replication |
@@ -25,7 +25,7 @@
 
 ---
 
-## 二、内置 Skill（91）
+## 二、内置 Skill（97）
 
 ### 元技能 · 发现与自省
 - `using-agent-skills` — 发现并调用 skill 的元技能
@@ -90,6 +90,14 @@
 - `zod` — 运行时校验与类型推导
 - `ui-replication` — 设计稿复刻与视觉偏差修复
 - `playwright-cli` — 浏览器自动化与 E2E
+
+### UI 设计方法学 · 视觉产出
+- `screenshot-to-ui` — 截图/设计稿 → UI 复刻方法学（盒子模型/布局/间距/字号/色彩/组件/状态/验收）
+- `css-layout-and-box-model` — 盒子模型与布局系统（Flex/Grid/定位/层叠/溢出/逻辑属性/排错）
+- `design-tokens` — 设计变量体系（颜色/间距/字号/圆角/阴影/动效/主题）
+- `ecommerce-image-studio` — 产品图 → 电商图组（六图组/平台方向/合规）
+- `interactive-h5-app` — 静态原型 → 零依赖可交互 H5
+- `red-team-animation-verification` — 动画逐帧验证 + red team 攻击矩阵
 
 ### AI 对话 UI · LLM 集成
 - `assistant-ui` — AI 聊天界面原语与运行时选型
