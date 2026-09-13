@@ -547,7 +547,10 @@ func TestDefaultModesIncludeSpecialistRoles(t *testing.T) {
 	cfg := &Config{Options: &Options{}}
 	cfg.SetupAgents()
 
-	roles := []string{"architect", "frontend", "backend", "designer", "qa", "ai-engineer"}
+	roles := []string{
+		"architect", "frontend", "backend", "designer", "qa", "ai-engineer",
+		"mobile", "devops", "researcher", "writer",
+	}
 	for _, id := range roles {
 		agent, ok := cfg.Agents[id]
 		require.True(t, ok, "specialist role %q should be configured", id)
