@@ -499,19 +499,23 @@ shell, so command coverage is layered and platform-dependent:
 |-------|----------|-----------|
 | POSIX builtins | `echo`, `printf`, `cd`, … | always |
 | Go coreutils (upstream) | `cat chmod cp find ls mkdir mv rm touch xargs base64 gzip mktemp shasum tar` | `MOCODE_CORE_UTILS` (default: Windows only) |
-| Stream utils (`internal/core/shellruntime/shell/pipeutils.go`) | `head tail wc tee sort uniq cut tr` | `MOCODE_PIPE_UTILS` (default: Windows only) |
+| Stream utils (`internal/core/shellruntime/shell/pipeutils.go`) | `head tail wc tee sort uniq cut tr fd` | `MOCODE_PIPE_UTILS` (default: Windows only) |
 
 **Not provided:** `grep`, `rg`, `sed`, `awk`. On macOS/Linux they resolve to
 system binaries; on Windows they fail with `executable file not found in $PATH`.
 The bash tool appends a **routing hint** when it detects a missing command,
 pointing at the dedicated tool (`grep`, `view`, `glob`, `edit`, `ts_run`/`py_run`).
 
+`fd` is special: it forwards to a real `fd` binary when one is installed (so
+behavior matches the host) and otherwise falls back to a built-in gitignore-aware
+walker (`fd.go`), so it works on Windows too.
+
 Guidance for agents and prompt/tool authors:
 
 - Prefer dedicated tools over shell text utilities: **search → `grep` tool,
-  preview → `view`, list → `glob`/`ls`, transform → `ts_run`/`py_run`**.
-- `… | head -20`, `… | tail`, `… | wc -l` now work on Windows and are fine for
-  **command output**; do not use them to inspect files (use `view`).
+  preview → `view`, find/list → `fd`/`glob`/`ls`, transform → `ts_run`/`py_run`**.
+- `… | head -20`, `… | tail`, `… | wc -l`, `fd <pattern>` now work on Windows and
+  are fine for **command output**; do not use them to inspect files (use `view`).
 
 See [docs/plans/shell-parity/README.md](docs/plans/shell-parity/README.md) for
 the design and the "implement vs route" boundary. This **supersedes** the

@@ -95,14 +95,18 @@ Phase 1 + 2 已落地：
 
 | 文件 | 内容 |
 |------|------|
-| `internal/core/shellruntime/shell/pipeutils.go` | `pipeEnv` + 8 个命令 + `pipeUtilsHandler` 中间件 |
-| `internal/core/shellruntime/shell/pipeutils_test.go` | 逐命令单测 + 经解释器的端到端管道测试 |
+| `internal/core/shellruntime/shell/pipeutils.go` | `pipeEnv` + 命令表 + `pipeUtilsHandler` 中间件 |
+| `internal/core/shellruntime/shell/fd.go` | `fd` 命令（Go 兜底 + `hostFdPath()` 宿主探测） |
+| `internal/core/shellruntime/shell/pipeutils_test.go` / `fd_test.go` | 逐命令单测 + 经解释器的端到端测试 |
 | `internal/core/shellruntime/shell/coreutils.go` | 开关改为**惰性求值**：`goCoreUtilsEnabled()` / `pipeUtilsEnabled()` |
 | `internal/core/shellruntime/shell/shell.go` | `execHandlers()` 注册 `pipeUtilsHandler`；注释更新 |
 
 - 开关：`MOCODE_PIPE_UTILS`（默认同 coreutils，仅 Windows）。
 - flag 覆盖：`head -n/-c/-q/-v`、`tail -n/+N/-c`、`wc -l -w -c -m -L`、`tee -a`、
-  `sort -n -r -u -f -k -t`、`uniq -c -d -u`、`cut -d -f -c -b`、`tr -d -s -c`。
+  `sort -n -r -u -f -k -t`、`uniq -c -d -u`、`cut -d -f -c -b`、`tr -d -s -c`、
+  `fd -H/-I/-a/-g/-e/-t/-d/--max-results`。
+- **`fd` 的特例**：检测到宿主 `fd` 二进制则**转发**给它（行为与本地一致），
+  否则用内置的 gitignore 感知遍历（`fd.go`，复用 `fsext.ListDirectory`）。
 - 未实现（按分界线保持路由）：`grep/rg/sed/awk`。
 - 校验：`go build ./...`、`go vet`、`gofumpt`、golangci-lint v2（新增文件 0 告警）均通过。
 
