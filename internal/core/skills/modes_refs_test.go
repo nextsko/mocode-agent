@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -54,4 +55,23 @@ func TestModeSkillReferencesExist(t *testing.T) {
 		}
 	}
 	require.Greater(t, checked, 0, "expected to find skill references in mode files")
+}
+
+// TestSkillsIndexListsAllBuiltins guards the docs index against drift: every
+// builtin skill must be listed in docs/skills-and-roles/README.md, and its
+// heading count must match.
+func TestSkillsIndexListsAllBuiltins(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join("..", "..", "..", "docs", "skills-and-roles", "README.md")
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	doc := string(data)
+
+	all := DiscoverBuiltin()
+	require.Contains(t, doc, fmt.Sprintf("内置 Skill（%d）", len(all)),
+		"docs index heading count is stale — update docs/skills-and-roles/README.md")
+	for _, s := range all {
+		require.Contains(t, doc, "`"+s.Name+"`", "docs index is missing skill %q", s.Name)
+	}
 }
