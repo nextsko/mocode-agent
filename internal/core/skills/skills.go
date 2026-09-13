@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/charlievieth/fastwalk"
 	"gopkg.in/yaml.v3"
@@ -258,7 +259,21 @@ func DiscoverWithStates(paths []string) ([]*Skill, []*SkillState) {
 	return skills, states
 }
 
-// ToPromptXML generates XML for injection into the system prompt.
+// skillGistMax caps the per-skill gist length (in runes) injected into the
+// prompt. Full text is read on demand from the skill's SKILL.md.
+const skillGistMax = 120
+
+// builtinSkillLocation is the canonical, name-derivable location of a builtin
+// skill; the prompt omits it to save tokens.
+func builtinSkillLocation(name string) string {
+	return "mocode://skills/" + name + "/SKILL.md"
+}
+
+// ToPromptXML generates the tiered <available_skills> block for the system
+// prompt: each skill is advertised by name, a one-line gist and (only when not
+// derivable) its location, rather than its full description. This keeps the
+// prompt small while leaving every skill discoverable — the model reads the
+// full SKILL.md only for the skills it actually needs.
 func ToPromptXML(skills []*Skill) string {
 	if len(skills) == 0 {
 		return ""
@@ -266,18 +281,37 @@ func ToPromptXML(skills []*Skill) string {
 
 	var sb strings.Builder
 	sb.WriteString("<available_skills>\n")
+	sb.WriteString("  <usage>Each skill is listed by name and a one-line gist. Before acting on a match, read its full SKILL.md: builtin skills live at mocode://skills/{name}/SKILL.md (substitute the name element); other skills carry their own location element.</usage>\n")
 	for _, s := range skills {
 		sb.WriteString("  <skill>\n")
 		fmt.Fprintf(&sb, "    <name>%s</name>\n", escape(s.Name))
-		fmt.Fprintf(&sb, "    <description>%s</description>\n", escape(s.Description))
-		fmt.Fprintf(&sb, "    <location>%s</location>\n", escape(s.SkillFilePath))
-		if s.Builtin {
-			sb.WriteString("    <type>builtin</type>\n")
+		fmt.Fprintf(&sb, "    <description>%s</description>\n", escape(SkillGist(s.Description)))
+		if s.SkillFilePath != builtinSkillLocation(s.Name) {
+			fmt.Fprintf(&sb, "    <location>%s</location>\n", escape(s.SkillFilePath))
 		}
 		sb.WriteString("  </skill>\n")
 	}
 	sb.WriteString("</available_skills>")
 	return sb.String()
+}
+
+// SkillGist condenses a skill description to a single line for tiered prompt
+// injection: whitespace is collapsed and the result is truncated to
+// skillGistMax runes at a word boundary with a trailing ellipsis.
+func SkillGist(desc string) string {
+	line := strings.Join(strings.Fields(desc), " ")
+	if utf8.RuneCountInString(line) <= skillGistMax {
+		return line
+	}
+	runes := []rune(line)
+	cut := skillGistMax
+	for cut > 0 && runes[cut-1] != ' ' {
+		cut--
+	}
+	if cut == 0 {
+		cut = skillGistMax
+	}
+	return strings.TrimRight(string(runes[:cut]), " ") + "…"
 }
 
 func escape(s string) string {
