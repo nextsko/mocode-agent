@@ -106,6 +106,30 @@ func TestEditorReservesSubagentSummaryHeight(t *testing.T) {
 	}
 }
 
+func TestEditorHidesSummaryWhenSubagentsFinish(t *testing.T) {
+	t.Parallel()
+
+	u := newTestUI()
+	u.updateLayoutAndSize()
+	baseEditor := u.layout.editor.Dy()
+	baseMain := u.layout.main.Dy()
+
+	// A finished Agent tool call yields a done-only roster, which must not
+	// reserve any editor rows (the box auto-hides once nothing is running).
+	sty := styles.ThemeForProvider("")
+	tc := message.ToolCall{ID: "tc1", Name: "agent", Input: `{"prompt":"x"}`, Finished: true}
+	res := &message.ToolResult{ToolCallID: "tc1", Name: "agent", Content: "done"}
+	u.chat.SetMessages(chat.NewAgentToolMessageItem(&sty, tc, res, false))
+	u.updateLayoutAndSize()
+
+	if got := u.layout.editor.Dy(); got != baseEditor {
+		t.Fatalf("editor height = %d, want %d (finished sub-agents must hide the summary box)", got, baseEditor)
+	}
+	if got := u.layout.main.Dy(); got != baseMain {
+		t.Fatalf("chat height = %d, want %d (hidden box must give rows back)", got, baseMain)
+	}
+}
+
 func TestHandleTextareaHeightChange_FollowModeStaysAtBottom(t *testing.T) {
 	t.Parallel()
 

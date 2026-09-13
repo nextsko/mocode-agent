@@ -99,15 +99,15 @@ func (m *UI) yoloPromptFunc(info textarea.PromptInfo) string {
 }
 
 // subagentSummaryHeight returns the number of rows the sub-agent summary box
-// occupies above the editor, or 0 when no sub-agent has run. It must stay in
+// occupies above the editor, or 0 when no sub-agent is running. It must stay in
 // sync with renderEditorView so generateLayout reserves enough space and the
 // input line is never clipped.
 func (m *UI) subagentSummaryHeight() int {
 	if m.chat == nil {
 		return 0
 	}
-	running, done := m.chat.SubagentCounts()
-	if running+done == 0 {
+	running, _ := m.chat.SubagentCounts()
+	if running == 0 {
 		return 0
 	}
 	return components.SummaryHeight
@@ -118,12 +118,17 @@ func (m *UI) renderEditorView(width int) string {
 	if len(m.attachments.List()) > 0 {
 		attachmentsView = m.attachments.Render(width)
 	}
-	// Prime-agent style sub-agent summary box (only when sub-agents ran).
+	// Prime-agent style sub-agent summary box, shown only while sub-agents are
+	// still running; once they all finish the box hides and the chat reclaims
+	// the rows (see subagentSummaryHeight).
 	running, done := m.chat.SubagentCounts()
-	summaryBox := components.RenderSubagentSummary(m.com.Styles, components.SubagentCounts{
-		Running: running,
-		Done:    done,
-	}, width)
+	var summaryBox string
+	if running > 0 {
+		summaryBox = components.RenderSubagentSummary(m.com.Styles, components.SubagentCounts{
+			Running: running,
+			Done:    done,
+		}, width)
+	}
 	separator := m.com.Styles.Header.Separator.Render(strings.Repeat("─", max(0, width)))
 	parts := make([]string, 0, 5)
 	if summaryBox != "" {

@@ -42,6 +42,27 @@ func newAgentToolItem(t *testing.T, finished bool, nested int) *AgentToolMessage
 
 func countLines(s string) int { return len(strings.Split(strings.TrimRight(s, "\n"), "\n")) }
 
+// EffectiveStatus must reflect completion derived from the tool result, while
+// the raw Status stays Running because it is never updated when the result
+// arrives. The sub-agent summary box relies on EffectiveStatus to tell when
+// sub-agents have finished.
+func TestEffectiveStatusDerivesFromResult(t *testing.T) {
+	t.Parallel()
+
+	done := newAgentToolItem(t, true, 0)
+	if got := done.EffectiveStatus(); got != ToolStatusSuccess {
+		t.Fatalf("finished item EffectiveStatus = %v, want ToolStatusSuccess", got)
+	}
+	if got := done.Status(); got != ToolStatusRunning {
+		t.Fatalf("raw Status = %v, want ToolStatusRunning (this is why EffectiveStatus exists)", got)
+	}
+
+	running := newAgentToolItem(t, false, 0)
+	if got := running.EffectiveStatus(); got != ToolStatusRunning {
+		t.Fatalf("running item EffectiveStatus = %v, want ToolStatusRunning", got)
+	}
+}
+
 // A1: while running, rendering stays a fixed handful of lines no matter how
 // many nested tool calls the sub-agent already made (prime-agent summary
 // line instead of a growing tree).

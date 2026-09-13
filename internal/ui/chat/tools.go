@@ -390,6 +390,15 @@ func (t *baseToolMessageItem) Status() ToolStatus {
 	return t.status
 }
 
+// EffectiveStatus returns the status a renderer would show: like Status but
+// derives success/error from the tool result when present. Callers that care
+// about completion (e.g. the sub-agent summary box) must use this, because the
+// raw status is only ever set to Running/AwaitingPermission and is not updated
+// when a result arrives.
+func (t *baseToolMessageItem) EffectiveStatus() ToolStatus {
+	return t.computeStatus()
+}
+
 // computeStatus computes the effective status considering the result.
 func (t *baseToolMessageItem) computeStatus() ToolStatus {
 	if t.result != nil {

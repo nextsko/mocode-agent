@@ -211,7 +211,7 @@ func (m *Chat) SubagentCounts() (running, done int) {
 			continue
 		}
 		if at, ok := item.(*chat.AgentToolMessageItem); ok {
-			switch at.Status() {
+			switch at.EffectiveStatus() {
 			case chat.ToolStatusRunning, chat.ToolStatusAwaitingPermission:
 				running++
 			case chat.ToolStatusSuccess, chat.ToolStatusError, chat.ToolStatusCanceled:
