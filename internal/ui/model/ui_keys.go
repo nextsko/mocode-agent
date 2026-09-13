@@ -7,8 +7,8 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/core/shellruntime/shell"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/completions"
 	"github.com/nextsko/mocode-agent/internal/ui/dialog"
 	"github.com/nextsko/mocode-agent/internal/ui/util"
@@ -200,6 +200,45 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 			case key.Matches(msg, m.keyMap.Editor.Cut):
 				if cmd := m.cutEditorText(); cmd != nil {
 					cmds = append(cmds, cmd)
+				}
+
+			// ── send-mode triad (when the agent is busy) ────────────────────
+			// enter: queue (default path below) · ctrl+enter: inject mid-turn
+			// guidance · alt+enter: force (interrupt + jump the queue).
+			case msg.String() == "ctrl+enter" || msg.String() == "alt+enter":
+				prevHeight := m.textarea.Height()
+				value := strings.TrimSpace(m.textarea.Value())
+				attachments := m.attachments.List()
+				if len(value) == 0 && !message.ContainsTextAttachment(attachments) {
+					break
+				}
+				m.textarea.Reset()
+				m.attachments.Reset()
+				m.editorAllSelected = false
+				if cmd := m.handleTextareaHeightChange(prevHeight); cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+				m.randomizePlaceholders()
+				m.historyReset()
+
+				if !m.hasSession() || !m.isAgentBusy() {
+					// Idle: all modes reduce to a plain send.
+					return tea.Batch(m.sendMessage(value, attachments...), m.loadPromptHistory())
+				}
+				sessionID := m.session.ID
+				force := msg.String() == "alt+enter"
+				return func() tea.Msg {
+					ctx := context.Background()
+					if force {
+						if err := m.com.Workspace.AgentForceRun(ctx, sessionID, value, attachments...); err != nil {
+							return util.InfoMsg{Type: util.InfoTypeError, Msg: err.Error()}
+						}
+						return util.InfoMsg{Type: util.InfoTypeSuccess, Msg: "Force-sent: interrupted the running turn and started your message."}
+					}
+					if err := m.com.Workspace.AgentInjectGuidance(ctx, sessionID, value); err != nil {
+						return util.InfoMsg{Type: util.InfoTypeError, Msg: err.Error()}
+					}
+					return util.InfoMsg{Type: util.InfoTypeSuccess, Msg: "Guidance injected into the running conversation."}
 				}
 
 			case key.Matches(msg, m.keyMap.Editor.SendMessage):

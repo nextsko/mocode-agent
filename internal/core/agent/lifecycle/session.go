@@ -83,6 +83,12 @@ type SessionAgent interface {
 	Model() Model
 	// SmallModel returns the configured small model (cheap auxiliary calls).
 	SmallModel() Model
+	// Inject adds mid-turn user guidance to the RUNNING turn: persisted as a
+	// user message and surfaced to the model at its next step.
+	Inject(ctx context.Context, sessionID, text string) error
+	// ForceRun preempts the session: the call jumps the queue and the running
+	// turn is interrupted (dispatch continues into the forced call).
+	ForceRun(ctx context.Context, call SessionAgentCall) (*fantasy.AgentResult, error)
 }
 
 type Model struct {
@@ -111,7 +117,11 @@ type sessionAgent struct {
 	compressor     *ctxcompress.Pipeline
 
 	messageQueue   *csync.Map[string, []SessionAgentCall]
-	activeRequests *csync.Map[string, context.CancelFunc]
+	activeRequests *csync.Map[string, context.CancelCauseFunc]
+	// injected buffers per-session user guidance for the RUNNING turn:
+	// drained by prepareStep and surfaced as <user_guidance> system messages
+	// so the model sees mid-turn steering without a new queued turn.
+	injected *csync.Map[string, []string]
 
 	// runMu guards busy-entry and queue transitions in the Run dispatcher
 	// loop. It is only held across map operations — never across model/IO
@@ -157,7 +167,8 @@ func NewSessionAgent(
 		errorCollector:       opts.ErrorCollector,
 		compressor:           ctxcompress.NewPipeline(ctxcompress.DefaultPolicy()),
 		messageQueue:         csync.NewMap[string, []SessionAgentCall](),
-		activeRequests:       csync.NewMap[string, context.CancelFunc](),
+		activeRequests:       csync.NewMap[string, context.CancelCauseFunc](),
+		injected:             csync.NewMap[string, []string](),
 	}
 }
 

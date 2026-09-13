@@ -15,12 +15,12 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/question"
+	mcptools "github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
 	"github.com/nextsko/mocode-agent/internal/domain/history"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/slash"
-	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
-	mcptools "github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 )
 
 // LSPClientInfo holds information about an LSP client's state. This is
@@ -93,6 +93,11 @@ type Workspace interface {
 
 	// Agent
 	AgentRun(ctx context.Context, sessionID, prompt string, attachments ...message.Attachment) error
+	// AgentInjectGuidance steers the RUNNING turn without queuing a new one.
+	AgentInjectGuidance(ctx context.Context, sessionID, text string) error
+	// AgentForceRun preempts the session: interrupts the running turn and
+	// executes the prompt immediately (jumps the queue).
+	AgentForceRun(ctx context.Context, sessionID, prompt string, attachments ...message.Attachment) error
 	AgentCancel(sessionID string)
 	// AgentCancelSubagent stops a single sub-agent dispatched by the
 	// Agent tool. subagentID is the user-visible identifier reported

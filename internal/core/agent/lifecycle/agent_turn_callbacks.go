@@ -83,6 +83,15 @@ func (a *sessionAgent) prepareStep(ts *turnState) func(callContext context.Conte
 			prepared.Messages = append([]fantasy.Message{fantasy.NewSystemMessage(ts.promptPrefix)}, prepared.Messages...)
 		}
 
+		// Mid-turn user guidance (Inject): drain the session buffer and
+		// surface each text as a <user_guidance> system message so the model
+		// steers immediately. The texts were already persisted as user
+		// messages, so history stays complete for later turns.
+		for _, guidance := range a.drainInjected(ts.call.SessionID) {
+			gm := fantasy.NewSystemMessage("<user_guidance>\n" + guidance + "\n</user_guidance>")
+			prepared.Messages = append([]fantasy.Message{gm}, prepared.Messages...)
+		}
+
 		// Todo nudge: surface open todos at each model step so the agent is
 		// reminded to finish pending/in-progress items before declaring done.
 		// Re-fetch the session for fresh todo state (the todos tool may have

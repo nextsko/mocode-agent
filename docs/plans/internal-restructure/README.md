@@ -56,13 +56,14 @@
 | R4c | **background.go 域拆分**：一次 `git checkout --` 误操作把未提交的增强打回原版；凭会话记录按四域完整重建并原计划拆分——`background_buffer.go` 142（head-tail+overflow）/`background_job.go` 369（类型+方法）/`background_manager.go` 322（单例+Start/Kill/持久化/epoch）/`background_notify.go` 102（通知/promote/sanitize/开关）。此前全部增强测试一次通过，复原完整性由测试证明。**教训入库：会话内改动应及时分批 commit，任何 checkout 前先 `git status` 确认** |
 | R4d | **四主题分批 commit**（bg-jobs/subagent-ui/ask-user/restructure，工作入版本保护）；上帝文件批次：`ui_dialogs` 892→231+471（actions）+206（openers）、`chat` 872→500+205（scroll）+180（msgs）、`app` 853→658+207（store services）。quickstyle 三次脚本尝试后判定为**声明式样式表**（上游 crush 同为 1051 行单文件），拆分收益低于风险，维持同构不拆 |
 | R4e | `plugins/*common` → `common/{gitea,gitops,net,search,ssh}`（共享库命名正名，21 处引用重写）；`wechat/bot` 746→405+353（media 域）、`diffview` 726→643+85（builders 域）、`question_form` 719→383+345（draw 域）；`handleDialogAction` 471 判定为宽浅路由表（40+ case 平均 10 行）记档不拆 |
+| R4f | **agent 根分包落地**：sessionAgent 全家（14 文件：session/run/queue/control/model/convert/prompt/turn_callbacks/callbacks/event/errors + 5 测试）迁 `core/agent/lifecycle/`；根包保留 API 面——type alias + `NewSessionAgent`/`Err*` 转发，**全部调用方零改动**；agent 根现只剩编排域（coordinator×7）与工具域（agent_tool/agentic_fetch/agent_tool_context），平铺 22→12 文件 |
 
 验证：全仓 build/vet/test 绿。R4b 教训：switch 内提取必须保留 case 标签转发（裸 if 插入会静默丢失事件路由，测试当场抓出）。
 
 验证：全仓 build/vet/test 绿。工具沉淀：`scripts/gosplit.ps1`（切块函数，需同进程 dot-source）。
 
 ## R4 剩余蓝图（按序）
-1. `agent` 根 lifecycle/coordinator 完全分包（接口重构破私有互访）——最后的大项
+1. ~~agent 根完全分包~~（R4f 完成 lifecycle 域；coordinator 域可同法后续分包——alias 面已验证）
 2. 残余 >350（收益递减区，按需）：quickstyle 964（已判定不拆）、ui.go 718、config.go 691、permissions.go 690、admin/server 677、wechat/channel 677、question_choice_base 668、app.go 658、diffview 643
 
 ## 相关

@@ -68,7 +68,7 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 
 	var (
 		genCtx      context.Context
-		cancelTurn  context.CancelFunc
+		cancelTurn  context.CancelCauseFunc
 		busyOwned   bool
 		current     = call
 		haveCurrent = true
@@ -83,7 +83,7 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 			a.runMu.Lock()
 			a.activeRequests.Del(sessionID)
 			if cancelTurn != nil {
-				cancelTurn()
+				cancelTurn(nil)
 			}
 			a.runMu.Unlock()
 		}
@@ -93,7 +93,7 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 		a.runMu.Lock()
 		a.activeRequests.Del(sessionID)
 		if cancelTurn != nil {
-			cancelTurn()
+			cancelTurn(nil)
 		}
 		a.runMu.Unlock()
 		busyOwned = false
@@ -126,7 +126,7 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 				next, hasNext := a.popQueueLocked(sessionID)
 				if !hasNext {
 					a.activeRequests.Del(sessionID)
-					cancelTurn()
+					cancelTurn(nil)
 					a.runMu.Unlock()
 					break
 				}
@@ -161,6 +161,29 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 			// Preserve existing semantics: a failed turn (including user
 			// cancel) returns immediately; queued prompts survive for the
 			// next dispatch and RunAfterAgent does not fire.
+			// EXCEPTION — force kick: a ForceRun interrupted this turn and
+			// its call already sits at the queue head; continue dispatching
+			// instead of stopping the session.
+			if forceKicked(genCtx, outcome.err) {
+				a.runMu.Lock()
+				a.activeRequests.Del(sessionID)
+				cancelTurn(nil)
+				next, hasNext := a.popQueueLocked(sessionID)
+				if hasNext {
+					var ok bool
+					genCtx, cancelTurn, ok = a.beginTurnLocked(sessionID, runCtx)
+					if ok {
+						current = next
+						a.runMu.Unlock()
+						continue
+					}
+					// Lost the race (defensive): keep FIFO by pushing back.
+					a.pushFrontQueueLocked(sessionID, next)
+				}
+				a.runMu.Unlock()
+				busyOwned = false
+				break
+			}
 			releaseBusy()
 			return outcome.result, outcome.err
 
@@ -187,7 +210,7 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 		// can neither lose its enqueue nor steal the dispatch.
 		a.runMu.Lock()
 		a.activeRequests.Del(sessionID)
-		cancelTurn()
+		cancelTurn(nil)
 		next, hasNext := a.popQueueLocked(sessionID)
 		if !hasNext {
 			a.runMu.Unlock()
@@ -216,11 +239,11 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 // beginTurnLocked marks the session busy by registering a fresh cancel
 // function in activeRequests. It must be called with a.runMu held and
 // returns ok=false when another turn already owns the session.
-func (a *sessionAgent) beginTurnLocked(sessionID string, ctx context.Context) (context.Context, context.CancelFunc, bool) {
+func (a *sessionAgent) beginTurnLocked(sessionID string, ctx context.Context) (context.Context, context.CancelCauseFunc, bool) {
 	if _, busy := a.activeRequests.Get(sessionID); busy {
 		return nil, nil, false
 	}
-	genCtx, cancel := context.WithCancel(ctx)
+	genCtx, cancel := context.WithCancelCause(ctx)
 	a.activeRequests.Set(sessionID, cancel)
 	return genCtx, cancel, true
 }
@@ -508,10 +531,10 @@ func (a *sessionAgent) Summarize(ctx context.Context, sessionID string, opts fan
 
 	aiMsgs, _ := a.preparePrompt(msgs, true)
 
-	genCtx, cancel := context.WithCancel(ctx)
+	genCtx, cancel := context.WithCancelCause(ctx)
 	a.activeRequests.Set(sessionID, cancel)
 	defer a.activeRequests.Del(sessionID)
-	defer cancel()
+	defer cancel(nil)
 
 	agent := fantasy.NewAgent(
 		largeModel.Model,

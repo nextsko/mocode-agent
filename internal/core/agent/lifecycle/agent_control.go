@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"context"
 	"log/slog"
 	"time"
 )
@@ -14,7 +15,7 @@ func (a *sessionAgent) Cancel(sessionID string) {
 	// each turn, on error returns, and via its panic safety net.
 	if cancel, ok := a.activeRequests.Get(sessionID); ok && cancel != nil {
 		slog.Debug("Request cancellation initiated", "session_id", sessionID)
-		cancel()
+		cancel(context.Canceled)
 	}
 
 	// Cancel also clears the queue: the running dispatcher pops an empty

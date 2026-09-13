@@ -8,10 +8,34 @@ import (
 
 	"charm.land/fantasy"
 	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
 
 func (c *coordinator) Cancel(sessionID string) {
 	c.currentAgent.Cancel(sessionID)
+}
+
+// InjectGuidance implements Coordinator: mid-turn steering for the RUNNING
+// turn of the session's current agent.
+func (c *coordinator) InjectGuidance(ctx context.Context, sessionID, text string) error {
+	if err := c.readyWg.Wait(); err != nil {
+		return err
+	}
+	return c.currentAgent.Inject(ctx, sessionID, text)
+}
+
+// ForceRun implements Coordinator: preempt the session with prompt jumping
+// the queue head. The interrupted turn hands dispatch straight to it.
+func (c *coordinator) ForceRun(ctx context.Context, sessionID, prompt string, attachments ...message.Attachment) error {
+	if err := c.readyWg.Wait(); err != nil {
+		return err
+	}
+	_, err := c.currentAgent.ForceRun(ctx, SessionAgentCall{
+		SessionID:   sessionID,
+		Prompt:      prompt,
+		Attachments: attachments,
+	})
+	return err
 }
 
 // CancelSubagent stops a single sub-agent dispatched by the Agent tool,

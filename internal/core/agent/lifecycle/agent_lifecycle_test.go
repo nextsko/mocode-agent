@@ -345,7 +345,8 @@ func newLifecycleTestAgent(t *testing.T, large, small fantasy.LanguageModel, age
 		messages:           messages,
 		compressor:         ctxcompress.NewPipeline(ctxcompress.DefaultPolicy()),
 		messageQueue:       csync.NewMap[string, []SessionAgentCall](),
-		activeRequests:     csync.NewMap[string, context.CancelFunc](),
+		activeRequests:     csync.NewMap[string, context.CancelCauseFunc](),
+		injected:           csync.NewMap[string, []string](),
 		callbacks:          callbacks,
 	}
 	return sa, sessions, messages

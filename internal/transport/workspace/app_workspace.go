@@ -14,12 +14,12 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/question"
+	mcptools "github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
 	"github.com/nextsko/mocode-agent/internal/domain/history"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/slash"
-	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
-	mcptools "github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 )
 
 // AppWorkspace implements the Workspace interface by delegating
@@ -140,6 +140,20 @@ func (w *AppWorkspace) AgentCancel(sessionID string) {
 	if w.app.AgentCoordinator != nil {
 		w.app.AgentCoordinator.Cancel(sessionID)
 	}
+}
+
+func (w *AppWorkspace) AgentInjectGuidance(ctx context.Context, sessionID, text string) error {
+	if w.app.AgentCoordinator == nil {
+		return errors.New("agent coordinator not initialized")
+	}
+	return w.app.AgentCoordinator.InjectGuidance(ctx, sessionID, text)
+}
+
+func (w *AppWorkspace) AgentForceRun(ctx context.Context, sessionID, prompt string, attachments ...message.Attachment) error {
+	if w.app.AgentCoordinator == nil {
+		return errors.New("agent coordinator not initialized")
+	}
+	return w.app.AgentCoordinator.ForceRun(ctx, sessionID, prompt, attachments...)
 }
 
 func (w *AppWorkspace) AgentCancelSubagent(subagentID string) {

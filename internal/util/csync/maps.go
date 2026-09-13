@@ -98,6 +98,21 @@ func (m *Map[K, V]) Take(key K) (V, bool) {
 	return v, ok
 }
 
+// Update atomically read-modify-writes the value at key. The fn receives the
+// current value and whether it existed; its return replaces the value (and
+// existence) — returning (zero, false) deletes the key.
+func (m *Map[K, V]) Update(key K, fn func(prev V, ok bool) (V, bool)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	v, ok := m.inner[key]
+	nv, keep := fn(v, ok)
+	if keep {
+		m.inner[key] = nv
+	} else {
+		delete(m.inner, key)
+	}
+}
+
 // Copy returns a copy of the inner map.
 func (m *Map[K, V]) Copy() map[K]V {
 	m.mu.RLock()

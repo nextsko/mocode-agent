@@ -69,6 +69,13 @@ type Coordinator interface {
 	SetMessenger(m messenger.Messenger)
 	Run(ctx context.Context, sessionID, prompt string, attachments ...message.Attachment) (*fantasy.AgentResult, error)
 	Cancel(sessionID string)
+	// InjectGuidance adds mid-turn user guidance to the RUNNING turn of the
+	// session: persisted as a user message and surfaced to the model at its
+	// next step (steering without a new queued turn).
+	InjectGuidance(ctx context.Context, sessionID, text string) error
+	// ForceRun preempts the session: the prompt jumps the queue head and the
+	// running turn is interrupted so dispatch continues into it immediately.
+	ForceRun(ctx context.Context, sessionID, prompt string, attachments ...message.Attachment) error
 	// CancelSubagent stops a single sub-agent dispatched by the Agent
 	// tool without cancelling the parent session. subagentID is the
 	// user-visible identifier (params.AgentID), e.g. "<parentToolCallID>-1".
