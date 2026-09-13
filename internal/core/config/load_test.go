@@ -543,6 +543,24 @@ func TestConfigSetupAgentsFiltersUnavailableSubAgents(t *testing.T) {
 	require.NotContains(t, searcherAgent.SubAgents, "searcher")
 }
 
+func TestDefaultModesIncludeSpecialistRoles(t *testing.T) {
+	cfg := &Config{Options: &Options{}}
+	cfg.SetupAgents()
+
+	roles := []string{"architect", "frontend", "backend", "designer", "qa", "ai-engineer"}
+	for _, id := range roles {
+		agent, ok := cfg.Agents[id]
+		require.True(t, ok, "specialist role %q should be configured", id)
+		require.NotEmpty(t, agent.Name, "role %q should have a display name", id)
+		require.NotEmpty(t, agent.Description, "role %q should have a description", id)
+		require.NotEmpty(t, agent.SystemPrompt, "role %q should have a prompt", id)
+		for _, sub := range agent.SubAgents {
+			_, exists := cfg.Agents[sub]
+			require.True(t, exists, "role %q sub-agent %q should resolve", id, sub)
+		}
+	}
+}
+
 func TestConfig_configureProvidersWithDisabledProvider(t *testing.T) {
 	knownProviders := []catwalk.Provider{
 		{
