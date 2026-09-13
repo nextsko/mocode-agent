@@ -61,7 +61,7 @@ description: >-
 
 ### 5. Performance（性能）
 
-细节见 `performance-optimization`。
+细节见下方性能检查项。
 
 - 是否有 N+1 query？
 - 是否有无界循环或无约束的数据拉取？
@@ -191,4 +191,4 @@ Model A 写代码 → Model B 评审 correctness 与 architecture → A 处理�
 - `verification-before-completion`：完成声明前必须提供新鲜证据。
 - `systematic-debugging`：bug / 测试失败的根因调查。
 - `test-driven-development`：为修复与回归写失败测试。
-- `security-and-hardening`、`performance-optimization`：安全与性能的深入检查。
+- `security-and-hardening`：安全加固；性能审查见本文件的性能轴。

@@ -35,7 +35,7 @@ Implement ──→ Test ──→ Verify ──→ Commit ──→ Next slice
 1. **Implement**：实现最小的完整功能块
 2. **Test**：运行测试套件（无测试则先写一个）
 3. **Verify**：确认 slice 按预期工作——测试通过、build 成功、必要时手动检查
-4. **Commit**：用描述性 message 保存进度（原子提交见 `git-workflow-and-versioning`）
+4. **Commit**：每个切片一个可回退的原子提交，message 说明「为什么」而非「做了什么」
 5. **Next slice**：向前推进，不要推倒重来
 
 ## 切片策略
