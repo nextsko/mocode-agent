@@ -25,12 +25,14 @@ plans/
 │   └── 03-context-isolation-plan.md
 ├── tool-call-arguments/               # 部分 provider 报 tool_calls.function.arguments is required
 │   └── 01-empty-arguments-bad-request.md
-└── summary-async/                     # /summary slash 命令同步阻塞 TUI 根因与异步化方案
-    ├── 01-sync-blocking-root-cause.md
-    ├── 02-async-fix-options.md
-    ├── 03-implementation-plan.md
-    ├── 04-pubsub-integration.md
-    └── 05-testing-matrix.md
+├── summary-async/                     # /summary slash 命令同步阻塞 TUI 根因与异步化方案
+│   ├── 01-sync-blocking-root-cause.md
+│   ├── 02-async-fix-options.md
+│   ├── 03-implementation-plan.md
+│   ├── 04-pubsub-integration.md
+│   └── 05-testing-matrix.md
+└── shell-parity/                      # bash 工具跨平台命令补齐（head/grep 等在 Windows 缺失）
+    └── README.md
 ```
 
 ## 子目录说明
@@ -76,6 +78,14 @@ Step 3.7 Flash 等严格 OpenAI 兼容 provider 在第二轮请求时把 `tool_c
 | 03-implementation-plan.md | M0–M5 拆 PR：设计澄清 → API 暴露 → pubsub → UI 切换 → 测试 → 文档 |
 | 04-pubsub-integration.md | 接入 app.events 总线：SummaryCompletedMsg 类型 + setupSubscriber 范式 + session 级隔离未来改进 |
 | 05-testing-matrix.md | 单元 + 集成 + UI + 端到端手动测试矩阵；含 V1-V4 端到端验证步骤 |
+
+### shell-parity/
+
+bash 工具在 Windows 上缺失 `head`/`grep`/`sed` 等 Unix 文本工具（mvdan/sh 的 Go coreutils 覆盖不全）导致反复失败。分三层改进：L1 修正误导性注释、L2 失败时返回「改用专用工具」的路由提示、L3 计划以 Go 中间件补齐纯流式命令。
+
+| 文件 | 主题 |
+|------|------|
+| README.md | 根因（coreutils 覆盖集）、命令「实现 vs 路由」分界线、L3 分阶段计划与语义坑（早退/EPIPE、CRLF、字节 vs 字符）|
 
 ## 添加新计划时的规范
 

@@ -66,3 +66,4 @@
 | plans/summary-async/03 | [plans/summary-async/03-implementation-plan.md](plans/summary-async/03-implementation-plan.md) | M0–M5 PR 拆解：设计澄清 → API → pubsub → UI → 测试 → 文档 |
 | plans/summary-async/04 | [plans/summary-async/04-pubsub-integration.md](plans/summary-async/04-pubsub-integration.md) | 接入 app.events 总线：SummaryCompletedMsg + setupSubscriber 范式 |
 | plans/summary-async/05 | [plans/summary-async/05-testing-matrix.md](plans/summary-async/05-testing-matrix.md) | 单元/集成/UI/端到端测试矩阵 + V1–V4 手动验证步骤 |
+| plans/shell-parity | [plans/shell-parity/README.md](plans/shell-parity/README.md) | bash 工具跨平台命令补齐（L1 注释修正 / L2 路由提示 / L3 流式工具实现计划）|
