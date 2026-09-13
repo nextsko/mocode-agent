@@ -15,7 +15,6 @@ import (
 	"github.com/nextsko/mocode-agent/internal/ui/chat"
 	"github.com/nextsko/mocode-agent/internal/ui/common"
 	"github.com/nextsko/mocode-agent/internal/ui/list"
-	"github.com/nextsko/mocode-agent/internal/util/anim"
 )
 
 // Constants for multi-click detection.
@@ -26,6 +25,7 @@ const (
 
 // DelayedClickMsg is sent after the double-click threshold to trigger a
 // single-click action (like expansion) if no double-click occurred.
+
 type DelayedClickMsg struct {
 	ClickID int
 	ItemIdx int
@@ -38,6 +38,7 @@ type mouseDoubleClickable interface {
 
 // Chat represents the chat UI model that handles chat interactions and
 // messages.
+
 type Chat struct {
 	com      *common.Common
 	list     *list.List
@@ -73,6 +74,7 @@ type Chat struct {
 
 // NewChat creates a new instance of [Chat] that handles chat interactions and
 // messages.
+
 func NewChat(com *common.Common) *Chat {
 	c := &Chat{
 		com:              com,
@@ -93,12 +95,14 @@ func NewChat(com *common.Common) *Chat {
 }
 
 // Height returns the height of the chat view port.
+
 func (m *Chat) Height() int {
 	return m.list.Height()
 }
 
 // Draw renders the chat UI component to the screen and the given area.
 // Content and scrollbar are rendered separately to avoid conflicts with text selection/copy.
+
 func (m *Chat) Draw(scr uv.Screen, area uv.Rectangle) {
 	// Check if scrollbar should be shown
 	scrollbar := m.list.RenderScrollbar()
@@ -140,6 +144,7 @@ func (m *Chat) Draw(scr uv.Screen, area uv.Rectangle) {
 
 // SetSize sets the size of the chat view port.
 // Reserves 1 column for scrollbar if content overflows.
+
 func (m *Chat) SetSize(width, height int) {
 	// Set list size to full width/height (scrollbar is rendered separately)
 	m.list.SetSize(width, height)
@@ -150,12 +155,14 @@ func (m *Chat) SetSize(width, height int) {
 }
 
 // Len returns the number of items in the chat list.
+
 func (m *Chat) Len() int {
 	return m.list.Len()
 }
 
 // InvalidateRenderCaches drops cached rendered output on every message
 // item so the next draw re-renders with the current styles.
+
 func (m *Chat) InvalidateRenderCaches() {
 	items := make([]chat.MessageItem, 0, m.list.Len())
 	for i := range m.list.Len() {
@@ -167,407 +174,19 @@ func (m *Chat) InvalidateRenderCaches() {
 }
 
 // SetMessages sets the chat messages to the provided list of message items.
-func (m *Chat) SetMessages(msgs ...chat.MessageItem) {
-	m.idInxMap = make(map[string]int)
-	m.pausedAnimations = make(map[string]struct{})
 
-	items := make([]list.Item, len(msgs))
-	for i, msg := range msgs {
-		m.idInxMap[msg.ID()] = i
-		// Register nested tool IDs for tools that contain nested tools.
-		if container, ok := msg.(chat.NestedToolContainer); ok {
-			for _, nested := range container.NestedTools() {
-				m.idInxMap[nested.ID()] = i
-			}
-		}
-		items[i] = msg
-	}
-	m.list.SetItems(items...)
-	m.ScrollToBottom()
-}
-
-// AppendMessages appends a new message item to the chat list.
-// If in follow mode or currently at the bottom, it will auto-scroll to show the new messages.
-func (m *Chat) AppendMessages(msgs ...chat.MessageItem) {
-	// Check if we should auto-scroll before appending
-	shouldAutoScroll := m.follow || m.AtBottom()
-
-	items := make([]list.Item, len(msgs))
-	indexOffset := m.list.Len()
-	for i, msg := range msgs {
-		m.idInxMap[msg.ID()] = indexOffset + i
-		// Register nested tool IDs for tools that contain nested tools.
-		if container, ok := msg.(chat.NestedToolContainer); ok {
-			for _, nested := range container.NestedTools() {
-				m.idInxMap[nested.ID()] = indexOffset + i
-			}
-		}
-		items[i] = msg
-	}
-	m.list.AppendItems(items...)
-
-	// Auto-scroll to bottom if in follow mode or was at bottom
-	if shouldAutoScroll {
-		m.ScrollToBottom()
-	}
-}
-
-// UpdateNestedToolIDs updates the ID map for nested tools within a container.
-// Call this after modifying nested tools to ensure animations work correctly.
-func (m *Chat) UpdateNestedToolIDs(containerID string) {
-	idx, ok := m.idInxMap[containerID]
-	if !ok {
-		return
-	}
-
-	item, ok := m.list.ItemAt(idx).(chat.MessageItem)
-	if !ok {
-		return
-	}
-
-	container, ok := item.(chat.NestedToolContainer)
-	if !ok {
-		return
-	}
-
-	// Register all nested tool IDs to point to the container's index.
-	for _, nested := range container.NestedTools() {
-		m.idInxMap[nested.ID()] = idx
-	}
-}
-
-// Animate animates items in the chat list. Only propagates animation messages
-// to visible items to save CPU. When items are not visible, their animation ID
-// is tracked so it can be restarted when they become visible again.
-func (m *Chat) Animate(msg anim.StepMsg) tea.Cmd {
-	idx, ok := m.idInxMap[msg.ID]
-	if !ok {
-		return nil
-	}
-
-	animatable, ok := m.list.ItemAt(idx).(chat.Animatable)
-	if !ok {
-		return nil
-	}
-
-	// Check if item is currently visible.
-	startIdx, endIdx := m.list.VisibleItemIndices()
-	isVisible := idx >= startIdx && idx <= endIdx
-
-	if !isVisible {
-		// Item not visible - pause animation by not propagating.
-		// Track it so we can restart when it becomes visible.
-		m.pausedAnimations[msg.ID] = struct{}{}
-		return nil
-	}
-
-	// Item is visible - remove from paused set and animate.
-	delete(m.pausedAnimations, msg.ID)
-	return animatable.Animate(msg)
-}
-
-// RestartPausedVisibleAnimations restarts animations for items that were paused
-// due to being scrolled out of view but are now visible again.
-func (m *Chat) RestartPausedVisibleAnimations() tea.Cmd {
-	if len(m.pausedAnimations) == 0 {
-		return nil
-	}
-
-	startIdx, endIdx := m.list.VisibleItemIndices()
-	var cmds []tea.Cmd
-
-	for id := range m.pausedAnimations {
-		idx, ok := m.idInxMap[id]
-		if !ok {
-			// Item no longer exists.
-			delete(m.pausedAnimations, id)
-			continue
-		}
-
-		if idx >= startIdx && idx <= endIdx {
-			// Item is now visible - restart its animation.
-			if animatable, ok := m.list.ItemAt(idx).(chat.Animatable); ok {
-				if cmd := animatable.StartAnimation(); cmd != nil {
-					cmds = append(cmds, cmd)
-				}
-			}
-			delete(m.pausedAnimations, id)
-		}
-	}
-
-	if len(cmds) == 0 {
-		return nil
-	}
-	return tea.Batch(cmds...)
-}
-
-// Focus sets the focus state of the chat component.
 func (m *Chat) Focus() {
 	m.list.Focus()
 }
 
 // Blur removes the focus state from the chat component.
+
 func (m *Chat) Blur() {
 	m.list.Blur()
 }
 
 // AtBottom returns whether the chat list is currently scrolled to the bottom.
-func (m *Chat) AtBottom() bool {
-	return m.list.AtBottom()
-}
 
-// Follow returns whether the chat view is in follow mode (auto-scroll to
-// bottom on new messages).
-func (m *Chat) Follow() bool {
-	return m.follow
-}
-
-// ScrollToBottom scrolls the chat view to the bottom.
-func (m *Chat) ScrollToBottom() {
-	m.list.ScrollToBottom()
-	m.follow = true // Enable follow mode when user scrolls to bottom
-}
-
-// ScrollToTop scrolls the chat view to the top.
-func (m *Chat) ScrollToTop() {
-	m.list.ScrollToTop()
-	m.follow = false // Disable follow mode when user scrolls up
-}
-
-// ScrollBy scrolls the chat view by the given number of line deltas.
-func (m *Chat) ScrollBy(lines int) {
-	m.list.ScrollBy(lines)
-	m.follow = lines > 0 && m.AtBottom() // Disable follow mode if user scrolls up
-}
-
-// ScrollToSelected scrolls the chat view to the selected item.
-func (m *Chat) ScrollToSelected() {
-	m.list.ScrollToSelected()
-	m.follow = m.AtBottom() // Disable follow mode if user scrolls up
-}
-
-// ScrollToIndex scrolls the chat view to the item at the given index.
-func (m *Chat) ScrollToIndex(index int) {
-	m.list.ScrollToIndex(index)
-	m.follow = m.AtBottom() // Disable follow mode if user scrolls up
-}
-
-// ScrollToTopAndAnimate scrolls the chat view to the top and returns a command to restart
-// any paused animations that are now visible.
-func (m *Chat) ScrollToTopAndAnimate() tea.Cmd {
-	m.ScrollToTop()
-	return m.RestartPausedVisibleAnimations()
-}
-
-// ScrollToBottomAndAnimate scrolls the chat view to the bottom and returns a command to
-// restart any paused animations that are now visible.
-func (m *Chat) ScrollToBottomAndAnimate() tea.Cmd {
-	m.ScrollToBottom()
-	return m.RestartPausedVisibleAnimations()
-}
-
-// ScrollByAndAnimate scrolls the chat view by the given number of line deltas and returns
-// a command to restart any paused animations that are now visible.
-func (m *Chat) ScrollByAndAnimate(lines int) tea.Cmd {
-	m.ScrollBy(lines)
-	return m.RestartPausedVisibleAnimations()
-}
-
-// ScrollToSelectedAndAnimate scrolls the chat view to the selected item and returns a
-// command to restart any paused animations that are now visible.
-func (m *Chat) ScrollToSelectedAndAnimate() tea.Cmd {
-	m.ScrollToSelected()
-	return m.RestartPausedVisibleAnimations()
-}
-
-// SelectedItemInView returns whether the selected item is currently in view.
-func (m *Chat) SelectedItemInView() bool {
-	return m.list.SelectedItemInView()
-}
-
-func (m *Chat) isSelectable(index int) bool {
-	item := m.list.ItemAt(index)
-	if item == nil {
-		return false
-	}
-	_, ok := item.(list.Focusable)
-	return ok
-}
-
-// SetSelected sets the selected message index in the chat list.
-func (m *Chat) SetSelected(index int) {
-	m.list.SetSelected(index)
-	if index < 0 || index >= m.list.Len() {
-		return
-	}
-	for {
-		if m.isSelectable(m.list.Selected()) {
-			return
-		}
-		if m.list.SelectNext() {
-			continue
-		}
-		// If we're at the end and the last item isn't selectable, walk backwards
-		// to find the nearest selectable item.
-		for {
-			if !m.list.SelectPrev() {
-				return
-			}
-			if m.isSelectable(m.list.Selected()) {
-				return
-			}
-		}
-	}
-}
-
-// SelectPrev selects the previous message in the chat list.
-func (m *Chat) SelectPrev() {
-	for {
-		if !m.list.SelectPrev() {
-			return
-		}
-		if m.isSelectable(m.list.Selected()) {
-			return
-		}
-	}
-}
-
-// SelectNext selects the next message in the chat list.
-func (m *Chat) SelectNext() {
-	for {
-		if !m.list.SelectNext() {
-			return
-		}
-		if m.isSelectable(m.list.Selected()) {
-			return
-		}
-	}
-}
-
-// SelectFirst selects the first message in the chat list.
-func (m *Chat) SelectFirst() {
-	if !m.list.SelectFirst() {
-		return
-	}
-	if m.isSelectable(m.list.Selected()) {
-		return
-	}
-	for {
-		if !m.list.SelectNext() {
-			return
-		}
-		if m.isSelectable(m.list.Selected()) {
-			return
-		}
-	}
-}
-
-// SelectLast selects the last message in the chat list.
-func (m *Chat) SelectLast() {
-	if !m.list.SelectLast() {
-		return
-	}
-	if m.isSelectable(m.list.Selected()) {
-		return
-	}
-	for {
-		if !m.list.SelectPrev() {
-			return
-		}
-		if m.isSelectable(m.list.Selected()) {
-			return
-		}
-	}
-}
-
-// SelectFirstInView selects the first message currently in view.
-func (m *Chat) SelectFirstInView() {
-	startIdx, endIdx := m.list.VisibleItemIndices()
-	for i := startIdx; i <= endIdx; i++ {
-		if m.isSelectable(i) {
-			m.list.SetSelected(i)
-			return
-		}
-	}
-}
-
-// SelectLastInView selects the last message currently in view.
-func (m *Chat) SelectLastInView() {
-	startIdx, endIdx := m.list.VisibleItemIndices()
-	for i := endIdx; i >= startIdx; i-- {
-		if m.isSelectable(i) {
-			m.list.SetSelected(i)
-			return
-		}
-	}
-}
-
-// ClearMessages removes all messages from the chat list.
-func (m *Chat) ClearMessages() {
-	m.idInxMap = make(map[string]int)
-	m.pausedAnimations = make(map[string]struct{})
-	m.list.SetItems()
-	m.ClearMouse()
-}
-
-// RemoveMessage removes a message from the chat list by its ID.
-func (m *Chat) RemoveMessage(id string) {
-	idx, ok := m.idInxMap[id]
-	if !ok {
-		return
-	}
-
-	// Remove from list
-	m.list.RemoveItem(idx)
-
-	// Remove from index map
-	delete(m.idInxMap, id)
-
-	// Rebuild index map for all items after the removed one
-	for i := idx; i < m.list.Len(); i++ {
-		if item, ok := m.list.ItemAt(i).(chat.MessageItem); ok {
-			m.idInxMap[item.ID()] = i
-		}
-	}
-
-	// Clean up any paused animations for this message
-	delete(m.pausedAnimations, id)
-}
-
-// MessageItem returns the message item with the given ID, or nil if not found.
-func (m *Chat) MessageItem(id string) chat.MessageItem {
-	idx, ok := m.idInxMap[id]
-	if !ok {
-		return nil
-	}
-	item, ok := m.list.ItemAt(idx).(chat.MessageItem)
-	if !ok {
-		return nil
-	}
-	return item
-}
-
-// CountRunningAgentTools returns how many Agent tool calls are still in
-// flight (parallel sub-agents included) — the prime-agent style roster count
-// surfaced in the status line.
-func (m *Chat) CountRunningAgentTools() int {
-	n := 0
-	for i := 0; i < m.list.Len(); i++ {
-		item, ok := m.list.ItemAt(i).(chat.MessageItem)
-		if !ok {
-			continue
-		}
-		if at, ok := item.(*chat.AgentToolMessageItem); ok {
-			switch at.Status() {
-			case chat.ToolStatusRunning, chat.ToolStatusAwaitingPermission:
-				n++
-			}
-		}
-	}
-	return n
-}
-
-// ToggleExpandedSelectedItem expands the selected message item if it is expandable.
 func (m *Chat) ToggleExpandedSelectedItem() {
 	if expandable, ok := m.list.SelectedItem().(chat.Expandable); ok {
 		if !expandable.ToggleExpanded() {
@@ -580,6 +199,7 @@ func (m *Chat) ToggleExpandedSelectedItem() {
 }
 
 // HandleKeyMsg handles key events for the chat component.
+
 func (m *Chat) HandleKeyMsg(key tea.KeyMsg) (bool, tea.Cmd) {
 	if m.list.Focused() {
 		if handler, ok := m.list.SelectedItem().(chat.KeyEventHandler); ok {
@@ -593,6 +213,7 @@ func (m *Chat) HandleKeyMsg(key tea.KeyMsg) (bool, tea.Cmd) {
 // It detects single, double, and triple clicks for text selection.
 // Returns whether the click was handled and an optional command for delayed
 // single-click actions.
+
 func (m *Chat) HandleMouseDown(x, y int) (bool, tea.Cmd) {
 	if m.list.Len() == 0 {
 		return false, nil
@@ -667,37 +288,7 @@ func (m *Chat) HandleMouseDown(x, y int) (bool, tea.Cmd) {
 // HandleDelayedClick handles a delayed single-click action (like expansion).
 // It only executes if the click ID matches (i.e., no double-click occurred)
 // and no text selection was made (drag to select).
-func (m *Chat) HandleDelayedClick(msg DelayedClickMsg) bool {
-	// Ignore if this click was superseded by a newer click (double/triple).
-	if msg.ClickID != m.pendingClickID {
-		return false
-	}
 
-	// Don't expand if user dragged to select text.
-	if m.HasHighlight() {
-		return false
-	}
-
-	// Execute the click action (e.g., expansion).
-	selectedItem := m.list.SelectedItem()
-	if clickable, ok := selectedItem.(list.MouseClickable); ok {
-		handled := clickable.HandleMouseClick(ansi.MouseButton1, msg.X, msg.Y)
-		// Toggle expansion if applicable.
-		if expandable, ok := selectedItem.(chat.Expandable); ok {
-			if !expandable.ToggleExpanded() {
-				m.ScrollToIndex(m.list.Selected())
-			}
-		}
-		if m.AtBottom() {
-			m.ScrollToBottom()
-		}
-		return handled
-	}
-
-	return false
-}
-
-// HandleMouseUp handles mouse up events for the chat component.
 func (m *Chat) HandleMouseUp(x, y int) bool {
 	if !m.mouseDown {
 		return false
@@ -708,6 +299,7 @@ func (m *Chat) HandleMouseUp(x, y int) bool {
 }
 
 // HandleMouseDrag handles mouse drag events for the chat component.
+
 func (m *Chat) HandleMouseDrag(x, y int) bool {
 	if !m.mouseDown {
 		return false
@@ -730,6 +322,7 @@ func (m *Chat) HandleMouseDrag(x, y int) bool {
 }
 
 // HasHighlight returns whether there is currently highlighted content.
+
 func (m *Chat) HasHighlight() bool {
 	startItemIdx, startLine, startCol, endItemIdx, endLine, endCol := m.getHighlightRange()
 	return startItemIdx >= 0 && endItemIdx >= 0 && (startLine != endLine || startCol != endCol)
@@ -737,6 +330,7 @@ func (m *Chat) HasHighlight() bool {
 
 // HighlightContent returns the currently highlighted content based on the mouse
 // selection. It returns an empty string if no content is highlighted.
+
 func (m *Chat) HighlightContent() string {
 	startItemIdx, startLine, startCol, endItemIdx, endLine, endCol := m.getHighlightRange()
 	if startItemIdx < 0 || endItemIdx < 0 || startLine == endLine && startCol == endCol {
@@ -771,6 +365,7 @@ func (m *Chat) HighlightContent() string {
 }
 
 // ClearMouse clears the current mouse interaction state.
+
 func (m *Chat) ClearMouse() {
 	m.mouseDown = false
 	m.mouseDownItem = -1
@@ -783,6 +378,7 @@ func (m *Chat) ClearMouse() {
 }
 
 // applyHighlightRange applies the current highlight range to the chat items.
+
 func (m *Chat) applyHighlightRange(idx, selectedIdx int, item list.Item) list.Item {
 	if hi, ok := item.(list.Highlightable); ok {
 		// Apply highlight
@@ -824,6 +420,7 @@ func (m *Chat) applyHighlightRange(idx, selectedIdx int, item list.Item) list.It
 }
 
 // getHighlightRange returns the current highlight range.
+
 func (m *Chat) getHighlightRange() (startItemIdx, startLine, startCol, endItemIdx, endLine, endCol int) {
 	if m.mouseDownItem < 0 {
 		return -1, -1, -1, -1, -1, -1
@@ -859,6 +456,7 @@ func (m *Chat) getHighlightRange() (startItemIdx, startLine, startCol, endItemId
 }
 
 // selectWord selects the word at the given position within an item.
+
 func (m *Chat) selectWord(itemIdx, x, itemY int) {
 	item := m.list.ItemAt(itemIdx)
 	if item == nil {
@@ -909,6 +507,7 @@ func (m *Chat) selectWord(itemIdx, x, itemY int) {
 }
 
 // selectLine selects the entire line at the given position within an item.
+
 func (m *Chat) selectLine(itemIdx, itemY int) {
 	item := m.list.ItemAt(itemIdx)
 	if item == nil {
@@ -946,6 +545,7 @@ func (m *Chat) selectLine(itemIdx, itemY int) {
 
 // findWordBoundaries finds the start and end column of the word at the given column.
 // Returns (startCol, endCol) where endCol is exclusive.
+
 func findWordBoundaries(line string, col int) (startCol, endCol int) {
 	if line == "" || col < 0 {
 		return 0, 0
@@ -989,6 +589,7 @@ func findWordBoundaries(line string, col int) (startCol, endCol int) {
 }
 
 // abs returns the absolute value of an integer.
+
 func abs(x int) int {
 	if x < 0 {
 		return -x

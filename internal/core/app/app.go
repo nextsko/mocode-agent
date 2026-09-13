@@ -29,6 +29,8 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/question"
 	"github.com/nextsko/mocode-agent/internal/core/shellruntime/shell"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
 	"github.com/nextsko/mocode-agent/internal/domain/filetracker"
 	"github.com/nextsko/mocode-agent/internal/domain/history"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
@@ -40,8 +42,6 @@ import (
 	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/nextsko/mocode-agent/internal/util/log"
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
-	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 )
 
 type App struct {
@@ -88,6 +88,7 @@ type SessionServices struct {
 }
 
 // New initializes a new application instance with file-based storage.
+
 func New(ctx context.Context, storeCfg *config.ConfigStore) (*App, error) {
 	cfg := storeCfg.Config()
 	skipPermissionsRequests := storeCfg.Overrides().SkipPermissionRequests
@@ -176,38 +177,45 @@ func New(ctx context.Context, storeCfg *config.ConfigStore) (*App, error) {
 }
 
 // Config returns the pure-data configuration.
+
 func (app *App) Config() *config.Config {
 	return app.config.Config()
 }
 
 // Store returns the config store.
+
 func (app *App) Store() *config.ConfigStore {
 	return app.config
 }
 
 // DataStore returns the file-based data store.
+
 func (app *App) DataStore() *store.Store {
 	return app.store
 }
 
 // ErrorCollectorService returns the project-local asynchronous error
 // collector used by tools.
+
 func (app *App) ErrorCollectorService() *errcoll.Collector {
 	return app.ErrorCollector
 }
 
 // Events returns a per-caller subscription channel for application events.
 // Each caller receives its own channel; all callers receive every event.
+
 func (app *App) Events(ctx context.Context) <-chan pubsub.Event[tea.Msg] {
 	return app.events.Subscribe(ctx)
 }
 
 // SendEvent publishes a message to all event subscribers.
+
 func (app *App) SendEvent(msg tea.Msg) {
 	app.events.Publish(pubsub.UpdatedEvent, msg)
 }
 
 // AgentNotifications returns the broker for agent notification events.
+
 func (app *App) AgentNotifications() *pubsub.Broker[notify.Notification] {
 	return app.agentNotifications
 }
@@ -216,6 +224,7 @@ func (app *App) AgentNotifications() *pubsub.Broker[notify.Notification] {
 // If continueSessionID is set, it looks up that session by ID
 // If useLast is set, it returns the most recently updated top-level session
 // Otherwise, it creates a new session
+
 func (app *App) resolveSession(ctx context.Context, continueSessionID string, useLast bool) (session.Session, error) {
 	var sess session.Session
 	var err error
@@ -253,6 +262,7 @@ func (app *App) resolveSession(ctx context.Context, continueSessionID string, us
 
 // RunNonInteractive runs the application in non-interactive mode with the
 // given prompt, printing to stdout.
+
 func (app *App) RunNonInteractive(ctx context.Context, output io.Writer, prompt, largeModel, smallModel string, hideSpinner bool, continueSessionID string, useLast bool) error {
 	slog.Info("Running in non-interactive mode")
 
@@ -434,6 +444,7 @@ func (app *App) UpdateAgentModel(ctx context.Context) error {
 // Model matching is case-insensitive.
 // If largeModel is provided but smallModel is not, the small model defaults to
 // the provider's default small model.
+
 func (app *App) overrideModelsForNonInteractive(ctx context.Context, largeModel, smallModel string) error {
 	providers := app.config.Config().Providers.Copy()
 
@@ -482,6 +493,7 @@ func (app *App) overrideModelsForNonInteractive(ctx context.Context, largeModel,
 
 // GetDefaultSmallModel returns the default small model for the given
 // provider. Falls back to the large model if no default is found.
+
 func (app *App) GetDefaultSmallModel(providerID string) config.SelectedModel {
 	cfg := app.config.Config()
 	largeModelCfg := cfg.Models[config.SelectedModelTypeLarge]
@@ -521,6 +533,7 @@ func (app *App) GetDefaultSmallModel(providerID string) config.SelectedModel {
 // SetSpinnerThemer wires the spinner color resolver. Called from the UI/transport
 // layer after construction; core/app never imports ui/styles. Defaults to
 // NoopThemer when unset, so non-TUI builds render black spinner colors.
+
 func (app *App) SetSpinnerThemer(t theme.SpinnerThemer) {
 	if t == nil {
 		t = theme.NoopThemer{}
@@ -653,6 +666,7 @@ func (app *App) InitCoderAgent(ctx context.Context) error {
 }
 
 // Subscribe sends events to the TUI as tea.Msgs.
+
 func (app *App) Subscribe(program *tea.Program) {
 	defer log.RecoverPanic("app.Subscribe", func() {
 		slog.Info("TUI subscription panic: attempting graceful shutdown")
@@ -686,6 +700,7 @@ func (app *App) Subscribe(program *tea.Program) {
 }
 
 // Shutdown performs a graceful shutdown of the application.
+
 func (app *App) Shutdown() {
 	start := time.Now()
 	defer func() { slog.Debug("Shutdown took " + time.Since(start).String()) }()
@@ -740,255 +755,23 @@ func (app *App) Shutdown() {
 // --- Store-backed service adapters ---
 
 // storeSessionService wraps *store.SessionStore and adds pubsub to satisfy session.Service.
+
 type storeSessionService struct {
 	*pubsub.Broker[session.Session]
 	store *store.SessionStore
 }
 
-func newStoreSessionService(st *store.Store) *storeSessionService {
-	return &storeSessionService{
-		Broker: pubsub.NewBroker[session.Session](),
-		store:  st.Sessions(),
-	}
-}
-
-func (s *storeSessionService) Create(ctx context.Context, title string) (session.Session, error) {
-	sess, err := s.store.Create(ctx, title)
-	if err != nil {
-		return session.Session{}, err
-	}
-	s.Publish(pubsub.CreatedEvent, sess)
-	return sess, nil
-}
-
-func (s *storeSessionService) Get(ctx context.Context, id string) (session.Session, error) {
-	return s.store.Get(ctx, id)
-}
-
-func (s *storeSessionService) GetLast(ctx context.Context) (session.Session, error) {
-	return s.store.GetLast(ctx)
-}
-
-func (s *storeSessionService) List(ctx context.Context) ([]session.Session, error) {
-	return s.store.List(ctx)
-}
-
-func (s *storeSessionService) Save(ctx context.Context, sess session.Session) (session.Session, error) {
-	if err := s.store.Save(ctx, sess); err != nil {
-		return session.Session{}, err
-	}
-	s.Publish(pubsub.UpdatedEvent, sess)
-	return sess, nil
-}
-
-func (s *storeSessionService) UpdateTitleAndUsage(ctx context.Context, id, title string, p, c, cacheRead, cacheCreation int64, cost float64) error {
-	return s.store.UpdateTitleAndUsage(ctx, id, title, p, c, cacheRead, cacheCreation, cost)
-}
-
-func (s *storeSessionService) Rename(ctx context.Context, id, title string) error {
-	return s.store.Rename(ctx, id, title)
-}
-
-func (s *storeSessionService) Delete(ctx context.Context, id string) error {
-	sess, _ := s.store.Get(ctx, id)
-	if err := s.store.Delete(ctx, id); err != nil {
-		return err
-	}
-	if sess.ID != "" {
-		s.Publish(pubsub.DeletedEvent, sess)
-	}
-	return nil
-}
-
-func (s *storeSessionService) CreateTitleSession(ctx context.Context, pid string) (session.Session, error) {
-	now := time.Now().Unix()
-	sess := session.Session{ID: "title-" + pid, ParentSessionID: pid, Title: "Generate a title", CreatedAt: now, UpdatedAt: now}
-	s.store.Save(ctx, sess)
-	s.Publish(pubsub.CreatedEvent, sess)
-	return sess, nil
-}
-
-func (s *storeSessionService) CreateTaskSession(ctx context.Context, tool, pid, title string) (session.Session, error) {
-	now := time.Now().Unix()
-	sess := session.Session{
-		ID:              tool,
-		ParentSessionID: pid,
-		Title:           title,
-		CreatedAt:       now,
-		UpdatedAt:       now,
-		AgentToolCallID: tool,
-	}
-	if err := s.store.Save(ctx, sess); err != nil {
-		return session.Session{}, err
-	}
-	s.Publish(pubsub.CreatedEvent, sess)
-	return sess, nil
-}
-
-func (s *storeSessionService) CreateAgentToolSessionID(mID, tcID string) string {
-	return fmt.Sprintf("%s$$%s", mID, tcID)
-}
-
-func (s *storeSessionService) ParseAgentToolSessionID(id string) (string, string, bool) {
-	parts := strings.Split(id, "$$")
-	if len(parts) != 2 {
-		return "", "", false
-	}
-	return parts[0], parts[1], true
-}
-
-func (s *storeSessionService) IsAgentToolSession(id string) bool {
-	_, _, ok := s.ParseAgentToolSessionID(id)
-	return ok
-}
-
-func (s *storeSessionService) IncrementCost(ctx context.Context, id string, delta float64) error {
-	return s.store.IncrementCost(ctx, id, delta)
-}
-
-// storeMessageService wraps *store.MessageStore.
 type storeMessageService struct {
 	*pubsub.Broker[message.Message]
 	store     *store.MessageStore
 	debouncer *messageUpdateDebouncer
 }
 
-func newStoreMessageService(st *store.Store) *storeMessageService {
-	svc := &storeMessageService{
-		Broker: pubsub.NewBroker[message.Message](),
-		store:  st.Messages(),
-	}
-	svc.debouncer = newMessageUpdateDebouncer(svc)
-	return svc
-}
-
-func (s *storeMessageService) Create(ctx context.Context, sid string, params message.CreateMessageParams) (message.Message, error) {
-	msg, err := s.store.Create(ctx, sid, params)
-	if err != nil {
-		return message.Message{}, err
-	}
-	s.Publish(pubsub.CreatedEvent, msg.Clone())
-	return msg, nil
-}
-
-func (s *storeMessageService) Update(ctx context.Context, msg message.Message) error {
-	return s.debouncer.Update(ctx, msg)
-}
-
-func (s *storeMessageService) Get(ctx context.Context, id string) (message.Message, error) {
-	return s.store.Get(ctx, id)
-}
-
-func (s *storeMessageService) List(ctx context.Context, sid string) ([]message.Message, error) {
-	return s.store.List(ctx, sid)
-}
-
-func (s *storeMessageService) ListUserMessages(ctx context.Context, sid string) ([]message.Message, error) {
-	return s.store.ListUserMessages(ctx, sid)
-}
-
-func (s *storeMessageService) ListAllUserMessages(ctx context.Context) ([]message.Message, error) {
-	return s.store.ListAllUserMessages(ctx)
-}
-
-func (s *storeMessageService) Delete(ctx context.Context, id string) error {
-	msg, _ := s.store.Get(ctx, id)
-	if err := s.store.Delete(ctx, id); err != nil {
-		return err
-	}
-	if msg.ID != "" {
-		s.Publish(pubsub.DeletedEvent, msg.Clone())
-	}
-	return nil
-}
-
-func (s *storeMessageService) DeleteSessionMessages(ctx context.Context, sid string) error {
-	return s.store.DeleteSessionMessages(ctx, sid)
-}
-
-// storeHistoryService wraps *store.FileHistoryStore.
 type storeHistoryService struct {
 	*pubsub.Broker[history.File]
 	store *store.FileHistoryStore
 }
 
-func newStoreHistoryService(st *store.Store) *storeHistoryService {
-	return &storeHistoryService{
-		Broker: pubsub.NewBroker[history.File](),
-		store:  st.Files(),
-	}
-}
-
-func (s *storeHistoryService) Create(ctx context.Context, sid, path, content string) (history.File, error) {
-	f, err := s.store.Create(ctx, sid, path, content)
-	if err != nil {
-		return history.File{}, err
-	}
-	s.Publish(pubsub.CreatedEvent, f)
-	return f, nil
-}
-
-func (s *storeHistoryService) CreateVersion(ctx context.Context, sid, path, content string) (history.File, error) {
-	f, err := s.store.CreateVersion(ctx, sid, path, content)
-	if err != nil {
-		return history.File{}, err
-	}
-	s.Publish(pubsub.CreatedEvent, f)
-	return f, nil
-}
-
-func (s *storeHistoryService) Get(ctx context.Context, id string) (history.File, error) {
-	return s.store.Get(ctx, id)
-}
-
-func (s *storeHistoryService) GetByPathAndSession(ctx context.Context, path, sid string) (history.File, error) {
-	return s.store.GetByPathAndSession(ctx, path, sid)
-}
-
-func (s *storeHistoryService) ListBySession(ctx context.Context, sid string) ([]history.File, error) {
-	return s.store.ListBySession(ctx, sid)
-}
-
-func (s *storeHistoryService) ListLatestSessionFiles(ctx context.Context, sid string) ([]history.File, error) {
-	return s.store.ListLatestSessionFiles(ctx, sid)
-}
-
-func (s *storeHistoryService) Delete(ctx context.Context, id string) error {
-	f, _ := s.store.Get(ctx, id)
-	if err := s.store.Delete(ctx, id); err != nil {
-		return err
-	}
-	if f.ID != "" {
-		s.Publish(pubsub.DeletedEvent, f)
-	}
-	return nil
-}
-
-func (s *storeHistoryService) DeleteSessionFiles(ctx context.Context, sid string) error {
-	return s.store.DeleteSessionFiles(ctx, sid)
-}
-
-// storeFileTrackerService wraps *store.FileTrackerStore.
 type storeFileTrackerService struct {
 	store *store.FileTrackerStore
-}
-
-func newStoreFileTrackerService(st *store.Store) *storeFileTrackerService {
-	return &storeFileTrackerService{store: st.Tracker()}
-}
-
-func (s *storeFileTrackerService) RecordRead(ctx context.Context, sid, path string) {
-	s.store.RecordRead(ctx, sid, path)
-}
-
-func (s *storeFileTrackerService) LastReadTime(ctx context.Context, sid, path string) time.Time {
-	return s.store.LastReadTime(ctx, sid, path)
-}
-
-func (s *storeFileTrackerService) ListReadFiles(ctx context.Context, sid string) ([]string, error) {
-	return s.store.ListReadFiles(ctx, sid)
-}
-
-func (s *storeFileTrackerService) DeleteSession(ctx context.Context, sid string) {
-	s.store.DeleteSession(ctx, sid)
 }
