@@ -188,7 +188,7 @@ func (c *Commands) customCommandDescriptors() []slash.CommandDescriptor {
 		}
 		descriptors = append(descriptors, slash.CommandDescriptor{
 			ID:        "custom_" + cmd.ID,
-			Title:     cmd.Name,
+			Title:     cmd.DisplayLabel(),
 			Category:  slash.CommandCategoryUser,
 			Arguments: cmd.Arguments,
 			Risk:      slash.RiskLevelRead,

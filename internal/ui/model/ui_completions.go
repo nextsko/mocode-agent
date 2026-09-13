@@ -13,7 +13,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
@@ -340,7 +339,7 @@ func (m *UI) slashCompletionGroups() []completions.SlashGroup {
 		customItems := make([]completions.SlashCompletionValue, 0, len(m.customCommands))
 		for _, cmd := range m.customCommands {
 			customItems = append(customItems, completions.SlashCompletionValue{
-				Command: customCommandLabel(cmd),
+				Command: cmd.DisplayLabel(),
 				Desc:    slashDescFromContent(cmd.Content),
 				Msg: dialog.ActionRunCustomCommand{
 					Content:   cmd.Content,
@@ -365,13 +364,13 @@ func slashLabelFromCommandID(id string) string {
 }
 
 // slashDescFromContent returns a one-line description of a custom command
-// derived from its markdown source. ANSI escape sequences are stripped
-// first because users often paste colorized previews into command files, and
-// those would otherwise leak into the popup as raw escapes (which already
-// broke display once on an 8;2;104;255;214m-colored directory example).
+// derived from its markdown source. Users often paste colorized previews into
+// command files, so both real ANSI escapes and ESC-less SGR leftovers (e.g.
+// "8;2;104;255;214m" from a folder name created by such a paste) are removed
+// before the line is shown in the popup.
 func slashDescFromContent(content string) string {
 	for _, raw := range strings.SplitN(content, "\n", 5) {
-		line := ansi.Strip(raw)
+		line := slash.CleanCommandText(raw)
 		line = strings.TrimLeft(line, "#> ")
 		line = strings.TrimSpace(line)
 		if line != "" {
@@ -382,18 +381,6 @@ func slashDescFromContent(content string) string {
 		}
 	}
 	return ""
-}
-
-// customCommandLabel picks the user-facing label for a custom command:
-// its markdown file's relative path (sans extension) is the most useful
-// hint in the popup. Falls back to the ID's hash suffix when the path
-// is unknown (e.g. legacy callers that only have the ID).
-func customCommandLabel(cmd slash.CustomCommand) string {
-	if cmd.Path != "" {
-		base := strings.TrimSuffix(cmd.Path, filepath.Ext(cmd.Path))
-		return strings.ReplaceAll(base, string(filepath.Separator), "/")
-	}
-	return cmd.ID
 }
 
 func (m *UI) insertCompletionText(text string) bool {

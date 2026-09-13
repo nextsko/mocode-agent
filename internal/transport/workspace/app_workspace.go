@@ -597,7 +597,7 @@ func (w *AppWorkspace) BuildCommandRegistry() []slash.CommandDescriptor {
 			customDescs = make([]slash.CommandDescriptor, 0, len(customCommands))
 			for _, cmd := range customCommands {
 				customDescs = append(customDescs, slash.CommandDescriptor{
-					ID: "custom_" + cmd.ID, Title: cmd.Name,
+					ID: "custom_" + cmd.ID, Title: cmd.DisplayLabel(),
 					Category: slash.CommandCategoryUser, Arguments: cmd.Arguments,
 					Risk: slash.RiskLevelRead,
 				})
