@@ -15,7 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/plugins/netcommon"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/net"
 	"github.com/nextsko/mocode-agent/internal/util/errcoll"
 
 	"charm.land/fantasy"

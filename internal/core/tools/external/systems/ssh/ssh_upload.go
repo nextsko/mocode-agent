@@ -10,7 +10,7 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/plugins/sshcommon"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/ssh"
 )
 
 //go:embed ssh_upload.md

@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/plugins/searchcommon"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/search"
 
 	"charm.land/fantasy"
 	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"

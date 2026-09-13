@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/plugins/sshcommon"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/ssh"
 )
 
 // TestRegistry_IncludesSSHTools asserts that AllToolNames() returns

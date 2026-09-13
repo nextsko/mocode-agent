@@ -9,7 +9,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/plugins/sshcommon"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/ssh"
 	"github.com/stretchr/testify/assert"
 )
 

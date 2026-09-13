@@ -10,7 +10,7 @@ import (
 	"charm.land/fantasy"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/plugins/gitopscommon"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/gitops"
 )
 
 // PlanCommitsToolName is the registered name of the git_plan_commits tool.

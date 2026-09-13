@@ -54,17 +54,17 @@
 | R4a | `doctor.go` 1150→163+352（checks）+359（providers）+308（helpers）；`ui.go` 1589→956+358（messages）+230（view）+69（question） |
 | R4b | `runTurn` 475 行手术：回调闭包（PrepareStep/OnReasoning*/OnText/OnTool*/OnStepFinish/StopWhen）提取为 `agent_turn_callbacks.go`（297 行，turnState 状态载体），runTurn 缩为编排骨架（agent_lifecycle 776→564）；`Update` 473 行巨型路由按消息族提取 `ui_update_handlers.go`（295 行：service 事件/mouse/anim 三族），ui.go 956→718 |
 | R4c | **background.go 域拆分**：一次 `git checkout --` 误操作把未提交的增强打回原版；凭会话记录按四域完整重建并原计划拆分——`background_buffer.go` 142（head-tail+overflow）/`background_job.go` 369（类型+方法）/`background_manager.go` 322（单例+Start/Kill/持久化/epoch）/`background_notify.go` 102（通知/promote/sanitize/开关）。此前全部增强测试一次通过，复原完整性由测试证明。**教训入库：会话内改动应及时分批 commit，任何 checkout 前先 `git status` 确认** |
+| R4d | **四主题分批 commit**（bg-jobs/subagent-ui/ask-user/restructure，工作入版本保护）；上帝文件批次：`ui_dialogs` 892→231+471（actions）+206（openers）、`chat` 872→500+205（scroll）+180（msgs）、`app` 853→658+207（store services）。quickstyle 三次脚本尝试后判定为**声明式样式表**（上游 crush 同为 1051 行单文件），拆分收益低于风险，维持同构不拆 |
 
 验证：全仓 build/vet/test 绿。R4b 教训：switch 内提取必须保留 case 标签转发（裸 if 插入会静默丢失事件路由，测试当场抓出）。
 
 验证：全仓 build/vet/test 绿。工具沉淀：`scripts/gosplit.ps1`（切块函数，需同进程 dot-source）。
 
 ## R4 剩余蓝图（按序）
-1. `quickstyle.go` 964（单函数 900 行，分节清晰但段间共享 base/muted/subtle 局部变量——子函数化需变量传递重构）
+1. `handleDialogAction`（471，巨型 action switch）语义拆分——同 Update 模式
 2. `plugins/*common` → `common/` 重命名（实为共享库，命名误导）
 3. `agent` 根 lifecycle/coordinator 完全分包（接口重构破私有互访）
-4. 残余 >350 清单逐个消化：ui_dialogs 892、chat 872、app 853、wechat/bot 746、diffview 726、question_form 719（crush 移植件，可原样吸收上游拆分）
-5. **git 纪律**：本会话所有改动尚未提交，按主题分批 commit（bg-jobs / subagent-ui / ask-user / restructure 四组）
+4. 残余 >350：wechat/bot 746、diffview 726、question_form 719（crush 移植件可吸收上游拆分）、app.go 658、chat.go 500、coordinator_tools 482、agent_lifecycle 564
 
 ## 相关
 - [[../bg-jobs-fix/README]]（background_notify 的来历）

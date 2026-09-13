@@ -9,7 +9,7 @@ import (
 	"charm.land/fantasy"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/plugins/giteacommon"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/gitea"
 )
 
 // PullsToolName is the registered name of the gitea_pulls tool.

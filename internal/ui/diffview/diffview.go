@@ -34,6 +34,7 @@ const (
 )
 
 // DiffView represents a view for displaying differences between two files.
+
 type DiffView struct {
 	layout          layout
 	before          file
@@ -73,6 +74,7 @@ type DiffView struct {
 }
 
 // New creates a new DiffView with default settings.
+
 func New() *DiffView {
 	dv := &DiffView{
 		layout:       layoutUnified,
@@ -86,40 +88,7 @@ func New() *DiffView {
 }
 
 // Unified sets the layout of the DiffView to unified.
-func (dv *DiffView) Unified() *DiffView {
-	dv.layout = layoutUnified
-	return dv
-}
 
-// Split sets the layout of the DiffView to split (side-by-side).
-func (dv *DiffView) Split() *DiffView {
-	dv.layout = layoutSplit
-	return dv
-}
-
-// Before sets the "before" file for the DiffView.
-func (dv *DiffView) Before(path, content string) *DiffView {
-	dv.before = file{path: path, content: content}
-	// Clear caches when content changes
-	dv.clearCaches()
-	return dv
-}
-
-// After sets the "after" file for the DiffView.
-func (dv *DiffView) After(path, content string) *DiffView {
-	dv.after = file{path: path, content: content}
-	// Clear caches when content changes
-	dv.clearCaches()
-	return dv
-}
-
-// FileName sets the file name header to display above the diff.
-func (dv *DiffView) FileName(name string) *DiffView {
-	dv.fileName = name
-	return dv
-}
-
-// clearCaches clears all caches when content or major settings change.
 func (dv *DiffView) clearCaches() {
 	dv.cachedLexer = nil
 	dv.clearSyntaxCache()
@@ -127,70 +96,7 @@ func (dv *DiffView) clearCaches() {
 }
 
 // ContextLines sets the number of context lines for the DiffView.
-func (dv *DiffView) ContextLines(contextLines int) *DiffView {
-	dv.contextLines = contextLines
-	return dv
-}
 
-// Style sets the style for the DiffView.
-func (dv *DiffView) Style(style Style) *DiffView {
-	dv.style = style
-	return dv
-}
-
-// LineNumbers sets whether to display line numbers in the DiffView.
-func (dv *DiffView) LineNumbers(lineNumbers bool) *DiffView {
-	dv.lineNumbers = lineNumbers
-	return dv
-}
-
-// Height sets the height of the DiffView.
-func (dv *DiffView) Height(height int) *DiffView {
-	dv.height = height
-	return dv
-}
-
-// Width sets the width of the DiffView.
-func (dv *DiffView) Width(width int) *DiffView {
-	dv.width = width
-	return dv
-}
-
-// XOffset sets the horizontal offset for the DiffView.
-func (dv *DiffView) XOffset(xOffset int) *DiffView {
-	dv.xOffset = xOffset
-	return dv
-}
-
-// YOffset sets the vertical offset for the DiffView.
-func (dv *DiffView) YOffset(yOffset int) *DiffView {
-	dv.yOffset = yOffset
-	return dv
-}
-
-// InfiniteYScroll allows the YOffset to scroll beyond the last line.
-func (dv *DiffView) InfiniteYScroll(infiniteYScroll bool) *DiffView {
-	dv.infiniteYScroll = infiniteYScroll
-	return dv
-}
-
-// TabWidth sets the tab width. Only relevant for code that contains tabs, like
-// Go code.
-func (dv *DiffView) TabWidth(tabWidth int) *DiffView {
-	dv.tabWidth = tabWidth
-	return dv
-}
-
-// ChromaStyle sets the chroma style for syntax highlighting.
-// If nil, no syntax highlighting will be applied.
-func (dv *DiffView) ChromaStyle(style *chroma.Style) *DiffView {
-	dv.chromaStyle = style
-	// Clear syntax cache when style changes since highlighting will be different
-	dv.clearSyntaxCache()
-	return dv
-}
-
-// clearSyntaxCache clears the syntax highlighting cache.
 func (dv *DiffView) clearSyntaxCache() {
 	if dv.syntaxCache != nil {
 		// Clear the map but keep it allocated
@@ -201,6 +107,7 @@ func (dv *DiffView) clearSyntaxCache() {
 }
 
 // String returns the string representation of the DiffView.
+
 func (dv *DiffView) String() string {
 	dv.normalizeLineEndings()
 	dv.replaceTabs()
@@ -238,6 +145,7 @@ func (dv *DiffView) String() string {
 }
 
 // normalizeLineEndings ensures the file contents use Unix-style line endings.
+
 func (dv *DiffView) normalizeLineEndings() {
 	dv.before.content = strings.ReplaceAll(dv.before.content, "\r\n", "\n")
 	dv.after.content = strings.ReplaceAll(dv.after.content, "\r\n", "\n")
@@ -245,6 +153,7 @@ func (dv *DiffView) normalizeLineEndings() {
 
 // replaceTabs replaces tabs in the before and after file contents with spaces
 // according to the specified tab width.
+
 func (dv *DiffView) replaceTabs() {
 	spaces := strings.Repeat(" ", dv.tabWidth)
 	dv.before.content = strings.ReplaceAll(dv.before.content, "\t", spaces)
@@ -252,6 +161,7 @@ func (dv *DiffView) replaceTabs() {
 }
 
 // computeDiff computes the differences between the "before" and "after" files.
+
 func (dv *DiffView) computeDiff() error {
 	if dv.isComputed {
 		return dv.err
@@ -273,6 +183,7 @@ func (dv *DiffView) computeDiff() error {
 
 // convertDiffToSplit converts the unified diff to a split diff if the layout is
 // set to split.
+
 func (dv *DiffView) convertDiffToSplit() {
 	if dv.layout != layoutSplit {
 		return
@@ -285,6 +196,7 @@ func (dv *DiffView) convertDiffToSplit() {
 }
 
 // adjustStyles adjusts adds padding and alignment to the styles.
+
 func (dv *DiffView) adjustStyles() {
 	setPadding := func(s lipgloss.Style) lipgloss.Style {
 		return s.Padding(0, lineNumPadding).Align(lipgloss.Right)
@@ -299,6 +211,7 @@ func (dv *DiffView) adjustStyles() {
 
 // detectNumDigits calculates the maximum number of digits needed for before and
 // after line numbers.
+
 func (dv *DiffView) detectNumDigits() {
 	dv.beforeNumDigits = 0
 	dv.afterNumDigits = 0
@@ -345,6 +258,7 @@ func (dv *DiffView) preventInfiniteYScroll() {
 }
 
 // detectCodeWidth calculates the maximum width of code lines in the diff view.
+
 func (dv *DiffView) detectCodeWidth() {
 	switch dv.layout {
 	case layoutUnified:
@@ -357,6 +271,7 @@ func (dv *DiffView) detectCodeWidth() {
 
 // detectUnifiedCodeWidth calculates the maximum width of code lines in a
 // unified diff.
+
 func (dv *DiffView) detectUnifiedCodeWidth() {
 	dv.codeWidth = 0
 
@@ -372,6 +287,7 @@ func (dv *DiffView) detectUnifiedCodeWidth() {
 
 // detectSplitCodeWidth calculates the maximum width of code lines in a
 // split diff.
+
 func (dv *DiffView) detectSplitCodeWidth() {
 	dv.codeWidth = 0
 
@@ -392,6 +308,7 @@ func (dv *DiffView) detectSplitCodeWidth() {
 }
 
 // resizeCodeWidth resizes the code width to fit within the specified width.
+
 func (dv *DiffView) resizeCodeWidth() {
 	fullNumWidth := dv.beforeNumDigits + dv.afterNumDigits
 	fullNumWidth += lineNumPadding * 4 // left and right padding for both line numbers
@@ -409,6 +326,7 @@ func (dv *DiffView) resizeCodeWidth() {
 }
 
 // renderUnified renders the unified diff view as a string.
+
 func (dv *DiffView) renderUnified() string {
 	var b strings.Builder
 
@@ -532,6 +450,7 @@ outer:
 }
 
 // renderSplit renders the split (side-by-side) diff view as a string.
+
 func (dv *DiffView) renderSplit() string {
 	var b strings.Builder
 
@@ -706,6 +625,7 @@ outer:
 }
 
 // hunkLineFor formats the header line for a hunk in the unified diff view.
+
 func (dv *DiffView) hunkLineFor(h *udiff.Hunk) string {
 	beforeShownLines, afterShownLines := dv.hunkShownLines(h)
 
@@ -720,6 +640,7 @@ func (dv *DiffView) hunkLineFor(h *udiff.Hunk) string {
 
 // hunkShownLines calculates the number of lines shown in a hunk for both before
 // and after versions.
+
 func (dv *DiffView) hunkShownLines(h *udiff.Hunk) (before, after int) {
 	for _, l := range h.Lines {
 		switch l.Kind {
@@ -784,6 +705,7 @@ func (dv *DiffView) hightlightCode(source string, bgColor color.Color) string {
 
 // createSyntaxCacheKey creates a cache key from source content and background color.
 // We use a simple hash to keep memory usage reasonable.
+
 func (dv *DiffView) createSyntaxCacheKey(source string, bgColor color.Color) string {
 	// Convert color to string representation
 	r, g, b, a := bgColor.RGBA()

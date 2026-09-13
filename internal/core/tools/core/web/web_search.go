@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/plugins/netcommon"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/net"
 
 	"charm.land/fantasy"
 )

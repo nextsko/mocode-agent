@@ -17,7 +17,7 @@ import (
 	shell "github.com/nextsko/mocode-agent/internal/core/tools/core/shell"
 	web "github.com/nextsko/mocode-agent/internal/core/tools/core/web"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/plugins/netcommon"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/net"
 	gitops "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitops"
 	wechat "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/wechat"
 	agenttools "github.com/nextsko/mocode-agent/internal/core/tools/internalx/agent"

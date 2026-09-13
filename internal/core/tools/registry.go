@@ -16,7 +16,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/tools/core/web"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/nethttp"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/plugins/sshcommon"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/ssh"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitea"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitops"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/ssh"
