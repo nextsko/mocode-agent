@@ -8,8 +8,10 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/core/question"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
 	fs "github.com/nextsko/mocode-agent/internal/core/tools/core/fs"
+	agentquestion "github.com/nextsko/mocode-agent/internal/core/tools/core/question"
 	shell "github.com/nextsko/mocode-agent/internal/core/tools/core/shell"
 	"github.com/nextsko/mocode-agent/internal/core/tools/core/web"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
@@ -46,6 +48,7 @@ type ToolCategory string
 const (
 	CategoryFile      ToolCategory = "file"
 	CategoryExec      ToolCategory = "exec"
+	CategoryQuestion  ToolCategory = "question"
 	CategorySearch    ToolCategory = "search"
 	CategoryNetwork   ToolCategory = "network"
 	CategoryLSP       ToolCategory = "lsp"
@@ -81,6 +84,7 @@ type ToolPlugin interface {
 type ToolDeps struct {
 	Cfg             *config.ConfigStore
 	Permissions     permission.Service
+	Questions       question.Service
 	LSPManager      *lsp.Manager
 	History         history.Service
 	FileTracker     filetracker.Service
@@ -153,6 +157,7 @@ func (r *Registry) Build(ctx context.Context, deps ToolDeps) []fantasy.AgentTool
 func standardPlugins() []ToolPlugin {
 	return []ToolPlugin{
 		execPlugin{},
+		questionPlugin{},
 		filePlugin{},
 		searchPlugin{},
 		networkPlugin{},
@@ -187,6 +192,25 @@ func (execPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 		shell.NewJobInputTool(),
 		shell.NewJobKillTool(),
 	}
+}
+
+// ─── builtin/question ────────────────────────────────────────────────────────
+
+// questionPlugin exposes the AskUser-style question tool (crush-compatible):
+// 4 question types, batched tabbed forms, blocking-until-answered.
+type questionPlugin struct{}
+
+func (questionPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: agentquestion.QuestionToolName, Kind: ToolKindBuiltin, Category: CategoryQuestion},
+	}
+}
+
+func (questionPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	if deps.Questions == nil {
+		return nil
+	}
+	return []fantasy.AgentTool{agentquestion.NewQuestionTool(deps.Questions)}
 }
 
 // ─── builtin/file ─────────────────────────────────────────────────────────────

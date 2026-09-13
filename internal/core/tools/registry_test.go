@@ -2,7 +2,8 @@ package tools
 
 import (
 	web "github.com/nextsko/mocode-agent/internal/core/tools/core/web"
-	
+	agentquestion "github.com/nextsko/mocode-agent/internal/core/tools/core/question"
+
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitea"
 	"slices"
 	"sort"
@@ -23,6 +24,7 @@ var knownAllToolNames = []string{
 	JobOutputToolName,
 	JobInputToolName,
 	JobKillToolName,
+	agentquestion.QuestionToolName,
 	DownloadToolName,
 	EditToolName,
 	MultiEditToolName,

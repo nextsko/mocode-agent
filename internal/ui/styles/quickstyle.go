@@ -11,6 +11,7 @@ import (
 	"charm.land/glamour/v2/ansi"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/exp/charmtone"
+	uv "github.com/charmbracelet/ultraviolet"
 
 	"github.com/nextsko/mocode-agent/internal/ui/diffview"
 )
@@ -624,6 +625,8 @@ func quickStyle(o quickStyleOpts) Styles {
 
 	s.Tool.ErrorTag = base.Padding(0, 1).Background(o.destructive).Foreground(o.onPrimary)
 	s.Tool.ErrorMessage = base.Foreground(o.fgSubtle)
+	s.Tool.WarnTag = base.Padding(0, 1).Background(o.warning).Foreground(o.bgBase).Bold(true)
+	s.Tool.WarnMessage = base.Foreground(o.fgSubtle)
 
 	// Diff and multi-edit styles
 	s.Tool.DiffTruncation = muted.Background(o.bgLeastVisible).PaddingLeft(2)
@@ -690,6 +693,7 @@ func quickStyle(o quickStyleOpts) Styles {
 	// Buttons
 	s.Button.Focused = lipgloss.NewStyle().Foreground(o.onPrimary).Background(o.secondary)
 	s.Button.Blurred = lipgloss.NewStyle().Foreground(o.fgBase).Background(o.bgLessVisible)
+	s.Button.Hovered = lipgloss.NewStyle().Foreground(o.onPrimary).Background(o.secondary)
 
 	// Editor
 	s.Editor.PromptNormalFocused = lipgloss.NewStyle().Foreground(o.successMostSubtle).SetString("::: ")
@@ -699,8 +703,50 @@ func quickStyle(o quickStyleOpts) Styles {
 	s.Editor.PromptYoloDotsFocused = lipgloss.NewStyle().MarginRight(1).Foreground(o.warningSubtle).SetString("::: ")
 	s.Editor.PromptYoloDotsBlurred = s.Editor.PromptYoloDotsFocused.Foreground(o.fgMoreSubtle)
 
+	// AskUser question components (crush-compatible).
+	s.Editor.PromptQuestionIconFocused = lipgloss.NewStyle().MarginRight(1).Foreground(o.fgBase).Background(o.primary).Bold(true).SetString(" ? ")
+	s.Editor.PromptQuestionIconBlurred = s.Editor.PromptQuestionIconFocused.Foreground(o.bgBase).Background(o.fgMoreSubtle)
+	s.Editor.QuestionSelected = lipgloss.NewStyle().Foreground(o.secondary).Bold(true)
+	s.Editor.QuestionUnselected = lipgloss.NewStyle().Foreground(o.fgBase)
+	s.Editor.QuestionBody = lipgloss.NewStyle().Foreground(o.fgMoreSubtle)
+	s.Editor.QuestionConfirm = lipgloss.NewStyle().Foreground(o.primary).Bold(true)
+	s.Editor.QuestionNote = lipgloss.NewStyle().Foreground(o.fgMostSubtle)
+	s.Editor.QuestionCursorBar = lipgloss.NewStyle().Foreground(o.secondary)
+	s.Editor.QuestionRadioOn = lipgloss.NewStyle().Foreground(o.secondary).SetString(RadioOn)
+	s.Editor.QuestionRadioOff = lipgloss.NewStyle().Foreground(o.fgSubtle).SetString(RadioOff)
+	s.Editor.QuestionCheckOn = lipgloss.NewStyle().Foreground(o.secondary).SetString(RadioOn)
+	s.Editor.QuestionCheckOff = lipgloss.NewStyle().Foreground(o.fgSubtle).SetString(RadioOff)
+
 	s.Radio.On = lipgloss.NewStyle().Foreground(o.fgSubtle).SetString(RadioOn)
 	s.Radio.Off = lipgloss.NewStyle().Foreground(o.fgSubtle).SetString(RadioOff)
+
+	// AskUser question-form tabs (crush-compatible): active tab has an open
+	// bottom that merges with the content area.
+	borderColor := uv.Style{Fg: o.primary}
+	inactiveBorder := uv.RoundedBorder().Style(borderColor)
+	inactiveBorder.BottomLeft = uv.Side{Content: "┴", Style: borderColor}
+	inactiveBorder.BottomRight = uv.Side{Content: "┴", Style: borderColor}
+	activeBorder := uv.RoundedBorder().Style(borderColor)
+	activeBorder.Bottom = uv.Side{Content: " ", Style: borderColor}
+	activeBorder.BottomLeft = uv.Side{Content: "┘", Style: borderColor}
+	activeBorder.BottomRight = uv.Side{Content: "└", Style: borderColor}
+
+	s.Tab.ActiveBorder = activeBorder
+	s.Tab.InactiveBorder = inactiveBorder
+
+	blurredBorderColor := uv.Style{Fg: o.fgMoreSubtle}
+	inactiveBorderBlurred := uv.RoundedBorder().Style(blurredBorderColor)
+	inactiveBorderBlurred.BottomLeft = uv.Side{Content: "┴", Style: blurredBorderColor}
+	inactiveBorderBlurred.BottomRight = uv.Side{Content: "┴", Style: blurredBorderColor}
+	activeBorderBlurred := uv.RoundedBorder().Style(blurredBorderColor)
+	activeBorderBlurred.Bottom = uv.Side{Content: " ", Style: blurredBorderColor}
+	activeBorderBlurred.BottomLeft = uv.Side{Content: "┘", Style: blurredBorderColor}
+	activeBorderBlurred.BottomRight = uv.Side{Content: "└", Style: blurredBorderColor}
+	s.Tab.ActiveBorderBlurred = activeBorderBlurred
+	s.Tab.InactiveBorderBlurred = inactiveBorderBlurred
+
+	s.Tab.ActiveStyle = uv.Style{Fg: o.fgBase}
+	s.Tab.InactiveStyle = uv.Style{Fg: o.fgMoreSubtle}
 	s.Radio.Label = lipgloss.NewStyle().Foreground(o.fgSubtle)
 
 	// Logo

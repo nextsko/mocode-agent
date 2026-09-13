@@ -29,7 +29,27 @@ var (
 	mdCacheMu    sync.Mutex
 	mdCache      = map[int]*glamour.TermRenderer{}
 	quietMDCache = map[int]*glamour.TermRenderer{}
+
+	// rendererLocksMu guards rendererLocks: per-renderer mutexes so
+	// concurrent Render calls on a shared TermRenderer serialize (glamour
+	// renderers are not goroutine-safe). Lock ordering: mdCacheMu first.
+	rendererLocksMu sync.Mutex
+	rendererLocks   = map[*glamour.TermRenderer]*sync.Mutex{}
 )
+
+// LockMarkdownRenderer returns a mutex stable for the renderer's lifetime,
+// serializing concurrent Render calls on the shared instance (borrowed from
+// crush's dialog/question components).
+func LockMarkdownRenderer(r *glamour.TermRenderer) *sync.Mutex {
+	rendererLocksMu.Lock()
+	defer rendererLocksMu.Unlock()
+	if mu, ok := rendererLocks[r]; ok {
+		return mu
+	}
+	mu := &sync.Mutex{}
+	rendererLocks[r] = mu
+	return mu
+}
 
 // MarkdownRenderer returns a glamour [glamour.TermRenderer] configured with
 // the given styles and width. Renderers are memoized per width and shared
@@ -91,4 +111,7 @@ func InvalidateMarkdownRendererCache() {
 	defer mdCacheMu.Unlock()
 	mdCache = map[int]*glamour.TermRenderer{}
 	quietMDCache = map[int]*glamour.TermRenderer{}
+	rendererLocksMu.Lock()
+	defer rendererLocksMu.Unlock()
+	rendererLocks = map[*glamour.TermRenderer]*sync.Mutex{}
 }

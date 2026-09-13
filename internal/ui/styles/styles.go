@@ -13,6 +13,7 @@ import (
 	"charm.land/glamour/v2/ansi"
 	"charm.land/lipgloss/v2"
 	"github.com/alecthomas/chroma/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 
 	"github.com/nextsko/mocode-agent/internal/ui/diffview"
 )
@@ -125,8 +126,10 @@ type Styles struct {
 
 	// Buttons
 	Button struct {
-		Focused lipgloss.Style
-		Blurred lipgloss.Style
+		Focused  lipgloss.Style
+		Blurred  lipgloss.Style
+		Hovered  lipgloss.Style
+		Negative lipgloss.Style
 	}
 
 	// Editor
@@ -142,6 +145,21 @@ type Styles struct {
 		PromptYoloIconBlurred lipgloss.Style
 		PromptYoloDotsFocused lipgloss.Style
 		PromptYoloDotsBlurred lipgloss.Style
+
+		// Question mode prompt (" ? " icon) and choice styling
+		// (crush-compatible AskUser components).
+		PromptQuestionIconFocused lipgloss.Style
+		PromptQuestionIconBlurred lipgloss.Style
+		QuestionSelected         lipgloss.Style // Active choice text.
+		QuestionUnselected       lipgloss.Style // Inactive header text.
+		QuestionBody             lipgloss.Style // Description/body text.
+		QuestionConfirm          lipgloss.Style // Confirm tab title.
+		QuestionNote             lipgloss.Style // Saved note text.
+		QuestionCursorBar        lipgloss.Style // Active cursor indicator bar.
+		QuestionRadioOn          lipgloss.Style
+		QuestionRadioOff         lipgloss.Style
+		QuestionCheckOn          lipgloss.Style
+		QuestionCheckOff         lipgloss.Style
 	}
 
 	// Radio
@@ -149,6 +167,17 @@ type Styles struct {
 		On    lipgloss.Style
 		Off   lipgloss.Style
 		Label lipgloss.Style // Text next to a radio button
+	}
+
+	// Tabs for batch question forms (AskUser). Uses uv types for direct
+	// screen rendering without lipgloss.
+	Tab struct {
+		ActiveBorder          uv.Border
+		InactiveBorder        uv.Border
+		ActiveBorderBlurred   uv.Border
+		InactiveBorderBlurred uv.Border
+		ActiveStyle           uv.Style
+		InactiveStyle         uv.Style
 	}
 
 	// Background
@@ -309,6 +338,8 @@ type Styles struct {
 		// Error styles
 		ErrorTag     lipgloss.Style // ERROR tag
 		ErrorMessage lipgloss.Style // Error message text
+		WarnTag      lipgloss.Style // Warning tag (attention background)
+		WarnMessage  lipgloss.Style // Warning message text
 
 		// Diff styles
 		DiffTruncation lipgloss.Style // Diff truncation message with padding

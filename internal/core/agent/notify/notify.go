@@ -21,6 +21,13 @@ const (
 	// describing the result so the web UI can refresh the parent tool
 	// card in place.
 	TypeSubagentCompleted Type = "subagent_completed"
+	// TypeBackgroundJobCompleted indicates a background shell job (bash
+	// with run_in_background, or a command auto-backgrounded after the
+	// wait window) reached a terminal state. It carries a
+	// BackgroundJobCompletedEvent so UIs learn the job finished without
+	// the model polling job_output (push model, borrowed from
+	// opencode/Claude Code task notifications).
+	TypeBackgroundJobCompleted Type = "background_job_completed"
 )
 
 // Notification represents a domain event published by the agent.
@@ -34,6 +41,9 @@ type Notification struct {
 	// SubagentCompleted is set when Type == TypeSubagentCompleted and
 	// describes the sub-agent run that just finished.
 	SubagentCompleted *SubagentCompletedEvent
+
+	// BackgroundJobCompleted is set when Type == TypeBackgroundJobCompleted.
+	BackgroundJobCompleted *BackgroundJobCompletedEvent
 }
 
 // SubagentStatus is the terminal status of a sub-agent run.
@@ -61,8 +71,7 @@ type SubagentTokenUsage struct {
 }
 
 // SubagentCompletedEvent is the payload for TypeSubagentCompleted.
-type SubagentCompletedEvent struct {
-	// ParentSessionID is the session that dispatched the sub-agent.
+type SubagentCompletedEvent struct {	// ParentSessionID is the session that dispatched the sub-agent.
 	ParentSessionID string `json:"parent_session_id"`
 	// ParentToolCallID is the Agent tool call ID that owns the sub-agent.
 	ParentToolCallID string `json:"parent_tool_call_id"`
@@ -83,3 +92,27 @@ type SubagentCompletedEvent struct {
 	// SubagentStatusCancelled.
 	Error string `json:"error,omitempty"`
 }
+
+// BackgroundJobCompletedEvent is the payload for TypeBackgroundJobCompleted.
+type BackgroundJobCompletedEvent struct {
+	// JobID is the background shell ID (bash run_in_background / auto
+	// background) that reached a terminal state.
+	JobID string `json:"job_id"`
+	// Command is the executed command line.
+	Command string `json:"command"`
+	// Description is the optional model-provided description.
+	Description string `json:"description,omitempty"`
+	// SessionID is the agent session that owns the job ("" when unowned).
+	SessionID string `json:"session_id,omitempty"`
+	// State is the terminal JobState: completed | failed | killed.
+	State string `json:"state"`
+	// ExitCode is the process exit code (0 when the job was killed before
+	// exiting normally).
+	ExitCode int `json:"exit_code,omitempty"`
+	// ElapsedMs is the wall-clock duration of the job.
+	ElapsedMs int64 `json:"elapsed_ms"`
+	// TailOutput is a short tail of the captured output so a UI can show
+	// what the job last printed without calling job_output.
+	TailOutput string `json:"tail_output,omitempty"`
+}
+

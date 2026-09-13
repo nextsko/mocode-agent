@@ -9,10 +9,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"charm.land/fantasy"
-	"github.com/nextsko/mocode-agent/internal/core/agent"
+	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
 	"github.com/nextsko/mocode-agent/internal/core/app"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/core/question"
 	"github.com/nextsko/mocode-agent/internal/domain/history"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
@@ -250,6 +251,16 @@ func (w *AppWorkspace) PermissionSetSkipRequests(skip bool) {
 	w.app.Permissions.SetSkipRequests(skip)
 }
 
+// -- Questions --
+
+func (w *AppWorkspace) QuestionAnswer(answers []question.Answer) bool {
+	return w.app.Questions.Answer(answers)
+}
+
+func (w *AppWorkspace) QuestionCancel() bool {
+	return w.app.Questions.Cancel()
+}
+
 // -- FileTracker --
 
 func (w *AppWorkspace) FileTrackerRecordRead(ctx context.Context, sessionID, path string) {
@@ -365,7 +376,7 @@ func (w *AppWorkspace) MarkProjectInitialized() error {
 }
 
 func (w *AppWorkspace) InitializePrompt() (string, error) {
-	return agent.InitializePrompt(w.store)
+	return prompt.InitializePrompt(w.store)
 }
 
 // -- MCP operations --
