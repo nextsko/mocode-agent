@@ -4,6 +4,7 @@ package slash
 
 import (
 	"context"
+	"hash/fnv"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -45,6 +46,7 @@ type MCPPrompt struct {
 type CustomCommand struct {
 	ID        string
 	Name      string
+	Path      string // relative path to the .md source — preserved for display
 	Content   string
 	Arguments []Argument
 }
@@ -152,10 +154,12 @@ func loadCommand(path, baseDir, prefix string) (CustomCommand, error) {
 	}
 
 	id := buildCommandID(path, baseDir, prefix)
+	rel, _ := filepath.Rel(baseDir, path)
 
 	return CustomCommand{
 		ID:        id,
 		Name:      id,
+		Path:      rel,
 		Content:   string(content),
 		Arguments: extractArgNames(string(content)),
 	}, nil
@@ -183,16 +187,48 @@ func extractArgNames(content string) []Argument {
 }
 
 func buildCommandID(path, baseDir, prefix string) string {
-	relPath, _ := filepath.Rel(baseDir, path)
-	parts := strings.Split(relPath, string(filepath.Separator))
-
-	// Remove .md extension from last part
-	if len(parts) > 0 {
-		lastIdx := len(parts) - 1
-		parts[lastIdx] = strings.TrimSuffix(parts[lastIdx], filepath.Ext(parts[lastIdx]))
+	// Use a stable hash of the relative path instead of joining directory
+	// names with `:` — a folder whose name itself contains `:` (e.g.
+	// `8;2;104;255;214m`) would otherwise split the ID mid-sequence and
+	// collide with the desc row. The full relative path is stored in
+	// the command for hash stability and to recover the display path.
+	rel, err := filepath.Rel(baseDir, path)
+	if err != nil {
+		rel = path
 	}
+	return prefix + commandPathHash(rel)
+}
 
-	return prefix + strings.Join(parts, ":")
+// commandPathHash returns a short, stable hash of the command's relative
+// path. The hash is the only piece used in the ID so that paths with
+// separator-like characters (`/`, `:`, `;`, `\`) can never split it.
+func commandPathHash(rel string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(rel))
+	// Base36 of the FNV-1a 32-bit hash, 7 chars (≈ 36^7 ≈ 78B unique) is
+	// plenty for per-source custom command counts.
+	return encodeBase36(uint64(h.Sum32()), 7)
+}
+
+// encodeBase36 returns the value as a fixed-width base-36 string (uppercase).
+// Width 0 means "as many digits as needed".
+func encodeBase36(v uint64, width int) string {
+	const digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	if v == 0 {
+		if width <= 0 {
+			return "0"
+		}
+		return strings.Repeat("0", width)
+	}
+	var buf []byte
+	for v > 0 {
+		buf = append([]byte{digits[v%36]}, buf...)
+		v /= 36
+	}
+	for len(buf) < width {
+		buf = append([]byte{'0'}, buf...)
+	}
+	return string(buf)
 }
 
 func isMarkdownFile(name string) bool {

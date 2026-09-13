@@ -13,11 +13,13 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/completions"
 	"github.com/nextsko/mocode-agent/internal/ui/dialog"
+	"github.com/nextsko/mocode-agent/internal/ui/slash"
 )
 
 func (m *UI) openSlashCompletions() tea.Cmd {
@@ -338,7 +340,7 @@ func (m *UI) slashCompletionGroups() []completions.SlashGroup {
 		customItems := make([]completions.SlashCompletionValue, 0, len(m.customCommands))
 		for _, cmd := range m.customCommands {
 			customItems = append(customItems, completions.SlashCompletionValue{
-				Command: slashLabelFromCommandID(cmd.ID),
+				Command: customCommandLabel(cmd),
 				Desc:    slashDescFromContent(cmd.Content),
 				Msg: dialog.ActionRunCustomCommand{
 					Content:   cmd.Content,
@@ -353,18 +355,25 @@ func (m *UI) slashCompletionGroups() []completions.SlashGroup {
 }
 
 func slashLabelFromCommandID(id string) string {
-	parts := strings.Split(id, ":")
-	name := parts[len(parts)-1]
-	name = strings.ReplaceAll(name, "_", "-")
-	if name == "" {
-		name = id
+	// ID is now a stable hash; display the actual command name from the
+	// loader's Path field when available. As a fallback for hash-only
+	// callers, strip the prefix and show the last 16 hash chars.
+	if !strings.HasPrefix(id, "/") {
+		return "/" + id
 	}
-	return "/" + name
+	return id
 }
 
+// slashDescFromContent returns a one-line description of a custom command
+// derived from its markdown source. ANSI escape sequences are stripped
+// first because users often paste colorized previews into command files, and
+// those would otherwise leak into the popup as raw escapes (which already
+// broke display once on an 8;2;104;255;214m-colored directory example).
 func slashDescFromContent(content string) string {
-	for _, line := range strings.SplitN(content, "\n", 5) {
-		line = strings.TrimSpace(strings.TrimLeft(line, "#> "))
+	for _, raw := range strings.SplitN(content, "\n", 5) {
+		line := ansi.Strip(raw)
+		line = strings.TrimLeft(line, "#> ")
+		line = strings.TrimSpace(line)
 		if line != "" {
 			if len(line) > 60 {
 				return line[:60] + "…"
@@ -373,6 +382,18 @@ func slashDescFromContent(content string) string {
 		}
 	}
 	return ""
+}
+
+// customCommandLabel picks the user-facing label for a custom command:
+// its markdown file's relative path (sans extension) is the most useful
+// hint in the popup. Falls back to the ID's hash suffix when the path
+// is unknown (e.g. legacy callers that only have the ID).
+func customCommandLabel(cmd slash.CustomCommand) string {
+	if cmd.Path != "" {
+		base := strings.TrimSuffix(cmd.Path, filepath.Ext(cmd.Path))
+		return strings.ReplaceAll(base, string(filepath.Separator), "/")
+	}
+	return cmd.ID
 }
 
 func (m *UI) insertCompletionText(text string) bool {

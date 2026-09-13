@@ -31,7 +31,8 @@ func TestLoadFromSource_ExistingDir(t *testing.T) {
 	cmds, err := loadFromSource(commandSource{path: dir, prefix: userCommandPrefix})
 	require.NoError(t, err)
 	require.Len(t, cmds, 1)
-	require.Equal(t, "user:hello", cmds[0].ID)
+	require.Equal(t, "user:"+commandPathHash("hello.md"), cmds[0].ID)
+	require.Equal(t, "hello.md", cmds[0].Path)
 	require.Equal(t, "say hello", cmds[0].Content)
 }
 
@@ -49,5 +50,6 @@ func TestLoadAll_MixedSources(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, cmds, 1)
-	require.Equal(t, "user:cmd", cmds[0].ID)
+	require.Equal(t, "user:"+commandPathHash("cmd.md"), cmds[0].ID)
+	require.Equal(t, "cmd.md", cmds[0].Path)
 }
