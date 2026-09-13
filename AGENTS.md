@@ -560,3 +560,9 @@ Builtin skills live in `internal/core/skills/builtin/<name>/SKILL.md`; the front
 matter `name` **must equal the directory name**. Role prompts live in
 `internal/core/config/templates/modes/<id>.md`. Both are embedded at build time,
 so a rebuild + restart is required for changes to take effect.
+
+Skills are injected into the system prompt in **tiered** form: each is advertised
+by name + a one-line gist (`SkillGist`, capped at 120 runes) and, only when not
+derivable, its location (`ToPromptXML`). The model reads the full `SKILL.md` on
+demand — builtin ones at `mocode://skills/<name>/SKILL.md`. This keeps the prompt
+small (~40% smaller for the current set) and scales as the collection grows.
