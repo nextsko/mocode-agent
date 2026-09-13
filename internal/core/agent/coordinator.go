@@ -1,35 +1,27 @@
 package agent
 
 import (
-	"bytes"
-	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"path/filepath"
-	"slices"
 	"strings"
 
-	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
-	"charm.land/fantasy/providers/anthropic"
-	"charm.land/fantasy/providers/azure"
-	"charm.land/fantasy/providers/google"
-	"charm.land/fantasy/providers/openai"
-	"charm.land/fantasy/providers/openaicompat"
-	"charm.land/fantasy/providers/openrouter"
-	"charm.land/fantasy/providers/vercel"
-	"github.com/nextsko/mocode-agent/internal/core/agent/failover"
+	"github.com/nextsko/mocode-agent/internal/core/agent/jobs"
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
 	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
+	"github.com/nextsko/mocode-agent/internal/core/agent/summary"
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
-	"github.com/nextsko/mocode-agent/internal/core/shellruntime/screencap"
+	"github.com/nextsko/mocode-agent/internal/core/question"
+	"github.com/nextsko/mocode-agent/internal/core/shellruntime/shell"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
+	"github.com/nextsko/mocode-agent/internal/core/tools"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/nethttp"
+	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
 	"github.com/nextsko/mocode-agent/internal/domain/filetracker"
 	"github.com/nextsko/mocode-agent/internal/domain/history"
 	"github.com/nextsko/mocode-agent/internal/domain/messenger"
@@ -41,10 +33,6 @@ import (
 	"github.com/nextsko/mocode-agent/internal/util/errcoll"
 	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
-	"github.com/nextsko/mocode-agent/internal/core/tools"
-	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/nethttp"
-	"github.com/qjebbs/go-jsons"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -127,6 +115,7 @@ type coordinator struct {
 	sessions    session.Service
 	messages    message.Service
 	permissions permission.Service
+	questions   question.Service
 	history     history.Service
 	filetracker filetracker.Service
 	lspManager  *lsp.Manager
@@ -149,7 +138,7 @@ type coordinator struct {
 	// that cancelled sub-agents can be stopped without affecting the
 	// parent session.
 	subagentIndex *csync.Map[string, string]
-	summaryQueue  *sessionSummaryQueue
+	summaryQueue  *summary.Queue
 	// summaryDone emits a SummaryCompletedMsg whenever the asynchronous
 	// summary goroutine finishes (success or failure). The composition
 	// root (internal/core/app/app.go) subscribes to it inside
@@ -177,6 +166,7 @@ func NewCoordinator(
 	sessions session.Service,
 	messages message.Service,
 	permissions permission.Service,
+	questions question.Service,
 	history history.Service,
 	filetracker filetracker.Service,
 	lspManager *lsp.Manager,
@@ -193,13 +183,14 @@ func NewCoordinator(
 		sessions:       sessions,
 		messages:       messages,
 		permissions:    permissions,
+		questions:      questions,
 		history:        history,
 		filetracker:    filetracker,
 		lspManager:     lspManager,
 		notify:         notify,
 		agents:         make(map[string]SessionAgent),
 		subagentIndex:  csync.NewMap[string, string](),
-		summaryQueue:   sessionSummaryQueueNew(),
+		summaryQueue:   summary.NewQueue(),
 		summaryDone:    pubsub.NewBroker[SummaryCompletedMsg](),
 		allSkills:      allSkills,
 		activeSkills:   activeSkills,
@@ -228,7 +219,7 @@ func NewCoordinator(
 	}
 
 	promptOpts := []prompt.Option{prompt.WithWorkingDir(c.cfg.WorkingDir())}
-	agentPrompt, err := promptForAgent(agentCfg, promptOpts...)
+	agentPrompt, err := prompt.PromptForAgent(agentCfg, promptOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -305,6 +296,13 @@ func (c *coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 		}
 	}
 
+	// Push model: fold background-job completion notifications into this
+	// turn's prompt so the model learns jobs finished without polling
+	// job_output (see shell.DrainCompletedNotifications).
+	if jobNotes := shell.GetBackgroundShellManager().DrainCompletedNotifications(sessionID); len(jobNotes) > 0 {
+		prompt = jobs.FormatPendingJobNotifications(jobNotes) + "\n\n" + prompt
+	}
+
 	// Inject session context (branch/snapshot info) into system prompt.
 	if sessionCtx := getSessionContext(ctx, c.sessions, sessionID); sessionCtx != "" {
 		c.currentAgent.SetSystemPrompt(c.currentAgent.SystemPrompt() + "\n\n<session_context>\n" + sessionCtx + "\n</session_context>")
@@ -353,535 +351,10 @@ func (c *coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 	return result, originalErr
 }
 
-func getProviderOptions(model Model, providerCfg config.ProviderConfig) fantasy.ProviderOptions {
-	options := fantasy.ProviderOptions{}
-
-	cfgOpts := []byte("{}")
-	providerCfgOpts := []byte("{}")
-	catwalkOpts := []byte("{}")
-
-	if model.ModelCfg.ProviderOptions != nil {
-		data, err := json.Marshal(model.ModelCfg.ProviderOptions)
-		if err == nil {
-			cfgOpts = data
-		}
-	}
-
-	if providerCfg.ProviderOptions != nil {
-		data, err := json.Marshal(providerCfg.ProviderOptions)
-		if err == nil {
-			providerCfgOpts = data
-		}
-	}
-
-	if model.CatwalkCfg.Options.ProviderOptions != nil {
-		data, err := json.Marshal(model.CatwalkCfg.Options.ProviderOptions)
-		if err == nil {
-			catwalkOpts = data
-		}
-	}
-
-	readers := []io.Reader{
-		bytes.NewReader(catwalkOpts),
-		bytes.NewReader(providerCfgOpts),
-		bytes.NewReader(cfgOpts),
-	}
-
-	got, err := jsons.Merge(readers)
-	if err != nil {
-		slog.Error("Could not merge call config", "err", err)
-		return options
-	}
-
-	mergedOptions := make(map[string]any)
-
-	err = json.Unmarshal([]byte(got), &mergedOptions)
-	if err != nil {
-		slog.Error("Could not create config for call", "err", err)
-		return options
-	}
-
-	switch providerCfg.Type {
-	case openai.Name, azure.Name:
-		_, hasReasoningEffort := mergedOptions["reasoning_effort"]
-		if !hasReasoningEffort && model.ModelCfg.ReasoningEffort != "" {
-			mergedOptions["reasoning_effort"] = model.ModelCfg.ReasoningEffort
-		}
-		if openai.IsResponsesModel(model.CatwalkCfg.ID) {
-			if openai.IsResponsesReasoningModel(model.CatwalkCfg.ID) {
-				mergedOptions["reasoning_summary"] = "auto"
-				mergedOptions["include"] = []openai.IncludeType{openai.IncludeReasoningEncryptedContent}
-			}
-			parsed, err := openai.ParseResponsesOptions(mergedOptions)
-			if err == nil {
-				options[openai.Name] = parsed
-			}
-		} else {
-			parsed, err := openai.ParseOptions(mergedOptions)
-			if err == nil {
-				options[openai.Name] = parsed
-			}
-		}
-	case anthropic.Name:
-		var (
-			_, hasEffort = mergedOptions["effort"]
-			_, hasThink  = mergedOptions["thinking"]
-		)
-		switch {
-		case !hasEffort && model.ModelCfg.ReasoningEffort != "":
-			mergedOptions["effort"] = model.ModelCfg.ReasoningEffort
-		case !hasThink && model.ModelCfg.Think:
-			mergedOptions["thinking"] = map[string]any{"budget_tokens": 2000}
-		}
-		parsed, err := anthropic.ParseOptions(mergedOptions)
-		if err == nil {
-			options[anthropic.Name] = parsed
-		}
-
-	case openrouter.Name:
-		_, hasReasoning := mergedOptions["reasoning"]
-		if !hasReasoning && model.ModelCfg.ReasoningEffort != "" {
-			mergedOptions["reasoning"] = map[string]any{
-				"enabled": true,
-				"effort":  model.ModelCfg.ReasoningEffort,
-			}
-		}
-		parsed, err := openrouter.ParseOptions(mergedOptions)
-		if err == nil {
-			options[openrouter.Name] = parsed
-		}
-	case vercel.Name:
-		_, hasReasoning := mergedOptions["reasoning"]
-		if !hasReasoning && model.ModelCfg.ReasoningEffort != "" {
-			mergedOptions["reasoning"] = map[string]any{
-				"enabled": true,
-				"effort":  model.ModelCfg.ReasoningEffort,
-			}
-		}
-		parsed, err := vercel.ParseOptions(mergedOptions)
-		if err == nil {
-			options[vercel.Name] = parsed
-		}
-	case google.Name:
-		_, hasReasoning := mergedOptions["thinking_config"]
-		if !hasReasoning {
-			if strings.HasPrefix(model.CatwalkCfg.ID, "gemini-2") {
-				mergedOptions["thinking_config"] = map[string]any{
-					"thinking_budget":  2000,
-					"include_thoughts": true,
-				}
-			} else {
-				mergedOptions["thinking_config"] = map[string]any{
-					"thinking_level":   model.ModelCfg.ReasoningEffort,
-					"include_thoughts": true,
-				}
-			}
-		}
-		parsed, err := google.ParseOptions(mergedOptions)
-		if err == nil {
-			options[google.Name] = parsed
-		}
-	case openaicompat.Name:
-		_, hasReasoningEffort := mergedOptions["reasoning_effort"]
-		if !hasReasoningEffort && model.ModelCfg.ReasoningEffort != "" {
-			mergedOptions["reasoning_effort"] = model.ModelCfg.ReasoningEffort
-		}
-
-		extraBody := make(map[string]any)
-
-		// "reasoning effort" is a standard OpenAI field, but "thinking" is not.
-		// Setting it in the right way for each provider.
-		// TODO: Abstract this in Fantasy somehow?
-		// TODO: Allow custom providers to specify how to set this?
-		switch providerCfg.ID {
-		case string(catwalk.InferenceProviderIoNet):
-			extraBody["chat_template_kwargs"] = map[string]any{
-				"thinking": model.ModelCfg.Think,
-			}
-		case string(catwalk.InferenceProviderZAI):
-			if model.ModelCfg.Think {
-				extraBody["thinking"] = map[string]any{
-					"type": "enabled",
-				}
-			} else {
-				extraBody["thinking"] = map[string]any{
-					"type": "disabled",
-				}
-			}
-		}
-
-		mergedOptions["extra_body"] = extraBody
-
-		parsed, err := openaicompat.ParseOptions(mergedOptions)
-		if err == nil {
-			options[openaicompat.Name] = parsed
-		}
-	}
-
-	return options
-}
-
-func mergeCallOptions(model Model, cfg config.ProviderConfig) (fantasy.ProviderOptions, *float64, *float64, *int64, *float64, *float64) {
-	modelOptions := getProviderOptions(model, cfg)
-	temp := cmp.Or(model.ModelCfg.Temperature, model.CatwalkCfg.Options.Temperature)
-	topP := cmp.Or(model.ModelCfg.TopP, model.CatwalkCfg.Options.TopP)
-	topK := cmp.Or(model.ModelCfg.TopK, model.CatwalkCfg.Options.TopK)
-	freqPenalty := cmp.Or(model.ModelCfg.FrequencyPenalty, model.CatwalkCfg.Options.FrequencyPenalty)
-	presPenalty := cmp.Or(model.ModelCfg.PresencePenalty, model.CatwalkCfg.Options.PresencePenalty)
-	return modelOptions, temp, topP, topK, freqPenalty, presPenalty
-}
-
-func (c *coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, agent config.Agent, isSubAgent bool) (SessionAgent, error) {
-	large, small, err := c.buildAgentModels(ctx, isSubAgent)
-	if err != nil {
-		return nil, err
-	}
-
-	largeProviderCfg, _ := c.cfg.Config().Providers.Get(large.ModelCfg.Provider)
-	result := NewSessionAgent(SessionAgentOptions{
-		LargeModel:           large,
-		SmallModel:           small,
-		SystemPromptPrefix:   largeProviderCfg.SystemPromptPrefix,
-		SystemPrompt:         "",
-		IsSubAgent:           isSubAgent,
-		DisableAutoSummarize: c.cfg.Config().Options.DisableAutoSummarize,
-		IsYolo:               c.permissions.SkipRequests(),
-		Sessions:             c.sessions,
-		Messages:             c.messages,
-		Tools:                nil,
-		Notify:               c.notify,
-		WorkingDir:           c.cfg.WorkingDir(),
-		ErrorCollector:       c.errorCollector,
-	})
-
-	c.readyWg.Go(func() error {
-		systemPrompt, err := prompt.Build(ctx, large.Model.Provider(), large.Model.Model(), c.cfg)
-		if err != nil {
-			return err
-		}
-		result.SetSystemPrompt(systemPrompt)
-		return nil
-	})
-
-	c.readyWg.Go(func() error {
-		tools, err := c.buildTools(ctx, agent, isSubAgent)
-		if err != nil {
-			return err
-		}
-		result.SetTools(tools)
-		return nil
-	})
-
-	return result, nil
-}
-
-func (c *coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isSubAgent bool) ([]fantasy.AgentTool, error) {
-	// ── coordinator-owned tools (call back into coordinator state) ───────────
-	var allTools []fantasy.AgentTool
-	if slices.Contains(agentCfg.AllowedTools, AgentToolName) {
-		agentTool, err := c.agentTool(ctx)
-		if err != nil {
-			return nil, err
-		}
-		allTools = append(allTools, agentTool)
-	}
-	if slices.Contains(agentCfg.AllowedTools, tools.AgenticFetchToolName) {
-		agenticFetchTool, err := c.agenticFetchTool(ctx, nil)
-		if err != nil {
-			return nil, err
-		}
-		allTools = append(allTools, agenticFetchTool)
-	}
-
-	// ── standard tools via registry ──────────────────────────────────────────
-	modelName := ""
-	if modelCfg, ok := c.cfg.Config().Models[agentCfg.Model]; ok {
-		if m := c.cfg.Config().GetModel(modelCfg.Provider, modelCfg.Model); m != nil {
-			modelName = m.Name
-		}
-	}
-	deps := tools.ToolDeps{
-		Cfg:          c.cfg,
-		Permissions:  c.permissions,
-		LSPManager:   c.lspManager,
-		History:      c.history,
-		FileTracker:  c.filetracker,
-		Sessions:     c.sessions,
-		Messages:     c.messages,
-		AllSkills:    c.allSkills,
-		ActiveSkills: c.activeSkills,
-		SkillTracker: c.skillTracker,
-		ModelName:    modelName,
-		SummarySchedule: func(ctx context.Context, sessionID string) error {
-			c.summaryQueue.Add(sessionID)
-			return nil
-		},
-		SessionSearch: c.sessionSearch,
-		HTTP:          c.httpFactory,
-	}
-	allTools = append(allTools, c.toolRegistry.Build(ctx, deps)...)
-
-	// ── transfer_to_agent (coordinator-owned, config-driven) ─────────────────
-	if len(agentCfg.SubAgents) > 0 {
-		onTransfer := func(ctx context.Context, fromAgent, toAgent, message string) error {
-			// Validate the target is in the sub_agents list.
-			found := false
-			for _, sa := range agentCfg.SubAgents {
-				if sa == toAgent {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return fmt.Errorf("agent %q is not in sub_agents list", toAgent)
-			}
-			// Actually switch the coordinator's active agent.
-			if err := c.SetMainAgent(toAgent); err != nil {
-				return fmt.Errorf("failed to switch to agent %q: %w", toAgent, err)
-			}
-			return nil
-		}
-		allTools = append(allTools, tools.NewTransferTool(agentCfg.SubAgents, onTransfer))
-	}
-
-	// ── Screenshot tools ─────────────────────────────────────────────────────
-	screenshotDir := infra.ScreenshotsDir()
-	allTools = append(allTools, screencap.NewAgentTool(screenshotDir))
-
-	// ── Messaging tools (coordinator-owned, always available regardless of AllowedTools) ─
-	messengerPort := c.messenger
-	if messengerPort == nil {
-		messengerPort = messenger.NoopMessenger{}
-	}
-	allTools = append(
-		allTools,
-		tools.NewWeChatSendImageTool(messengerPort),
-		tools.NewWeChatSendFileTool(messengerPort),
-		tools.NewWeChatScreenshotTool(messengerPort, screenshotDir),
-	)
-
-	// ── filter by AllowedTools ────────────────────────────────────────────────
-	// coordinator-owned tools (agent, agentic_fetch, transfer_to_agent) bypass
-	// the AllowedTools filter because they are already conditioned at the top.
-	coordOwned := map[string]bool{
-		AgentToolName:                  true,
-		tools.AgenticFetchToolName:     true,
-		tools.TransferToolName:         true,
-		tools.WeChatSendImageToolName:  true,
-		tools.WeChatSendFileToolName:   true,
-		tools.WeChatScreenshotToolName: true,
-	}
-	var filteredTools []fantasy.AgentTool
-	for _, tool := range allTools {
-		if coordOwned[tool.Info().Name] || slices.Contains(agentCfg.AllowedTools, tool.Info().Name) {
-			filteredTools = append(filteredTools, tool)
-		}
-	}
-
-	// ── append runtime MCP tools with AllowedMCP filter ──────────────────────
-	for _, mcpTool := range tools.GetMCPTools(c.permissions, c.cfg, c.cfg.WorkingDir()) {
-		if agentCfg.AllowedMCP == nil {
-			// No MCP restrictions.
-			filteredTools = append(filteredTools, mcpTool)
-			continue
-		}
-		if len(agentCfg.AllowedMCP) == 0 {
-			// No MCPs allowed.
-			slog.Debug("No MCPs allowed", "tool", mcpTool.Name(), "agent", agentCfg.Name)
-			break
-		}
-		for mcpName, mcpToolNames := range agentCfg.AllowedMCP {
-			if mcpName != mcpTool.MCP() {
-				continue
-			}
-			if len(mcpToolNames) == 0 || slices.Contains(mcpToolNames, mcpTool.MCPToolName()) {
-				filteredTools = append(filteredTools, mcpTool)
-				break
-			}
-			slog.Debug("MCP not allowed", "tool", mcpTool.Name(), "agent", agentCfg.Name)
-		}
-	}
-	slices.SortFunc(filteredTools, func(a, b fantasy.AgentTool) int {
-		return strings.Compare(a.Info().Name, b.Info().Name)
-	})
-
-	// Wrap tools with hook interception for the top-level agent only.
-	// Sub-agents (the `agent` task tool, `agentic_fetch`, etc.) run
-	// without hook interception to avoid firing the user's hook N times
-	// per delegated turn. The top-level invocation of the sub-agent tool
-	// itself is still wrapped from the coder's side.
-	return filteredTools, nil
-}
-
-// TODO: when we support multiple agents we need to change this so that we pass in the agent specific model config
-func (c *coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Model, Model, error) {
-	largeModelCfg, ok := c.cfg.Config().Models[config.SelectedModelTypeLarge]
-	if !ok {
-		return Model{}, Model{}, errLargeModelNotSelected
-	}
-	smallModelCfg, ok := c.cfg.Config().Models[config.SelectedModelTypeSmall]
-	if !ok {
-		return Model{}, Model{}, errSmallModelNotSelected
-	}
-
-	largeProviderCfg, ok := c.cfg.Config().Providers.Get(largeModelCfg.Provider)
-	if !ok {
-		return Model{}, Model{}, errLargeModelProviderNotConfigured
-	}
-
-	largeProvider, err := c.buildProvider(largeProviderCfg, largeModelCfg, isSubAgent)
-	if err != nil {
-		return Model{}, Model{}, err
-	}
-
-	smallProviderCfg, ok := c.cfg.Config().Providers.Get(smallModelCfg.Provider)
-	if !ok {
-		return Model{}, Model{}, errSmallModelProviderNotConfigured
-	}
-
-	smallProvider, err := c.buildProvider(smallProviderCfg, smallModelCfg, true)
-	if err != nil {
-		return Model{}, Model{}, err
-	}
-
-	var largeCatwalkModel *catwalk.Model
-	var smallCatwalkModel *catwalk.Model
-
-	for _, m := range largeProviderCfg.Models {
-		if m.ID == largeModelCfg.Model {
-			largeCatwalkModel = &m
-		}
-	}
-	for _, m := range smallProviderCfg.Models {
-		if m.ID == smallModelCfg.Model {
-			smallCatwalkModel = &m
-		}
-	}
-
-	if largeCatwalkModel == nil {
-		return Model{}, Model{}, errLargeModelNotFound
-	}
-
-	if smallCatwalkModel == nil {
-		return Model{}, Model{}, errSmallModelNotFound
-	}
-
-	largeModelID := largeModelCfg.Model
-	smallModelID := smallModelCfg.Model
-
-	if largeModelCfg.Provider == openrouter.Name && isExactoSupported(largeModelID) {
-		largeModelID += ":exacto"
-	}
-
-	if smallModelCfg.Provider == openrouter.Name && isExactoSupported(smallModelID) {
-		smallModelID += ":exacto"
-	}
-
-	largeModel, err := largeProvider.LanguageModel(ctx, largeModelID)
-	if err != nil {
-		return Model{}, Model{}, err
-	}
-	smallModel, err := smallProvider.LanguageModel(ctx, smallModelID)
-	if err != nil {
-		return Model{}, Model{}, err
-	}
-
-	// Wrap with failover when a fallback is declared. The wrap is a no-op when
-	// no fallback is configured, so existing behavior is unchanged.
-	largeModel, err = c.withFailover(ctx, largeModel, largeModelCfg)
-	if err != nil {
-		return Model{}, Model{}, err
-	}
-	smallModel, err = c.withFailover(ctx, smallModel, smallModelCfg)
-	if err != nil {
-		return Model{}, Model{}, err
-	}
-
-	return Model{
-			Model:      largeModel,
-			CatwalkCfg: *largeCatwalkModel,
-			ModelCfg:   largeModelCfg,
-		}, Model{
-			Model:      smallModel,
-			CatwalkCfg: *smallCatwalkModel,
-			ModelCfg:   smallModelCfg,
-		}, nil
-}
-
-// withFailover wraps a primary LanguageModel with failover when the model's
-// config declares a Fallback. It mirrors the primary construction (resolve
-// provider config, build provider, resolve model id) for the fallback, then
-// wraps the two with failover.New. When no fallback is declared the primary is
-// returned unchanged, preserving existing behavior.
-func (c *coordinator) withFailover(ctx context.Context, primary fantasy.LanguageModel, cfg config.SelectedModel) (fantasy.LanguageModel, error) {
-	if cfg.Fallback == nil {
-		return primary, nil
-	}
-	fb := *cfg.Fallback
-	fbProviderCfg, ok := c.cfg.Config().Providers.Get(fb.Provider)
-	if !ok {
-		return nil, fmt.Errorf("failover: fallback provider %q not configured", fb.Provider)
-	}
-	fbProvider, err := c.buildProvider(fbProviderCfg, fb, true)
-	if err != nil {
-		return nil, fmt.Errorf("failover: build fallback provider: %w", err)
-	}
-	fbModelID := fb.Model
-	if fb.Provider == openrouter.Name && isExactoSupported(fbModelID) {
-		fbModelID += ":exacto"
-	}
-	fbModel, err := fbProvider.LanguageModel(ctx, fbModelID)
-	if err != nil {
-		return nil, fmt.Errorf("failover: build fallback model: %w", err)
-	}
-	wrapped, err := failover.New(failover.WithPrimary(primary), failover.WithFallback(fbModel))
-	if err != nil {
-		return nil, fmt.Errorf("failover: %w", err)
-	}
-	return wrapped, nil
-}
-
 // sessionLogSink adapts *sessionlog.Logger to toolutil.SessionLoggerSink.
 // It lives in the coordinator (not the tool layer) so toolutil stays free of
 // a sessionlog import.
 type sessionLogSink struct{ l *sessionlog.Logger }
-
-func (s sessionLogSink) LogToolCall(event, data string, m toolutil.SessionLogMeta) {
-	s.l.LogToolCall(event, data, toSessionLogMeta(m))
-}
-
-func (s sessionLogSink) LogThink(event, data string, m toolutil.SessionLogMeta) {
-	s.l.LogThink(event, data, toSessionLogMeta(m))
-}
-
-func (s sessionLogSink) LogBug(event, data string, m toolutil.SessionLogMeta) {
-	s.l.LogBug(event, data, toSessionLogMeta(m))
-}
-
-func (s sessionLogSink) LogInfo(event, data string, m toolutil.SessionLogMeta) {
-	s.l.LogInfo(event, data, toSessionLogMeta(m))
-}
-
-func toSessionLogMeta(m toolutil.SessionLogMeta) sessionlog.Meta {
-	return sessionlog.Meta{
-		ToolName:   m.ToolName,
-		ToolCallID: m.ToolCallID,
-		AgentID:    m.AgentID,
-		DurationMs: m.DurationMs,
-		ErrorType:  m.ErrorType,
-	}
-}
-
-func isExactoSupported(modelID string) bool {
-	supportedModels := []string{
-		"moonshotai/kimi-k2-0905",
-		"deepseek/deepseek-v3.1-terminus",
-		"z-ai/glm-4.6",
-		"openai/gpt-oss-120b",
-		"qwen/qwen3-coder",
-	}
-	return slices.Contains(supportedModels, modelID)
-}
 
 // SetMessenger wires the external-account send port (e.g. messaging
 // integration) used by the coordinator-owned messaging tools. A nil m falls
@@ -908,7 +381,7 @@ func (c *coordinator) SetMainAgent(agentID string) error {
 	}
 
 	promptOpts := []prompt.Option{prompt.WithWorkingDir(c.cfg.WorkingDir())}
-	agentPrompt, err := promptForAgent(agentCfg, promptOpts...)
+	agentPrompt, err := prompt.PromptForAgent(agentCfg, promptOpts...)
 	if err != nil {
 		return err
 	}
@@ -981,7 +454,7 @@ func (c *coordinator) UpdateModels(ctx context.Context) error {
 	// If the active mode changed, rebuild and set the system prompt.
 	if activeAgentID != c.activeAgentID {
 		promptOpts := []prompt.Option{prompt.WithWorkingDir(c.cfg.WorkingDir())}
-		agentPrompt, err := promptForAgent(agentCfg, promptOpts...)
+		agentPrompt, err := prompt.PromptForAgent(agentCfg, promptOpts...)
 		if err != nil {
 			return err
 		}
@@ -1030,176 +503,4 @@ type subAgentResult struct {
 	Response   fantasy.ToolResponse
 	DurationMs int64
 	Usage      fantasy.Usage
-}
-
-// subagentUsageFromTotal converts a fantasy provider's TotalUsage into the
-// notify package's sub-agent token usage representation.
-func subagentUsageFromTotal(usage fantasy.Usage) notify.SubagentTokenUsage {
-	return notify.SubagentTokenUsage{
-		Input:         usage.InputTokens,
-		Output:        usage.OutputTokens,
-		CacheRead:     usage.CacheReadTokens,
-		CacheCreation: usage.CacheCreationTokens,
-		Total:         usage.TotalTokens,
-	}
-}
-
-// discoverSkills runs the skill discovery pipeline and returns both the
-// pre-filter (all discovered, after dedup) and post-filter (active) lists.
-// It also emits a single diagnostic log line summarising the outcome to
-// help track skill-loading health over time.
-func discoverSkills(cfg *config.ConfigStore) (allSkills, activeSkills []*skills.Skill) {
-	builtin, builtinStates := skills.DiscoverBuiltinWithStates()
-	discovered := append([]*skills.Skill(nil), builtin...)
-
-	var userStates []*skills.SkillState
-	var userPaths []string
-
-	opts := cfg.Config().Options
-	if opts != nil && len(opts.SkillsPaths) > 0 {
-		userPaths = make([]string, 0, len(opts.SkillsPaths))
-		for _, pth := range opts.SkillsPaths {
-			expanded := infra.Long(pth)
-			if strings.HasPrefix(expanded, "$") {
-				if resolved, err := cfg.Resolver().ResolveValue(expanded); err == nil {
-					expanded = resolved
-				}
-			}
-			userPaths = append(userPaths, expanded)
-		}
-		var userSkills []*skills.Skill
-		userSkills, userStates = skills.DiscoverWithStates(userPaths)
-		discovered = append(discovered, userSkills...)
-	}
-
-	allSkills = skills.Deduplicate(discovered)
-	var disabledSkills []string
-	if opts != nil {
-		disabledSkills = opts.DisabledSkills
-	}
-	activeSkills = skills.Filter(allSkills, disabledSkills)
-
-	logDiscoveryStats(builtin, builtinStates, userStates, userPaths, allSkills, activeSkills, disabledSkills)
-	return allSkills, activeSkills
-}
-
-// logTurnSkillUsage emits a per-turn diagnostic line showing which skills
-// (if any) were loaded during this turn and which looked relevant based on
-// a cheap keyword match against the user prompt. The goal is to surface
-// "should-have-loaded but didn't" situations for later analysis.
-//
-// Logged at Info level under component=skills; heavy fields are elided when
-// there is nothing interesting to report.
-func logTurnSkillUsage(
-	sessionID string,
-	prompt string,
-	activeSkills []*skills.Skill,
-	tracker *skills.Tracker,
-	before []string,
-) {
-	if tracker == nil || len(activeSkills) == 0 {
-		return
-	}
-
-	after := tracker.LoadedNames()
-
-	beforeSet := make(map[string]bool, len(before))
-	for _, n := range before {
-		beforeSet[n] = true
-	}
-	var loadedThisTurn []string
-	for _, n := range after {
-		if !beforeSet[n] {
-			loadedThisTurn = append(loadedThisTurn, n)
-		}
-	}
-
-	slog.Info(
-		"Skill turn summary",
-		"component", "skills",
-		"session_id", sessionID,
-		"prompt_len", len(prompt),
-		"active_total", len(activeSkills),
-		"loaded_total", len(after),
-		"loaded_this_turn", loadedThisTurn,
-	)
-}
-
-// logDiscoveryStats emits a single structured log line summarising skill
-// discovery for the current session. It is intentionally low-volume: one
-// line per session start.
-func logDiscoveryStats(
-	builtin []*skills.Skill,
-	builtinStates, userStates []*skills.SkillState,
-	userPaths []string,
-	allSkills, activeSkills []*skills.Skill,
-	disabled []string,
-) {
-	countErrors := func(states []*skills.SkillState) int {
-		n := 0
-		for _, s := range states {
-			if s.State == skills.StateError {
-				n++
-			}
-		}
-		return n
-	}
-
-	userOK := 0
-	for _, s := range userStates {
-		if s.State == skills.StateNormal {
-			userOK++
-		}
-	}
-
-	activeNames := make([]string, 0, len(activeSkills))
-	for _, s := range activeSkills {
-		activeNames = append(activeNames, s.Name)
-	}
-
-	xml := skills.ToPromptXML(activeSkills)
-
-	slog.Info(
-		"Skill discovery complete",
-		"component", "skills",
-		"builtin_ok", len(builtin),
-		"builtin_errors", countErrors(builtinStates),
-		"user_ok", userOK,
-		"user_errors", countErrors(userStates),
-		"user_paths", len(userPaths),
-		"deduped_total", len(allSkills),
-		"active", len(activeSkills),
-		"disabled", len(disabled),
-		"prompt_bytes", len(xml),
-		"prompt_tok_est", skills.ApproxTokenCount(xml),
-		"active_names", activeNames,
-	)
-}
-
-// getSessionContext returns a human-readable string describing the
-// current session's branch/snapshot/revert state.
-func getSessionContext(ctx context.Context, sessions session.Service, sessionID string) string {
-	if sessionID == "" {
-		return ""
-	}
-	sess, err := sessions.Get(ctx, sessionID)
-	if err != nil {
-		return ""
-	}
-
-	var parts []string
-	if sess.ParentSessionID != "" {
-		parts = append(parts, fmt.Sprintf("This session is a branch of %s.", sess.ParentSessionID[:8]))
-	}
-	if sess.RevertSessionID != "" {
-		parts = append(parts, "Files have been reverted to a previous checkpoint.")
-	}
-	if sess.ActiveSnapshotID != "" {
-		parts = append(parts, "File changes are being tracked with checkpoints.")
-	}
-
-	if len(parts) == 0 {
-		return ""
-	}
-	return strings.Join(parts, " ")
 }

@@ -7,6 +7,7 @@ import (
 
 	"charm.land/fantasy"
 
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/shellruntime/shell"
 )
 
@@ -39,7 +40,7 @@ func NewJobKillTool() fantasy.AgentTool {
 			bgManager := shell.GetBackgroundShellManager()
 
 			bgShell, ok := bgManager.Get(params.ShellID)
-			if !ok {
+			if !ok || !bgShell.BelongsTo(toolutil.GetSessionFromContext(ctx)) {
 				return fantasy.NewTextErrorResponse(fmt.Sprintf("background shell not found: %s", params.ShellID)), nil
 			}
 

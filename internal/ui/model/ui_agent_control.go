@@ -11,6 +11,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/core/shellruntime/shell"
 	"github.com/nextsko/mocode-agent/internal/core/tools"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/chat"
@@ -188,6 +189,11 @@ func (m *UI) handleAgentNotification(n notify.Notification) tea.Cmd {
 			} else {
 				m.agentStatus = "executing tool..."
 			}
+			// Prime-agent style roster: when several sub-agents run in
+			// parallel, prefix their count so parallel progress stays visible.
+			if k := m.chat.CountRunningAgentTools(); k > 1 {
+				m.agentStatus = fmt.Sprintf("%d agents running · %s", k, m.agentStatus)
+			}
 			m.agentStatusTime = time.Now()
 		}
 		return nil
@@ -212,6 +218,24 @@ func (m *UI) handleAgentNotification(n notify.Notification) tea.Cmd {
 			m.ensureTodoContinuationState(m.session.ID).ReauthBlocked = true
 		}
 		return m.handleReAuthenticate(n.ProviderID)
+	case notify.TypeBackgroundJobCompleted:
+		if e := n.BackgroundJobCompleted; e != nil {
+			// Completed jobs reach the model via the turn injection and the
+			// chat card already; the OS-level notification is reserved for
+			// failures so it stays meaningful (result-level restraint).
+			if e.State == string(shell.JobStateCompleted) {
+				return nil
+			}
+			detail := e.Command
+			if e.Description != "" {
+				detail = fmt.Sprintf("%s (%s)", e.Command, e.Description)
+			}
+			return m.sendNotification(notification.Notification{
+				Title:   fmt.Sprintf("Background job %s %s", e.JobID, e.State),
+				Message: detail,
+			})
+		}
+		return nil
 	default:
 		return nil
 	}

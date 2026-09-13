@@ -27,8 +27,8 @@ type BashParams struct {
 	Description         string `json:"description" description:"A brief description of what the command does, try to keep it under 30 characters or so"`
 	Command             string `json:"command" description:"The command to execute"`
 	WorkingDir          string `json:"working_dir,omitempty" description:"The working directory to execute the command in (defaults to current directory)"`
-	RunInBackground     bool   `json:"run_in_background,omitempty" description:"Set to true (boolean) to run this command in the background. Use job_output to read the output later."`
-	AutoBackgroundAfter int    `json:"auto_background_after,omitempty" description:"Seconds to wait before automatically moving the command to a background job (default: 60)"`
+	RunInBackground     bool   `json:"run_in_background,omitempty" description:"Set to true (boolean) to run this command in the background. You will be notified on completion via job status updates; use job_output to read output on demand."`
+	AutoBackgroundAfter int    `json:"auto_background_after,omitempty" description:"Seconds to wait before automatically moving the command to a background job (default: 30, max: 30)"`
 	TTY                 bool   `json:"tty,omitempty" description:"When true, run the command in a terminal-like PTY on supported platforms. Useful for live terminal output and more reliable cancellation of long-running jobs."`
 }
 
@@ -55,9 +55,14 @@ type BashResponseMetadata struct {
 const (
 	BashToolName = "bash"
 
-	DefaultAutoBackgroundAfter = 60 // Commands taking longer automatically become background jobs
-	MaxOutputLength            = 30000
-	BashNoOutput               = "no output"
+	// DefaultAutoBackgroundAfter is how long a synchronous command runs
+	// before it is moved to the background (was 60s; aligned to Codex's
+	// 30s yield ceiling so the agent turn never blocks longer than that).
+	DefaultAutoBackgroundAfter = 30
+	// MaxAutoBackgroundAfter caps the model-requested wait window.
+	MaxAutoBackgroundAfter = 30
+	MaxOutputLength        = 30000
+	BashNoOutput           = "no output"
 )
 
 //go:embed bash.tpl
@@ -295,6 +300,9 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 
 			// If explicitly requested as background, start immediately with detached context
 			if params.RunInBackground {
+				if shell.BackgroundTasksDisabled() {
+					return fantasy.NewTextErrorResponse("background tasks are disabled by MO_CODE_DISABLE_BACKGROUND_TASKS; run the command synchronously instead"), nil
+				}
 				startTime := time.Now()
 				bgManager := shell.GetBackgroundShellManager()
 				bgManager.Cleanup()
@@ -305,7 +313,7 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 					blockFuncs(),
 					params.Command,
 					params.Description,
-					shell.BackgroundShellOptions{TTY: params.TTY},
+					shell.BackgroundShellOptions{TTY: params.TTY, SessionID: sessionID},
 				)
 				if err != nil {
 					msg := fmt.Sprintf("error starting background shell: %v", err)
@@ -313,14 +321,15 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 					return fantasy.NewTextErrorResponse(msg), nil
 				}
 
-				// Wait a short time to detect fast failures (blocked commands, syntax errors, etc.)
-				time.Sleep(250 * time.Millisecond)
-				stdout, stderr, done, execErr := bgShell.GetOutput()
-
-				if done {
+				// Explicit yield window (Codex model) instead of a blind
+				// sleep: wait up to 2s for fast failures (blocked command,
+				// syntax error) before handing the job back as background.
+				const startupCheckWindow = 2 * time.Second
+				if bgShell.WaitFor(startupCheckWindow) {
 					// Command failed or completed very quickly
 					_ = bgManager.Remove(bgShell.ID)
 
+					stdout, stderr, _, execErr := bgShell.GetOutput()
 					interrupted := shell.IsInterrupt(execErr)
 					exitCode := shell.ExitCode(execErr)
 					if exitCode == 0 && !interrupted && execErr != nil {
@@ -355,7 +364,7 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 					ShellID:          bgShell.ID,
 					TTY:              bgShell.TTY,
 				}
-				response := fmt.Sprintf("Background shell started with ID: %s\n\nUse job_output to view output, job_input to answer prompts, or job_kill to terminate.", bgShell.ID)
+				response := fmt.Sprintf("Background shell started with ID: %s\n\nYou will be notified automatically when it finishes (exit code + tail output). Use job_output only to fetch more output on demand, job_input to answer prompts, or job_kill to terminate.", bgShell.ID)
 				return fantasy.WithResponseMetadata(fantasy.NewTextResponse(response), metadata), nil
 			}
 
@@ -371,7 +380,7 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 				blockFuncs(),
 				params.Command,
 				params.Description,
-				shell.BackgroundShellOptions{TTY: params.TTY},
+				shell.BackgroundShellOptions{TTY: params.TTY, SessionID: sessionID},
 			)
 			if err != nil {
 				msg := fmt.Sprintf("error starting shell: %v", err)
@@ -379,16 +388,18 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 				return fantasy.NewTextErrorResponse(msg), nil
 			}
 
-			// Wait for either completion, auto-background threshold, or context cancellation.
-			// Poll IsDone only — GetOutput copies the whole buffer, which made
-			// chatty commands O(n²) over the wait window. Output is fetched
-			// once, after the loop exits.
-			ticker := time.NewTicker(100 * time.Millisecond)
-			defer ticker.Stop()
-
-			autoBackgroundAfter := cmp.Or(params.AutoBackgroundAfter, DefaultAutoBackgroundAfter)
-			autoBackgroundThreshold := time.Duration(autoBackgroundAfter) * time.Second
-			timeout := time.After(autoBackgroundThreshold)
+			// Wait for either completion, auto-background threshold, or context
+			// cancellation — event-driven on the job's done channel (the old
+			// 100ms ticker poll added latency and wakeups for nothing).
+			autoBackgroundAfter := params.AutoBackgroundAfter
+			if autoBackgroundAfter <= 0 {
+				autoBackgroundAfter = DefaultAutoBackgroundAfter
+			}
+			autoBackgroundAfter = min(autoBackgroundAfter, MaxAutoBackgroundAfter)
+			timeout := time.After(time.Duration(autoBackgroundAfter) * time.Second)
+			// Ctrl+B promote: hand the wait back as a background job on user
+			// demand instead of waiting out the window (Claude Code Ctrl+B).
+			promote := shell.PromoteSignal()
 
 			var stdout, stderr string
 			var done bool
@@ -397,12 +408,30 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 		waitLoop:
 			for {
 				select {
-				case <-ticker.C:
-					if bgShell.IsDone() {
-						break waitLoop
-					}
-				case <-timeout:
+				case <-bgShell.Done():
 					break waitLoop
+				case <-timeout:
+					if shell.BackgroundTasksDisabled() {
+						// Kill switch: never move to background — keep the
+						// synchronous wait window open until completion.
+						timeout = time.After(time.Duration(autoBackgroundAfter) * time.Second)
+						continue
+					}
+					break waitLoop
+				case <-promote:
+					// User promoted: keep the job registered as background
+					// and return its ID immediately.
+					metadata := BashResponseMetadata{
+						StartTime:        startTime.UnixMilli(),
+						EndTime:          time.Now().UnixMilli(),
+						Description:      params.Description,
+						WorkingDirectory: bgShell.WorkingDir,
+						Background:       true,
+						ShellID:          bgShell.ID,
+						TTY:              bgShell.TTY,
+					}
+					response := fmt.Sprintf("Command moved to background by user (Ctrl+B).\n\nBackground shell ID: %s\n\nYou will be notified automatically when it finishes.", bgShell.ID)
+					return fantasy.WithResponseMetadata(fantasy.NewTextResponse(response), metadata), nil
 				case <-ctx.Done():
 					// Incoming context was cancelled before we moved to background
 					// Kill the shell and return error

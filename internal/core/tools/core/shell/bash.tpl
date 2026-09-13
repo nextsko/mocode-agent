@@ -1,4 +1,4 @@
-Execute shell commands; long-running commands automatically move to background and return a shell ID.
+Execute shell commands; long-running commands automatically move to background and return a shell ID; finished background jobs are announced automatically with their exit code and tail output.
 
 <cross_platform>
 Uses mvdan/sh interpreter (Bash-compatible on all platforms including Windows).
@@ -10,7 +10,7 @@ Common shell builtins and core utils available on Windows.
 1. Directory Verification: If creating directories/files, use LS tool to verify parent exists
 2. Security Check: Banned commands ({{ .BannedCommands }}) return error - explain to user. Safe read-only commands execute without prompts
 3. Command Execution: Execute with proper quoting, capture output
-4. Auto-Background: Commands exceeding 1 minute (default, configurable via `auto_background_after`) automatically move to background and return shell ID
+4. Auto-Background: Commands exceeding 30 seconds (default and max, configurable via `auto_background_after`) automatically move to background and return shell ID
 5. Output Processing: Truncate if exceeds {{ .MaxOutputLength }} characters
 6. Return Result: Include errors, metadata with <cwd></cwd> tags
 </execution_steps>
@@ -31,7 +31,8 @@ The dedicated tools give better results and work identically across platforms. B
 <background_execution>
 - Set run_in_background=true to run commands in a separate background shell
 - Returns a shell ID for managing the background process
-- Use job_output tool to view current output from background shell
+- COMPLETION IS PUSHED TO YOU: when a background job finishes you automatically receive its ID, exit code, and tail output — do NOT sleep/poll job_output to wait for completion
+- Use job_output only to fetch more/earlier output on demand, or to inspect a still-running job
 - Use job_kill tool to terminate a background shell
 - IMPORTANT: NEVER use `&` at the end of commands to run in background - use run_in_background parameter instead
 - Commands that should run in background:

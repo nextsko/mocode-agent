@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
+	"github.com/nextsko/mocode-agent/internal/core/shellruntime/shell"
 	"github.com/nextsko/mocode-agent/internal/ui/completions"
 	"github.com/nextsko/mocode-agent/internal/ui/dialog"
 	"github.com/nextsko/mocode-agent/internal/ui/util"
@@ -81,6 +82,15 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 					})
 				}
 			}
+			return true
+		}
+		// Ctrl+B: promote the synchronously-waited bash command to the
+		// background (Claude Code semantics; tmux users press it twice).
+		if msg.String() == "ctrl+b" && m.isAgentBusy() && !shell.BackgroundTasksDisabled() {
+			shell.PromotePendingBash()
+			cmds = append(cmds, func() tea.Msg {
+				return util.NewInfoMsg("Moving the running command to the background...")
+			})
 			return true
 		}
 		return false

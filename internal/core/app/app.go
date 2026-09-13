@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/core/question"
 	"github.com/nextsko/mocode-agent/internal/core/shellruntime/shell"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
 	"github.com/nextsko/mocode-agent/internal/domain/filetracker"
@@ -47,6 +49,7 @@ type App struct {
 	Messages    message.Service
 	History     history.Service
 	Permissions permission.Service
+	Questions   question.Service
 	FileTracker filetracker.Service
 
 	AgentCoordinator agent.Coordinator
@@ -100,6 +103,7 @@ func New(ctx context.Context, storeCfg *config.ConfigStore) (*App, error) {
 
 	app := &App{
 		Permissions: permission.NewPermissionService(storeCfg.WorkingDir(), skipPermissionsRequests, allowedTools),
+		Questions:   question.NewService(),
 		LSPManager:  lsp.NewManager(storeCfg),
 
 		globalCtx: ctx,
@@ -530,6 +534,8 @@ func (app *App) setupEvents() {
 	app.subscribeSessionServices(ctx)
 	setupSubscriber(ctx, app.serviceEventsWG, "permissions", app.Permissions.Subscribe, app.events)
 	setupSubscriber(ctx, app.serviceEventsWG, "permissions-notifications", app.Permissions.SubscribeNotifications, app.events)
+	setupSubscriber(ctx, app.serviceEventsWG, "questions", app.Questions.Subscribe, app.events)
+	setupSubscriber(ctx, app.serviceEventsWG, "questions-notifications", app.Questions.SubscribeNotifications, app.events)
 	setupSubscriber(ctx, app.serviceEventsWG, "agent-notifications", app.agentNotifications.Subscribe, app.events)
 	setupSubscriber(ctx, app.serviceEventsWG, "mcp", mcp.SubscribeEvents, app.events)
 	setupSubscriber(ctx, app.serviceEventsWG, "lsp", SubscribeLSPEvents, app.events)
@@ -586,6 +592,7 @@ func (app *App) InitCoderAgent(ctx context.Context) error {
 		app.Sessions,
 		app.Messages,
 		app.Permissions,
+		app.Questions,
 		app.History,
 		app.FileTracker,
 		app.LSPManager,
@@ -605,6 +612,43 @@ func (app *App) InitCoderAgent(ctx context.Context) error {
 	// events arrive in the TUI as agent.SummaryCompletedMsg.
 	setupSubscriber(app.eventsCtx, app.serviceEventsWG, "summary",
 		app.AgentCoordinator.SummarySubscribe, app.events)
+
+	// Route background-job completion to the notification broker (push
+	// model, borrowed from opencode/Claude Code task notifications): UIs
+	// learn a job finished with its exit code and tail output, without
+	// the model polling job_output. Terminal snapshots are additionally
+	// queued in the manager for the agent layer to drain into its next
+	// turn (DrainCompletedNotifications).
+	shell.GetBackgroundShellManager().SetOnJobComplete(func(bs *shell.BackgroundShell) {
+		st := bs.Status()
+		stdout, stderr, _, _, _ := bs.GetTailOutput(2048, 1024)
+		tail := stdout
+		switch {
+		case tail == "":
+			tail = stderr
+		case stderr != "":
+			tail = tail + "\n" + stderr
+		}
+		app.agentNotifications.Publish(pubsub.UpdatedEvent, notify.Notification{
+			SessionID: st.SessionID,
+			Type:      notify.TypeBackgroundJobCompleted,
+			BackgroundJobCompleted: &notify.BackgroundJobCompletedEvent{
+				JobID:       st.ID,
+				Command:     st.Command,
+				Description: st.Description,
+				SessionID:   st.SessionID,
+				State:       string(st.State),
+				ExitCode:    st.ExitCode,
+				ElapsedMs:   st.ElapsedMs,
+				TailOutput:  tail,
+			},
+		})
+	})
+	// Persist background-job output for post-crash auditing: memory buffers
+	// die with the process, <data>/background-jobs/*.log files do not.
+	if dataPath := config.GlobalConfigData(); dataPath != "" {
+		shell.GetBackgroundShellManager().SetOutputDir(filepath.Join(filepath.Dir(dataPath), "background-jobs"))
+	}
 	return nil
 }
 

@@ -117,7 +117,10 @@ func TestBackgroundShell_GetTailOutput(t *testing.T) {
 	t.Parallel()
 
 	manager := newBackgroundShellManager()
-	bg, err := manager.Start(t.Context(), t.TempDir(), nil, "seq 1 2000", "")
+	// Pure-bash loop (no external `seq` binary, which is missing from the
+	// minimal Git-Bash environment on Windows and exited 127).
+	bg, err := manager.Start(t.Context(), t.TempDir(), nil,
+		"i=1; while [ $i -le 2000 ]; do echo $i; i=$((i+1)); done", "")
 	require.NoError(t, err)
 	bg.Wait()
 
