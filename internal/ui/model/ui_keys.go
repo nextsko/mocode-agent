@@ -407,14 +407,17 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 					// Close completions if cursor moved before start.
 					if newIdx <= m.completionsStartIndex {
 						m.closeCompletions()
-					} else if msg.String() == "space" {
-						// Close on space.
+					} else if msg.String() == "space" && !m.updateSlashArgCompletions() {
+						// Close on space — unless the space enters argument
+						// completion territory (e.g. "/agents " → mode list).
 						m.closeCompletions()
-					} else {
+					} else if msg.String() != "space" {
 						// Extract current word and filter.
 						word := m.textareaWord()
 						if m.completionsSlashMode {
-							if strings.HasPrefix(word, "/") {
+							if m.updateSlashArgCompletions() {
+								// Argument completion handled above.
+							} else if strings.HasPrefix(word, "/") {
 								m.completionsQuery = word[1:]
 								m.completions.Filter(m.completionsQuery)
 							} else {

@@ -28,6 +28,7 @@ func (m *UI) openSlashCompletions() tea.Cmd {
 	needsSlash := value == "" || !strings.HasPrefix(word, "/")
 	if needsSlash {
 		m.textarea.InsertRune('/')
+		word = m.textareaWord()
 		if cmd := m.handleTextareaHeightChange(prevHeight); cmd != nil {
 			m.completionsOpen = true
 			m.completionsSlashMode = true
@@ -47,13 +48,21 @@ func (m *UI) openSlashCompletions() tea.Cmd {
 	m.completionsOpen = true
 	m.completionsSlashMode = true
 	m.completionsAtMode = false
-	if strings.HasPrefix(m.textareaWord(), "/") {
-		m.completionsQuery = strings.TrimPrefix(m.textareaWord(), "/")
+	if strings.HasPrefix(word, "/") {
+		m.completionsQuery = strings.TrimPrefix(word, "/")
 	} else {
 		m.completionsQuery = ""
 	}
-	m.completionsStartIndex = max(0, len(m.textarea.Value())-len(m.textareaWord()))
+	m.completionsStartIndex = max(0, len(m.textarea.Value())-len(word))
 	m.completionsPositionStart = m.completionsPosition()
+	// Argument completion (grok-build ArgItem idea): once the command token
+	// is complete ("/agents "), suggest its argument values inline instead
+	// of command names.
+	if groups, argQuery, ok := m.slashArgCompletionGroups(m.textarea.Value()); ok {
+		m.completions.SetSlashGroups(groups, m.com.Styles, max(m.layout.editor.Dx(), 10))
+		m.completions.Filter(argQuery)
+		return noop
+	}
 	m.completions.SetSlashGroups(
 		m.slashCompletionGroups(),
 		m.com.Styles,
@@ -63,6 +72,73 @@ func (m *UI) openSlashCompletions() tea.Cmd {
 		m.completions.Filter(m.completionsQuery)
 	}
 	return noop
+}
+
+// slashArgCompletionGroups returns inline argument suggestions when the
+// input is a complete command plus a partial argument (grok-build's ArgItem
+// idea). Currently covers "/agents <mode>"; selecting an entry executes the
+// mode switch directly (no dialog round-trip).
+func (m *UI) slashArgCompletionGroups(input string) (groups []completions.SlashGroup, argQuery string, ok bool) {
+	// Only the leading segment matters; textarea.Word() splits on spaces so
+	// we parse the raw input instead.
+	firstLine := input
+	if i := strings.IndexAny(firstLine, "\n"); i >= 0 {
+		firstLine = firstLine[:i]
+	}
+	token, arg, hasArg := strings.Cut(firstLine, " ")
+	if !hasArg || !strings.HasPrefix(token, "/") {
+		return nil, "", false
+	}
+	if strings.Contains(arg, " ") {
+		return nil, "", false // one argument only
+	}
+	token = strings.TrimPrefix(token, "/")
+	argQuery = strings.TrimSpace(arg)
+
+	switch token {
+	case "agents", "agent", "mode", "modes":
+		cfg := m.com.Config()
+		if cfg == nil {
+			return nil, "", false
+		}
+		items := make([]completions.SlashCompletionValue, 0, len(cfg.Agents))
+		for id, a := range cfg.Agents {
+			if a.Disabled {
+				continue
+			}
+			desc := a.Description
+			if desc == "" {
+				desc = "Switch to " + a.Name
+			}
+			items = append(items, completions.SlashCompletionValue{
+				Command: "/agents " + id,
+				Desc:    desc,
+				Msg:     dialog.ActionSelectMode{ModeID: id},
+			})
+		}
+		if len(items) == 0 {
+			return nil, "", false
+		}
+		return []completions.SlashGroup{{Label: "Modes", Items: items}}, argQuery, true
+	}
+	return nil, "", false
+}
+
+// updateSlashArgCompletions refreshes inline argument completions when the
+// input is in argument mode ("/agents <partial>"). Returns true when arg
+// mode is active (groups were refreshed and filtered).
+func (m *UI) updateSlashArgCompletions() bool {
+	if !m.completionsSlashMode {
+		return false
+	}
+	groups, argQuery, ok := m.slashArgCompletionGroups(m.textarea.Value())
+	if !ok {
+		return false
+	}
+	m.completions.SetSlashGroups(groups, m.com.Styles, max(m.layout.editor.Dx(), 10))
+	m.completionsQuery = argQuery
+	m.completions.Filter(argQuery)
+	return true
 }
 
 func (m *UI) closeCompletions() {
