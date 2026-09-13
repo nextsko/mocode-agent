@@ -153,6 +153,8 @@ The plan should be reviewable: the human should be able to read it and say "yes,
 └── findings.md    # Research, decisions, issues encountered
 ```
 
+> **Directory convention:** `docs-rulebook` governs *where* these live (or the repository's existing docs convention) — e.g. `<docs-root>/<topic>/` with `plans/NN-*-plan.md`, a topic `README.md`, and `specs/`.
+
 This ensures you can resume work after any interruption without re-reading the entire conversation history. The **5-Question Reboot Check** in progress.md is the key: "Where am I? Where am I going? What is the goal? What have I learned? What have I done?"
 
 ### Phase 3: Tasks

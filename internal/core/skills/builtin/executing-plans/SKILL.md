@@ -3,7 +3,8 @@ name: executing-plans
 description: >-
   Use when the user says "execute the plan", "implement the plan",
   "start implementation", "begin coding", or when a structured
-  implementation plan exists (in .mocode/plans/ or similar) and needs
+  implementation plan exists (per the docs-rulebook layout, e.g.
+  <docs-root>/<topic>/plans/NN-*-plan.md) and needs
   to be carried out with review checkpoints. Also use when the user
   provides a numbered task list or multi-step implementation guide
   that should be executed methodically.

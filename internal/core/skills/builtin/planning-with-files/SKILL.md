@@ -16,6 +16,8 @@ Structured task planning with persistent progress tracking.
 
 This is a **meta-level process skill** for managing complex, multi-step tasks. It creates three files to track all context, preventing loss across sessions.
 
+> **Where do these files live?** Follow the `docs-rulebook` skill (or the repository's existing docs convention). The three files map onto a topic directory: `task_plan.md` → `plans/NN-<purpose>-plan.md`, `progress.md` → `logs/`, `findings.md` → `NN-<topic>.md`.
+
 ## The Three Core Files
 
 When starting a complex task, create these files in a `.plans/` directory:

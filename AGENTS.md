@@ -529,3 +529,9 @@ outright — they are acceptable for pipelines now; steer only file inspection.
 Before non-trivial TUI changes, read `internal/ui/AGENTS.md`. Optional local
 plans may live under `.mocode/plans/` (gitignored). Structure governance
 baseline: `docs/dev-notes/structure-governance-baseline.md`.
+
+**Docs & plan layout:** project documentation and plans follow the
+`docs-rulebook` builtin skill (three-zone lifecycle, topic dirs,
+`plans/NN-*-plan.md`, `MASTER_PLAN.md`, archive-on-completion). This repo's own
+convention (`docs/plans/<topic>/README.md` + `docs/README.md` index) is an
+instance of "follow the repository first"; the plan mode prompt embeds it too.
