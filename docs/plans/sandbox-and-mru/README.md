@@ -21,3 +21,10 @@
 
 - build/vet/test 绿；sandbox 工具单测（echo/超时/输出截断）；MRU 排序单测
 - 注册进 allToolNames（registry 清单测试同步）
+
+## 增补（同日第二批）：slash 参数级补全
+
+- `/agents <partial>`（含 `/mode` 别名）：命令 token 完成后空格触发参数候选（grok ArgItem 思想），选中直接 `ActionSelectMode` 切换（免对话框）
+- 空格不再无条件关闭补全；输入联动改为整行解析（`textarea.Word()` 空格分词不适合 arg 场景）；禁用 agent 隐藏、单参数限定
+- `/model` 参数补全暂缺（模型清单 API 为对话框专供，需要抽 registry——记为后续）
+- 测试：`slash_args_test.go`（别名路由/禁用隐藏/单参数/未知命令回退）
