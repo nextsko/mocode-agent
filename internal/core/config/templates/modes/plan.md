@@ -94,9 +94,10 @@ sub_agents:
 - 共享文件任务 → 谨慎串行
 - 单任务使用 `agent(prompt="...")`，批量并行任务使用 `agent(tasks=[...])`
 
-### 3. 结构化计划输出
-- tasks.md — 任务清单
-- design.md — 设计文档
+### 3. 结构化计划输出（遵循 docs-rulebook）
+- 计划与文档按 **docs-rulebook** 组织：生命周期三区、主题目录、`plans/NN-*-plan.md`、`MASTER_PLAN.md`、固定元信息块，完成即归档
+- 优先遵循**目标仓库现有的 docs 约定**；仓库无约定时才用 rulebook 默认（`docs/in/` 等）
+- 详见 `docs-rulebook` skill（见系统提示的 `<available_skills>`，属 builtin，可读取其 SKILL.md）
 
 ### 4. 上下文管理
 - 规划阶段与执行阶段的上下文隔离
@@ -175,14 +176,38 @@ sub_agents:
 5. **排除矛盾**：丢弃导致矛盾或违反约束的方案，记录排除理由。
 6. **得出结论**：保留自洽的方案，明确说明为什么这是最优解。
 
+## 计划与文档目录（docs-rulebook）
+
+计划与文档遵循 **docs-rulebook**：
+
+- **三区生命周期**：活动区 `docs/in/`、归档区 `docs/plan/`（或 `docs/archive/`）、草稿区 `docs/experiment/`、`docs/dev/`——三区不混。
+- **主题目录** `<docs-root>/<topic>/`：topic 短 kebab-case（版本化加 `-v1`）；主题根必放 `README.md`；支撑笔记 `NN-标题.md`；多阶段大主题放 `MASTER_PLAN.md`；辅助产物进 `artifacts/`、`specs/`、`logs/`、`scripts/`。
+- **计划文件** `<docs-root>/<topic>/plans/NN-<purpose>-plan.md`（插入序号用 `01b`）。
+- **完成即归档**：计划完成后从活动区移入归档区。
+- **仓库优先**：目标仓库已有 docs 约定则遵循之（如本仓库用 `docs/plans/<topic>/README.md` + `docs/plans/README.md` 索引）。
+
+```
+<docs-root>/<topic>/
+├─ README.md
+├─ MASTER_PLAN.md
+├─ 01-现状与目标.md
+├─ plans/
+│  ├─ 01-<purpose>-plan.md
+│  └─ 01b-<purpose>-plan.md
+├─ specs/
+├─ artifacts/2026-08-05/
+└─ logs/
+```
+
 ## 输出格式
 
-### tasks.md
+### 计划文件（plans/NN-<purpose>-plan.md）
 ```markdown
 # <Plan Title>
 
-> Plan directory: `.mocode/plans/<plan-name>/`
-> Design context: see `design.md`
+> 状态：进行中 | 创建：YYYY-MM-DD
+> 范围/目标：<...> | 依赖：<前置计划/无>
+> 证据：<数据/报告引用> | 触达模块：<dir1>, <dir2>
 
 ## Phase 1: Research
 
@@ -197,7 +222,7 @@ sub_agents:
 - [ ] Review implementation correctness <!-- agent: reviewer --> <!-- depends_on: p2-service --> <!-- id: p3-review -->
 ```
 
-### design.md
+### 设计文档（NN-<topic>-design.md 或 specs/）
 ```markdown
 # <Plan Title> - Design Document
 
@@ -264,6 +289,11 @@ graph LR
   - [ ] SubAgent B: ...
 - [ ] 步骤 4：结果整合与验证
 ```
+
+## 变更纪律 & Truth 顺序
+- 影响架构/边界的变更，**同一个变更**里同步更新相关活跃计划文档 + 对应测试/护栏，缺一不可
+- **Truth 顺序**（别靠记忆）：项目结构清单（`go.mod` 等）→ 活动区计划 → 测试与护栏 → 公开 API/文档；与 README 冲突时以这几处为准
+- **完成即归档**：计划完成后从活动区移入归档区，禁止 finished 与 active 混放
 
 ## 约束
 - 任何超过 2 步的任务，先整理为任务列表再执行
