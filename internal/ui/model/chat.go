@@ -547,6 +547,26 @@ func (m *Chat) MessageItem(id string) chat.MessageItem {
 	return item
 }
 
+// CountRunningAgentTools returns how many Agent tool calls are still in
+// flight (parallel sub-agents included) — the prime-agent style roster count
+// surfaced in the status line.
+func (m *Chat) CountRunningAgentTools() int {
+	n := 0
+	for i := 0; i < m.list.Len(); i++ {
+		item, ok := m.list.ItemAt(i).(chat.MessageItem)
+		if !ok {
+			continue
+		}
+		if at, ok := item.(*chat.AgentToolMessageItem); ok {
+			switch at.Status() {
+			case chat.ToolStatusRunning, chat.ToolStatusAwaitingPermission:
+				n++
+			}
+		}
+	}
+	return n
+}
+
 // ToggleExpandedSelectedItem expands the selected message item if it is expandable.
 func (m *Chat) ToggleExpandedSelectedItem() {
 	if expandable, ok := m.list.SelectedItem().(chat.Expandable); ok {

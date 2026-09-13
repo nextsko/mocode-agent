@@ -172,7 +172,35 @@ func (r *AgentToolRenderContext) RenderTool(sty *styles.Styles, width int, opts 
 		return lipgloss.JoinVertical(lipgloss.Left, runningParts...)
 	}
 
-	// Build tree with nested tool calls.
+	// Prime-agent style summary mode (default): the chat stream carries ONE
+	// status line instead of the full nested-tool tree. The tree used to grow
+	// with every sub-agent tool call and wreck the chat layout; the full tree
+	// stays available in the expanded (audit) view below.
+	if !opts.ExpandedContent {
+		var parts []string
+		parts = append(parts, header)
+		var summaryParts []string
+		if len(r.agent.nestedTools) > 0 {
+			summaryParts = append(summaryParts, fmt.Sprintf("%d tool calls", len(r.agent.nestedTools)))
+		}
+		if r.agent.statusSummary != "" {
+			summaryParts = append(summaryParts, r.agent.statusSummary)
+		}
+		if len(summaryParts) > 0 {
+			parts = append(parts, sty.Tool.StateWaiting.Render(strings.Join(summaryParts, " · ")))
+		}
+		if !opts.HasResult() && !opts.IsCanceled() && opts.Anim != nil {
+			parts = append(parts, opts.Anim.Render())
+		}
+		result := lipgloss.JoinVertical(lipgloss.Left, parts...)
+		if opts.HasResult() && opts.Result.Content != "" {
+			body := toolOutputMarkdownContent(sty, opts.Result.Content, cappedWidth-toolBodyLeftPaddingTotal, opts.ExpandedContent)
+			return joinToolParts(result, body)
+		}
+		return result
+	}
+
+	// Expanded audit view: the full nested-tool tree.
 	childTools := tree.Root(header)
 
 	// When running with nested tools, show a live status summary.
@@ -335,7 +363,26 @@ func (r *AgenticFetchToolRenderContext) RenderTool(sty *styles.Styles, width int
 		return header + "\n" + animView
 	}
 
-	// Build tree with nested tool calls.
+	// Prime-agent style summary mode (default): one status line instead of
+	// the full nested-tool tree (same rationale as the Agent tool above).
+	if !opts.ExpandedContent {
+		var parts []string
+		parts = append(parts, header)
+		if len(r.fetch.nestedTools) > 0 {
+			parts = append(parts, sty.Tool.StateWaiting.Render(fmt.Sprintf("%d tool calls", len(r.fetch.nestedTools))))
+		}
+		if !opts.HasResult() && !opts.IsCanceled() && opts.Anim != nil {
+			parts = append(parts, opts.Anim.Render())
+		}
+		result := lipgloss.JoinVertical(lipgloss.Left, parts...)
+		if opts.HasResult() && opts.Result.Content != "" {
+			body := toolOutputMarkdownContent(sty, opts.Result.Content, cappedWidth-toolBodyLeftPaddingTotal, opts.ExpandedContent)
+			return joinToolParts(result, body)
+		}
+		return result
+	}
+
+	// Expanded audit view: the full nested-tool tree.
 	childTools := tree.Root(header)
 
 	for _, nestedTool := range r.fetch.nestedTools {

@@ -460,7 +460,16 @@ func TestHandleChildSessionMessage_RendersNestedToolTreeForSingleSubAgent(t *tes
 	require.True(t, ok)
 	require.Len(t, toolItem.NestedTools(), 1)
 
+	// Default (prime-agent summary) view: one status line, no tool details.
 	rendered := ui.chat.MessageItem("agent-call").Render(80)
+	require.Contains(t, rendered, "1 tool calls")
+	require.NotContains(t, rendered, "echo hi")
+
+	// Expanded audit view: the nested tree with the child tool call.
+	if exp, ok := ui.chat.MessageItem("agent-call").(chat.Expandable); ok {
+		exp.ToggleExpanded()
+	}
+	rendered = ui.chat.MessageItem("agent-call").Render(80)
 	require.Contains(t, rendered, "Bash")
 	require.Contains(t, rendered, "echo hi")
 }
@@ -512,7 +521,16 @@ func TestHandleChildSessionMessage_RendersNestedToolTreeForBatchSubAgent(t *test
 	require.True(t, ok)
 	require.Len(t, toolItem.NestedTools(), 1)
 
+	// Default (prime-agent summary) view: one status line, no tool details.
 	rendered := ui.chat.MessageItem("agent-call").Render(80)
+	require.Contains(t, rendered, "1 tool calls")
+	require.NotContains(t, rendered, "echo hi")
+
+	// Expanded audit view: the nested tree with the child tool call.
+	if exp, ok := ui.chat.MessageItem("agent-call").(chat.Expandable); ok {
+		exp.ToggleExpanded()
+	}
+	rendered = ui.chat.MessageItem("agent-call").Render(80)
 	require.Contains(t, rendered, "Bash")
 	require.Contains(t, rendered, "echo hi")
 }
@@ -577,7 +595,13 @@ func TestUISubAgentTreeViaUpdateLoop(t *testing.T) {
 	require.True(t, ok)
 	require.Len(t, toolItem.NestedTools(), 1)
 
+	// Default summary view hides details; expanded audit view shows the tree.
 	rendered := ui.chat.MessageItem("agent-call").Render(80)
+	require.Contains(t, rendered, "1 tool calls")
+	if exp, ok := ui.chat.MessageItem("agent-call").(chat.Expandable); ok {
+		exp.ToggleExpanded()
+	}
+	rendered = ui.chat.MessageItem("agent-call").Render(80)
 	require.Contains(t, rendered, "Bash")
 }
 
