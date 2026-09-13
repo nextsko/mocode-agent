@@ -1,6 +1,6 @@
 # 助手角色 & 内置 Skill 总览
 
-> mocode 内置 **10 个专家角色**（模式）与 **97 个内置 skill** 的可浏览索引。
+> mocode 内置 **10 个专家角色**（模式）与 **99 个内置 skill** 的可浏览索引。
 > 权威来源：角色 = `internal/core/config/templates/modes/*.md`；skill = `internal/core/skills/builtin/<name>/SKILL.md`（front matter `name` 必须等于目录名）。
 > 首次构建/重启后生效。
 
@@ -25,7 +25,7 @@
 
 ---
 
-## 二、内置 Skill（97）
+## 二、内置 Skill（99）
 
 ### 元技能 · 发现与自省
 - `using-agent-skills` — 发现并调用 skill 的元技能
@@ -95,6 +95,8 @@
 - `screenshot-to-ui` — 截图/设计稿 → UI 复刻方法学（盒子模型/布局/间距/字号/色彩/组件/状态/验收）
 - `css-layout-and-box-model` — 盒子模型与布局系统（Flex/Grid/定位/层叠/溢出/逻辑属性/排错）
 - `design-tokens` — 设计变量体系（颜色/间距/字号/圆角/阴影/动效/主题）
+- `responsive-design` — 响应式细则（断点/流式/容器查询/重排模式/多视口验收）
+- `motion-design` — 动效与微交互（时长/缓动 token、模式、性能、prefers-reduced-motion）
 - `ecommerce-image-studio` — 产品图 → 电商图组（六图组/平台方向/合规）
 - `interactive-h5-app` — 静态原型 → 零依赖可交互 H5
 - `red-team-animation-verification` — 动画逐帧验证 + red team 攻击矩阵
