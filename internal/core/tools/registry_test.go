@@ -43,6 +43,7 @@ var knownAllToolNames = []string{
 	SourcegraphToolName,
 	ThinkToolName,
 	TodosToolName,
+	LearnToolName,
 	ViewToolName,
 	WriteToolName,
 	ListMCPResourcesToolName,

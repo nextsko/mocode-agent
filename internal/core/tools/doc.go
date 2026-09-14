@@ -25,9 +25,9 @@
 //
 //	internalx/              INTERNAL tools (agent-adjacent capabilities)
 //	  lsp/                  LSP tools + manager (+ lsputil, references)
-//	  agent/                think todos transfer diagnostics mocode_info
-//	                        mocode_logs session_export session_summary
-//	                        session_search message_export
+//	  agent/                think todos learn transfer diagnostics
+//	                        mocode_info mocode_logs session_export
+//	                        session_summary session_search message_export
 //	  filter/               composable predicates applied after Build
 //	  modes/                (future, P6) moa | team | tree agent modes
 //	  domain/               (future, P6) domain tools
@@ -105,8 +105,14 @@
 //     registry.go (that file is the single composition point).
 //  3. If the tool is network-bound, take *nethttp.Factory (or a client
 //     derived from it) — never build your own transport.
-//  4. Add the tool name to knownAllToolNames in registry_test.go so the
-//     config list cross-check stays authoritative.
+//  4. Add the tool name to BOTH config.allToolNames() (which drives every
+//     agent's AllowedTools, so a name missing there is filtered out and the
+//     model never sees the tool) and knownAllToolNames in registry_test.go.
+//     TestAllToolNames_MatchesConfigList asserts the two lists are equal, but
+//     it only compares against knownAllToolNames, so it cannot catch drift
+//     between knownAllToolNames and config on its own — update both by hand.
+//  5. If the tool writes to disk, gate it through permission.Service.Request
+//     the way write/learn do, so the write is an explicit, auditable decision.
 //
 // # Module
 //

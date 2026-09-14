@@ -534,6 +534,17 @@ Tools are organized by category. This is the complete list of built-in and plugi
 | `memory_load` | Load memories into context |
 | `memory_clear` | Clear cached memories |
 
+### Learning
+| Tool | Description |
+|------|-------------|
+| `learn` | Capture a finished task as a reusable skill (`create` / `refine` / `list`) |
+
+> `learn` writes `SKILL.md` files into the highest-priority user skills
+> directory (`options.skills_paths[0]`), stamping `origin`/`revision`/
+> timestamps into the frontmatter. Every write goes through the permission
+> prompt, overwrites are backed up, and bundled skills can never be modified.
+> See `docs/design/16-learn-tool.md`.
+
 ### LSP
 | Tool | Description |
 |------|-------------|

@@ -30,6 +30,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/store"
 	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/nextsko/mocode-agent/internal/util/log"
+	"strings"
 	"sync"
 )
 
@@ -168,6 +169,7 @@ func standardPlugins() []ToolPlugin {
 		lspPlugin{},
 		mcpMetaPlugin{},
 		thinkPlugin{},
+		learnPlugin{},
 		giteaPlugin{},
 		gitOpsPlugin{},
 		&sshPlugin{},
@@ -439,6 +441,60 @@ func (thinkPlugin) Descriptors() []ToolDescriptor {
 
 func (thinkPlugin) Build(_ context.Context, _ ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{agenttools.NewThinkTool()}
+}
+
+// ─── plugin/learn ─────────────────────────────────────────────────────────────
+
+// learnPlugin exposes the learn tool, which turns a finished task into a
+// durable skill under the highest-priority user skills directory. Provenance
+// metadata (origin/revision/timestamps) is stamped into the frontmatter so
+// agent-authored skills stay distinguishable from hand-written and bundled
+// ones — the precondition for ever curating or archiving them automatically.
+//
+// Categorised as memory because learn sits at the session→memory→skills
+// junction of the dependency DAG (see docs/architecture/00-hermes-blueprint.md
+// §7, block B10): it is what carries knowledge out of a session and into the
+// skill library.
+type learnPlugin struct{}
+
+func (learnPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: agenttools.LearnToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
+	}
+}
+
+func (learnPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	return []fantasy.AgentTool{agenttools.NewLearnTool(agenttools.LearnDeps{
+		Permissions: deps.Permissions,
+		Root:        learnSkillsRoot(deps),
+		Known:       deps.AllSkills,
+	})}
+}
+
+// learnSkillsRoot resolves where learned skills are written: the highest
+// priority user skills path. That directory is already read by skill discovery,
+// so a learned skill is picked up on the next session with no extra
+// configuration, and `options.skills_paths` remains the single knob for
+// redirecting it (to a project-scoped or shared directory, for example).
+//
+// Path expansion mirrors discoverSkills so the write target and the read target
+// are always the same directory.
+func learnSkillsRoot(deps ToolDeps) string {
+	if deps.Cfg == nil {
+		return ""
+	}
+	cfg := deps.Cfg.Config()
+	if cfg == nil || cfg.Options == nil || len(cfg.Options.SkillsPaths) == 0 {
+		return ""
+	}
+
+	root := infra.Long(cfg.Options.SkillsPaths[0])
+	if strings.HasPrefix(root, "$") {
+		if resolved, err := deps.Cfg.Resolver().ResolveValue(root); err == nil {
+			root = resolved
+		}
+	}
+	return root
 }
 
 // ─── plugin/gitops ────────────────────────────────────────────────────────────

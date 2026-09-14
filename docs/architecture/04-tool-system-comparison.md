@@ -133,7 +133,7 @@
 | trpc Tool | Description | mocode Workaround |
 |---|---|---|
 | **`skill_run`** | Execute skill scripts in sandboxed workspace with code executor | Use `bash` tool with manual sandboxing |
-| **`skill_load`** | Load skill definitions | mocode has skill system but not as a tool |
+| **`skill_load`** | Load skill definitions | `learn` tool authors/refines SKILL.md (`create`/`refine`/`list`); loading stays prompt-driven via `<available_skills>` + `view` |
 | **`skill_list_docs`** | List skill documentation | N/A |
 | **`skill_select_docs`** | Select skill docs for context | N/A |
 | **`agent.Tool`** | Wrap any agent as a callable tool | Coordinator/sub-agent pattern |

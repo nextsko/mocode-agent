@@ -136,6 +136,7 @@ const (
 	SessionSummaryToolName = agenttools.SessionSummaryToolName
 	SessionSearchToolName  = agenttools.SessionSearchToolName
 	MessageExportToolName  = agenttools.MessageExportToolName
+	LearnToolName          = agenttools.LearnToolName
 )
 
 var (
@@ -143,6 +144,13 @@ var (
 	NewTodosTool          = agenttools.NewTodosTool
 	NewTransferTool       = agenttools.NewTransferTool
 	NewSessionSummaryTool = agenttools.NewSessionSummaryTool
+	NewLearnTool          = agenttools.NewLearnTool
+)
+
+type (
+	LearnParams           = agenttools.LearnParams
+	LearnDeps             = agenttools.LearnDeps
+	LearnResponseMetadata = agenttools.LearnResponseMetadata
 )
 
 // ---------------------------------------------------------------------------
