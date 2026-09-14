@@ -6,11 +6,11 @@ import "runtime/debug"
 
 var (
 	// Version is the fallback shown when no VCS/build info is available.
-	// Keep it in lockstep with the latest git tag (v0.10.0) — the tag is the
+	// Keep it in lockstep with the latest git tag (v0.11.0) — the tag is the
 	// real source of truth: init() below overrides this with the buildinfo
 	// Main.Version (tag or pseudo-version), so in any git checkout this
 	// string never displays.
-	Version = "0.10.0"
+	Version = "0.11.0"
 	Commit  = "unknown"
 )
 
