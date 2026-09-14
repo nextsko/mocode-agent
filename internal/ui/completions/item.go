@@ -138,18 +138,22 @@ func (s *SlashCompletionItem) Render(width int) string {
 	// command + " " + desc) into per-column highlight sets.
 	cmdHits, descHits := splitMatchIndexes(s.match, len(s.command))
 
+	// Measure the columns while they are still plain text: highlighting adds
+	// escape sequences, and the layout must not depend on their byte length.
+	gap := strings.Repeat(" ", max(0, lineWidth-lipgloss.Width(label)-len(labelGap)-lipgloss.Width(desc)))
+
+	// Highlight *before* styling. The hit indexes are rune offsets into the
+	// unstyled command/description, so highlighting already-styled output would
+	// land them inside ANSI escape sequences, split those sequences apart, and
+	// leak their parameters onto the screen as literal text (e.g. "[38;2;104;255;214m").
 	var row string
 	if s.focused {
 		label = highlightRunes(label, cmdHits, lipgloss.NewStyle(), lipgloss.NewStyle(), false)
-		gap := strings.Repeat(" ", max(0, lineWidth-lipgloss.Width(label)-len(labelGap)-lipgloss.Width(desc)))
 		row = label + labelGap + desc + gap
 	} else {
-		renderedLabel := s.t.Dialog.TitleText.Render(label)
-		renderedLabel = highlightRunes(renderedLabel, cmdHits, s.t.Dialog.TitleText, s.t.Completions.Match, true)
-		renderedDesc := s.t.Dialog.ListItem.InfoBlurred.Render(desc)
-		renderedDesc = highlightRunes(renderedDesc, descHits, s.t.Dialog.ListItem.InfoBlurred, s.t.Completions.Match, true)
-		gap := strings.Repeat(" ", max(0, lineWidth-lipgloss.Width(label)-len(labelGap)-lipgloss.Width(desc)))
-		row = renderedLabel + labelGap + renderedDesc + gap
+		label = highlightRunes(label, cmdHits, s.t.Dialog.TitleText, s.t.Completions.Match, true)
+		desc = highlightRunes(desc, descHits, s.t.Dialog.ListItem.InfoBlurred, s.t.Completions.Match, true)
+		row = label + labelGap + desc + gap
 	}
 
 	result := style.Render(row)
@@ -172,10 +176,20 @@ func splitMatchIndexes(m fuzzy.Match, cmdLen int) (cmdHits, descHits map[int]boo
 	return cmdHits, descHits
 }
 
-// highlightRunes renders text with the fuzzy-hit runes emphasized. When
-// styled is false (focused row) it falls back to bolding the hits.
+// highlightRunes styles text with the fuzzy-hit runes emphasized.
+//
+// text must be *plain*: hits are rune indexes into it, so passing styled output
+// would misalign every index and split escape sequences. When styled is true
+// each segment is rendered with base, except the hits which get match; when
+// styled is false (focused row) only the hits are bolded, leaving the rest for
+// the row style to colour.
 func highlightRunes(text string, hits map[int]bool, base, match lipgloss.Style, styled bool) string {
 	if len(hits) == 0 {
+		if styled {
+			// Nothing to emphasize, but callers pass plain text and rely on us
+			// to apply the base style.
+			return base.Render(text)
+		}
 		return text
 	}
 	var b strings.Builder

@@ -33,8 +33,10 @@ plans/
 │   └── 05-testing-matrix.md
 ├── shell-parity/                      # bash 工具跨平台命令补齐（head/grep 等在 Windows 缺失）
 │   └── README.md
-└── subagent-summary-box/              # 子代理摘要盒遮挡输入框与完成后自动隐藏
-    └── README.md
+├── subagent-summary-box/              # 子代理摘要盒遮挡输入框与完成后自动隐藏
+│   └── README.md
+└── slash-popup-ansi-residue/          # / 补全弹窗非选中行出现字面量 ANSI 颜色码
+    └── 01-root-cause.md
 ```
 
 ## 子目录说明
@@ -96,6 +98,14 @@ TUI 子代理摘要盒的两个 bug：布局高度未计入盒子导致主输入
 | 文件 | 主题 |
 |------|------|
 | README.md | 两个根因（编辑器高度记账 / `Status()` vs `EffectiveStatus()`）、修复与回归测试 |
+
+### slash-popup-ansi-residue/
+
+输入 `/a` 后 `/` 内联补全弹窗的非选中行显示字面量 ANSI 颜色码（`[38;2;104;255;214m`、`;221m`）。根因是**着色后再按纯文本下标做逐 rune 切分**，把 `ESC[38;2;…m` 从中间切开。高亮选中行与全屏 `Commands` 对话框均正常，因此易被误判为终端/编码问题。
+
+| 文件 | 主题 |
+|------|------|
+| 01-root-cause.md | ✅ 已修复。逐行复现矩阵、`highlightRunes` 下标错位链路、与既有 `CleanCommandText` 的层次误诊辨析、修复记录与 6 组回归测试 |
 
 ## 添加新计划时的规范
 
