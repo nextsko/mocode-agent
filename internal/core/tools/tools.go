@@ -16,8 +16,9 @@ import (
 	fs "github.com/nextsko/mocode-agent/internal/core/tools/core/fs"
 	shell "github.com/nextsko/mocode-agent/internal/core/tools/core/shell"
 	web "github.com/nextsko/mocode-agent/internal/core/tools/core/web"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/net"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
+	browsertool "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/browser"
 	gitops "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitops"
 	wechat "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/wechat"
 	agenttools "github.com/nextsko/mocode-agent/internal/core/tools/internalx/agent"
@@ -137,6 +138,7 @@ const (
 	SessionSearchToolName  = agenttools.SessionSearchToolName
 	MessageExportToolName  = agenttools.MessageExportToolName
 	LearnToolName          = agenttools.LearnToolName
+	MemoryToolName         = agenttools.MemoryToolName
 )
 
 var (
@@ -145,12 +147,16 @@ var (
 	NewTransferTool       = agenttools.NewTransferTool
 	NewSessionSummaryTool = agenttools.NewSessionSummaryTool
 	NewLearnTool          = agenttools.NewLearnTool
+	NewMemoryTool         = agenttools.NewMemoryTool
 )
 
 type (
-	LearnParams           = agenttools.LearnParams
-	LearnDeps             = agenttools.LearnDeps
-	LearnResponseMetadata = agenttools.LearnResponseMetadata
+	LearnParams            = agenttools.LearnParams
+	MemoryParams           = agenttools.MemoryParams
+	MemoryDeps             = agenttools.MemoryDeps
+	MemoryResponseMetadata = agenttools.MemoryResponseMetadata
+	LearnDeps              = agenttools.LearnDeps
+	LearnResponseMetadata  = agenttools.LearnResponseMetadata
 )
 
 // ---------------------------------------------------------------------------
@@ -191,9 +197,11 @@ var (
 type MCPToolStruct = mcp.MCPToolStruct
 
 // ---------------------------------------------------------------------------
-// external/systems — gitops and wechat
+// external/systems — browser, gitops and wechat
 
 const (
+	BrowserToolName = browsertool.BrowserToolName
+
 	PlanCommitsToolName    = gitops.PlanCommitsToolName
 	ExecuteCommitsToolName = gitops.ExecuteCommitsToolName
 

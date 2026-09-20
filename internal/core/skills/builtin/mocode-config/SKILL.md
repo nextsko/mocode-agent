@@ -352,6 +352,7 @@ All behavioral knobs in one place.
 |-------|------|---------|-------------|
 | **Skills & Tools** | | | |
 | `skills_paths` | string[] | `[]` | Extra paths to search for SKILL.md files. Default paths (`.agents/skills/`, `.mocode/skills/`, `.claude/skills/`, `.cursor/skills/`) are always loaded |
+| `memory_dir` | Root of the session memory tree; empty uses the app data directory |
 | `disabled_skills` | string[] | `[]` | Disable builtin or local skills by name |
 | `disabled_tools` | string[] | `[]` | Disable built-in tools by name |
 | **LSP** | | | |
@@ -516,6 +517,20 @@ Tools are organized by category. This is the complete list of built-in and plugi
 | `crawl` | Recursive website crawling |
 | `download_docs` | Download documentation from GitHub repos |
 
+### Learning
+| Tool | Description |
+|------|-------------|
+| `learn` | Capture a finished task as a reusable skill (`create` / `refine` / `list`) |
+| `browser` | Native browser automation over CDP: `status` / `launch` / `goto` / `back` / `forward` / `reload` / `snapshot` / `click` / `dblclick` / `fill` / `press` / `hover` / `check` / `uncheck` / `select` / `eval` / `screenshot` / `pdf` / `console` / `tabs` / `storage` / `state` / `network` / `route` / `close` |
+
+> `browser` drives a Chromium-family browser **already installed** on the machine
+> over the Chrome DevTools Protocol — no Node, Playwright or browser download.
+> `status` reports which browsers were found (and lists every path it tried when
+> none were). Only `launch` asks for approval; the debugging actions that follow
+> do not. Tabs, cookies/localStorage/sessionStorage, state save/load, the
+> network request log, and URL-pattern routes (block or mock) are included.
+> See `docs/architecture/07-native-browser-runtime.md`.
+
 ### Session
 | Tool | Description |
 |------|-------------|
@@ -527,12 +542,14 @@ Tools are organized by category. This is the complete list of built-in and plugi
 ### Memory
 | Tool | Description |
 |------|-------------|
-| `memory_add` | Store a memory entry |
-| `memory_update` | Update a memory entry |
-| `memory_delete` | Delete a memory entry |
-| `memory_search` | Search memories |
-| `memory_load` | Load memories into context |
-| `memory_clear` | Clear cached memories |
+| `memory` | Session and global memory: `write` / `list` / `search` / `extract` / `forget` |
+
+> Memory is markdown files under `options.memory_dir` (default `<data dir>/memories`),
+> in two tiers: `sessions/<session>/` and `global/`. An auto-maintained `index.md`
+> records every entry **and where each session's memory lives**, so knowledge from
+> one session is findable from any other. `extract` promotes a session entry into
+> global, copying rather than moving and staying idempotent. `forget` archives.
+> Browse it all at `mocode://memory/`. See `docs/design/18-session-memory-protocol.md`.
 
 ### Learning
 | Tool | Description |

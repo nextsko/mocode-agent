@@ -36,7 +36,7 @@
 //	  mcp/                  MCP bridge: sessions, transports, meta tools
 //	  connector/            the Connector port (systems plug in here)
 //	  nethttp/              THE outbound-HTTP port (interface block)
-//	  systems/              ssh gitea gitops wechat
+//	  systems/              ssh gitea gitops wechat browser
 //	  plugins/              shared libs per category
 //	    netcommon/          fetch/search providers all web tools share
 //	    searchcommon/       ripgrep/pure-Go search stack (grep, glob,

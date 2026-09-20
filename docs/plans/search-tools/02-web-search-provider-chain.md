@@ -510,3 +510,7 @@ User/Agent           provider.ts          provider module       index.ts
 - oh-my-pi 的 `provider.ts` 是**单模块注册表**，不依赖 IoC 容器； mocode 的 `netcommon.Provider` 若用 DI 容器，可考虑保持注册表模式但保留自动发现能力。
 - oh-my-pi 的 Provider 全部放在一个目录下； mocode 可按 domain 分包（如 `providers/search/`, `providers/chat/`）。
 - `SearchResponse` 的 `answer` 字段只对 LLM-mediated provider 填充； mocode 的 DTO 设计可保持同样分层（结构化结果 + 合成答案）。
+
+## 相关笔记
+
+- [[01-web-search-provider-deep-dive]] — 16 个 Provider 的认证/协议/响应/错误处理深度实现分析

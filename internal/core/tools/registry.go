@@ -5,24 +5,30 @@ import (
 	"fmt"
 
 	"charm.land/fantasy"
+
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	corebrowser "github.com/nextsko/mocode-agent/internal/core/browser"
 	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/memory"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/question"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
 	fs "github.com/nextsko/mocode-agent/internal/core/tools/core/fs"
-	"github.com/nextsko/mocode-agent/internal/core/tools/core/sandbox"
 	agentquestion "github.com/nextsko/mocode-agent/internal/core/tools/core/question"
+	"github.com/nextsko/mocode-agent/internal/core/tools/core/sandbox"
 	shell "github.com/nextsko/mocode-agent/internal/core/tools/core/shell"
 	"github.com/nextsko/mocode-agent/internal/core/tools/core/web"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/ssh"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/nethttp"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/ssh"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/browser"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitea"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitops"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/ssh"
 	agenttools "github.com/nextsko/mocode-agent/internal/core/tools/internalx/agent"
 	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
+	"github.com/nextsko/mocode-agent/internal/core/uri"
+	ghuri "github.com/nextsko/mocode-agent/internal/core/uri/github"
 	"github.com/nextsko/mocode-agent/internal/domain/filetracker"
 	"github.com/nextsko/mocode-agent/internal/domain/history"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
@@ -30,6 +36,8 @@ import (
 	"github.com/nextsko/mocode-agent/internal/store"
 	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/nextsko/mocode-agent/internal/util/log"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -62,6 +70,8 @@ const (
 	CategoryGitea     ToolCategory = "gitea"
 	CategoryGitOps    ToolCategory = "gitops"
 	CategorySSH       ToolCategory = "ssh"
+	// CategoryBrowser groups the native browser automation tool.
+	CategoryBrowser ToolCategory = "browser"
 )
 
 // ToolDescriptor holds static metadata for a single tool.
@@ -109,6 +119,118 @@ func NewHTTPFactory(store *config.ConfigStore) *nethttp.Factory {
 	cfg := store.Config()
 	resolver := store.Resolver()
 	return nethttp.NewFactory(cfg.HTTPTransport(resolver), cfg.ResolvedProxyURL(resolver))
+}
+
+// buildURIRegistry assembles the internal resource namespaces.
+//
+// This is the composition root for the mocode:// protocol: every provider is
+// wired here, so the namespaces a session can reach are visible in one place
+// rather than scattered across the tools that happen to use them.
+func buildURIRegistry(deps ToolDeps) *uri.Registry {
+	r := uri.NewRegistry()
+
+	// skills: builtin (embedded) plus every configured user directory, so
+	// mocode://skills/ lists what is actually installed rather than only what
+	// ships with the binary.
+	r.Register(skills.NewURIProvider(expandPaths(deps, deps.Cfg.Config().Options.SkillsPaths)...))
+
+	// docs and exp: documented roots, falling back to the workspace conventions
+	// so the namespaces are useful with no configuration at all.
+	r.Register(uri.NewTreeProvider(uri.AuthorityDocs,
+		"Documentation roots for this workspace: design notes, architecture docs and guides.",
+		dirTrees(deps, cfgOr(deps, func(o *config.Options) []string { return o.DocsPaths }), []string{"docs"})...))
+
+	r.Register(uri.NewTreeProvider(uri.AuthorityExp,
+		"Experience notes: durable write-ups of problems solved and how, one file per lesson.",
+		dirTrees(deps, cfgOr(deps, func(o *config.Options) []string { return o.ExpPaths }), []string{".exps", "docs/exps"})...))
+
+	// github is injected only when an HTTP factory exists, so a build without
+	// outbound HTTP simply lacks the namespace instead of failing at call time.
+	if deps.HTTP != nil {
+		r.Register(ghuri.New(deps.HTTP.Client(nethttp.DefaultTimeout)))
+	}
+
+	// memory is served from the store, whose root resolves to the app data
+	// directory by default. The namespace root is the index rather than a
+	// directory listing, so `view mocode://memory` answers "what do we know?"
+	// directly.
+	if store := memoryStore(deps); store != nil {
+		r.Register(memory.NewURIProvider(store, memory.NewFileIndexer(store)))
+	}
+
+	// browser reads the live session, which may not be running yet; the
+	// provider reports that rather than being absent.
+	r.Register(corebrowser.NewURIProvider(browserManager()))
+
+	return r
+}
+
+// expandPaths applies the configured variable expansion (and `~`) to each path,
+// dropping empties. Discovery expands these before use; doing the same here
+// keeps one meaning for "a configured directory" — an unexpanded `~` used to
+// silently fail the skills containment test, so the exemption it granted never
+// applied.
+func expandPaths(deps ToolDeps, paths []string) []string {
+	out := make([]string, 0, len(paths))
+	for _, p := range paths {
+		if strings.TrimSpace(p) == "" {
+			continue
+		}
+		out = append(out, expandOne(deps, p))
+	}
+	return out
+}
+
+// expandOne resolves `~` and shell variables in a configured path.
+func expandOne(deps ToolDeps, p string) string {
+	if deps.Cfg == nil {
+		return p
+	}
+	expanded := infra.Long(p)
+	if strings.HasPrefix(expanded, "$") {
+		if resolved, err := deps.Cfg.Resolver().ResolveValue(expanded); err == nil {
+			expanded = resolved
+		}
+	}
+	return expanded
+}
+
+// cfgOr reads a path list from config, falling back to workspace-relative
+// defaults when it is empty.
+func cfgOr(deps ToolDeps, get func(*config.Options) []string) []string {
+	if deps.Cfg != nil {
+		if cfg := deps.Cfg.Config(); cfg != nil && cfg.Options != nil {
+			if paths := get(cfg.Options); len(paths) > 0 {
+				return paths
+			}
+		}
+	}
+	return nil
+}
+
+// dirTrees turns a list of directories into trees, defaulting to workspace
+// subdirectories and skipping anything that does not exist.
+func dirTrees(deps ToolDeps, configured, defaults []string) []uri.Tree {
+	dirs := configured
+	if len(dirs) == 0 {
+		wd := deps.Cfg.WorkingDir()
+		for _, d := range defaults {
+			dirs = append(dirs, filepath.Join(wd, d))
+		}
+	}
+
+	trees := make([]uri.Tree, 0, len(dirs))
+	for _, dir := range expandPaths(deps, dirs) {
+		info, err := os.Stat(dir)
+		if err != nil || !info.IsDir() {
+			// A missing root is normal: most workspaces have docs but no
+			// experience notes, and vice versa. The namespace simply lists
+			// fewer trees.
+			continue
+		}
+		trees = append(trees, uri.Tree{Label: dir, FS: os.DirFS(dir)})
+	}
+	return trees
 }
 
 // AllToolDescriptors returns descriptors for every standard (non-coordinator) tool.
@@ -170,6 +292,8 @@ func standardPlugins() []ToolPlugin {
 		mcpMetaPlugin{},
 		thinkPlugin{},
 		learnPlugin{},
+		memoryPlugin{},
+		browserPlugin{},
 		giteaPlugin{},
 		gitOpsPlugin{},
 		&sshPlugin{},
@@ -258,7 +382,7 @@ func (filePlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{
 		fs.NewEditTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
 		fs.NewMultiEditTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
-		fs.NewViewTool(deps.LSPManager, deps.Permissions, deps.FileTracker, deps.SkillTracker, wd, cfg.Options.SkillsPaths...),
+		fs.NewViewTool(deps.LSPManager, deps.Permissions, deps.FileTracker, deps.SkillTracker, buildURIRegistry(deps), wd, expandPaths(deps, cfg.Options.SkillsPaths)...),
 		fs.NewReadFilesTool(deps.Permissions, deps.FileTracker, wd),
 		fs.NewWriteTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
 		fs.NewLsTool(deps.Permissions, wd, cfg.Tools.Ls),
@@ -496,6 +620,114 @@ func learnSkillsRoot(deps ToolDeps) string {
 	}
 	return root
 }
+
+// ─── plugin/browser ────────────────────────────────────────────────────────────
+
+// browserPlugin exposes the native browser runtime: it drives an already
+// installed Chromium-family browser over CDP so the agent can inspect and debug
+// real pages. No Node/Playwright toolchain is involved — see
+// docs/architecture/07-native-browser-runtime.md.
+//
+// The session lives in one long-lived Manager rather than per call, because a
+// debugging loop (snapshot → click → snapshot → console) must stay on the same
+// page across calls.
+type browserPlugin struct{}
+
+func (browserPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: browser.BrowserToolName, Kind: ToolKindPlugin, Category: CategoryBrowser},
+	}
+}
+
+func (browserPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	return []fantasy.AgentTool{browser.NewBrowserTool(browser.Deps{
+		Permissions: deps.Permissions,
+		Manager:     browserManager(),
+	})}
+}
+
+func (browserPlugin) Start(context.Context) error { return nil }
+
+func (browserPlugin) Stop(ctx context.Context) error {
+	// A headless browser left running after mocode exits is a leaked process, so
+	// the session is torn down with the tool registry.
+	return browserManager().Close(ctx)
+}
+
+// browserManager returns the process-wide browser session manager.
+func browserManager() *corebrowser.Manager {
+	browserManagerOnce.Do(func() { browserManagerInst = corebrowser.NewManager() })
+	return browserManagerInst
+}
+
+var (
+	browserManagerOnce sync.Once
+	browserManagerInst *corebrowser.Manager
+)
+
+// ─── plugin/memory ─────────────────────────────────────────────────────────────
+
+// memoryPlugin exposes the session memory tool.
+//
+// The store lives in one long-lived value rather than being rebuilt per call,
+// because the tier an entry lands in depends on the session it belongs to, and
+// the index has to reflect every session's writes — not just this call's.
+type memoryPlugin struct{}
+
+func (memoryPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: agenttools.MemoryToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
+	}
+}
+
+func (memoryPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	store := memoryStore(deps)
+	if store == nil {
+		return nil
+	}
+	return []fantasy.AgentTool{agenttools.NewMemoryTool(agenttools.MemoryDeps{
+		Store:   store,
+		Indexer: memory.NewFileIndexer(store),
+	})}
+}
+
+// memoryStore returns the process-wide session memory store.
+//
+// A nil store means memory is unavailable (no config), in which case the tool is
+// simply absent rather than present and failing.
+func memoryStore(deps ToolDeps) *memory.Store {
+	memoryStoreOnce.Do(func() {
+		root := memoryRoot(deps)
+		if root == "" {
+			return
+		}
+		memoryStoreInst = memory.NewStore(root)
+	})
+	return memoryStoreInst
+}
+
+// memoryRoot resolves the memory tree root: the configured directory, else
+// <data dir>/memories.
+//
+// A single root rather than a search path: memory has a structured layout
+// (global/, sessions/, index.md) that the code owns and the index depends on,
+// so multiple roots would fracture the index rather than extend it.
+func memoryRoot(deps ToolDeps) string {
+	configured := ""
+	if deps.Cfg != nil {
+		if cfg := deps.Cfg.Config(); cfg != nil && cfg.Options != nil {
+			configured = cfg.Options.MemoryDir
+		}
+	}
+	return memory.ResolveRoot(configured, infra.DataDir(), func(p string) string {
+		return expandOne(deps, p)
+	})
+}
+
+var (
+	memoryStoreOnce sync.Once
+	memoryStoreInst *memory.Store
+)
 
 // ─── plugin/gitops ────────────────────────────────────────────────────────────
 

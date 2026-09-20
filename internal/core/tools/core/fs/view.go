@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +20,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
 	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
+	"github.com/nextsko/mocode-agent/internal/core/uri"
 	"github.com/nextsko/mocode-agent/internal/domain/filetracker"
 	"github.com/nextsko/mocode-agent/internal/util/ext"
 )
@@ -66,6 +67,7 @@ func NewViewTool(
 	permissions permission.Service,
 	filetracker filetracker.Service,
 	skillTracker *skills.Tracker,
+	uriRegistry *uri.Registry,
 	workingDir string,
 	skillsPaths ...string,
 ) fantasy.AgentTool {
@@ -77,10 +79,12 @@ func NewViewTool(
 				return fantasy.NewTextErrorResponse("file_path is required"), nil
 			}
 
-			// Handle builtin skill files (mocode: prefix).
-			if strings.HasPrefix(params.FilePath, skills.BuiltinPrefix) {
-				resp, err := readBuiltinFile(params, skillTracker)
-				return resp, err
+			// Internal resources (mocode://...) resolve through the protocol
+			// registry rather than the filesystem. Everything the scheme defines
+			// arrives here: embedded skills, the docs and experience namespaces,
+			// GitHub files, and the live browser session.
+			if uri.IsURI(params.FilePath) {
+				return readURIResource(ctx, params, uriRegistry, skillTracker)
 			}
 
 			// Handle relative paths
@@ -343,69 +347,84 @@ func (s *LineScanner) Err() error {
 	return s.scanner.Err()
 }
 
-// isInSkillsPath checks if filePath is within any of the configured skills
-// directories. Returns true for files that can be read without permission
-// prompts and without size limits.
+// isInSkillsPath reports whether filePath lies inside a configured skills
+// directory. Such files are readable without a permission prompt and without
+// size limits, because the agent is expected to consult its own skills.
 //
-// Note that symlinks are resolved to prevent path traversal attacks via
-// symbolic links.
+// The containment test lives in the skills package so that it is the same test
+// the rest of the program uses, rather than a second implementation that can
+// drift from it.
 func isInSkillsPath(filePath string, skillsPaths []string) bool {
-	if len(skillsPaths) == 0 {
-		return false
-	}
-
-	absFilePath, err := filepath.Abs(filePath)
-	if err != nil {
-		return false
-	}
-
-	evalFilePath, err := filepath.EvalSymlinks(absFilePath)
-	if err != nil {
-		return false
-	}
-
-	for _, skillsPath := range skillsPaths {
-		absSkillsPath, err := filepath.Abs(skillsPath)
-		if err != nil {
-			continue
-		}
-
-		evalSkillsPath, err := filepath.EvalSymlinks(absSkillsPath)
-		if err != nil {
-			continue
-		}
-
-		relPath, err := filepath.Rel(evalSkillsPath, evalFilePath)
-		if err == nil && !strings.HasPrefix(relPath, "..") {
-			return true
-		}
-	}
-
-	return false
+	return skills.SkillsDirIn(filePath, skillsPaths)
 }
 
-// readBuiltinFile reads a file from the embedded builtin skills filesystem.
-func readBuiltinFile(params ViewParams, skillTracker *skills.Tracker) (fantasy.ToolResponse, error) {
-	embeddedPath := "builtin/" + strings.TrimPrefix(params.FilePath, skills.BuiltinPrefix)
-	builtinFS := skills.BuiltinFS()
+// readURIResource resolves a mocode:// reference through the protocol registry.
+//
+// This is the single entry point for every non-filesystem resource. The mapping
+// used to be a hardcoded prefix check plus a direct read of the embedded skills
+// filesystem; a registry means one code path, one error message vocabulary, and
+// new namespaces that need no change here.
+func readURIResource(
+	ctx context.Context,
+	params ViewParams,
+	registry *uri.Registry,
+	skillTracker *skills.Tracker,
+) (fantasy.ToolResponse, error) {
+	if registry == nil {
+		return fantasy.NewTextErrorResponse(
+			"internal mocode:// resources are not available in this session"), nil
+	}
 
-	data, err := fs.ReadFile(builtinFS, embeddedPath)
+	content, u, err := registry.Resolve(ctx, params.FilePath)
 	if err != nil {
-		return fantasy.NewTextErrorResponse(fmt.Sprintf("Builtin file not found: %s", params.FilePath)), nil
+		// A bad reference is the model's mistake to correct, so it comes back
+		// as guidance it can act on rather than as a tool failure.
+		return fantasy.NewTextErrorResponse(uriGuidance(err, registry)), nil
 	}
 
-	content := string(data)
-	if !utf8.ValidString(content) {
-		return fantasy.NewTextErrorResponse("File content is not valid UTF-8"), nil
+	meta := ViewResponseMetadata{
+		FilePath:            params.FilePath,
+		ResourceType:        resourceTypeFor(u.Authority),
+		ResourceName:        content.Title,
+		ResourceDescription: content.Description,
 	}
 
+	switch content.Kind {
+	case uri.KindListing:
+		text := uri.RenderListing(u, content)
+		meta.Content = text
+		return fantasy.WithResponseMetadata(fantasy.NewTextResponse(text), meta), nil
+
+	case uri.KindImage:
+		return imageURIResponse(params, content, meta)
+
+	default:
+		return textURIResponse(params, u, content, meta, skillTracker)
+	}
+}
+
+// textURIResponse applies the same offset/limit/line-number treatment to remote
+// text as to a local file, so reading a GitHub file and reading a local one look
+// identical to the model.
+func textURIResponse(
+	params ViewParams,
+	u uri.URI,
+	content *uri.Content,
+	meta ViewResponseMetadata,
+	skillTracker *skills.Tracker,
+) (fantasy.ToolResponse, error) {
+	// Skills are the agent's own instructions, so they are read whole; anything
+	// else is windowed like a file.
 	limit := params.Limit
 	if limit <= 0 {
-		limit = 1000000 // Effectively no limit for skill files.
+		limit = DefaultReadLimit
+		if u.Authority == uri.AuthoritySkills {
+			limit = 1000000
+		}
 	}
 
-	lines := strings.Split(content, "\n")
-	offset := min(params.Offset, len(lines))
+	lines := strings.Split(content.Text, "\n")
+	offset := min(max(0, params.Offset), len(lines))
 	lines = lines[offset:]
 
 	hasMore := len(lines) > limit
@@ -413,27 +432,57 @@ func readBuiltinFile(params ViewParams, skillTracker *skills.Tracker) (fantasy.T
 		lines = lines[:limit]
 	}
 
-	output := "<file>\n"
-	output += addLineNumbers(strings.Join(lines, "\n"), offset+1)
+	var output strings.Builder
+	output.WriteString("<file>\n")
+	output.WriteString(addLineNumbers(strings.Join(lines, "\n"), offset+1))
 	if hasMore {
-		output += fmt.Sprintf("\n\n(File has more lines. Use 'offset' parameter to read beyond line %d)",
+		fmt.Fprintf(&output, "\n\n(File has more lines. Use 'offset' parameter to read beyond line %d)",
 			offset+len(lines))
 	}
-	output += "\n</file>\n"
+	output.WriteString("\n</file>\n")
 
-	meta := ViewResponseMetadata{
-		FilePath: params.FilePath,
-		Content:  strings.Join(lines, "\n"),
-	}
-	if skill, err := skills.ParseContent(data); err == nil {
-		meta.ResourceType = ViewResourceSkill
-		meta.ResourceName = skill.Name
-		meta.ResourceDescription = skill.Description
-		skillTracker.MarkLoaded(skill.Name)
+	meta.Content = strings.Join(lines, "\n")
+
+	// A skill read is how the model "loads" a skill; recording it keeps the
+	// loaded/unloaded state the prompt uses accurate.
+	if u.Authority == uri.AuthoritySkills && skillTracker != nil && strings.HasSuffix(u.Path, skills.SkillFileName) {
+		if skill, perr := skills.ParseContent([]byte(content.Text)); perr == nil {
+			meta.ResourceType = ViewResourceSkill
+			meta.ResourceName = skill.Name
+			meta.ResourceDescription = skill.Description
+			skillTracker.MarkLoaded(skill.Name)
+		}
 	}
 
+	return fantasy.WithResponseMetadata(fantasy.NewTextResponse(output.String()), meta), nil
+}
+
+// imageURIResponse returns binary image content the model can look at.
+func imageURIResponse(params ViewParams, content *uri.Content, meta ViewResponseMetadata) (fantasy.ToolResponse, error) {
+	meta.Content = fmt.Sprintf("<image %s, %d bytes>", content.MIME, len(content.Data))
 	return fantasy.WithResponseMetadata(
-		fantasy.NewTextResponse(output),
+		fantasy.NewImageResponse(content.Data, content.MIME),
 		meta,
 	), nil
+}
+
+// resourceTypeFor maps an authority onto the metadata type the UI shows,
+// preserving the historical "skill" label the skills namespace already used.
+func resourceTypeFor(authority string) ViewResourceType {
+	if authority == uri.AuthoritySkills {
+		return ViewResourceSkill
+	}
+	return ViewResourceType(authority)
+}
+
+// uriGuidance turns a resolution failure into something the model can act on:
+// the namespace map for an unknown authority, or a pointer at a listing for a
+// missing path.
+func uriGuidance(err error, registry *uri.Registry) string {
+	msg := fmt.Sprintf("Failed to resolve internal resource: %v", err)
+
+	if errors.Is(err, uri.ErrUnknownAuthority) || errors.Is(err, uri.ErrNotURI) {
+		return msg + "\n\n" + registry.Describe()
+	}
+	return msg + "\n\nAddress a namespace without a path to list what it contains, e.g. mocode://docs/"
 }

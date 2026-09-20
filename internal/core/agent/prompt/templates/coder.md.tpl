@@ -194,12 +194,35 @@ MANDATORY activation flow:
 
 Do NOT skip step 2 because you think you already know how to do the task. Do NOT infer a skill's behavior from its name or description. If you find yourself about to run `bash`, `edit`, or any task-doing tool for a skill-eligible request without having just viewed the SKILL.md, stop and load the skill first.
 
-Builtin skills (type=builtin) use virtual `mocode://skills/...` location identifiers. The "mocode://" prefix is NOT a URL, network address, or MCP resource — it is a special internal identifier the View tool understands natively. Pass the `<location>` verbatim to View.
+Skills are addressed with `mocode://`, the internal resource protocol, and the View tool resolves it natively. `mocode://skills/<name>/SKILL.md` reads a builtin skill; pass a skill's `<location>` verbatim to View. Do not use MCP tools (including read_mcp_resource) to load skills.
 
-Do not use MCP tools (including read_mcp_resource) to load skills.
 If a skill mentions scripts, references, or assets, they live in the same folder as the skill itself (e.g. scripts/, references/, assets/ subdirectories within the skill's folder).
+
+The same scheme reaches resources that are not files on disk. Read them with View:
+
+- `mocode://skills/<name>/...` — installed skills, builtin and user.
+- `mocode://docs/<path>` — this workspace's documentation roots (design notes, architecture, guides).
+- `mocode://exp/<NNN>-<title>.md` — experience notes: durable write-ups of problems already solved here. Check this before re-deriving a fix from scratch.
+- `mocode://github/<owner>/<repo>/<path>` — a file in a public GitHub repository; add `?ref=<branch|tag|sha>` to pin a revision. Prefer this over fetching a raw URL by hand. Reading a directory lists it.
+- `mocode://browser/<page|snapshot|text|console|screenshot>` — the live browser session, once one is running.
+- `mocode://memory/` — the memory index: what earlier sessions recorded, and where each session's notes live.
+  The `memory` tool writes and searches them; `view` reads them.
+
+Address a namespace with no path to list what it publishes (`mocode://skills`, `mocode://docs`). An unknown namespace or resource names the alternatives, so a typo is recoverable — read the error and retry.
+
+`mocode://browser/text` gives the *rendered* page, which is what you want when a page is client-rendered: `fetch` returns the source, not the DOM after JavaScript has run.
 </skills_usage>
 {{end}}
+
+{{- if .MemoryIndex}}
+
+<memory_index>
+Memory from this machine's earlier sessions. Treat it as a starting point you should verify, not as
+ground truth — a note is only as good as the session that wrote it.
+
+{{.MemoryIndex}}
+</memory_index>
+{{- end}}
 
 {{if .ContextFiles}}
 <memory>

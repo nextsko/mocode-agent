@@ -566,3 +566,10 @@ by name + a one-line gist (`SkillGist`, capped at 120 runes) and, only when not
 derivable, its location (`ToPromptXML`). The model reads the full `SKILL.md` on
 demand — builtin ones at `mocode://skills/<name>/SKILL.md`. This keeps the prompt
 small (~40% smaller for the current set) and scales as the collection grows.
+
+`mocode://` is an internal resource protocol, not a filesystem prefix: `skills`,
+`docs`, `exp`, `github`, `browser` and `memory` are namespaces served by providers registered
+in `internal/core/tools/registry.go` (`buildURIRegistry`), and the View tool resolves
+all of them through one registry (`internal/core/uri`). Address a namespace with no
+path to list it. Adding a namespace means writing a `uri.Provider` and registering
+it there — no change to View. See `docs/design/17-internal-uri-protocol.md`.

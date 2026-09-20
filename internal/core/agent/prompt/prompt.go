@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/memory"
 	"github.com/nextsko/mocode-agent/internal/core/shellruntime/shell"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
 	"github.com/nextsko/mocode-agent/internal/util/infra"
@@ -41,7 +42,9 @@ type PromptDat struct {
 	SessionContext string
 	ContextFiles   []ContextFile
 	AvailSkillXML  string
-	AppName        string
+	// MemoryIndex is a bounded digest of session and global memory.
+	MemoryIndex string
+	AppName     string
 }
 
 type ContextFile struct {
@@ -225,6 +228,10 @@ func (p *Prompt) promptData(ctx context.Context, provider, model string, store *
 		availSkillXML = skills.ToPromptXML(allSkills)
 	}
 
+	// Memory digest. Bounded on purpose: the full index is one View away, and a
+	// prompt that grows with every memory would eventually crowd out the task.
+	memoryIndex := memoryDigest(cfg)
+
 	isGit := isGitRepo(store.WorkingDir())
 	data := PromptDat{
 		Provider:       provider,
@@ -236,6 +243,7 @@ func (p *Prompt) promptData(ctx context.Context, provider, model string, store *
 		Date:           p.now().Format("1/2/2006"),
 		SessionContext: p.sessionContext,
 		AvailSkillXML:  availSkillXML,
+		MemoryIndex:    memoryIndex,
 		AppName:        config.GetAppName(cfg),
 	}
 	if isGit {
@@ -312,3 +320,28 @@ func getGitRecentCommits(ctx context.Context, sh *shell.Shell) (string, error) {
 func (p *Prompt) Name() string {
 	return p.name
 }
+
+// memoryDigest renders the bounded memory digest injected into the prompt.
+//
+// A failure here must never break prompt construction: memory is an aid, and a
+// prompt without it is better than no prompt at all.
+func memoryDigest(cfg *config.Config) string {
+	if cfg == nil || cfg.Options == nil {
+		return ""
+	}
+
+	root := memory.ResolveRoot(cfg.Options.MemoryDir, infra.DataDir(), func(p string) string {
+		return expandPath(p, nil)
+	})
+	store := memory.NewStore(root)
+
+	idx, err := memory.NewFileIndexer(store).Rebuild(context.Background())
+	if err != nil {
+		slog.Warn("Building the memory digest failed", "error", err)
+		return ""
+	}
+	return memory.Digest(idx, memoryPromptBudget)
+}
+
+// memoryPromptBudget caps the digest so memory can never crowd out the task.
+const memoryPromptBudget = 4000

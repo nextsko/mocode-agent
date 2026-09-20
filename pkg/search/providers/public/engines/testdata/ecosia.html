@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head><title>golang tour - Ecosia</title></head>
+<body>
+<main class="main-content">
+  <article data-test-id="organic-result">
+    <a href="https://example.com/ecosia-one" class="result__link">
+      <h2 data-test-id="result-title">Ecosia result one</h2>
+    </a>
+    <p data-test-id="web-result-description">First ecosia snippet with
+      the preferred inner paragraph.</p>
+  </article>
+  <article data-test-id="organic-result">
+    <a href="https://www.ecosia.org/images?q=go" class="result__link">
+      <h2 data-test-id="result-title">Internal images vertical</h2>
+    </a>
+    <p data-test-id="web-result-description">Internal navigation must
+      be rejected.</p>
+  </article>
+  <article data-test-id="ad-google">
+    <a href="https://ads.example.com/ad-slot">
+      <h2 data-test-id="result-title">Sponsored ad slot</h2>
+    </a>
+    <p data-test-id="web-result-description">Ad slots never match the
+      organic selector.</p>
+  </article>
+  <article data-test-id="organic-result">
+    <a href="https://example.com/ecosia-two" class="result__link">
+      <h2 data-test-id="result-title">Ecosia result two</h2>
+    </a>
+    <div data-test-id="result-description">Second snippet from the
+      fallback container.</div>
+  </article>
+</main>
+</body>
+</html>

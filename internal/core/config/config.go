@@ -250,8 +250,17 @@ func (Attribution) JSONSchemaExtend(schema *jsonschema.Schema) {
 }
 
 type Options struct {
-	ContextPaths              []string        `json:"context_paths,omitempty" jsonschema:"description=Paths to files containing context information for the AI,example=.cursorrules,example=AGENTS.md"`
-	SkillsPaths               []string        `json:"skills_paths,omitempty" jsonschema:"description=Paths to directories containing Agent Skills (folders with SKILL.md files),example=~/.config/mocode/skills,example=./skills"`
+	ContextPaths []string `json:"context_paths,omitempty" jsonschema:"description=Paths to files containing context information for the AI,example=.cursorrules,example=AGENTS.md"`
+	SkillsPaths  []string `json:"skills_paths,omitempty" jsonschema:"description=Paths to directories containing Agent Skills (folders with SKILL.md files),example=~/.config/mocode/skills,example=./skills"`
+	// DocsPaths are the roots served under mocode://docs/. Empty means the
+	// workspace's own docs/ directory.
+	DocsPaths []string `json:"docs_paths,omitempty" jsonschema:"description=Paths served under the mocode://docs/ namespace (defaults to the workspace docs/ directory)"`
+	// MemoryDir is the root of the session memory tree (session and global
+	// tiers plus their index). Empty means <data dir>/memories.
+	MemoryDir string `json:"memory_dir,omitempty" jsonschema:"description=Root of the session memory tree; empty uses the app data directory"`
+	// ExpPaths are the roots served under mocode://exp/ — the experience-notes
+	// library. Empty means the workspace's .exps/ directory.
+	ExpPaths                  []string        `json:"exp_paths,omitempty" jsonschema:"description=Paths served under the mocode://exp/ namespace (defaults to the workspace .exps/ directory)"`
 	TUI                       *TUIOptions     `json:"tui,omitempty" jsonschema:"description=Terminal user interface options"`
 	Debug                     bool            `json:"debug,omitempty" jsonschema:"description=Enable debug logging,default=false"`
 	DebugLSP                  bool            `json:"debug_lsp,omitempty" jsonschema:"description=Enable debug logging for LSP servers,default=false"`
@@ -559,6 +568,8 @@ func allToolNames() []string {
 		"think",
 		"todos",
 		"learn",
+		"memory",
+		"browser",
 		"view",
 		"write",
 		"list_mcp_resources",

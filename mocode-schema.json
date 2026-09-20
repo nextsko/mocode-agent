@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/nextsko/mocode-agent/internal/config/config",
+  "$id": "https://github.com/nextsko/mocode-agent/internal/core/config/config",
   "$ref": "#/$defs/Config",
   "$defs": {
     "Attribution": {
@@ -427,6 +427,24 @@
           "type": "array",
           "description": "Paths to directories containing Agent Skills (folders with SKILL.md files)"
         },
+        "docs_paths": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Paths served under the mocode://docs/ namespace (defaults to the workspace docs/ directory)"
+        },
+        "memory_dir": {
+          "type": "string",
+          "description": "Root of the session memory tree; empty uses the app data directory"
+        },
+        "exp_paths": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Paths served under the mocode://exp/ namespace (defaults to the workspace .exps/ directory)"
+        },
         "tui": {
           "$ref": "#/$defs/TUIOptions",
           "description": "Terminal user interface options"
@@ -445,14 +463,6 @@
           "type": "boolean",
           "description": "Disable automatic conversation summarization",
           "default": false
-        },
-        "data_directory": {
-          "type": "string",
-          "description": "Directory for storing application data (relative to working directory)",
-          "default": ".mocode",
-          "examples": [
-            ".mocode"
-          ]
         },
         "disabled_tools": {
           "items": {

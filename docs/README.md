@@ -26,6 +26,8 @@
 | 14 | [design/14-agent-architecture-refactor-plan.md](design/14-agent-architecture-refactor-plan.md) | Agent Architecture Refactor 实施计划 |
 | 15 | [design/15-file-mention-menu-redesign.md](design/15-file-mention-menu-redesign.md) | FileMentionMenu Redesign Design |
 | 16 | [design/16-learn-tool.md](design/16-learn-tool.md) | learn 工具：任务沉淀为 skill（provenance / 备份 / 权限门）|
+| 17 | [design/17-internal-uri-protocol.md](design/17-internal-uri-protocol.md) | 内部资源协议 mocode://：skills / docs / exp / github / browser 命名空间 |
+| 18 | [design/18-session-memory-protocol.md](design/18-session-memory-protocol.md) | 会话记忆协议：文件为基座、全局/会话两层、自动索引会话位置、萃取 |
 
 ### 架构文档
 
@@ -35,6 +37,10 @@
 | 02 | [architecture/02-workspace-types.md](architecture/02-workspace-types.md) | Workspace 类型与数据流 |
 | 03 | [architecture/03-slash-command-arch.md](architecture/03-slash-command-arch.md) | Slash Command 系统架构（两套命令系统）|
 | 04 | [architecture/04-tool-system-comparison.md](architecture/04-tool-system-comparison.md) | Mocode vs trpc-agent-go 工具系统对比 |
+| 05 | [architecture/05-wechat-butler-arch.md](architecture/05-wechat-butler-arch.md) | WeChat Butler 架构 |
+| 06 | [architecture/06-playwright-cli-design.md](architecture/06-playwright-cli-design.md) | Playwright CLI 设计要点（skill 形态）|
+| 07 | [architecture/07-native-browser-runtime.md](architecture/07-native-browser-runtime.md) | 原生浏览器运行时：跨平台探测 + CDP 直连 + 三层闭环测试 |
+| — | [architecture/00-hermes-blueprint.md](architecture/00-hermes-blueprint.md) | Hermes 蓝图（唯一规划真相源）|
 
 ### 开发指南
 

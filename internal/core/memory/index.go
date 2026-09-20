@@ -1,0 +1,353 @@
+package memory
+
+import (
+	"context"
+	"fmt"
+	"path"
+	"sort"
+	"strings"
+	"time"
+)
+
+// SessionSummary is one session's slice of the memory tree.
+type SessionSummary struct {
+	// Session is the short session id used in paths.
+	Session string
+	// Dir is the root-relative directory holding that session's entries. This is
+	// the "location" the global index exists to record: without it, memory
+	// written in one session would be unfindable from any other.
+	Dir string
+	// Entries are the session's memories, newest first.
+	Entries []*Entry
+	// Latest is the most recent entry's date.
+	Latest time.Time
+}
+
+// Index is the derived view of the whole memory tree.
+type Index struct {
+	// RebuiltAt is when the index was produced.
+	RebuiltAt time.Time
+	// Global holds the durable tier, newest first.
+	Global []*Entry
+	// Sessions holds every session that has memory, most recent first.
+	Sessions []SessionSummary
+	// Root is the absolute memory directory, recorded so the index is
+	// self-describing when read outside its original location.
+	Root string
+}
+
+// Total counts every entry across both tiers.
+func (idx *Index) Total() int {
+	n := len(idx.Global)
+	for _, s := range idx.Sessions {
+		n += len(s.Entries)
+	}
+	return n
+}
+
+// SessionEntryCount counts entries in the session tier.
+func (idx *Index) SessionEntryCount() int {
+	n := 0
+	for _, s := range idx.Sessions {
+		n += len(s.Entries)
+	}
+	return n
+}
+
+// Find returns the entry with the given root-relative path.
+func (idx *Index) Find(relPath string) (*Entry, bool) {
+	for _, e := range idx.Global {
+		if e.RelPath == relPath {
+			return e, true
+		}
+	}
+	for _, s := range idx.Sessions {
+		for _, e := range s.Entries {
+			if e.RelPath == relPath {
+				return e, true
+			}
+		}
+	}
+	return nil, false
+}
+
+// Indexer derives and maintains the global memory index.
+//
+// The blueprint's decided item #1 requires the index to be "pure file plus an
+// interface implementation, Liskov-substitutable": a file-scanning
+// implementation ships first and a future SQLite/FST index can replace it
+// without touching callers. Everything above this interface therefore treats
+// the index as a value, never as a file it knows the shape of.
+type Indexer interface {
+	// Rebuild scans the memory tree and returns the derived index.
+	Rebuild(ctx context.Context) (*Index, error)
+	// Render turns an index into the index document's bytes.
+	Render(idx *Index) []byte
+}
+
+// FileIndexer is the file-scanning implementation of [Indexer].
+type FileIndexer struct {
+	store *Store
+}
+
+// NewFileIndexer returns the file-scanning indexer.
+func NewFileIndexer(store *Store) *FileIndexer { return &FileIndexer{store: store} }
+
+// Rebuild scans both tiers and groups session entries by session.
+func (f *FileIndexer) Rebuild(ctx context.Context) (*Index, error) {
+	global, err := f.store.List(ctx, ListOptions{Scope: ScopeGlobal})
+	if err != nil {
+		return nil, err
+	}
+
+	sessionEntries, err := f.store.List(ctx, ListOptions{Scope: ScopeSession})
+	if err != nil {
+		return nil, err
+	}
+
+	bySession := map[string]*SessionSummary{}
+	for _, e := range sessionEntries {
+		short := sessionShort(e.Session)
+		if short == "" {
+			short = "unknown"
+		}
+		s, ok := bySession[short]
+		if !ok {
+			s = &SessionSummary{Session: short, Dir: path.Join(SessionsDir, short)}
+			bySession[short] = s
+		}
+		s.Entries = append(s.Entries, e)
+		if e.Date.After(s.Latest) {
+			s.Latest = e.Date
+		}
+	}
+
+	sessions := make([]SessionSummary, 0, len(bySession))
+	for _, s := range bySession {
+		sort.SliceStable(s.Entries, func(i, j int) bool {
+			if !s.Entries[i].Date.Equal(s.Entries[j].Date) {
+				return s.Entries[i].Date.After(s.Entries[j].Date)
+			}
+			return s.Entries[i].RelPath < s.Entries[j].RelPath
+		})
+		sessions = append(sessions, *s)
+	}
+	// Most recently used session first, then by id so the order is total.
+	sort.SliceStable(sessions, func(i, j int) bool {
+		if !sessions[i].Latest.Equal(sessions[j].Latest) {
+			return sessions[i].Latest.After(sessions[j].Latest)
+		}
+		return sessions[i].Session < sessions[j].Session
+	})
+
+	return &Index{
+		RebuiltAt: f.store.now().UTC(),
+		Global:    global,
+		Sessions:  sessions,
+		Root:      f.store.Root(),
+	}, nil
+}
+
+// maxIndexRows bounds the flat entry table. The tree is scanned by hand too, so
+// an unbounded index would only make the document expensive to read for no
+// extra reach.
+const maxIndexRows = 500
+
+// Render produces the index document.
+//
+// Output is deterministic for a given tree: no map iteration order, no
+// formatting that depends on when it ran beyond the explicit RebuiltAt line.
+// A rebuild that produced different bytes for the same content would make the
+// index un-diffable and any test of it meaningless.
+func (f *FileIndexer) Render(idx *Index) []byte {
+	var b strings.Builder
+
+	b.WriteString("# Memory Index\n\n")
+	b.WriteString("> Generated by mocode. This file is rewritten whenever memory changes —\n")
+	b.WriteString("> edit the entries, not this index.\n\n")
+	fmt.Fprintf(&b, "- Rebuilt: %s\n", idx.RebuiltAt.UTC().Format(time.RFC3339))
+	fmt.Fprintf(&b, "- Total: %d entries (%d global, %d across %d session(s))\n",
+		idx.Total(), len(idx.Global), idx.SessionEntryCount(), len(idx.Sessions))
+	fmt.Fprintf(&b, "- Location: %s\n\n", idx.Root)
+
+	b.WriteString("## Global memories\n\n")
+	if len(idx.Global) == 0 {
+		b.WriteString("_None yet._ Promote a session memory with `memory` action=`extract` once it is worth keeping.\n\n")
+	} else {
+		writeEntryTable(&b, idx.Global)
+	}
+
+	b.WriteString("## Session memories\n\n")
+	b.WriteString("Where each session's memory lives. Memory written in one session is reachable from any\n")
+	b.WriteString("other through these locations.\n\n")
+
+	if len(idx.Sessions) == 0 {
+		b.WriteString("_No session memory yet._\n\n")
+	} else {
+		b.WriteString("| Session | Entries | Latest | Location |\n")
+		b.WriteString("| --- | --- | --- | --- |\n")
+		for _, s := range idx.Sessions {
+			latest := "-"
+			if !s.Latest.IsZero() {
+				latest = s.Latest.UTC().Format("2006-01-02 15:04")
+			}
+			fmt.Fprintf(&b, "| `%s` | %d | %s | `%s/` |\n", s.Session, len(s.Entries), latest, s.Dir)
+		}
+		b.WriteString("\n")
+
+		for _, s := range idx.Sessions {
+			fmt.Fprintf(&b, "### Session `%s`\n\n", s.Session)
+			fmt.Fprintf(&b, "Directory: `%s/`\n\n", s.Dir)
+			writeEntryTable(&b, s.Entries)
+		}
+	}
+
+	return []byte(b.String())
+}
+
+// writeEntryTable renders one markdown table of entries.
+func writeEntryTable(b *strings.Builder, entries []*Entry) {
+	if len(entries) == 0 {
+		b.WriteString("_None._\n\n")
+		return
+	}
+
+	b.WriteString("| Date | Title | Kind | Tags | File |\n")
+	b.WriteString("| --- | --- | --- | --- | --- |\n")
+
+	shown := entries
+	truncated := 0
+	if len(shown) > maxIndexRows {
+		truncated = len(shown) - maxIndexRows
+		shown = shown[:maxIndexRows]
+	}
+
+	for _, e := range shown {
+		date := "-"
+		if !e.Date.IsZero() {
+			date = e.Date.UTC().Format("2006-01-02")
+		}
+		tags := "-"
+		if len(e.Tags) > 0 {
+			tags = strings.Join(e.Tags, ", ")
+		}
+		title := strings.ReplaceAll(e.Title, "|", `\|`)
+		fmt.Fprintf(b, "| %s | %s | %s | %s | [`%s`](%s) |\n",
+			date, escapeCell(title), e.Kind, escapeCell(tags), path.Base(e.RelPath), e.RelPath)
+	}
+	if truncated > 0 {
+		fmt.Fprintf(b, "\n_%d older entr(ies) omitted from this table; the files are still on disk._\n", truncated)
+	}
+	b.WriteString("\n")
+}
+
+// escapeCell keeps a value from breaking out of its table cell.
+func escapeCell(s string) string {
+	s = strings.ReplaceAll(s, "|", `\|`)
+	return strings.ReplaceAll(s, "\n", " ")
+}
+
+// UpdateIndex rebuilds and writes the index. It is called after every mutation,
+// which is what makes the index self-maintaining rather than a thing someone has
+// to remember to run.
+func UpdateIndex(ctx context.Context, store *Store, indexer Indexer) (*Index, error) {
+	idx, err := indexer.Rebuild(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	data := indexer.Render(idx)
+	target := path.Join(store.Root(), IndexFileName)
+
+	if err := writeFileAtomic(store.Root(), target, data); err != nil {
+		return nil, fmt.Errorf("writing memory index: %w", err)
+	}
+	return idx, nil
+}
+
+// LoadIndex reads the index document from disk. It reports whether the file
+// existed, so a caller can distinguish "no memory yet" from "not built yet".
+func LoadIndex(root string) ([]byte, bool, error) {
+	data, err := readFileIfExists(path.Join(root, IndexFileName))
+	if err != nil {
+		return nil, false, err
+	}
+	return data, data != nil, nil
+}
+
+// DefaultSubdir is the directory under the app data dir that holds memory.
+const DefaultSubdir = "memories"
+
+// ResolveRoot picks the memory tree root: the configured directory when set,
+// otherwise `<dataDir>/memories` with `~` and variables expanded.
+//
+// One place decides this so the tool, the URI namespace and the prompt digest
+// can never disagree about where memory lives.
+func ResolveRoot(configured, dataDir string, expand func(string) string) string {
+	if dir := strings.TrimSpace(configured); dir != "" {
+		if expand != nil {
+			dir = expand(dir)
+		}
+		return dir
+	}
+	if expand != nil {
+		dataDir = expand(dataDir)
+	}
+	return path.Join(dataDir, DefaultSubdir)
+}
+
+// Digest renders a bounded summary of the index for prompt injection.
+//
+// The full index is available on demand at mocode://memory/. The prompt gets
+// the shape of what is known — how much, of what kind, and where each session's
+// memory lives — plus enough titles to decide whether looking is worth it. That
+// keeps the prompt bounded as memory grows, which is the same trade the skill
+// prompt tiering makes.
+func Digest(idx *Index, maxBytes int) string {
+	if idx == nil || idx.Total() == 0 {
+		return ""
+	}
+	if maxBytes <= 0 {
+		maxBytes = 4000
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d memory entr(ies): %d global, %d across %d session(s).\n",
+		idx.Total(), len(idx.Global), idx.SessionEntryCount(), len(idx.Sessions))
+
+	if len(idx.Global) > 0 {
+		b.WriteString("\nGlobal (durable, worth reusing):\n")
+		for _, e := range idx.Global {
+			date := ""
+			if !e.Date.IsZero() {
+				date = e.Date.UTC().Format("2006-01-02") + " "
+			}
+			fmt.Fprintf(&b, "  - %s%s [%s]\n", date, e.Title, e.Kind)
+		}
+	}
+
+	if len(idx.Sessions) > 0 {
+		b.WriteString("\nSession memory locations:\n")
+		for _, s := range idx.Sessions {
+			fmt.Fprintf(&b, "  - %s (%d entries) → %s/\n", s.Session, len(s.Entries), s.Dir)
+		}
+	}
+
+	b.WriteString("\nRead the index at mocode://memory/ and search entries with the memory tool (action=search).")
+
+	return clampBytes(b.String(), maxBytes)
+}
+
+// clampBytes truncates on a line boundary and says so, so a digest is never a
+// half-sentence the model has to guess the end of.
+func clampBytes(s string, maxBytes int) string {
+	if len(s) <= maxBytes {
+		return s
+	}
+
+	cut := s[:maxBytes]
+	if i := strings.LastIndexByte(cut, '\n'); i > 0 {
+		cut = cut[:i]
+	}
+	return cut + "\n  … (truncated; read mocode://memory/ for the full index)"
+}

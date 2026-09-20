@@ -44,6 +44,8 @@ var knownAllToolNames = []string{
 	ThinkToolName,
 	TodosToolName,
 	LearnToolName,
+	MemoryToolName,
+	BrowserToolName,
 	ViewToolName,
 	WriteToolName,
 	ListMCPResourcesToolName,

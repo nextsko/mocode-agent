@@ -162,7 +162,9 @@ func (c *Coordinator) agenticFetchTool(_ context.Context, client *http.Client) (
 				tools.NewGlobTool(tmpDir),
 				tools.NewGrepTool(tmpDir, c.cfg.Config().Tools.Grep),
 				tools.NewSourcegraphTool(client),
-				tools.NewViewTool(c.lspManager, c.permissions, c.filetracker, nil, tmpDir),
+				// The sub-agent reads fetched pages from a temp directory, so it
+				// has no use for the internal resource namespaces.
+				tools.NewViewTool(c.lspManager, c.permissions, c.filetracker, nil, nil, tmpDir),
 			}
 
 			// Sub-agent tools run without hook interception. The top-level
