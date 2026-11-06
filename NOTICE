@@ -1,0 +1,12 @@
+mocode
+Copyright 2026 The mocode Authors
+
+This product includes software developed at Charmbracelet, Inc.
+(https://charm.land) and released under the Apache License, Version 2.0.
+
+The original terminal UI, agent framework integration, and provider
+abstraction were developed upstream and are used here under the terms of
+the Apache License, Version 2.0. See the LICENSE file for the full text.
+
+Third-party dependencies remain under their respective licenses; see the
+module cache metadata (go.sum) and each module's LICENSE file.
