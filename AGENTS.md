@@ -262,29 +262,31 @@ The following files are unusually large and centralize many responsibilities.
 Treat them as "god files": avoid adding new concerns to them; prefer extracting
 new packages or files instead.
 
-- **`internal/ui/model/ui.go`** — the most prominent god file in the project.
-  It is ~3,240 lines, contains ~75 methods/functions, 21 type definitions, and
-  54 imports. It centralizes the top-level Bubble Tea model: state machine,
+- **`internal/ui/model/ui.go`** (~850 lines, down from ~3,240 after the
+  subpackage extractions) — the top-level Bubble Tea model: state machine,
   message routing, layout, session lifecycle, agent runtime tracking, MCP
   management, clipboard/paste handling, and WeChat integration. Any new TUI
   feature should be implemented in a dedicated sub-package or model file, not
-  by expanding this file.
+  by expanding this file. Rendering helpers belong in `internal/ui/pills`,
+  `internal/ui/chat`, etc.
 
-- **`internal/core/agent/coordinator.go`** (~1,430 lines, 41 methods) — coordinates
-  named agents and their lifecycle.
+- **`internal/core/agent/coordinator/coordinator.go`** (~460 lines) — coordinates
+  named agents and their lifecycle (split from an earlier ~1,430-line file).
 
-- **`internal/core/app/app.go`** (~1,020 lines, 74 methods) — wires together nearly
-  every service (sessions, messages, history, permissions, LSP, memory,
-  pub/sub, agent coordinator, error collector).
+- **`internal/core/app/app.go`** (~780 lines) — wires together nearly every
+  service (sessions, messages, history, permissions, LSP, memory, pub/sub,
+  agent coordinator, error collector).
 
-- **`internal/ui/model/chat.go`** (~980 lines, 51 methods) — chat view,
-  scrolling, animations, and mouse handling.
+- **`internal/ui/model/chat.go`** (~600 lines) — chat view, scrolling,
+  animations, and mouse handling.
 
-- **`internal/ui/model/ui_dialogs.go`** (~980 lines, 28 methods) — central
-  dialog dispatch and handling.
+- **`internal/ui/model/ui_dialogs.go`** (~250 lines) — central dialog dispatch.
 
 - **`internal/ui/dialog/permissions.go`** (~790 lines, 34 methods) — permission
   dialog logic.
+
+Numbers above are refreshed on refactors; if one drifts, update it rather than
+trusting the number.
 
 ## Environment Quirks
 

@@ -73,6 +73,8 @@
 //
 //	tools/nethttp          may not import fantasy, catwalk, core/agent, core/config
 //	tools/plugins/netcommon may not import fantasy, catwalk, core/agent
+//	domain/...             may not import charm.land/* (LLM framework/SDK types)
+//	core/agent/messages    may not import charm.land/* (helpers live in llmconv)
 //
 // nethttp stays pure (net/http + time only) so any future runtime can sit
 // behind it; netcommon may not grow LLM-runtime coupling.
