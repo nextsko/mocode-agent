@@ -104,6 +104,15 @@ var packageRules = []packageRule{
 			"charm.land/",
 		},
 	},
+	{
+		// The toolkit contract must stay a leaf: implementations import it, so
+		// it may not depend on the framework or on other internal packages.
+		pkg: "github.com/nextsko/mocode-agent/internal/core/tools/contract",
+		forbidden: []string{
+			"charm.land/",
+			"github.com/nextsko/mocode-agent/internal/",
+		},
+	},
 }
 
 // bannedBy reports the first forbidden import matching a rule for pkgPath.

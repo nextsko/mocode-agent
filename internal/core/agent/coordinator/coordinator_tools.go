@@ -299,7 +299,14 @@ func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 		SessionSearch: c.sessionSearch,
 		HTTP:          c.httpFactory,
 		WrapPort: func(tool tools.Tool) fantasy.AgentTool {
-			return agenttooladapter.New(tool, nil)
+			workingDir := c.cfg.WorkingDir()
+			return agenttooladapter.NewWithContext(tool, func() (tools.ToolContext, func()) {
+				// Session id and permission/telemetry adapters are still being
+				// wired; the tools migrated so far are context-free, and the
+				// placeholder context denies permissions instead of allowing
+				// them silently.
+				return NewToolContext("", workingDir, nil, nil, nil)
+			})
 		},
 	}
 	allTools = append(allTools, c.toolRegistry.Build(ctx, deps)...)

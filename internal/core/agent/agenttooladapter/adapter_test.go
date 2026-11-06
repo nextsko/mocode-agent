@@ -127,6 +127,24 @@ func (fakeOptsData) MarshalJSON() ([]byte, error) { return []byte(`"v"`), nil }
 func (fakeOptsData) UnmarshalJSON([]byte) error   { return nil }
 func (fakeOptsData) Options()                     {}
 
+func TestNewWithContextBuildsFreshContextPerCall(t *testing.T) {
+	t.Parallel()
+
+	calls := 0
+	cleanups := 0
+	adapter := NewWithContext(&fakeTool{schema: tools.Schema{Name: "demo"}}, func() (tools.ToolContext, func()) {
+		calls++
+		return noContext{}, func() { cleanups++ }
+	})
+
+	for range 2 {
+		_, err := adapter.Run(t.Context(), fantasyCall(`{}`))
+		require.NoError(t, err)
+	}
+	require.Equal(t, 2, calls, "factory must run once per Execute")
+	require.Equal(t, 2, cleanups, "cleanup must run once per Execute")
+}
+
 func TestProviderOptionsRoundTrip(t *testing.T) {
 	t.Parallel()
 

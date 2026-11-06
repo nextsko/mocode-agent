@@ -24,13 +24,22 @@ type Adapter struct {
 	// while the coordinator wiring is still in progress; in that case a
 	// no-op context is supplied so context-free tools work safely.
 	tctx tools.ToolContext
-	opts fantasy.ProviderOptions
+	// newCtx, when set, produces a fresh context per Execute call (the correct
+	// shape for request-scoped state). It takes precedence over tctx.
+	newCtx func() (tools.ToolContext, func())
+	opts   fantasy.ProviderOptions
 }
 
 // New creates an adapter for tool. Pass nil tctx for context-free tools; pass
 // a real tools.ToolContext once the coordinator wires per-call state.
 func New(tool tools.Tool, tctx tools.ToolContext) *Adapter {
 	return &Adapter{tool: tool, tctx: tctx}
+}
+
+// NewWithContext creates an adapter that builds a fresh tools.ToolContext for
+// every Execute call. The returned cleanup func is invoked after the call.
+func NewWithContext(tool tools.Tool, factory func() (tools.ToolContext, func())) *Adapter {
+	return &Adapter{tool: tool, newCtx: factory}
 }
 
 // Info implements fantasy.AgentTool.
@@ -51,6 +60,11 @@ func (a *Adapter) Info() fantasy.ToolInfo {
 // Run implements fantasy.AgentTool.
 func (a *Adapter) Run(ctx context.Context, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
 	tctx := a.tctx
+	cleanup := func() {}
+	if a.newCtx != nil {
+		tctx, cleanup = a.newCtx()
+	}
+	defer cleanup()
 	if tctx == nil {
 		tctx = noContext{}
 	}

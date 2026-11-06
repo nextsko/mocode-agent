@@ -98,9 +98,11 @@
 //     core/config, and core/agent/toolutil. Migrate tools one at a time to
 //     tools.Tool and drop the legacy constructors; only then can layercheck
 //     ban fantasy imports here.
-//   - Adapter caveat: the coordinator currently passes a nil ToolContext (the
-//     adapter substitutes a no-op that denies permissions). Tools that need
-//     real session/permission state must wait for the per-call context wiring.
+//   - Adapter wiring: the coordinator injects a context factory, so every
+//     Execute call gets a fresh ToolContext carrying the working directory.
+//     Session id, permission and telemetry adapters are still TODO; until they
+//     land the placeholder context denies permissions rather than allowing
+//     them silently.
 //   - Coordinator-owned tools (agent, agentic_fetch, transfer_to_agent) are
 //     built outside the registry because they call back into coordinator
 //     state; their descriptors are mirrored in coordinatorToolNames().
