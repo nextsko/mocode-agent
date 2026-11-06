@@ -45,7 +45,7 @@ func TestSlashCommandParsing(t *testing.T) {
 }
 
 func TestHelpCommand(t *testing.T) {
-	result := cmdHelp(nil, nil, nil, "")
+	result := cmdHelp(context.TODO(), nil, nil, "")
 	if result == "" || !contains(result, "/help") || !contains(result, "/status") {
 		t.Error("help output incomplete")
 	}

@@ -213,7 +213,7 @@ func (c *Client) registerHandlers() {
 func (c *Client) Restart() error {
 	var openFiles []string
 	for uri := range c.openFiles.Seq2() {
-		openFiles = append(openFiles, string(uri))
+		openFiles = append(openFiles, uri)
 	}
 
 	closeCtx, cancel := context.WithTimeout(c.ctx, 10*time.Second)
@@ -258,7 +258,7 @@ func (c *Client) Restart() error {
 	return nil
 }
 
-// ServerState represents the state of an LSP server
+// ServerState represents the state of an LSP server.
 type ServerState int
 
 const (
@@ -270,7 +270,7 @@ const (
 	StateDisabled
 )
 
-// GetServerState returns the current state of the LSP server
+// GetServerState returns the current state of the LSP server.
 func (c *Client) GetServerState() ServerState {
 	if val := c.serverState.Load(); val != nil {
 		return val.(ServerState)
@@ -278,27 +278,27 @@ func (c *Client) GetServerState() ServerState {
 	return StateStarting
 }
 
-// SetServerState sets the current state of the LSP server
+// SetServerState sets the current state of the LSP server.
 func (c *Client) SetServerState(state ServerState) {
 	c.serverState.Store(state)
 }
 
-// GetName returns the name of the LSP client
+// GetName returns the name of the LSP client.
 func (c *Client) GetName() string {
 	return c.name
 }
 
-// FileTypes returns the file types this LSP client handles
+// FileTypes returns the file types this LSP client handles.
 func (c *Client) FileTypes() []string {
 	return slices.Clone(c.fileTypes)
 }
 
-// SetDiagnosticsCallback sets the callback function for diagnostic changes
+// SetDiagnosticsCallback sets the callback function for diagnostic changes.
 func (c *Client) SetDiagnosticsCallback(callback func(name string, count int)) {
 	c.onDiagnosticsChanged = callback
 }
 
-// WaitForServerReady waits for the server to be ready
+// WaitForServerReady waits for the server to be ready.
 func (c *Client) WaitForServerReady(ctx context.Context) error {
 	// Set initial state
 	c.SetServerState(StateStarting)
@@ -337,7 +337,7 @@ func (c *Client) WaitForServerReady(ctx context.Context) error {
 	}
 }
 
-// OpenFileInfo contains information about an open file
+// OpenFileInfo contains information about an open file.
 type OpenFileInfo struct {
 	Version int32
 	URI     protocol.DocumentURI
@@ -540,7 +540,7 @@ func (c *Client) NotifyWorkspaceChange(ctx context.Context) error {
 		return nil
 	}
 	return c.client.NotifyDidChangeWatchedFiles(ctx, []protocol.FileEvent{
-		{URI: protocol.DocumentURI(protocol.URIFromPath(c.cwd)), Type: protocol.Changed},
+		{URI: protocol.URIFromPath(c.cwd), Type: protocol.Changed},
 	})
 }
 

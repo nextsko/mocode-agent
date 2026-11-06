@@ -73,7 +73,7 @@ func getProviderOptions(model Model, providerCfg config.ProviderConfig) fantasy.
 
 	mergedOptions := make(map[string]any)
 
-	err = json.Unmarshal([]byte(got), &mergedOptions)
+	err = json.Unmarshal(got, &mergedOptions)
 	if err != nil {
 		slog.Error("Could not create config for call", "err", err)
 		return options
@@ -392,7 +392,7 @@ func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 	return filteredTools, nil
 }
 
-// TODO: when we support multiple agents we need to change this so that we pass in the agent specific model config
+// TODO: when we support multiple agents we need to change this so that we pass in the agent specific model config.
 func (c *Coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Model, Model, error) {
 	largeModelCfg, ok := c.cfg.Config().Models[config.SelectedModelTypeLarge]
 	if !ok {
@@ -477,14 +477,14 @@ func (c *Coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Mo
 	}
 
 	return Model{
-			Model:      largeModel,
-			CatwalkCfg: *largeCatwalkModel,
-			ModelCfg:   largeModelCfg,
-		}, Model{
-			Model:      smallModel,
-			CatwalkCfg: *smallCatwalkModel,
-			ModelCfg:   smallModelCfg,
-		}, nil
+		Model:      largeModel,
+		CatwalkCfg: *largeCatwalkModel,
+		ModelCfg:   largeModelCfg,
+	}, Model{
+		Model:      smallModel,
+		CatwalkCfg: *smallCatwalkModel,
+		ModelCfg:   smallModelCfg,
+	}, nil
 }
 
 // withFailover wraps a primary LanguageModel with failover when the model's

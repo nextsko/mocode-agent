@@ -88,7 +88,7 @@ func (b *Bot) Login(ctx context.Context, force bool) (*Credentials, error) {
 	b.opts.BaseURL = creds.BaseURL
 	b.mu.Unlock()
 
-	b.log("info", "Logged in as %s", creds.UserID)
+	b.logf("info", "Logged in as %s", creds.UserID)
 
 	return &Credentials{
 		Token:     creds.Token,
@@ -138,13 +138,13 @@ func (b *Bot) Run(ctx context.Context) error {
 	b.cancelPoll = cancel
 	b.mu.Unlock()
 
-	b.log("info", "Long-poll loop started")
+	b.logf("info", "Long-poll loop started")
 	retryDelay := time.Second
 
 	for {
 		select {
 		case <-pollCtx.Done():
-			b.log("info", "Long-poll loop stopped")
+			b.logf("info", "Long-poll loop stopped")
 			return nil
 		default:
 		}
@@ -153,13 +153,13 @@ func (b *Bot) Run(ctx context.Context) error {
 		updates, err := b.client.GetUpdates(pollCtx, creds.BaseURL, creds.Token, b.cursor)
 		if err != nil {
 			if pollCtx.Err() != nil {
-				b.log("info", "Long-poll loop stopped")
+				b.logf("info", "Long-poll loop stopped")
 				return nil
 			}
 
 			apiErr, isAPI := err.(*protocol.APIError)
 			if isAPI && apiErr.IsSessionExpired() {
-				b.log("warn", "Session expired — re-login required")
+				b.logf("warn", "Session expired — re-login required")
 				auth.ClearCredentials(b.opts.CredPath)
 				b.contextTokens = sync.Map{}
 				b.cursor = ""
@@ -310,13 +310,13 @@ func (b *Bot) getCreds() *auth.Credentials {
 }
 
 func (b *Bot) reportError(err error) {
-	b.log("error", "%v", err)
+	b.logf("error", "%v", err)
 	if b.opts.OnError != nil {
 		b.opts.OnError(err)
 	}
 }
 
-func (b *Bot) log(level, format string, args ...interface{}) {
+func (b *Bot) logf(level, format string, args ...interface{}) {
 	if b.opts.LogLevel == "silent" {
 		return
 	}
@@ -437,7 +437,7 @@ func (b *Bot) loadState() {
 	for k, v := range sf.ContextTokens {
 		b.contextTokens.Store(k, v)
 	}
-	b.log("info", "Loaded state: cursor=%s, tokens=%d", sf.Cursor, len(sf.ContextTokens))
+	b.logf("info", "Loaded state: cursor=%s, tokens=%d", sf.Cursor, len(sf.ContextTokens))
 }
 
 // saveState persists cursor and context tokens to disk.

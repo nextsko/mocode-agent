@@ -68,7 +68,7 @@ func (ms *MessageStore) Create(ctx context.Context, sessionID string, params mes
 		SessionID:        sessionID,
 		Role:             params.Role,
 		Parts:            params.Parts,
-		Model:            string(params.Model),
+		Model:            params.Model,
 		Provider:         params.Provider,
 		Sender:           params.Sender,
 		CreatedAt:        now,

@@ -89,15 +89,13 @@ func resolveRollbackTarget(messages []message.Message, node string) (rollbackTar
 		filtered = append(filtered, msg)
 	}
 	if len(filtered) == 0 {
-		return rollbackTarget{}, errors.New("No session nodes found")
+		return rollbackTarget{}, errors.New("no session nodes found")
 	}
 
-	if strings.HasPrefix(node, "#") {
-		node = strings.TrimPrefix(node, "#")
-	}
+	node = strings.TrimPrefix(node, "#")
 	if idx, err := strconv.Atoi(node); err == nil {
 		if idx < 1 || idx > len(filtered) {
-			return rollbackTarget{}, fmt.Errorf("Rollback node index must be between 1 and %d", len(filtered))
+			return rollbackTarget{}, fmt.Errorf("rollback node index must be between 1 and %d", len(filtered))
 		}
 		return rollbackTarget{Message: filtered[idx-1], Index: idx}, nil
 	}
@@ -107,7 +105,7 @@ func resolveRollbackTarget(messages []message.Message, node string) (rollbackTar
 			return rollbackTarget{Message: msg, Index: i + 1}, nil
 		}
 	}
-	return rollbackTarget{}, fmt.Errorf("Rollback node not found: %s", node)
+	return rollbackTarget{}, fmt.Errorf("rollback node not found: %s", node)
 }
 
 func restoreFilesAt(files []history.File, workingDir string, cutoff int64) (restored, removed int, err error) {

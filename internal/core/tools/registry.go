@@ -3,6 +3,10 @@ package tools
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
 
 	"charm.land/fantasy"
 
@@ -18,7 +22,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/tools/core/sandbox"
 	shell "github.com/nextsko/mocode-agent/internal/core/tools/core/shell"
 	"github.com/nextsko/mocode-agent/internal/core/tools/core/web"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/ssh"
+	sshcommon "github.com/nextsko/mocode-agent/internal/core/tools/external/common/ssh"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/nethttp"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/browser"
@@ -36,10 +40,6 @@ import (
 	"github.com/nextsko/mocode-agent/internal/store"
 	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/nextsko/mocode-agent/internal/util/log"
-	"os"
-	"path/filepath"
-	"strings"
-	"sync"
 )
 
 // ToolKind distinguishes builtin from plugin tools.
@@ -460,7 +460,7 @@ func (sessionPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool
 		agenttools.NewTodosTool(deps.Sessions),
 		agenttools.NewSessionExportTool(deps.Messages, deps.Cfg.WorkingDir()),
 		agenttools.NewMessageExportTool(deps.Messages, deps.Cfg.WorkingDir()),
-		agenttools.NewSessionSummaryTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), agenttools.SessionSummaryScheduler(deps.SummarySchedule)),
+		agenttools.NewSessionSummaryTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), deps.SummarySchedule),
 	}
 	if deps.SessionSearch != nil {
 		t = append(t, agenttools.NewSessionSearchTool(deps.SessionSearch))

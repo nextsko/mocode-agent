@@ -311,7 +311,7 @@ func (a *sessionAgent) onStepFinish(ts *turnState) func(stepResult fantasy.StepR
 
 func (a *sessionAgent) contextWindowStop(ts *turnState) func([]fantasy.StepResult) bool {
 	return func(_ []fantasy.StepResult) bool {
-		cw := int64(ts.largeModel.CatwalkCfg.ContextWindow)
+		cw := ts.largeModel.CatwalkCfg.ContextWindow
 		// If context window is unknown (0), skip auto-summarize
 		// to avoid immediately truncating custom/local models.
 		if cw == 0 {

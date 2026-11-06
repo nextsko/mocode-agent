@@ -89,7 +89,7 @@ func TestContextHelpers(t *testing.T) {
 
 	plain := FromContext(context.Background())
 	require.Nil(t, plain)
-	require.Nil(t, FromContext(nil))
+	require.Nil(t, FromContext(context.TODO()))
 }
 
 func TestRecordedMarker(t *testing.T) {

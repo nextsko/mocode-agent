@@ -37,7 +37,7 @@ import (
 // budget, cancellation is driven by the request context owned by the agent
 // loop.
 func (c *Coordinator) providerHTTPClient() *http.Client {
-	rt := http.RoundTripper(c.cfg.Config().HTTPTransport(c.cfg.Resolver()))
+	rt := c.cfg.Config().HTTPTransport(c.cfg.Resolver())
 	if c.cfg.Config().Options.Debug {
 		rt = &log.HTTPRoundTripLogger{Transport: rt}
 	}
@@ -116,7 +116,7 @@ func (c *Coordinator) buildOpenaiCompatProvider(baseURL, apiKey string, headers 
 		openaicompat.WithAPIKey(apiKey),
 	}
 
-	var httpClient *http.Client = c.providerHTTPClient()
+	httpClient := c.providerHTTPClient()
 	if httpClient != nil {
 		opts = append(opts, openaicompat.WithHTTPClient(httpClient))
 	}
