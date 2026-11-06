@@ -84,16 +84,23 @@
 // The framework-agnostic ambition is INCOMPLETE and tracked here instead of
 // being papered over:
 //
-//   - Lived today: tools.ToolContext / ToolResult / MCPHandles are real —
-//     core/agent/agent_tool_context.go implements the ToolContext port for
-//     in-process tool execution.
-//   - Not yet: no production tool implements tools.Tool; the 40+ builtin
-//     constructors return fantasy.AgentTool directly and this package imports
-//     charm.land/fantasy, core/config, and core/agent/toolutil. The planned
-//     consolidation point is an agenttool_adapter.go at the agent boundary
-//     that converts tools.Tool ⇄ fantasy.AgentTool. Until that adapter lands,
-//     layercheck deliberately does NOT ban fantasy imports here; banning them
-//     would fail the build ~40 times and teach people to ignore the check.
+//   - Lived today: the contract types (Tool/ToolContext/ToolResult/Schema)
+//     moved to the leaf package core/tools/contract and are re-exported here
+//     via type aliases, so implementations can import them without a cycle.
+//     core/agent/agent_tool_context.go implements the ToolContext port, and
+//     core/agent/agenttooladapter converts a tools.Tool into fantasy.AgentTool.
+//   - Pilot migrated: session_search is implemented as a tools.Tool
+//     (NewSessionSearchPortTool) and wrapped by the adapter through
+//     ToolDeps.WrapPort; the legacy fantasy constructor remains as a fallback
+//     for callers that do not inject the wrapper.
+//   - Remaining: the other 40+ builtin constructors still return
+//     fantasy.AgentTool directly, and this package still imports fantasy,
+//     core/config, and core/agent/toolutil. Migrate tools one at a time to
+//     tools.Tool and drop the legacy constructors; only then can layercheck
+//     ban fantasy imports here.
+//   - Adapter caveat: the coordinator currently passes a nil ToolContext (the
+//     adapter substitutes a no-op that denies permissions). Tools that need
+//     real session/permission state must wait for the per-call context wiring.
 //   - Coordinator-owned tools (agent, agentic_fetch, transfer_to_agent) are
 //     built outside the registry because they call back into coordinator
 //     state; their descriptors are mirrored in coordinatorToolNames().

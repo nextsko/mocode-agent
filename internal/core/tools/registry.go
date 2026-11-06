@@ -109,6 +109,11 @@ type ToolDeps struct {
 	SummarySchedule agenttools.SessionSummaryScheduler
 	SessionSearch   *store.SessionSearch
 	HTTP            *nethttp.Factory
+	// WrapPort converts a framework-agnostic tools.Tool into the runtime's
+	// AgentTool. It is injected by the agent boundary so this package does not
+	// import the adapter (which would create an import cycle). When nil, tools
+	// fall back to their legacy fantasy constructors.
+	WrapPort func(Tool) fantasy.AgentTool
 }
 
 // NewHTTPFactory builds the canonical outbound-HTTP factory from the config
@@ -463,7 +468,11 @@ func (sessionPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool
 		agenttools.NewSessionSummaryTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), deps.SummarySchedule),
 	}
 	if deps.SessionSearch != nil {
-		t = append(t, agenttools.NewSessionSearchTool(deps.SessionSearch))
+		if deps.WrapPort != nil {
+			t = append(t, deps.WrapPort(agenttools.NewSessionSearchPortTool(deps.SessionSearch)))
+		} else {
+			t = append(t, agenttools.NewSessionSearchTool(deps.SessionSearch))
+		}
 	}
 	return t
 }

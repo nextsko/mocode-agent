@@ -20,6 +20,7 @@ import (
 	"charm.land/fantasy/providers/openaicompat"
 	"charm.land/fantasy/providers/openrouter"
 	"charm.land/fantasy/providers/vercel"
+	"github.com/nextsko/mocode-agent/internal/core/agent/agenttooladapter"
 	"github.com/nextsko/mocode-agent/internal/core/agent/failover"
 	"github.com/nextsko/mocode-agent/internal/core/agent/lifecycle"
 	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
@@ -297,6 +298,9 @@ func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 		},
 		SessionSearch: c.sessionSearch,
 		HTTP:          c.httpFactory,
+		WrapPort: func(tool tools.Tool) fantasy.AgentTool {
+			return agenttooladapter.New(tool, nil)
+		},
 	}
 	allTools = append(allTools, c.toolRegistry.Build(ctx, deps)...)
 
