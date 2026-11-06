@@ -1,6 +1,7 @@
 package gitopscommon
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strconv"
@@ -57,18 +58,18 @@ type ScanResult struct {
 }
 
 // ScanWorkingTree runs git commands to produce a full working tree snapshot.
-func ScanWorkingTree(dir string) (*ScanResult, error) {
-	branch, ahead, err := scanBranch(dir)
+func ScanWorkingTree(ctx context.Context, dir string) (*ScanResult, error) {
+	branch, ahead, err := scanBranch(ctx, dir)
 	if err != nil {
 		return nil, fmt.Errorf("scan branch: %w", err)
 	}
 
-	changes, err := scanChanges(dir)
+	changes, err := scanChanges(ctx, dir)
 	if err != nil {
 		return nil, fmt.Errorf("scan changes: %w", err)
 	}
 
-	staged, err := scanStagedCount(dir)
+	staged, err := scanStagedCount(ctx, dir)
 	if err != nil {
 		return nil, fmt.Errorf("scan staged: %w", err)
 	}
@@ -88,17 +89,17 @@ func ScanWorkingTree(dir string) (*ScanResult, error) {
 
 // scanBranch returns the current branch name and how many commits it is ahead
 // of the upstream tracking branch.
-func scanBranch(dir string) (string, int, error) {
-	out, err := GitRun(dir, "rev-parse", "--abbrev-ref", "HEAD")
+func scanBranch(ctx context.Context, dir string) (string, int, error) {
+	out, err := GitRun(ctx, dir, "rev-parse", "--abbrev-ref", "HEAD")
 	if err != nil {
 		return "", 0, err
 	}
 	branch := strings.TrimSpace(string(out))
 
 	ahead := 0
-	upstream, err := GitRun(dir, "rev-parse", "--abbrev-ref", "@{upstream}")
+	upstream, err := GitRun(ctx, dir, "rev-parse", "--abbrev-ref", "@{upstream}")
 	if err == nil {
-		revList, err := GitRun(dir, "rev-list", "--count",
+		revList, err := GitRun(ctx, dir, "rev-list", "--count",
 			strings.TrimSpace(string(upstream))+"..HEAD")
 		if err == nil {
 			ahead, _ = strconv.Atoi(strings.TrimSpace(string(revList)))
@@ -109,9 +110,9 @@ func scanBranch(dir string) (string, int, error) {
 
 // scanChanges reads git status --porcelain=v1 and git diff --numstat to
 // produce the full list of changed files with insertion/deletion counts.
-func scanChanges(dir string) ([]FileChange, error) {
+func scanChanges(ctx context.Context, dir string) ([]FileChange, error) {
 	// Step 1: git status --porcelain=v1 to collect file paths and status codes
-	statusOut, err := GitRun(dir, "status", "--porcelain=v1")
+	statusOut, err := GitRun(ctx, dir, "status", "--porcelain=v1")
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +157,7 @@ func scanChanges(dir string) ([]FileChange, error) {
 	}
 
 	// Step 2: git diff --numstat for insertion/deletion counts
-	diffOut, _ := GitRun(dir, "diff", "--numstat")
+	diffOut, _ := GitRun(ctx, dir, "diff", "--numstat")
 	numstatMap := make(map[string][2]int)
 	for _, line := range strings.Split(string(diffOut), "\n") {
 		parts := strings.Fields(line)
@@ -191,8 +192,8 @@ func scanChanges(dir string) ([]FileChange, error) {
 }
 
 // scanStagedCount returns the number of files in the staging area.
-func scanStagedCount(dir string) (int, error) {
-	out, err := GitRun(dir, "diff", "--cached", "--name-only")
+func scanStagedCount(ctx context.Context, dir string) (int, error) {
+	out, err := GitRun(ctx, dir, "diff", "--cached", "--name-only")
 	if err != nil {
 		return 0, err
 	}
@@ -204,8 +205,8 @@ func scanStagedCount(dir string) (int, error) {
 }
 
 // DiffStat returns the raw numstat for a single file against HEAD.
-func DiffStat(dir, path string) (additions, deletions int) {
-	out, err := GitRun(dir, "diff", "--numstat", "HEAD", "--", path)
+func DiffStat(ctx context.Context, dir, path string) (additions, deletions int) {
+	out, err := GitRun(ctx, dir, "diff", "--numstat", "HEAD", "--", path)
 	if err != nil {
 		return 0, 0
 	}
@@ -218,8 +219,8 @@ func DiffStat(dir, path string) (additions, deletions int) {
 }
 
 // GitRun executes a git sub-command in dir and returns combined stdout.
-func GitRun(dir string, args ...string) ([]byte, error) {
-	cmd := exec.Command("git", args...)
+func GitRun(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {

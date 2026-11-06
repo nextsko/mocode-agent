@@ -16,6 +16,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -107,7 +108,8 @@ func bannedBy(pkgPath string, imports []string) (rule packageRule, hit string, b
 }
 
 func main() {
-	out, err := exec.Command("go", "list", "./internal/...").Output()
+	ctx := context.Background()
+	out, err := exec.CommandContext(ctx, "go", "list", "./internal/...").Output()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "layercheck: go list failed: %v\n", err)
 		os.Exit(2)
@@ -121,7 +123,7 @@ func main() {
 		if fromLayer < 0 {
 			continue
 		}
-		jsonOut, err := exec.Command("go", "list", "-json", pkg).Output()
+		jsonOut, err := exec.CommandContext(ctx, "go", "list", "-json", pkg).Output()
 		if err != nil {
 			continue
 		}

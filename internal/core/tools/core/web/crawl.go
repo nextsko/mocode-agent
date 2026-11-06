@@ -66,7 +66,7 @@ func NewCrawlTool(client ...*http.Client) fantasy.AgentTool {
 			if len(client) > 0 && client[0] != nil {
 				rc.SetClient(client[0])
 			}
-			result, err := rc.Crawl(params.URL)
+			result, err := rc.Crawl(ctx, params.URL)
 			if err != nil {
 				return fantasy.NewTextErrorResponse(fmt.Sprintf("Crawl failed: %v", err)), nil
 			}
@@ -77,11 +77,11 @@ func NewCrawlTool(client ...*http.Client) fantasy.AgentTool {
 
 			// Format output
 			var sb strings.Builder
-			sb.WriteString(fmt.Sprintf("# Crawl Results\n\nCrawled %d pages from %s (max_depth: %d)\n\n", result.Total, params.URL, params.MaxDepth))
+			fmt.Fprintf(&sb, "# Crawl Results\n\nCrawled %d pages from %s (max_depth: %d)\n\n", result.Total, params.URL, params.MaxDepth)
 
 			for i, page := range result.Pages {
-				sb.WriteString(fmt.Sprintf("---\n\n## Page %d: %s\n\n", i+1, page.Title))
-				sb.WriteString(fmt.Sprintf("**URL:** %s\n\n", page.URL))
+				fmt.Fprintf(&sb, "---\n\n## Page %d: %s\n\n", i+1, page.Title)
+				fmt.Fprintf(&sb, "**URL:** %s\n\n", page.URL)
 				sb.WriteString(page.Markdown)
 				sb.WriteString("\n\n")
 			}

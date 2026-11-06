@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -39,8 +40,8 @@ func NewScraper() *Scraper {
 }
 
 // FetchToMarkdown fetches a URL and converts the HTML to Markdown.
-func (s *Scraper) FetchToMarkdown(url string) (*ScrapeResult, error) {
-	req, err := http.NewRequest("GET", url, nil)
+func (s *Scraper) FetchToMarkdown(ctx context.Context, url string) (*ScrapeResult, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -90,7 +91,7 @@ func (s *Scraper) FetchToMarkdown(url string) (*ScrapeResult, error) {
 
 	var sb strings.Builder
 	if title != "" {
-		sb.WriteString(fmt.Sprintf("# %s\n\n", title))
+		fmt.Fprintf(&sb, "# %s\n\n", title)
 	}
 	sb.WriteString(markdown)
 	result.Markdown = sb.String()
@@ -99,6 +100,6 @@ func (s *Scraper) FetchToMarkdown(url string) (*ScrapeResult, error) {
 }
 
 // QuickFetch is a convenience function for quick single-page scraping.
-func QuickFetch(url string) (*ScrapeResult, error) {
-	return NewScraper().FetchToMarkdown(url)
+func QuickFetch(ctx context.Context, url string) (*ScrapeResult, error) {
+	return NewScraper().FetchToMarkdown(ctx, url)
 }

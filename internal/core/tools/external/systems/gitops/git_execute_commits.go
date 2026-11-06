@@ -10,7 +10,7 @@ import (
 	"charm.land/fantasy"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/gitops"
+	gitopscommon "github.com/nextsko/mocode-agent/internal/core/tools/external/common/gitops"
 )
 
 // ExecuteCommitsToolName is the registered name of the git_execute_commits tool.
@@ -50,7 +50,7 @@ func NewExecuteCommitsTool(workingDir string) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		ExecuteCommitsToolName,
 		toolutil.FirstLineDescription(executeDescription),
-		func(_ context.Context, params ExecuteCommitsParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
+		func(ctx context.Context, params ExecuteCommitsParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if workingDir == "" {
 				return fantasy.NewTextErrorResponse("no working directory configured"), nil
 			}
@@ -66,7 +66,7 @@ func NewExecuteCommitsTool(workingDir string) fantasy.AgentTool {
 				}
 			}
 
-			scan, err := gitopscommon.ScanWorkingTree(workingDir)
+			scan, err := gitopscommon.ScanWorkingTree(ctx, workingDir)
 			if err != nil {
 				return fantasy.NewTextErrorResponse(fmt.Sprintf("scan failed: %v", err)), nil
 			}
@@ -84,7 +84,7 @@ func NewExecuteCommitsTool(workingDir string) fantasy.AgentTool {
 				group := plan.Groups[entry.Index]
 
 				for _, f := range group.Files {
-					if _, err := gitopscommon.GitRun(workingDir, "add", "--", f); err != nil {
+					if _, err := gitopscommon.GitRun(ctx, workingDir, "add", "--", f); err != nil {
 						return fantasy.NewTextErrorResponse(
 							fmt.Sprintf("git add failed for %s: %v", f, err)), nil
 					}
@@ -95,14 +95,14 @@ func NewExecuteCommitsTool(workingDir string) fantasy.AgentTool {
 					args = []string{"commit", "-m", entry.Subject, "-m", entry.Body}
 				}
 
-				out, err := gitopscommon.GitRun(workingDir, args...)
+				out, err := gitopscommon.GitRun(ctx, workingDir, args...)
 				if err != nil {
 					return fantasy.NewTextErrorResponse(
 						fmt.Sprintf("git commit failed for group %d: %v\n%s",
 							entry.Index, err, string(out))), nil
 				}
 
-				hashOut, _ := gitopscommon.GitRun(workingDir, "rev-parse", "--short", "HEAD")
+				hashOut, _ := gitopscommon.GitRun(ctx, workingDir, "rev-parse", "--short", "HEAD")
 				hash := strings.TrimSpace(string(hashOut))
 
 				results = append(results, ExecuteResultEntry{
@@ -113,7 +113,7 @@ func NewExecuteCommitsTool(workingDir string) fantasy.AgentTool {
 				})
 			}
 
-			statusOut, _ := gitopscommon.GitRun(workingDir, "status", "--short")
+			statusOut, _ := gitopscommon.GitRun(ctx, workingDir, "status", "--short")
 			remaining := strings.TrimSpace(string(statusOut))
 			remainingCount := 0
 			if remaining != "" {
@@ -121,12 +121,12 @@ func NewExecuteCommitsTool(workingDir string) fantasy.AgentTool {
 			}
 
 			var b strings.Builder
-			b.WriteString(fmt.Sprintf("✅ %d commits created:\n", len(results)))
+			fmt.Fprintf(&b, "✅ %d commits created:\n", len(results))
 			for _, r := range results {
-				b.WriteString(fmt.Sprintf("  %s %s (%d files)\n", r.Hash, r.Subject, r.Files))
+				fmt.Fprintf(&b, "  %s %s (%d files)\n", r.Hash, r.Subject, r.Files)
 			}
 			if remainingCount > 0 {
-				b.WriteString(fmt.Sprintf("\n⚠️ %d file(s) still uncommitted", remainingCount))
+				fmt.Fprintf(&b, "\n⚠️ %d file(s) still uncommitted", remainingCount)
 			} else {
 				b.WriteString("\n🎉 Working tree is clean!")
 			}

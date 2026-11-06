@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -56,7 +57,7 @@ func (rc *RecursiveCrawler) SetClient(client *http.Client) {
 }
 
 // Crawl starts crawling from the given URL.
-func (rc *RecursiveCrawler) Crawl(startURL string) (*CrawlResult, error) {
+func (rc *RecursiveCrawler) Crawl(ctx context.Context, startURL string) (*CrawlResult, error) {
 	u, err := url.Parse(startURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid URL: %w", err)
@@ -93,7 +94,7 @@ func (rc *RecursiveCrawler) Crawl(startURL string) (*CrawlResult, error) {
 		}
 		rc.mu.Unlock()
 
-		links, err := rc.crawlPage(task.url)
+		links, err := rc.crawlPage(ctx, task.url)
 		if err != nil {
 			continue // skip failed pages
 		}
@@ -119,8 +120,8 @@ func (rc *RecursiveCrawler) Crawl(startURL string) (*CrawlResult, error) {
 }
 
 // crawlPage fetches a single page, converts to Markdown, and returns discovered links.
-func (rc *RecursiveCrawler) crawlPage(pageURL string) ([]string, error) {
-	req, err := http.NewRequest("GET", pageURL, nil)
+func (rc *RecursiveCrawler) crawlPage(ctx context.Context, pageURL string) ([]string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +183,7 @@ func (rc *RecursiveCrawler) crawlPage(pageURL string) ([]string, error) {
 
 	var sb strings.Builder
 	if title != "" {
-		sb.WriteString(fmt.Sprintf("# %s\n\n", title))
+		fmt.Fprintf(&sb, "# %s\n\n", title)
 	}
 	sb.WriteString(markdown)
 
@@ -250,7 +251,7 @@ func (rc *RecursiveCrawler) pageCount() int {
 }
 
 // QuickCrawl is a convenience function for quick recursive crawling.
-func QuickCrawl(startURL string, maxDepth, maxPages int) (*CrawlResult, error) {
+func QuickCrawl(ctx context.Context, startURL string, maxDepth, maxPages int) (*CrawlResult, error) {
 	opts := DefaultCrawlOptions()
 	if maxDepth > 0 {
 		opts.MaxDepth = maxDepth
@@ -258,5 +259,5 @@ func QuickCrawl(startURL string, maxDepth, maxPages int) (*CrawlResult, error) {
 	if maxPages > 0 {
 		opts.MaxPages = maxPages
 	}
-	return NewRecursiveCrawler(opts).Crawl(startURL)
+	return NewRecursiveCrawler(opts).Crawl(ctx, startURL)
 }

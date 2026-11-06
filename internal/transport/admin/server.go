@@ -127,7 +127,8 @@ func (s *Server) Start(ctx context.Context, port int) (string, error) {
 		return s.url, nil
 	}
 	addr := "127.0.0.1:" + strconv.Itoa(port)
-	ln, err := net.Listen("tcp", addr)
+	var lc net.ListenConfig
+	ln, err := lc.Listen(ctx, "tcp", addr)
 	if err != nil {
 		return "", err
 	}

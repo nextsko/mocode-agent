@@ -77,7 +77,7 @@ func cmdHelp(_ context.Context, _ *Channel, _ *wechatbot.IncomingMessage, _ stri
 	var b strings.Builder
 	b.WriteString("━━━━━━━━━━━━━━━━\n📖 Mocode WeChat 帮助\n━━━━━━━━━━━━━━━━\n\n")
 	for _, cmd := range slashRegistry {
-		b.WriteString(fmt.Sprintf("  %-14s %s\n", cmd.name, cmd.description))
+		fmt.Fprintf(&b, "  %-14s %s\n", cmd.name, cmd.description)
 	}
 	b.WriteString("\n  其他消息 → 总管 Agent 处理\n")
 	return b.String()
@@ -91,21 +91,21 @@ func cmdStatus(_ context.Context, ch *Channel, _ *wechatbot.IncomingMessage, _ s
 
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
-	b.WriteString(fmt.Sprintf("  内存: %.1f MB (GC %d 次)\n", float64(mem.Alloc)/1024/1024, mem.NumGC))
-	b.WriteString(fmt.Sprintf("  协程: %d\n", runtime.NumGoroutine()))
+	fmt.Fprintf(&b, "  内存: %.1f MB (GC %d 次)\n", float64(mem.Alloc)/1024/1024, mem.NumGC)
+	fmt.Fprintf(&b, "  协程: %d\n", runtime.NumGoroutine())
 
 	if ch.slashCfg.CurrentModel != nil {
-		b.WriteString(fmt.Sprintf("  主模型: %s\n", ch.slashCfg.CurrentModel()))
+		fmt.Fprintf(&b, "  主模型: %s\n", ch.slashCfg.CurrentModel())
 	}
 	if ch.slashCfg.SmallModel != nil {
-		b.WriteString(fmt.Sprintf("  小模型: %s\n", ch.slashCfg.SmallModel()))
+		fmt.Fprintf(&b, "  小模型: %s\n", ch.slashCfg.SmallModel())
 	}
 
 	n := 0
 	ch.sessions.Range(func(_, _ any) bool { n++; return true })
-	b.WriteString(fmt.Sprintf("  会话: %d\n", n))
+	fmt.Fprintf(&b, "  会话: %d\n", n)
 	if ch.Credentials != nil {
-		b.WriteString(fmt.Sprintf("  账号: %s\n", ch.Credentials.UserID))
+		fmt.Fprintf(&b, "  账号: %s\n", ch.Credentials.UserID)
 	}
 	return b.String()
 }
@@ -126,7 +126,7 @@ func cmdList(_ context.Context, ch *Channel, _ *wechatbot.IncomingMessage, _ str
 	sort.Slice(es, func(i, j int) bool { return es[i].u < es[j].u })
 	for i, e := range es {
 		displayUser := stripSessionKeyPrefix(e.u)
-		b.WriteString(fmt.Sprintf("  #%d 👤 %s → %s\n", i+1, displayUser, shortSessionID(e.s)))
+		fmt.Fprintf(&b, "  #%d 👤 %s → %s\n", i+1, displayUser, shortSessionID(e.s))
 	}
 	return b.String()
 }
@@ -150,7 +150,7 @@ func cmdModels(_ context.Context, ch *Channel, _ *wechatbot.IncomingMessage, _ s
 		if m == current {
 			marker = "→ "
 		}
-		b.WriteString(fmt.Sprintf("  %s%s\n", marker, m))
+		fmt.Fprintf(&b, "  %s%s\n", marker, m)
 	}
 	b.WriteString("\n  → 当前选中\n")
 	return b.String()
@@ -184,22 +184,22 @@ func cmdTestModel(_ context.Context, ch *Channel, _ *wechatbot.IncomingMessage, 
 		return "❌ 格式错误"
 	}
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("━━━━━━━━━━━━━━━━\n🔍 测试: %s\n━━━━━━━━━━━━━━━━\n\n", modelPath))
+	fmt.Fprintf(&b, "━━━━━━━━━━━━━━━━\n🔍 测试: %s\n━━━━━━━━━━━━━━━━\n\n", modelPath)
 	start := time.Now()
 	err := ch.slashCfg.TestModel(parts[0], parts[1])
 	elapsed := time.Since(start)
 	if err != nil {
-		b.WriteString(fmt.Sprintf("  ❌ %v (%dms)\n", err, elapsed.Milliseconds()))
+		fmt.Fprintf(&b, "  ❌ %v (%dms)\n", err, elapsed.Milliseconds())
 	} else {
-		b.WriteString(fmt.Sprintf("  ✅ 可用 (%dms)\n", elapsed.Milliseconds()))
+		fmt.Fprintf(&b, "  ✅ 可用 (%dms)\n", elapsed.Milliseconds())
 	}
 	return b.String()
 }
 
 // ─── /screenshot ─────────────────────────────────────────────────────────────
 
-func cmdScreenshot(_ context.Context, ch *Channel, msg *wechatbot.IncomingMessage, _ string) string {
-	path, err := takeScreenshot()
+func cmdScreenshot(ctx context.Context, ch *Channel, msg *wechatbot.IncomingMessage, _ string) string {
+	path, err := takeScreenshot(ctx)
 	if err != nil {
 		return fmt.Sprintf("❌ %v", err)
 	}
@@ -250,7 +250,7 @@ func shortSessionID(id string) string {
 	return id
 }
 
-func takeScreenshot() (string, error) {
+func takeScreenshot(ctx context.Context) (string, error) {
 	tmpPath := filepath.Join(os.TempDir(), fmt.Sprintf("mocode-ss-%d.png", time.Now().UnixMilli()))
 	switch runtime.GOOS {
 	case "windows":
@@ -261,17 +261,17 @@ func takeScreenshot() (string, error) {
 			`$g.CopyFromScreen(0,0,0,0,$b);`+
 			`$bm.Save('%s',[System.Drawing.Imaging.ImageFormat]::Png);`+
 			`$g.Dispose();$bm.Dispose()`, strings.ReplaceAll(tmpPath, "'", "''"))
-		out, err := exec.Command("powershell", "-NoProfile", "-Command", ps).CombinedOutput()
+		out, err := exec.CommandContext(ctx, "powershell", "-NoProfile", "-Command", ps).CombinedOutput()
 		if err != nil {
 			return "", fmt.Errorf("ps: %s %w", string(out), err)
 		}
 	case "darwin":
-		if err := exec.Command("screencapture", "-x", tmpPath).Run(); err != nil {
+		if err := exec.CommandContext(ctx, "screencapture", "-x", tmpPath).Run(); err != nil {
 			return "", fmt.Errorf("screencapture: %w", err)
 		}
 	case "linux":
-		if exec.Command("scrot", tmpPath).Run() != nil {
-			if exec.Command("import", "-window", "root", tmpPath).Run() != nil {
+		if exec.CommandContext(ctx, "scrot", tmpPath).Run() != nil {
+			if exec.CommandContext(ctx, "import", "-window", "root", tmpPath).Run() != nil {
 				return "", fmt.Errorf("no screenshot tool")
 			}
 		}

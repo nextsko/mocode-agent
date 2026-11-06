@@ -124,6 +124,9 @@ func dialCDP(ctx context.Context, wsURL string) (*cdpConn, error) {
 	ws, resp, err := dialer.DialContext(ctx, wsURL, http.Header{})
 	if err != nil {
 		if resp != nil {
+			// A failed handshake still hands back the HTTP response, whose
+			// body buffers the error reply; leaking it leaks the socket.
+			_ = resp.Body.Close()
 			return nil, fmt.Errorf("dialling %s: %w (http %s)", wsURL, err, resp.Status)
 		}
 		return nil, fmt.Errorf("dialling %s: %w", wsURL, err)

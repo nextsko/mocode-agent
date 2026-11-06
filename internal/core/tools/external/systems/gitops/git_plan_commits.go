@@ -10,7 +10,7 @@ import (
 	"charm.land/fantasy"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/gitops"
+	gitopscommon "github.com/nextsko/mocode-agent/internal/core/tools/external/common/gitops"
 )
 
 // PlanCommitsToolName is the registered name of the git_plan_commits tool.
@@ -32,12 +32,12 @@ func NewPlanCommitsTool(workingDir string) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		PlanCommitsToolName,
 		toolutil.FirstLineDescription(planDescription),
-		func(_ context.Context, _ PlanCommitsParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
+		func(ctx context.Context, _ PlanCommitsParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			if workingDir == "" {
 				return fantasy.NewTextErrorResponse("no working directory configured"), nil
 			}
 
-			result, err := gitopscommon.ScanWorkingTree(workingDir)
+			result, err := gitopscommon.ScanWorkingTree(ctx, workingDir)
 			if err != nil {
 				return fantasy.NewTextErrorResponse(fmt.Sprintf("scan failed: %v", err)), nil
 			}
