@@ -29,6 +29,9 @@ All notable changes to mocode are documented here. The format follows
 
 - Domain layer no longer imports the LLM framework or provider SDKs; layercheck
   enforces this, and `agent/messages` keeps the same rule.
+- Tool contracts moved to the leaf `core/tools/contract` package (re-exported
+  as `tools.*` aliases); an `agenttooladapter` converts `tools.Tool` into the
+  runtime `fantasy.AgentTool`, and `session_search` is the first migrated tool.
 - WeChat account manager is created at the command boundary and injected into
   the UI dependency container instead of being a package-level singleton.
 - Docker MCP availability probing is encapsulated in a `dockerMCPProbe` value.
