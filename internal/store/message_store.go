@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"time"
 
@@ -93,6 +94,7 @@ func (ms *MessageStore) Create(ctx context.Context, sessionID string, params mes
 	if err := writer.Append(jmsg); err != nil {
 		return message.Message{}, fmt.Errorf("append message: %w", err)
 	}
+	ms.indexMessage(ctx, jmsg)
 
 	return msg, nil
 }
@@ -223,8 +225,13 @@ func (ms *MessageStore) Update(ctx context.Context, msg message.Message) error {
 	if !found {
 		return fmt.Errorf("message not found: %s", msg.ID)
 	}
-
-	return writer.WriteAll(newValues)
+	if err := writer.WriteAll(newValues); err != nil {
+		return err
+	}
+	if jm := findJSONLMessage(newValues, msg.ID); jm != nil {
+		ms.indexMessage(ctx, *jm)
+	}
+	return nil
 }
 
 // Delete removes a message from the JSONL file.
@@ -248,13 +255,21 @@ func (ms *MessageStore) Delete(ctx context.Context, id string) error {
 			newValues = append(newValues, jm)
 		}
 	}
-	return writer.WriteAll(newValues)
+	if err := writer.WriteAll(newValues); err != nil {
+		return err
+	}
+	ms.deleteIndexedMessage(ctx, id)
+	return nil
 }
 
 // DeleteSessionMessages removes all messages for a session.
 func (ms *MessageStore) DeleteSessionMessages(ctx context.Context, sessionID string) error {
 	writer := NewJSONLWriter(ms.messagesPath(sessionID))
-	return writer.Remove()
+	if err := writer.Remove(); err != nil {
+		return err
+	}
+	ms.deleteIndexedSession(ctx, sessionID)
+	return nil
 }
 
 // DeleteAfter removes all messages after the given index (0-based, exclusive).
@@ -276,7 +291,11 @@ func (ms *MessageStore) DeleteAfter(ctx context.Context, sessionID string, after
 			kept = append(kept, v)
 		}
 	}
-	return writer.WriteAll(kept)
+	if err := writer.WriteAll(kept); err != nil {
+		return err
+	}
+	ms.reindexSession(ctx, sessionID, toJSONLMessages(kept))
+	return nil
 }
 
 // DeleteAfterMessage removes all messages after the message with the given ID.
@@ -304,10 +323,81 @@ func (ms *MessageStore) DeleteAfterMessage(ctx context.Context, sessionID string
 	if !found {
 		return fmt.Errorf("message not found: %s", messageID)
 	}
-	return writer.WriteAll(kept)
+	if err := writer.WriteAll(kept); err != nil {
+		return err
+	}
+	ms.reindexSession(ctx, sessionID, toJSONLMessages(kept))
+	return nil
 }
 
 // jsonlToMessage converts a jsonlMessage to a domain message.Message.
+// indexMessage keeps the derived FTS index in step with the JSONL truth. The
+// index is a cache, so a failure is logged instead of failing the write.
+func (ms *MessageStore) indexMessage(ctx context.Context, jm jsonlMessage) {
+	se := ms.store.Search()
+	if se == nil {
+		return
+	}
+	if err := se.IndexMessage(ctx, jm); err != nil {
+		slog.Warn("Failed to update session search index", "message", jm.ID, "error", err)
+	}
+}
+
+// deleteIndexedMessage removes one message from the derived FTS index.
+func (ms *MessageStore) deleteIndexedMessage(ctx context.Context, id string) {
+	se := ms.store.Search()
+	if se == nil {
+		return
+	}
+	if err := se.DeleteMessage(ctx, id); err != nil {
+		slog.Warn("Failed to remove message from session search index", "message", id, "error", err)
+	}
+}
+
+// deleteIndexedSession removes one session from the derived FTS index.
+func (ms *MessageStore) deleteIndexedSession(ctx context.Context, sessionID string) {
+	se := ms.store.Search()
+	if se == nil {
+		return
+	}
+	if err := se.DeleteSession(ctx, sessionID); err != nil {
+		slog.Warn("Failed to remove session from search index", "session", sessionID, "error", err)
+	}
+}
+
+// reindexSession replaces one session's rows in the derived FTS index after a
+// rewrite of its JSONL file.
+func (ms *MessageStore) reindexSession(ctx context.Context, sessionID string, msgs []jsonlMessage) {
+	se := ms.store.Search()
+	if se == nil {
+		return
+	}
+	if err := se.ReindexSession(ctx, sessionID, msgs); err != nil {
+		slog.Warn("Failed to reindex session search", "session", sessionID, "error", err)
+	}
+}
+
+// findJSONLMessage returns the message with id, or nil.
+func findJSONLMessage(values []any, id string) *jsonlMessage {
+	for _, v := range values {
+		if jm, ok := v.(*jsonlMessage); ok && jm.ID == id {
+			return jm
+		}
+	}
+	return nil
+}
+
+// toJSONLMessages converts rewritten values back to typed messages.
+func toJSONLMessages(values []any) []jsonlMessage {
+	msgs := make([]jsonlMessage, 0, len(values))
+	for _, v := range values {
+		if jm, ok := v.(*jsonlMessage); ok {
+			msgs = append(msgs, *jm)
+		}
+	}
+	return msgs
+}
+
 func jsonlToMessage(jm jsonlMessage) (message.Message, error) {
 	parts, err := unmarshalParts(jm.Parts)
 	if err != nil {

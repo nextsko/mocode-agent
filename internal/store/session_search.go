@@ -200,7 +200,7 @@ func (ss *SessionSearch) Rebuild(ctx context.Context) error {
 	return tx.Commit()
 }
 
-// IndexMessage adds a single message to the FTS5 index.
+// IndexMessage adds or replaces a single message in the FTS5 index.
 func (ss *SessionSearch) IndexMessage(ctx context.Context, jm jsonlMessage) error {
 	if err := ss.Open(ctx); err != nil {
 		return err
@@ -213,7 +213,71 @@ func (ss *SessionSearch) IndexMessage(ctx context.Context, jm jsonlMessage) erro
 	_, err := ss.db.ExecContext(ctx,
 		`INSERT OR REPLACE INTO messages (id, session_id, role, content, tool_name, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
 		jm.ID, jm.SessionID, jm.Role, content, toolName, jm.CreatedAt)
-	return err
+	if err != nil {
+		return fmt.Errorf("index message %s: %w", jm.ID, err)
+	}
+	return nil
+}
+
+// DeleteMessage removes a single message from the FTS5 index.
+func (ss *SessionSearch) DeleteMessage(ctx context.Context, id string) error {
+	if err := ss.Open(ctx); err != nil {
+		return err
+	}
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+
+	if _, err := ss.db.ExecContext(ctx, `DELETE FROM messages WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("delete indexed message %s: %w", id, err)
+	}
+	return nil
+}
+
+// DeleteSession removes every indexed message of one session.
+func (ss *SessionSearch) DeleteSession(ctx context.Context, sessionID string) error {
+	if err := ss.Open(ctx); err != nil {
+		return err
+	}
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+
+	if _, err := ss.db.ExecContext(ctx, `DELETE FROM messages WHERE session_id = ?`, sessionID); err != nil {
+		return fmt.Errorf("delete indexed session %s: %w", sessionID, err)
+	}
+	return nil
+}
+
+// ReindexSession replaces every indexed message of one session with msgs. It is
+// used after operations that rewrite a session's JSONL file (truncation,
+// deletion) where per-message bookkeeping is not worth it.
+func (ss *SessionSearch) ReindexSession(ctx context.Context, sessionID string, msgs []jsonlMessage) error {
+	if err := ss.Open(ctx); err != nil {
+		return err
+	}
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+
+	tx, err := ss.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin reindex tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM messages WHERE session_id = ?`, sessionID); err != nil {
+		return fmt.Errorf("clear indexed session %s: %w", sessionID, err)
+	}
+	for _, jm := range msgs {
+		_, err := tx.ExecContext(ctx,
+			`INSERT OR REPLACE INTO messages (id, session_id, role, content, tool_name, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+			jm.ID, jm.SessionID, jm.Role, extractSearchText(jm.Parts), extractToolName(jm.Parts), jm.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("reindex message %s: %w", jm.ID, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit reindex: %w", err)
+	}
+	return nil
 }
 
 // Search performs FTS5 full-text search across all sessions.
@@ -236,7 +300,9 @@ func (ss *SessionSearch) Search(ctx context.Context, query string, limit int) (*
 
 	// Get the list of matching session IDs first for dedup
 	matchRows, err := ss.db.QueryContext(ctx,
-		`SELECT DISTINCT session_id FROM messages_fts WHERE messages_fts MATCH ? ORDER BY bm25(messages_fts) LIMIT ?`,
+		`SELECT DISTINCT m.session_id FROM messages_fts
+			JOIN messages AS m ON m.rowid = messages_fts.rowid
+			WHERE messages_fts MATCH ? ORDER BY bm25(messages_fts) LIMIT ?`,
 		ftsQuery, limit)
 	if err != nil {
 		return nil, fmt.Errorf("fts search sessions: %w", err)
@@ -262,10 +328,10 @@ func (ss *SessionSearch) Search(ctx context.Context, query string, limit int) (*
 		var snippet sql.NullString
 		err := ss.db.QueryRowContext(ctx,
 			`SELECT m.session_id, m.id, m.role, m.content,
-				snippet(messages_fts, 2, '<b>', '</b>', '...', 32),
+				snippet(messages_fts, -1, '<b>', '</b>', '...', 32),
 				m.created_at, bm25(messages_fts)
-			FROM messages_fts AS fts
-			JOIN messages AS m ON m.rowid = fts.rowid
+			FROM messages_fts
+			JOIN messages AS m ON m.rowid = messages_fts.rowid
 			WHERE messages_fts MATCH ? AND m.session_id = ?
 			ORDER BY bm25(messages_fts) LIMIT 1`,
 			ftsQuery, sid).Scan(&r.SessionID, &r.MessageID, &r.Role, &r.Content, &snippet, &r.Timestamp, &r.Rank)
