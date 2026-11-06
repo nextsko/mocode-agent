@@ -1,0 +1,63 @@
+name: Lint (full, scheduled)
+
+# The per-diff Lint job in test.yml only inspects changed lines, so the
+# repository-wide backlog is invisible there. This job runs the full suite on
+# a schedule, publishes a per-linter summary and uploads the raw report as an
+# artifact. It is intentionally non-blocking: it reports debt, it does not
+# gate merges.
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # Mondays 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-full:
+    name: Full lint report
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      GOEXPERIMENT: greenteagc
+      GOPROXY: https://goproxy.cn,direct
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+
+      - name: Run full lint (non-blocking)
+        run: bash scripts/lint-full.sh golangci.txt || true
+
+      - name: Publish summary
+        if: always()
+        run: |
+          {
+            echo "### Full lint summary"
+            echo
+            if [ -f golangci.txt ]; then
+              echo '```'
+              grep -oE '\((gosec|staticcheck|revive|wrapcheck|goconst|godot|nilerr|noctx|bodyclose|sqlclosecheck|exhaustive|nestif|prealloc|unparam|godox|unconvert|whitespace|rowserrcheck|nolintlint)\)' golangci.txt \
+                | tr -d '()' | sort | uniq -c | sort -rn || true
+              echo '```'
+            else
+              echo "No report produced."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golangci-report
+          path: golangci.txt
+          if-no-files-found: ignore
