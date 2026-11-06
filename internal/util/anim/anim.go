@@ -65,7 +65,7 @@ func nextID() int {
 	return int(lastID.Add(1))
 }
 
-// Cache for expensive animation calculations
+// Cache for expensive animation calculations.
 type animCache struct {
 	initialFrames  [][]string
 	cyclingFrames  [][]string
@@ -77,7 +77,7 @@ type animCache struct {
 
 var animCacheMap = csync.NewMap[string, *animCache]()
 
-// settingsHash creates a hash key for the settings to use for caching
+// settingsHash creates a hash key for the settings to use for caching.
 func settingsHash(opts Settings) string {
 	h := xxh3.New()
 	fmt.Fprintf(h, "%d-%s-%v-%v-%v-%t",

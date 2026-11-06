@@ -50,7 +50,7 @@ func NewShellVariableResolver(env Env) VariableResolver {
 // ResolveValue is a method for resolving values, such as environment variables.
 // it will resolve shell-like variable substitution anywhere in the string, including:
 // - $(command) for command substitution
-// - $VAR or ${VAR} for environment variables
+// - $VAR or ${VAR} for environment variables.
 func (r *shellVariableResolver) ResolveValue(value string) (string, error) {
 	// Special case: lone $ is an error (backward compatibility)
 	if value == "$" {

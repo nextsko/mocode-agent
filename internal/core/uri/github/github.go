@@ -290,15 +290,19 @@ func (p *Provider) get(ctx context.Context, url, accept string) (io.ReadCloser, 
 		return resp.Body, nil
 	case resp.StatusCode == http.StatusNotFound:
 		_ = resp.Body.Close()
-		return nil, &statusError{code: resp.StatusCode, url: url,
-			hint: "check the owner, repository, path and ref"}
+		return nil, &statusError{
+			code: resp.StatusCode, url: url,
+			hint: "check the owner, repository, path and ref",
+		}
 	case resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests:
 		_ = resp.Body.Close()
 		// Unauthenticated GitHub API calls are limited to 60/hour; a bare 403
 		// otherwise reads as a permissions problem and sends the agent hunting
 		// for the wrong cause.
-		return nil, &statusError{code: resp.StatusCode, url: url,
-			hint: "GitHub's rate limit was reached — set GITHUB_TOKEN to raise it, or read a file directly instead of listing a directory"}
+		return nil, &statusError{
+			code: resp.StatusCode, url: url,
+			hint: "GitHub's rate limit was reached — set GITHUB_TOKEN to raise it, or read a file directly instead of listing a directory",
+		}
 	default:
 		_ = resp.Body.Close()
 		return nil, &statusError{code: resp.StatusCode, url: url}

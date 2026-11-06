@@ -167,7 +167,7 @@ func applyTextEdit(lines []string, edit protocol.TextEdit, encoding powernap.Off
 	return result, nil
 }
 
-// applyDocumentChange applies a DocumentChange (create/rename/delete operations)
+// applyDocumentChange applies a DocumentChange (create/rename/delete operations).
 func applyDocumentChange(change protocol.DocumentChange, encoding powernap.OffsetEncoding) error {
 	if change.CreateFile != nil {
 		path, err := change.CreateFile.URI.Path()

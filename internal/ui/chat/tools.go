@@ -18,7 +18,7 @@ import (
 // responseContextHeight limits the number of lines displayed in tool output.
 const responseContextHeight = 10
 
-// toolBodyLeftPaddingTotal represents the padding that should be applied to each tool body
+// toolBodyLeftPaddingTotal represents the padding that should be applied to each tool body.
 const toolBodyLeftPaddingTotal = 2
 
 // ToolStatus represents the current state of a tool call.

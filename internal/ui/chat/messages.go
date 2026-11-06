@@ -63,7 +63,7 @@ func ResetCacheStats() {
 // padding. We also cap the width so text is readable to the maxTextWidth(120).
 const MessageLeftPaddingTotal = 2
 
-// maxTextWidth is the maximum width text messages can be
+// maxTextWidth is the maximum width text messages can be.
 const maxTextWidth = 120
 
 // Identifiable is an interface for items that can provide a unique identifier.
@@ -190,7 +190,7 @@ func ClearItemCaches(items []MessageItem) {
 // This should be used by any message that can store a cached version of its render. e.x user,assistant... and so on
 //
 // THOUGHT(kujtim): we should consider if its efficient to store the render for different widths
-// the issue with that could be memory usage
+// the issue with that could be memory usage.
 type cachedMessageItem struct {
 	// rendered is the cached rendered string
 	rendered string

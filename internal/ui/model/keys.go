@@ -9,13 +9,13 @@ type KeyMap struct {
 		SendGuidance key.Binding
 		SendForce    key.Binding
 		OpenEditor   key.Binding
-		Newline     key.Binding
-		AddImage    key.Binding
-		PasteImage  key.Binding
-		MentionFile key.Binding
-		Commands    key.Binding
-		SelectAll   key.Binding
-		Cut         key.Binding
+		Newline      key.Binding
+		AddImage     key.Binding
+		PasteImage   key.Binding
+		MentionFile  key.Binding
+		Commands     key.Binding
+		SelectAll    key.Binding
+		Cut          key.Binding
 
 		// Attachments key maps
 		AttachmentDeleteMode key.Binding

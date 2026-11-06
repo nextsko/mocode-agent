@@ -61,27 +61,48 @@ func TestBannedBy(t *testing.T) {
 		imports []string
 		banned  bool
 	}{
-		{"nethttp importing fantasy is banned",
+		{
+			"nethttp importing fantasy is banned",
 			"github.com/nextsko/mocode-agent/internal/core/tools/external/nethttp",
-			[]string{"net/http", "charm.land/fantasy"}, true},
-		{"nethttp importing fantasy subpackage is banned",
+			[]string{"net/http", "charm.land/fantasy"},
+			true,
+		},
+		{
+			"nethttp importing fantasy subpackage is banned",
 			"github.com/nextsko/mocode-agent/internal/core/tools/external/nethttp",
-			[]string{"charm.land/fantasy/providers/openai"}, true},
-		{"nethttp importing config is banned",
+			[]string{"charm.land/fantasy/providers/openai"},
+			true,
+		},
+		{
+			"nethttp importing config is banned",
 			"github.com/nextsko/mocode-agent/internal/core/tools/external/nethttp",
-			[]string{"github.com/nextsko/mocode-agent/internal/core/config"}, true},
-		{"nethttp importing net/http is fine",
+			[]string{"github.com/nextsko/mocode-agent/internal/core/config"},
+			true,
+		},
+		{
+			"nethttp importing net/http is fine",
 			"github.com/nextsko/mocode-agent/internal/core/tools/external/nethttp",
-			[]string{"net/http", "time"}, false},
-		{"netcommon importing catwalk is banned",
+			[]string{"net/http", "time"},
+			false,
+		},
+		{
+			"netcommon importing catwalk is banned",
 			"github.com/nextsko/mocode-agent/internal/core/tools/external/plugins/netcommon",
-			[]string{"golang.org/x/net/html", "charm.land/catwalk/pkg/catwalk"}, true},
-		{"rule does not leak to prefix-sibling packages",
+			[]string{"golang.org/x/net/html", "charm.land/catwalk/pkg/catwalk"},
+			true,
+		},
+		{
+			"rule does not leak to prefix-sibling packages",
 			"github.com/nextsko/mocode-agent/internal/core/tools/external/nethttpx",
-			[]string{"charm.land/fantasy"}, false},
-		{"unrelated package unaffected",
+			[]string{"charm.land/fantasy"},
+			false,
+		},
+		{
+			"unrelated package unaffected",
 			"github.com/nextsko/mocode-agent/internal/core/agent",
-			[]string{"charm.land/fantasy"}, false},
+			[]string{"charm.land/fantasy"},
+			false,
+		},
 	}
 	for _, c := range cases {
 		if _, _, got := bannedBy(c.pkg, c.imports); got != c.banned {

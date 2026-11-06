@@ -23,6 +23,7 @@ func (f fakeModel) Generate(_ context.Context, _ fantasy.Call) (*fantasy.Respons
 	}
 	return &fantasy.Response{FinishReason: fantasy.FinishReasonStop}, nil
 }
+
 func (f fakeModel) Stream(_ context.Context, _ fantasy.Call) (fantasy.StreamResponse, error) {
 	if f.genErr != nil {
 		return nil, f.genErr
@@ -31,12 +32,14 @@ func (f fakeModel) Stream(_ context.Context, _ fantasy.Call) (fantasy.StreamResp
 		yield(fantasy.StreamPart{Type: fantasy.StreamPartTypeTextDelta, Delta: "hi"})
 	}, nil
 }
+
 func (f fakeModel) GenerateObject(_ context.Context, _ fantasy.ObjectCall) (*fantasy.ObjectResponse, error) {
 	if f.genErr != nil {
 		return nil, f.genErr
 	}
 	return &fantasy.ObjectResponse{}, nil
 }
+
 func (f fakeModel) StreamObject(_ context.Context, _ fantasy.ObjectCall) (fantasy.ObjectStreamResponse, error) {
 	if f.genErr != nil {
 		return nil, f.genErr
@@ -155,6 +158,7 @@ func (f fakeStreamModel) Model() string    { return f.name }
 func (f fakeStreamModel) Generate(context.Context, fantasy.Call) (*fantasy.Response, error) {
 	return &fantasy.Response{}, nil
 }
+
 func (f fakeStreamModel) Stream(_ context.Context, _ fantasy.Call) (fantasy.StreamResponse, error) {
 	return func(yield func(fantasy.StreamPart) bool) {
 		if f.firstErr {
@@ -164,9 +168,11 @@ func (f fakeStreamModel) Stream(_ context.Context, _ fantasy.Call) (fantasy.Stre
 		yield(fantasy.StreamPart{Type: fantasy.StreamPartTypeTextDelta, Delta: f.delta})
 	}, nil
 }
+
 func (f fakeStreamModel) GenerateObject(context.Context, fantasy.ObjectCall) (*fantasy.ObjectResponse, error) {
 	return &fantasy.ObjectResponse{}, nil
 }
+
 func (f fakeStreamModel) StreamObject(context.Context, fantasy.ObjectCall) (fantasy.ObjectStreamResponse, error) {
 	return func(yield func(fantasy.ObjectStreamPart) bool) {}, nil
 }

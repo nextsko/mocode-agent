@@ -11,10 +11,10 @@ type Kind string
 
 const (
 	// KindFact represents stable personal attributes, preferences, or background.
-	// Example: "User is a software engineer."
+	// Example: "User is a software engineer.".
 	KindFact Kind = "fact"
 	// KindEpisode represents a specific event that happened at a particular time.
-	// Example: "On 2024-05-07, User went hiking at Mt. Fuji with Alice."
+	// Example: "On 2024-05-07, User went hiking at Mt. Fuji with Alice.".
 	KindEpisode Kind = "episode"
 )
 

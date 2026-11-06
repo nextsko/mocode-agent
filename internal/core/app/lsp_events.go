@@ -4,12 +4,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
 	"github.com/nextsko/mocode-agent/internal/util/csync"
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
-	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
 )
 
-// LSPEventType represents the type of LSP event
+// LSPEventType represents the type of LSP event.
 type LSPEventType string
 
 const (
@@ -17,7 +17,7 @@ const (
 	LSPEventDiagnosticsChanged LSPEventType = "diagnostics_changed"
 )
 
-// LSPEvent represents an event in the LSP system
+// LSPEvent represents an event in the LSP system.
 type LSPEvent struct {
 	Type            LSPEventType
 	Name            string
@@ -26,7 +26,7 @@ type LSPEvent struct {
 	DiagnosticCount int
 }
 
-// LSPClientInfo holds information about an LSP client's state
+// LSPClientInfo holds information about an LSP client's state.
 type LSPClientInfo struct {
 	Name            string
 	State           lsp.ServerState
@@ -41,22 +41,22 @@ var (
 	lspBroker = pubsub.NewBroker[LSPEvent]()
 )
 
-// SubscribeLSPEvents returns a channel for LSP events
+// SubscribeLSPEvents returns a channel for LSP events.
 func SubscribeLSPEvents(ctx context.Context) <-chan pubsub.Event[LSPEvent] {
 	return lspBroker.Subscribe(ctx)
 }
 
-// GetLSPStates returns the current state of all LSP clients
+// GetLSPStates returns the current state of all LSP clients.
 func GetLSPStates() map[string]LSPClientInfo {
 	return lspStates.Copy()
 }
 
-// GetLSPState returns the state of a specific LSP client
+// GetLSPState returns the state of a specific LSP client.
 func GetLSPState(name string) (LSPClientInfo, bool) {
 	return lspStates.Get(name)
 }
 
-// updateLSPState updates the state of an LSP client and publishes an event
+// updateLSPState updates the state of an LSP client and publishes an event.
 func updateLSPState(name string, state lsp.ServerState, err error, client *lsp.Client, diagnosticCount int) {
 	info := LSPClientInfo{
 		Name:            name,
@@ -82,7 +82,7 @@ func updateLSPState(name string, state lsp.ServerState, err error, client *lsp.C
 	})
 }
 
-// updateLSPDiagnostics updates the diagnostic count for an LSP client and publishes an event
+// updateLSPDiagnostics updates the diagnostic count for an LSP client and publishes an event.
 func updateLSPDiagnostics(name string, diagnosticCount int) {
 	if info, exists := lspStates.Get(name); exists {
 		info.DiagnosticCount = diagnosticCount

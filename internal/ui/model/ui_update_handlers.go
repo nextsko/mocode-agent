@@ -304,7 +304,6 @@ func (m *UI) handleAnimMsg(msg tea.Msg) (cmds []tea.Cmd) {
 		if m.isAgentBusy() {
 			cmds = append(cmds, m.breathingCmd())
 		}
-
 	}
 	return cmds
 }

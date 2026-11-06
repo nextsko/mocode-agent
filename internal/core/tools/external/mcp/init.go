@@ -61,7 +61,7 @@ var (
 	initDone = make(chan struct{})
 )
 
-// State represents the current state of an MCP client
+// State represents the current state of an MCP client.
 type State int
 
 const (
@@ -86,7 +86,7 @@ func (s State) String() string {
 	}
 }
 
-// EventType represents the type of MCP event
+// EventType represents the type of MCP event.
 type EventType uint
 
 const (
@@ -96,7 +96,7 @@ const (
 	EventResourcesListChanged
 )
 
-// Event represents an event in the MCP system
+// Event represents an event in the MCP system.
 type Event struct {
 	Type   EventType
 	Name   string
@@ -112,7 +112,7 @@ type Counts struct {
 	Resources int
 }
 
-// ClientInfo holds information about an MCP client's state
+// ClientInfo holds information about an MCP client's state.
 type ClientInfo struct {
 	Name        string
 	State       State
@@ -122,17 +122,17 @@ type ClientInfo struct {
 	ConnectedAt time.Time
 }
 
-// SubscribeEvents returns a channel for MCP events
+// SubscribeEvents returns a channel for MCP events.
 func SubscribeEvents(ctx context.Context) <-chan pubsub.Event[Event] {
 	return broker.Subscribe(ctx)
 }
 
-// GetStates returns the current state of all MCP clients
+// GetStates returns the current state of all MCP clients.
 func GetStates() map[string]ClientInfo {
 	return states.Copy()
 }
 
-// GetState returns the state of a specific MCP client
+// GetState returns the state of a specific MCP client.
 func GetState(name string) (ClientInfo, bool) {
 	return states.Get(name)
 }
@@ -322,7 +322,7 @@ func getOrRenewClient(ctx context.Context, cfg *config.ConfigStore, name string)
 	return sess, nil
 }
 
-// updateState updates the state of an MCP client and publishes an event
+// updateState updates the state of an MCP client and publishes an event.
 func updateState(name string, state State, err error, client *ClientSession, counts Counts) {
 	info := ClientInfo{
 		Name:   name,

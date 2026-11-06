@@ -146,8 +146,8 @@ func formatSessionSummaryStatus(metadata SessionSummaryMetadata) string {
 		b.WriteString("\ntitle: ")
 		b.WriteString(metadata.Title)
 	}
-	b.WriteString(fmt.Sprintf("\nmessages: %d", metadata.MessageCount))
-	b.WriteString(fmt.Sprintf("\ntokens: prompt %d / completion %d", metadata.PromptTokens, metadata.CompletionTokens))
+	fmt.Fprintf(&b, "\nmessages: %d", metadata.MessageCount)
+	fmt.Fprintf(&b, "\ntokens: prompt %d / completion %d", metadata.PromptTokens, metadata.CompletionTokens)
 	if metadata.SummaryMessageID == "" {
 		b.WriteString("\nsummary: none")
 	} else {

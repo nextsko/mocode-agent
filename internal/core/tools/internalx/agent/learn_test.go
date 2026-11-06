@@ -56,8 +56,10 @@ func TestLearn_List_SeparatesEditableFromBundled(t *testing.T) {
 		Root: root,
 		Known: []*skills.Skill{
 			{Name: "jq", Description: "Use when parsing JSON", Builtin: true, SkillFilePath: "mocode://skills/jq/SKILL.md"},
-			{Name: "deploy", Description: "Use when deploying", SkillFilePath: filepath.Join(root, "deploy", "SKILL.md"),
-				Metadata: map[string]string{skills.MetaOrigin: skills.OriginLearn, skills.MetaRevision: "3"}},
+			{
+				Name: "deploy", Description: "Use when deploying", SkillFilePath: filepath.Join(root, "deploy", "SKILL.md"),
+				Metadata: map[string]string{skills.MetaOrigin: skills.OriginLearn, skills.MetaRevision: "3"},
+			},
 			{Name: "handwritten", Description: "Use when hand written", SkillFilePath: "/tmp/handwritten/SKILL.md"},
 		},
 	}
@@ -250,8 +252,10 @@ Original hand-written body.
 `), 0o644))
 
 	deps := LearnDeps{Root: root, Now: fixedNow, Known: []*skills.Skill{
-		{Name: "team-conventions", Description: "Use when touching the payment service",
-			SkillFilePath: filepath.Join(handWritten, skills.SkillFileName)},
+		{
+			Name: "team-conventions", Description: "Use when touching the payment service",
+			SkillFilePath: filepath.Join(handWritten, skills.SkillFileName),
+		},
 	}}
 
 	resp := run(t, deps, `{"action":"refine","name":"team-conventions","instructions":"Improved body."}`)
@@ -303,8 +307,10 @@ Original.
 `), 0o644))
 
 	deps := LearnDeps{Root: root, Now: fixedNow, Known: []*skills.Skill{
-		{Name: "shared-skill", Description: "Use when sharing",
-			SkillFilePath: filepath.Join(elsewhere, skills.SkillFileName)},
+		{
+			Name: "shared-skill", Description: "Use when sharing",
+			SkillFilePath: filepath.Join(elsewhere, skills.SkillFileName),
+		},
 	}}
 
 	resp := run(t, deps, `{"action":"refine","name":"shared-skill","instructions":"Rewritten in place."}`)
@@ -396,8 +402,10 @@ func TestLearn_PermissionErrorIsHardFailure(t *testing.T) {
 	gate := &fakeGate{allow: true, err: errors.New("boom")}
 	_, err := NewLearnTool(LearnDeps{Root: t.TempDir(), Permissions: gate, Now: fixedNow}).Run(
 		context.Background(),
-		fantasy.ToolCall{ID: "call-1", Name: LearnToolName,
-			Input: createInput("deploy", "Use when deploying", "body")},
+		fantasy.ToolCall{
+			ID: "call-1", Name: LearnToolName,
+			Input: createInput("deploy", "Use when deploying", "body"),
+		},
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "boom")

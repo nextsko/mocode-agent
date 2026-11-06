@@ -59,20 +59,20 @@ import (
 // failures from this package.
 const shellErrorToolName = "bash"
 
-// Logger interface for optional logging
+// Logger interface for optional logging.
 type Logger interface {
 	InfoPersist(msg string, keysAndValues ...any)
 }
 
-// noopLogger is a logger that does nothing
+// noopLogger is a logger that does nothing.
 type noopLogger struct{}
 
 func (noopLogger) InfoPersist(msg string, keysAndValues ...any) {}
 
-// BlockFunc is a function that determines if a command should be blocked
+// BlockFunc is a function that determines if a command should be blocked.
 type BlockFunc func(args []string) bool
 
-// Shell provides cross-platform shell execution with optional state persistence
+// Shell provides cross-platform shell execution with optional state persistence.
 type Shell struct {
 	env        []string
 	cwd        string
@@ -81,7 +81,7 @@ type Shell struct {
 	blockFuncs []BlockFunc
 }
 
-// Options for creating a new shell
+// Options for creating a new shell.
 type Options struct {
 	WorkingDir string
 	Env        []string
@@ -89,7 +89,7 @@ type Options struct {
 	BlockFuncs []BlockFunc
 }
 
-// NewShell creates a new shell instance with the given options
+// NewShell creates a new shell instance with the given options.
 func NewShell(opts *Options) *Shell {
 	if opts == nil {
 		opts = &Options{}
@@ -126,7 +126,7 @@ func NewShell(opts *Options) *Shell {
 	}
 }
 
-// Exec executes a command in the shell
+// Exec executes a command in the shell.
 func (s *Shell) Exec(ctx context.Context, command string) (string, string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -134,7 +134,7 @@ func (s *Shell) Exec(ctx context.Context, command string) (string, string, error
 	return s.exec(ctx, command)
 }
 
-// ExecStream executes a command in the shell with streaming output to provided writers
+// ExecStream executes a command in the shell with streaming output to provided writers.
 func (s *Shell) ExecStream(ctx context.Context, command string, stdout, stderr io.Writer) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -153,14 +153,14 @@ func (s *Shell) ExecStreamWithStdin(ctx context.Context, command string, stdin i
 	return s.execStreamStdin(ctx, command, stdin, stdout, stderr)
 }
 
-// GetWorkingDir returns the current working directory
+// GetWorkingDir returns the current working directory.
 func (s *Shell) GetWorkingDir() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.cwd
 }
 
-// SetWorkingDir sets the working directory
+// SetWorkingDir sets the working directory.
 func (s *Shell) SetWorkingDir(dir string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -174,7 +174,7 @@ func (s *Shell) SetWorkingDir(dir string) error {
 	return nil
 }
 
-// GetEnv returns a copy of the environment variables
+// GetEnv returns a copy of the environment variables.
 func (s *Shell) GetEnv() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -184,7 +184,7 @@ func (s *Shell) GetEnv() []string {
 	return env
 }
 
-// SetEnv sets an environment variable
+// SetEnv sets an environment variable.
 func (s *Shell) SetEnv(key, value string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -200,14 +200,14 @@ func (s *Shell) SetEnv(key, value string) {
 	s.env = append(s.env, keyPrefix+value)
 }
 
-// SetBlockFuncs sets the command block functions for the shell
+// SetBlockFuncs sets the command block functions for the shell.
 func (s *Shell) SetBlockFuncs(blockFuncs []BlockFunc) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.blockFuncs = blockFuncs
 }
 
-// CommandsBlocker creates a BlockFunc that blocks exact command matches
+// CommandsBlocker creates a BlockFunc that blocks exact command matches.
 func CommandsBlocker(cmds []string) BlockFunc {
 	bannedSet := make(map[string]struct{})
 	for _, cmd := range cmds {
@@ -223,7 +223,7 @@ func CommandsBlocker(cmds []string) BlockFunc {
 	}
 }
 
-// ArgumentsBlocker creates a BlockFunc that blocks specific subcommand
+// ArgumentsBlocker creates a BlockFunc that blocks specific subcommand.
 func ArgumentsBlocker(cmd string, args []string, flags []string) BlockFunc {
 	return func(parts []string) bool {
 		if len(parts) == 0 || parts[0] != cmd {
@@ -300,7 +300,7 @@ func (s *Shell) builtinHandler() func(next interp.ExecHandlerFunc) interp.ExecHa
 	}
 }
 
-// newInterp creates a new interpreter with the current shell state
+// newInterp creates a new interpreter with the current shell state.
 func (s *Shell) newInterp(stdin io.Reader, stdout, stderr io.Writer) (*interp.Runner, error) {
 	return interp.New(
 		interp.StdIO(stdin, stdout, stderr),
@@ -322,7 +322,7 @@ func (s *Shell) updateShellFromRunner(runner *interp.Runner) {
 	}
 }
 
-// execCommon is the shared implementation for executing commands
+// execCommon is the shared implementation for executing commands.
 func (s *Shell) execCommon(ctx context.Context, command string, stdin io.Reader, stdout, stderr io.Writer) (err error) {
 	var runner *interp.Runner
 	defer func() {
@@ -366,7 +366,7 @@ func (s *Shell) exec(ctx context.Context, command string) (string, string, error
 	return stdout.String(), stderr.String(), err
 }
 
-// execStream executes commands using POSIX shell emulation with streaming output
+// execStream executes commands using POSIX shell emulation with streaming output.
 func (s *Shell) execStream(ctx context.Context, command string, stdout, stderr io.Writer) error {
 	return s.execCommon(ctx, command, nil, stdout, stderr)
 }
@@ -390,13 +390,13 @@ func (s *Shell) execHandlers() []func(next interp.ExecHandlerFunc) interp.ExecHa
 	return handlers
 }
 
-// IsInterrupt checks if an error is due to interruption
+// IsInterrupt checks if an error is due to interruption.
 func IsInterrupt(err error) bool {
 	return errors.Is(err, context.Canceled) ||
 		errors.Is(err, context.DeadlineExceeded)
 }
 
-// ExitCode extracts the exit code from an error
+// ExitCode extracts the exit code from an error.
 func ExitCode(err error) int {
 	if err == nil {
 		return 0

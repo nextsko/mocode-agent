@@ -8,9 +8,9 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/nextsko/mocode-agent/internal/core/question"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
-	uv "github.com/charmbracelet/ultraviolet"
 )
 
 // SingleChoice is an inline single-choice question component.

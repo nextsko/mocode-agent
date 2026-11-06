@@ -190,13 +190,13 @@ func FormatPlan(p *CommitPlan) string {
 	var b strings.Builder
 
 	b.WriteString("📦 Commit Plan\n")
-	b.WriteString(fmt.Sprintf("├── Branch: %s", p.Branch))
+	fmt.Fprintf(&b, "├── Branch: %s", p.Branch)
 	if p.Ahead > 0 {
-		b.WriteString(fmt.Sprintf(" (ahead %d)", p.Ahead))
+		fmt.Fprintf(&b, " (ahead %d)", p.Ahead)
 	}
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("├── Files: %d (+%d -%d)\n", p.TotalFiles, p.TotalAdd, p.TotalDel))
-	b.WriteString(fmt.Sprintf("└── Groups: %d\n\n", len(p.Groups)))
+	fmt.Fprintf(&b, "├── Files: %d (+%d -%d)\n", p.TotalFiles, p.TotalAdd, p.TotalDel)
+	fmt.Fprintf(&b, "└── Groups: %d\n\n", len(p.Groups))
 
 	for i, g := range p.Groups {
 		connector := "├──"
@@ -207,15 +207,15 @@ func FormatPlan(p *CommitPlan) string {
 		if scope == "" {
 			scope = "general"
 		}
-		b.WriteString(fmt.Sprintf("%s %s %s(%s): [%d files] +%d -%d\n",
+		fmt.Fprintf(&b, "%s %s %s(%s): [%d files] +%d -%d\n",
 			connector, g.Emoji, g.Type, scope,
-			len(g.Files), g.Additions, g.Deletions))
+			len(g.Files), g.Additions, g.Deletions)
 		for j, f := range g.Files {
 			fileConnector := "│   ├──"
 			if j == len(g.Files)-1 {
 				fileConnector = "│   └──"
 			}
-			b.WriteString(fmt.Sprintf("    %s %s\n", fileConnector, f))
+			fmt.Fprintf(&b, "    %s %s\n", fileConnector, f)
 		}
 		b.WriteString("\n")
 	}

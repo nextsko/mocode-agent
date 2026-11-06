@@ -20,13 +20,13 @@ type BackgroundShell struct {
 	WorkingDir  string
 	TTY         bool
 	// SessionID is the agent session that started this job ("" = unowned).
-	SessionID  string
-	ctx        context.Context
-	cancel     context.CancelFunc
-	stdout     *syncBuffer
-	stderr     *syncBuffer
-	done       chan struct{}
-	exitErr    error
+	SessionID string
+	ctx       context.Context
+	cancel    context.CancelFunc
+	stdout    *syncBuffer
+	stderr    *syncBuffer
+	done      chan struct{}
+	exitErr   error
 	// runner is assigned by the start goroutine (TTY path) and read by
 	// WriteInput/Kill/Status from other goroutines — every access must go
 	// through setRunner/runnerRef (the old bare field access was a data race).

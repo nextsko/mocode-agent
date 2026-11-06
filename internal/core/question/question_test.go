@@ -67,8 +67,10 @@ func TestRequestValidate(t *testing.T) {
 	q.Choices = nil
 	require.NoError(t, Request{Questions: []Question{q}}.Validate())
 
-	choice := Question{Type: TypeSingleChoice, Text: "pick", Description: "d",
-		Choices: []Choice{{ID: "a", Label: "A"}, {ID: "b", Label: "B"}}}
+	choice := Question{
+		Type: TypeSingleChoice, Text: "pick", Description: "d",
+		Choices: []Choice{{ID: "a", Label: "A"}, {ID: "b", Label: "B"}},
+	}
 	require.NoError(t, Request{Questions: []Question{choice}}.Validate())
 
 	single := choice
@@ -103,4 +105,4 @@ func TestNotificationBroadcast(t *testing.T) {
 	}
 }
 
-var _ pubsub.Subscriber[Request] = (Service)(nil)
+var _ pubsub.Subscriber[Request] = Service(nil)

@@ -123,7 +123,7 @@ type (
 	// copyChatHighlightMsg is sent to copy the current chat highlight to clipboard.
 	copyChatHighlightMsg struct{}
 
-	// sessionFilesUpdatesMsg is sent when the files for this session have been updated
+	// sessionFilesUpdatesMsg is sent when the files for this session have been updated.
 	sessionFilesUpdatesMsg struct {
 		sessionFiles []SessionFile
 	}

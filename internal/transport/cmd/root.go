@@ -218,7 +218,7 @@ func printCommandHelp(cmd *cobra.Command) {
 	}
 }
 
-// copied from cobra:
+// copied from cobra:.
 const defaultVersionTemplate = `{{with .DisplayName}}{{printf "%s " .}}{{end}}{{printf "version %s" .Version}}
 `
 

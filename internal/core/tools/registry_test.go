@@ -1,13 +1,13 @@
 package tools
 
 import (
-	agentquestion "github.com/nextsko/mocode-agent/internal/core/tools/core/question"
-	"github.com/nextsko/mocode-agent/internal/core/tools/core/sandbox"
-	web "github.com/nextsko/mocode-agent/internal/core/tools/core/web"
-
 	"slices"
 	"sort"
 	"testing"
+
+	agentquestion "github.com/nextsko/mocode-agent/internal/core/tools/core/question"
+	"github.com/nextsko/mocode-agent/internal/core/tools/core/sandbox"
+	web "github.com/nextsko/mocode-agent/internal/core/tools/core/web"
 
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitea"
 

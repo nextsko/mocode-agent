@@ -266,15 +266,7 @@ type migrationFile struct {
 }
 
 func (f migrationFile) toJSONL() jsonlFile {
-	return jsonlFile{
-		ID:        f.ID,
-		SessionID: f.SessionID,
-		Path:      f.Path,
-		Content:   f.Content,
-		Version:   f.Version,
-		CreatedAt: f.CreatedAt,
-		UpdatedAt: f.UpdatedAt,
-	}
+	return jsonlFile(f)
 }
 
 // --- SQLite readers ---
@@ -350,5 +342,5 @@ func readFiles(ctx context.Context, db *sql.DB, sessionID string) ([]jsonlFile, 
 	return result, rows.Err()
 }
 
-// migrate_message ensures message import is used
+// migrate_message ensures message import is used.
 var _ = message.Message{}

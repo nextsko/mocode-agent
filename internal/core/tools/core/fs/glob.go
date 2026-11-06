@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/search"
+	searchcommon "github.com/nextsko/mocode-agent/internal/core/tools/external/common/search"
 
 	"charm.land/fantasy"
 

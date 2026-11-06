@@ -13,11 +13,11 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 
 	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/core/tools"
 	"github.com/nextsko/mocode-agent/internal/ui/common"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
 	"github.com/nextsko/mocode-agent/internal/util/ext"
 	"github.com/nextsko/mocode-agent/internal/util/fsext"
-	"github.com/nextsko/mocode-agent/internal/core/tools"
 )
 
 // PermissionsID is the identifier for the permissions dialog.

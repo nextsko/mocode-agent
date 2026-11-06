@@ -14,8 +14,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
-	"github.com/nextsko/mocode-agent/internal/ui/common"
 	mcptools "github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
+	"github.com/nextsko/mocode-agent/internal/ui/common"
 )
 
 const MCPID = "mcp"
@@ -156,11 +156,12 @@ func (m *MCP) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	rc.TitleInfo = titleInfo
 	rc.Gap = 1
 	rc.AddPart(m.tabs(innerWidth))
-	if m.view == mcpPanelDetails {
+	switch m.view {
+	case mcpPanelDetails:
 		rc.AddPart(m.detailsView(innerWidth, listHeight))
-	} else if m.view == mcpPanelTools {
+	case mcpPanelTools:
 		rc.AddPart(m.toolsView(innerWidth, listHeight))
-	} else {
+	default:
 		rc.AddPart(m.serversView(innerWidth, listHeight))
 	}
 	rc.Help = m.help.View(m)
@@ -177,11 +178,12 @@ func (m *MCP) tabs(width int) string {
 	serversTab := t.Radio.Off.Padding(0, 1).Render() + t.Radio.Label.Render("Servers")
 	detailsTab := t.Radio.Off.Padding(0, 1).Render() + t.Radio.Label.Render("Details")
 	toolsTab := t.Radio.Off.Padding(0, 1).Render() + t.Radio.Label.Render("Tools")
-	if m.view == mcpPanelServers {
+	switch m.view {
+	case mcpPanelServers:
 		serversTab = t.Radio.On.Padding(0, 1).Render() + t.Radio.Label.Render("Servers")
-	} else if m.view == mcpPanelDetails {
+	case mcpPanelDetails:
 		detailsTab = t.Radio.On.Padding(0, 1).Render() + t.Radio.Label.Render("Details")
-	} else {
+	default:
 		toolsTab = t.Radio.On.Padding(0, 1).Render() + t.Radio.Label.Render("Tools")
 	}
 	line := serversTab + " " + detailsTab + " " + toolsTab

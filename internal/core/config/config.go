@@ -485,7 +485,7 @@ func (c *Config) EnabledProviders() []ProviderConfig {
 	return enabled
 }
 
-// IsConfigured  return true if at least one provider is configured
+// IsConfigured  return true if at least one provider is configured.
 func (c *Config) IsConfigured() bool {
 	return len(c.EnabledProviders()) > 0
 }

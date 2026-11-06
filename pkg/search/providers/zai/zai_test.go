@@ -676,7 +676,8 @@ func TestSessionReuseAndRebuild(t *testing.T) {
 
 	search := func() error {
 		_, err := p.Search(context.Background(), search.SearchParams{
-			Query: "q", AuthStorage: broker})
+			Query: "q", AuthStorage: broker,
+		})
 		return err
 	}
 
@@ -708,10 +709,12 @@ func TestSessionCredentialSwitchReconnects(t *testing.T) {
 	p := newProvider(srv.Client(), srv.URL)
 
 	_, err := p.Search(context.Background(), search.SearchParams{
-		Query: "q", AuthStorage: stubBroker{key: "k1"}})
+		Query: "q", AuthStorage: stubBroker{key: "k1"},
+	})
 	require.NoError(t, err)
 	_, err = p.Search(context.Background(), search.SearchParams{
-		Query: "q", AuthStorage: stubBroker{key: "k2"}})
+		Query: "q", AuthStorage: stubBroker{key: "k2"},
+	})
 	require.NoError(t, err)
 
 	require.Equal(t, 2, mock.countMethod("initialize"),
@@ -826,21 +829,29 @@ func TestIsArgumentError(t *testing.T) {
 		want bool
 	}{
 		{"status 400", &search.SearchProviderError{
-			HTTPStatus: 400}, true},
+			HTTPStatus: 400,
+		}, true},
 		{"invalid keyword", &search.SearchProviderError{
-			Message: "Invalid params"}, true},
+			Message: "Invalid params",
+		}, true},
 		{"argument keyword", &search.SearchProviderError{
-			Message: "unknown argument"}, true},
+			Message: "unknown argument",
+		}, true},
 		{"search_query keyword", &search.SearchProviderError{
-			Message: "missing search_query"}, true},
+			Message: "missing search_query",
+		}, true},
 		{"query keyword", &search.SearchProviderError{
-			Message: "query field rejected"}, true},
+			Message: "query field rejected",
+		}, true},
 		{"keyword matching is lowercase", &search.SearchProviderError{
-			Message: "INVALID"}, true},
+			Message: "INVALID",
+		}, true},
 		{"rate limited", &search.SearchProviderError{
-			HTTPStatus: 429, Message: "rate limit"}, false},
+			HTTPStatus: 429, Message: "rate limit",
+		}, false},
 		{"unauthorized", &search.SearchProviderError{
-			HTTPStatus: 401, Message: "unauthorized"}, false},
+			HTTPStatus: 401, Message: "unauthorized",
+		}, false},
 		{"plain error", errors.New("boom"), false},
 	}
 	for _, tc := range cases {
@@ -859,8 +870,10 @@ func TestToSources(t *testing.T) {
 	t.Parallel()
 	recent := time.Now().UTC().Add(-2 * time.Hour).Format(time.RFC3339)
 	results := []zaiResult{
-		{Title: "A", Link: "https://a", URL: "https://ignored",
-			Content: "ca", Media: "ma", PublishDate: recent},
+		{
+			Title: "A", Link: "https://a", URL: "https://ignored",
+			Content: "ca", Media: "ma", PublishDate: recent,
+		},
 		{Title: "", URL: "https://b", PublishedDate: "2024-01-02"},
 		{Title: "NoLink", Content: "dropped"},
 		{Link: "   ", URL: "  ", Title: "BlankValues", Content: "x"},
@@ -909,7 +922,8 @@ func TestClassifyZAIHTTP(t *testing.T) {
 func TestMapZAIError(t *testing.T) {
 	t.Parallel()
 	spe, ok := mapZAIError(&zaiHTTPError{
-		Status: http.StatusUnauthorized, Body: ""}).(*search.SearchProviderError)
+		Status: http.StatusUnauthorized, Body: "",
+	}).(*search.SearchProviderError)
 	require.True(t, ok)
 	require.Equal(t, search.ErrorCodeUnauthorized, spe.Code)
 

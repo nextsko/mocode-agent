@@ -545,7 +545,7 @@ func NewBashTool(permissions permission.Service, workingDir string, attribution 
 	)
 }
 
-// formatOutput formats the output of a completed command with error handling
+// formatOutput formats the output of a completed command with error handling.
 func formatOutput(stdout, stderr string, execErr error) string {
 	interrupted := shell.IsInterrupt(execErr)
 	exitCode := shell.ExitCode(execErr)

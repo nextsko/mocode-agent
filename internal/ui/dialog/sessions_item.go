@@ -57,19 +57,19 @@ func (s *SessionItem) SetMatch(m fuzzy.Match) {
 	s.m = m
 }
 
-// InputValue returns the updated title value
+// InputValue returns the updated title value.
 func (s *SessionItem) InputValue() string {
 	return s.updateTitleInput.Value()
 }
 
-// HandleInput forwards input message to the update title input
+// HandleInput forwards input message to the update title input.
 func (s *SessionItem) HandleInput(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
 	s.updateTitleInput, cmd = s.updateTitleInput.Update(msg)
 	return cmd
 }
 
-// Cursor returns the cursor of the update title input
+// Cursor returns the cursor of the update title input.
 func (s *SessionItem) Cursor() *tea.Cursor {
 	return s.updateTitleInput.Cursor()
 }

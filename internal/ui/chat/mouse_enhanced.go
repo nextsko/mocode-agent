@@ -9,13 +9,13 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Position 表示位置
+// Position 表示位置.
 type Position struct {
 	X int
 	Y int
 }
 
-// URLInfo 表示检测到的 URL
+// URLInfo 表示检测到的 URL.
 type URLInfo struct {
 	URL   string
 	Start int
@@ -24,7 +24,7 @@ type URLInfo struct {
 	Col   int
 }
 
-// Selection 表示文本选择
+// Selection 表示文本选择.
 type Selection struct {
 	Start     Position
 	End       Position
@@ -32,7 +32,7 @@ type Selection struct {
 	StartTime time.Time
 }
 
-// EnhancedMouseHandler 增强的鼠标处理器
+// EnhancedMouseHandler 增强的鼠标处理器.
 type EnhancedMouseHandler struct {
 	// URL 悬停
 	hoveredURL *URLInfo
@@ -54,7 +54,7 @@ type EnhancedMouseHandler struct {
 	enabled bool
 }
 
-// NewEnhancedMouseHandler 创建增强的鼠标处理器
+// NewEnhancedMouseHandler 创建增强的鼠标处理器.
 func NewEnhancedMouseHandler() *EnhancedMouseHandler {
 	return &EnhancedMouseHandler{
 		enabled: true,
@@ -64,12 +64,12 @@ func NewEnhancedMouseHandler() *EnhancedMouseHandler {
 	}
 }
 
-// SetEnabled 设置是否启用
+// SetEnabled 设置是否启用.
 func (h *EnhancedMouseHandler) SetEnabled(enabled bool) {
 	h.enabled = enabled
 }
 
-// HandleMouseClick 处理鼠标点击
+// HandleMouseClick 处理鼠标点击.
 func (h *EnhancedMouseHandler) HandleMouseClick(btn ansi.MouseButton, x, y int) tea.Cmd {
 	if !h.enabled {
 		return nil
@@ -105,7 +105,7 @@ func (h *EnhancedMouseHandler) HandleMouseClick(btn ansi.MouseButton, x, y int) 
 	return nil
 }
 
-// HandleMouseMotion 处理鼠标移动
+// HandleMouseMotion 处理鼠标移动.
 func (h *EnhancedMouseHandler) HandleMouseMotion(x, y int) {
 	if !h.enabled {
 		return
@@ -120,7 +120,7 @@ func (h *EnhancedMouseHandler) HandleMouseMotion(x, y int) {
 	}
 }
 
-// HandleMouseDrag 处理鼠标拖拽
+// HandleMouseDrag 处理鼠标拖拽.
 func (h *EnhancedMouseHandler) HandleMouseDrag(x, y int) {
 	if !h.enabled {
 		return
@@ -133,7 +133,7 @@ func (h *EnhancedMouseHandler) HandleMouseDrag(x, y int) {
 	h.dragEnd = Position{X: x, Y: y}
 }
 
-// HandleMouseUp 处理鼠标释放
+// HandleMouseUp 处理鼠标释放.
 func (h *EnhancedMouseHandler) HandleMouseUp(x, y int) {
 	if !h.enabled {
 		return
@@ -145,7 +145,7 @@ func (h *EnhancedMouseHandler) HandleMouseUp(x, y int) {
 	}
 }
 
-// handleSingleClick 处理单击
+// handleSingleClick 处理单击.
 func (h *EnhancedMouseHandler) handleSingleClick(x, y int) tea.Cmd {
 	// 检查是否点击了 URL
 	if h.hoveredURL != nil {
@@ -156,7 +156,7 @@ func (h *EnhancedMouseHandler) handleSingleClick(x, y int) tea.Cmd {
 	return h.toggleExpand(x, y)
 }
 
-// handleDoubleClick 处理双击
+// handleDoubleClick 处理双击.
 func (h *EnhancedMouseHandler) handleDoubleClick(x, y int) tea.Cmd {
 	// 选择单词
 	word := h.getWordAt(x, y)
@@ -172,7 +172,7 @@ func (h *EnhancedMouseHandler) handleDoubleClick(x, y int) tea.Cmd {
 	return nil
 }
 
-// handleTripleClick 处理三击
+// handleTripleClick 处理三击.
 func (h *EnhancedMouseHandler) handleTripleClick(x, y int) tea.Cmd {
 	// 选择行
 	line := h.getLineAt(y)
@@ -188,7 +188,7 @@ func (h *EnhancedMouseHandler) handleTripleClick(x, y int) tea.Cmd {
 	return nil
 }
 
-// updateSelection 更新选择区域
+// updateSelection 更新选择区域.
 func (h *EnhancedMouseHandler) updateSelection() {
 	if h.dragStart.Y == h.dragEnd.Y {
 		// 单行选择
@@ -213,7 +213,7 @@ func (h *EnhancedMouseHandler) updateSelection() {
 	}
 }
 
-// isInURL 检查位置是否在 URL 上
+// isInURL 检查位置是否在 URL 上.
 func (h *EnhancedMouseHandler) isInURL(x, y int) bool {
 	if h.hoveredURL == nil {
 		return false
@@ -221,31 +221,31 @@ func (h *EnhancedMouseHandler) isInURL(x, y int) bool {
 	return y == h.hoveredURL.Line && x >= h.hoveredURL.Col && x <= h.hoveredURL.Col+len(h.hoveredURL.URL)
 }
 
-// getWordAt 获取指定位置的单词
+// getWordAt 获取指定位置的单词.
 func (h *EnhancedMouseHandler) getWordAt(x, y int) string {
 	// TODO: 实现从内容中获取单词
 	return ""
 }
 
-// getLineAt 获取指定行的内容
+// getLineAt 获取指定行的内容.
 func (h *EnhancedMouseHandler) getLineAt(y int) string {
 	// TODO: 实现从内容中获取行
 	return ""
 }
 
-// getTextBetween 获取两个位置之间的文本
+// getTextBetween 获取两个位置之间的文本.
 func (h *EnhancedMouseHandler) getTextBetween(y, startX, endX int) string {
 	// TODO: 实现从内容中获取文本
 	return ""
 }
 
-// getTextBetweenLines 获取两行之间的文本
+// getTextBetweenLines 获取两行之间的文本.
 func (h *EnhancedMouseHandler) getTextBetweenLines(startY, endY int) string {
 	// TODO: 实现从内容中获取多行文本
 	return ""
 }
 
-// openURL 打开 URL
+// openURL 打开 URL.
 func (h *EnhancedMouseHandler) openURL(url string) tea.Cmd {
 	return func() tea.Msg {
 		// TODO: 实现打开 URL
@@ -253,7 +253,7 @@ func (h *EnhancedMouseHandler) openURL(url string) tea.Cmd {
 	}
 }
 
-// toggleExpand 切换展开/折叠
+// toggleExpand 切换展开/折叠.
 func (h *EnhancedMouseHandler) toggleExpand(x, y int) tea.Cmd {
 	return func() tea.Msg {
 		// TODO: 实现展开/折叠
@@ -261,7 +261,7 @@ func (h *EnhancedMouseHandler) toggleExpand(x, y int) tea.Cmd {
 	}
 }
 
-// copyToClipboard 复制到剪贴板
+// copyToClipboard 复制到剪贴板.
 func (h *EnhancedMouseHandler) copyToClipboard(content string) tea.Cmd {
 	return func() tea.Msg {
 		// TODO: 实现复制到剪贴板
@@ -269,42 +269,42 @@ func (h *EnhancedMouseHandler) copyToClipboard(content string) tea.Cmd {
 	}
 }
 
-// GetHoveredURL 获取悬停的 URL
+// GetHoveredURL 获取悬停的 URL.
 func (h *EnhancedMouseHandler) GetHoveredURL() *URLInfo {
 	return h.hoveredURL
 }
 
-// SetHoveredURL 设置悬停的 URL
+// SetHoveredURL 设置悬停的 URL.
 func (h *EnhancedMouseHandler) SetHoveredURL(url *URLInfo) {
 	h.hoveredURL = url
 }
 
-// GetSelection 获取当前选择
+// GetSelection 获取当前选择.
 func (h *EnhancedMouseHandler) GetSelection() *Selection {
 	return h.selection
 }
 
-// ClearSelection 清除选择
+// ClearSelection 清除选择.
 func (h *EnhancedMouseHandler) ClearSelection() {
 	h.selection = nil
 }
 
-// IsDragging 是否正在拖拽
+// IsDragging 是否正在拖拽.
 func (h *EnhancedMouseHandler) IsDragging() bool {
 	return h.isDragging
 }
 
-// GetDragStart 获取拖拽起点
+// GetDragStart 获取拖拽起点.
 func (h *EnhancedMouseHandler) GetDragStart() Position {
 	return h.dragStart
 }
 
-// GetDragEnd 获取拖拽终点
+// GetDragEnd 获取拖拽终点.
 func (h *EnhancedMouseHandler) GetDragEnd() Position {
 	return h.dragEnd
 }
 
-// RenderSelection 渲染选择区域
+// RenderSelection 渲染选择区域.
 func (h *EnhancedMouseHandler) RenderSelection(content string, width int) string {
 	if h.selection == nil {
 		return content
@@ -358,7 +358,7 @@ func (h *EnhancedMouseHandler) RenderSelection(content string, width int) string
 	return strings.Join(result, "\n")
 }
 
-// abs 返回绝对值
+// abs 返回绝对值.
 func abs(x int) int {
 	if x < 0 {
 		return -x
@@ -366,7 +366,7 @@ func abs(x int) int {
 	return x
 }
 
-// min 返回两个数中的较小值
+// min 返回两个数中的较小值.
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -374,7 +374,7 @@ func min(a, b int) int {
 	return b
 }
 
-// max 返回两个数中的较大值
+// max 返回两个数中的较大值.
 func max(a, b int) int {
 	if a > b {
 		return a

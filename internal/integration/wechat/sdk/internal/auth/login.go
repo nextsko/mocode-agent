@@ -22,7 +22,7 @@ type Credentials struct {
 	SavedAt   string `json:"savedAt,omitempty"`
 }
 
-// DefaultCredPath returns ~/.wechatbot/credentials.json
+// DefaultCredPath returns ~/.wechatbot/credentials.json.
 func DefaultCredPath() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".wechatbot", "credentials.json")

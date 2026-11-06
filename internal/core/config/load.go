@@ -218,7 +218,7 @@ func (c *Config) setDefaults(workingDir string) {
 	c.Options.InitializeAs = cmp.Or(c.Options.InitializeAs, defaultInitializeAs)
 }
 
-// applyLSPDefaults applies default values from powernap to LSP configurations
+// applyLSPDefaults applies default values from powernap to LSP configurations.
 func (c *Config) applyLSPDefaults() {
 	// Get powernap's default configuration
 	configManager := powernapConfig.NewManager()

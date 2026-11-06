@@ -57,7 +57,7 @@ type Logger struct {
 }
 
 // NewLogger creates a logger for the given session.
-// baseDir is typically infra.SessionLogsDir()/
+// baseDir is typically infra.SessionLogsDir()/.
 func NewLogger(baseDir, sessionID string) (*Logger, error) {
 	dir := filepath.Join(baseDir, sessionID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -167,7 +167,7 @@ func (l *Logger) getFile(cat string) (*os.File, error) {
 	// repeat every time we open an existing file in O_APPEND mode.
 	info, err := f.Stat()
 	if err == nil && info.Size() == 0 {
-		f.WriteString(fmt.Sprintf("# %s\n\n", catName(cat)))
+		fmt.Fprintf(f, "# %s\n\n", catName(cat))
 	}
 	l.files[cat] = f
 	return f, nil

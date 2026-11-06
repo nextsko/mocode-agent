@@ -289,9 +289,9 @@ func (c *Coordinator) runSubAgentParallel(ctx context.Context, params subAgentBa
 		if agentName == "" {
 			agentName = config.AgentTask
 		}
-		out.WriteString(fmt.Sprintf("\n## %s [%s]\n\n", label, agentName))
+		fmt.Fprintf(&out, "\n## %s [%s]\n\n", label, agentName)
 		if e.err != "" {
-			out.WriteString(fmt.Sprintf("**error**: %s\n", e.err))
+			fmt.Fprintf(&out, "**error**: %s\n", e.err)
 		} else if e.result != "" {
 			out.WriteString(e.result)
 			out.WriteString("\n")
@@ -499,7 +499,7 @@ func (c *Coordinator) runSubAgentDAG(ctx context.Context, params subAgentBatchPa
 		default:
 			status = "✅"
 		}
-		out.WriteString(fmt.Sprintf("\n## %s %s [%s]\n\n", status, t.ID, agentName))
+		fmt.Fprintf(&out, "\n## %s %s [%s]\n\n", status, t.ID, agentName)
 		if results[i] != "" {
 			out.WriteString(results[i])
 			out.WriteString("\n")

@@ -31,7 +31,7 @@ func handleSleep(ctx context.Context, args []string, stderr io.Writer) error {
 	if len(args) < 2 {
 		fmt.Fprintln(stderr, "sleep: missing operand")
 		fmt.Fprint(stderr, sleepUsage)
-		return interp.NewExitStatus(1)
+		return error(interp.ExitStatus(uint8(1)))
 	}
 
 	var total time.Duration
@@ -43,7 +43,7 @@ func handleSleep(ctx context.Context, args []string, stderr io.Writer) error {
 		d, err := parseSleepDuration(arg)
 		if err != nil {
 			fmt.Fprintf(stderr, "sleep: invalid time interval %q\n", arg)
-			return interp.NewExitStatus(1)
+			return error(interp.ExitStatus(uint8(1)))
 		}
 		total += d
 	}

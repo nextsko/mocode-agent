@@ -32,7 +32,7 @@ var (
 	providerErr  error
 )
 
-// file to cache provider data
+// file to cache provider data.
 func cachePathFor(name string) string {
 	xdgDataHome := os.Getenv("XDG_DATA_HOME")
 	if xdgDataHome != "" {

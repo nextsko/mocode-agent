@@ -11,7 +11,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 )
 
-// setSessionMessages sets the messages for the current session in the chat
+// setSessionMessages sets the messages for the current session in the chat.
 func (m *UI) setSessionMessages(msgs []message.Message) tea.Cmd {
 	var cmds []tea.Cmd
 	// Build tool result map to link tool calls with their results
@@ -131,7 +131,7 @@ func (m *UI) reloadNestedToolsForItem(toolItem chat.ToolMessageItem) {
 }
 
 // appendSessionMessage appends a new message to the current session in the chat
-// if the message is a tool result it will update the corresponding tool call message
+// if the message is a tool result it will update the corresponding tool call message.
 func (m *UI) appendSessionMessage(msg message.Message) tea.Cmd {
 	var cmds []tea.Cmd
 

@@ -4,7 +4,6 @@ package wechat
 import (
 	"os"
 	"path/filepath"
-
 	"sync"
 	"time"
 

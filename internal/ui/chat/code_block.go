@@ -8,7 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// CodeBlock 表示一个代码块
+// CodeBlock 表示一个代码块.
 type CodeBlock struct {
 	Language  string
 	Content   string
@@ -19,7 +19,7 @@ type CodeBlock struct {
 	Index     int
 }
 
-// CodeBlockRenderer 渲染代码块
+// CodeBlockRenderer 渲染代码块.
 type CodeBlockRenderer struct {
 	blocks    []CodeBlock
 	clipboard string
@@ -27,7 +27,7 @@ type CodeBlockRenderer struct {
 	style     CodeBlockStyle
 }
 
-// CodeBlockStyle 代码块样式
+// CodeBlockStyle 代码块样式.
 type CodeBlockStyle struct {
 	HeaderStyle   lipgloss.Style
 	LangStyle     lipgloss.Style
@@ -38,7 +38,7 @@ type CodeBlockStyle struct {
 	BorderStyle   lipgloss.Style
 }
 
-// DefaultCodeBlockStyle 返回默认样式
+// DefaultCodeBlockStyle 返回默认样式.
 func DefaultCodeBlockStyle() CodeBlockStyle {
 	return CodeBlockStyle{
 		HeaderStyle: lipgloss.NewStyle().
@@ -64,7 +64,7 @@ func DefaultCodeBlockStyle() CodeBlockStyle {
 	}
 }
 
-// NewCodeBlockRenderer 创建代码块渲染器
+// NewCodeBlockRenderer 创建代码块渲染器.
 func NewCodeBlockRenderer() *CodeBlockRenderer {
 	return &CodeBlockRenderer{
 		style: DefaultCodeBlockStyle(),
@@ -72,18 +72,18 @@ func NewCodeBlockRenderer() *CodeBlockRenderer {
 	}
 }
 
-// SetWidth 设置渲染宽度
+// SetWidth 设置渲染宽度.
 func (r *CodeBlockRenderer) SetWidth(width int) {
 	r.width = width
 }
 
-// AddBlock 添加代码块
+// AddBlock 添加代码块.
 func (r *CodeBlockRenderer) AddBlock(block CodeBlock) {
 	block.Index = len(r.blocks)
 	r.blocks = append(r.blocks, block)
 }
 
-// Render 渲染代码块
+// Render 渲染代码块.
 func (r *CodeBlockRenderer) Render(block CodeBlock) string {
 	// 语言标签
 	langLabel := ""
@@ -131,13 +131,13 @@ func (r *CodeBlockRenderer) Render(block CodeBlock) string {
 	return lipgloss.JoinVertical(lipgloss.Left, header, renderedContent)
 }
 
-// canCollapse 检查是否可以折叠
+// canCollapse 检查是否可以折叠.
 func (r *CodeBlockRenderer) canCollapse(block CodeBlock) bool {
 	lines := strings.Split(block.Content, "\n")
 	return len(lines) > 5
 }
 
-// collapseContent 折叠内容
+// collapseContent 折叠内容.
 func (r *CodeBlockRenderer) collapseContent(content string) string {
 	lines := strings.Split(content, "\n")
 	if len(lines) <= 5 {
@@ -152,7 +152,7 @@ func (r *CodeBlockRenderer) collapseContent(content string) string {
 	return result
 }
 
-// HandleClick 处理点击事件
+// HandleClick 处理点击事件.
 func (r *CodeBlockRenderer) HandleClick(blockIdx int, x, y int) tea.Cmd {
 	if blockIdx < 0 || blockIdx >= len(r.blocks) {
 		return nil
@@ -171,21 +171,21 @@ func (r *CodeBlockRenderer) HandleClick(blockIdx int, x, y int) tea.Cmd {
 	return nil
 }
 
-// isCopyButtonClick 检测是否点击了复制按钮
+// isCopyButtonClick 检测是否点击了复制按钮.
 func (r *CodeBlockRenderer) isCopyButtonClick(blockIdx int, x, y int) bool {
 	// 简化实现：假设复制按钮在头部右侧
 	// 实际实现需要根据布局计算位置
 	return false
 }
 
-// isCollapseClick 检测是否点击了折叠/展开按钮
+// isCollapseClick 检测是否点击了折叠/展开按钮.
 func (r *CodeBlockRenderer) isCollapseClick(blockIdx int, x, y int) bool {
 	// 简化实现：假设折叠按钮在头部右侧
 	// 实际实现需要根据布局计算位置
 	return false
 }
 
-// copyToClipboard 复制到剪贴板
+// copyToClipboard 复制到剪贴板.
 func (r *CodeBlockRenderer) copyToClipboard(blockIdx int) tea.Cmd {
 	if blockIdx < 0 || blockIdx >= len(r.blocks) {
 		return nil
@@ -203,7 +203,7 @@ func (r *CodeBlockRenderer) copyToClipboard(blockIdx int) tea.Cmd {
 	}
 }
 
-// toggleCollapse 切换折叠/展开
+// toggleCollapse 切换折叠/展开.
 func (r *CodeBlockRenderer) toggleCollapse(blockIdx int) tea.Cmd {
 	if blockIdx < 0 || blockIdx >= len(r.blocks) {
 		return nil
@@ -220,12 +220,12 @@ func (r *CodeBlockRenderer) toggleCollapse(blockIdx int) tea.Cmd {
 	}
 }
 
-// GetBlocks 获取所有代码块
+// GetBlocks 获取所有代码块.
 func (r *CodeBlockRenderer) GetBlocks() []CodeBlock {
 	return r.blocks
 }
 
-// GetBlock 获取指定代码块
+// GetBlock 获取指定代码块.
 func (r *CodeBlockRenderer) GetBlock(index int) *CodeBlock {
 	if index < 0 || index >= len(r.blocks) {
 		return nil
@@ -233,29 +233,29 @@ func (r *CodeBlockRenderer) GetBlock(index int) *CodeBlock {
 	return &r.blocks[index]
 }
 
-// ClearBlocks 清空代码块
+// ClearBlocks 清空代码块.
 func (r *CodeBlockRenderer) ClearBlocks() {
 	r.blocks = nil
 }
 
-// GetClipboard 获取剪贴板内容
+// GetClipboard 获取剪贴板内容.
 func (r *CodeBlockRenderer) GetClipboard() string {
 	return r.clipboard
 }
 
-// CodeBlockCopiedMsg 代码块复制消息
+// CodeBlockCopiedMsg 代码块复制消息.
 type CodeBlockCopiedMsg struct {
 	BlockIndex int
 	Content    string
 }
 
-// CodeBlockToggledMsg 代码块折叠/展开消息
+// CodeBlockToggledMsg 代码块折叠/展开消息.
 type CodeBlockToggledMsg struct {
 	BlockIndex int
 	Collapsed  bool
 }
 
-// DetectLanguage 检测代码语言
+// DetectLanguage 检测代码语言.
 func DetectLanguage(content string) string {
 	// 简单的语言检测
 	content = strings.TrimSpace(content)
@@ -299,7 +299,7 @@ func DetectLanguage(content string) string {
 	return ""
 }
 
-// FormatCodeBlock 格式化代码块
+// FormatCodeBlock 格式化代码块.
 func FormatCodeBlock(content string, language string) string {
 	if language == "" {
 		language = DetectLanguage(content)

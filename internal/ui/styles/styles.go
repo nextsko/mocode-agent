@@ -150,16 +150,16 @@ type Styles struct {
 		// (crush-compatible AskUser components).
 		PromptQuestionIconFocused lipgloss.Style
 		PromptQuestionIconBlurred lipgloss.Style
-		QuestionSelected         lipgloss.Style // Active choice text.
-		QuestionUnselected       lipgloss.Style // Inactive header text.
-		QuestionBody             lipgloss.Style // Description/body text.
-		QuestionConfirm          lipgloss.Style // Confirm tab title.
-		QuestionNote             lipgloss.Style // Saved note text.
-		QuestionCursorBar        lipgloss.Style // Active cursor indicator bar.
-		QuestionRadioOn          lipgloss.Style
-		QuestionRadioOff         lipgloss.Style
-		QuestionCheckOn          lipgloss.Style
-		QuestionCheckOff         lipgloss.Style
+		QuestionSelected          lipgloss.Style // Active choice text.
+		QuestionUnselected        lipgloss.Style // Inactive header text.
+		QuestionBody              lipgloss.Style // Description/body text.
+		QuestionConfirm           lipgloss.Style // Confirm tab title.
+		QuestionNote              lipgloss.Style // Saved note text.
+		QuestionCursorBar         lipgloss.Style // Active cursor indicator bar.
+		QuestionRadioOn           lipgloss.Style
+		QuestionRadioOff          lipgloss.Style
+		QuestionCheckOn           lipgloss.Style
+		QuestionCheckOff          lipgloss.Style
 	}
 
 	// Radio

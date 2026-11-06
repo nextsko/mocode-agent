@@ -147,7 +147,7 @@ func BuildSummaryPrompt(todos []session.Todo) string {
 				inProgress++
 			}
 		}
-		sb.WriteString(fmt.Sprintf("\n\n## 当前 Todo 状态\n\n- pending: %d\n- in_progress: %d\n", pending, inProgress))
+		fmt.Fprintf(&sb, "\n\n## 当前 Todo 状态\n\n- pending: %d\n- in_progress: %d\n", pending, inProgress)
 		sb.WriteString("\n### 详情\n\n")
 		for _, t := range todos {
 			fmt.Fprintf(&sb, "- [%s] %s\n", t.Status, t.Content)

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/search"
+	searchcommon "github.com/nextsko/mocode-agent/internal/core/tools/external/common/search"
 
 	"charm.land/fantasy"
 
@@ -45,7 +45,7 @@ const (
 //go:embed grep.md
 var grepDescription []byte
 
-// escapeRegexPattern escapes special regex characters so they're treated as literal characters
+// escapeRegexPattern escapes special regex characters so they're treated as literal characters.
 func escapeRegexPattern(pattern string) string {
 	return searchcommon.EscapeRegexPattern(pattern)
 }

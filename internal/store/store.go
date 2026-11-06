@@ -133,7 +133,7 @@ func globalStoreDir() string {
 }
 
 // projectDirName returns the directory-safe project identifier.
-// Format: <base>_<xxh3-hex-prefix8>
+// Format: <base>_<xxh3-hex-prefix8>.
 func projectDirName(projectPath string) string {
 	base := filepath.Base(projectPath)
 	base = sanitize(base)

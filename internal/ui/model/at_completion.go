@@ -11,13 +11,13 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/nextsko/mocode-agent/internal/core/skills"
+	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/common"
 	"github.com/nextsko/mocode-agent/internal/ui/completions"
 	"github.com/nextsko/mocode-agent/internal/ui/slash"
 	"github.com/nextsko/mocode-agent/internal/util/fsext"
 	"github.com/nextsko/mocode-agent/internal/util/infra"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 )
 
 func (m *UI) openAtCompletions(depth, limit int) tea.Cmd {
@@ -81,9 +81,7 @@ func (m *UI) atMCPItems() []completions.AtCompletionValue {
 			})
 		}
 	}
-	for _, prompt := range m.mcpPromptItems() {
-		items = append(items, prompt)
-	}
+	items = append(items, m.mcpPromptItems()...)
 	return items
 }
 

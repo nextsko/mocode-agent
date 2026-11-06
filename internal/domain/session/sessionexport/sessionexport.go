@@ -169,7 +169,7 @@ func RenderMarkdown(sessionID string, messages []message.Message, now time.Time)
 	b.WriteString("\"\n")
 	b.WriteString("exported_at: \"" + now.Format(time.RFC3339) + "\"\n")
 	b.WriteString("message_count: ")
-	b.WriteString(fmt.Sprintf("%d\n", len(messages)))
+	fmt.Fprintf(&b, "%d\n", len(messages))
 	b.WriteString("---\n\n")
 	b.WriteString("# Session Export\n\n")
 	for _, msg := range messages {

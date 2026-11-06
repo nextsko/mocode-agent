@@ -35,7 +35,7 @@ func NewThinkTool() fantasy.AgentTool {
 		ThinkToolName,
 		toolutil.FirstLineDescription(thinkDescription),
 		func(_ context.Context, params ThinkParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			meta := ThinkResponseMetadata{Thought: params.Thought}
+			meta := ThinkResponseMetadata(params)
 			return fantasy.WithResponseMetadata(
 				fantasy.NewTextResponse(params.Thought),
 				meta,

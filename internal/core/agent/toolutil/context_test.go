@@ -17,12 +17,15 @@ type recordingSink struct {
 func (r *recordingSink) LogToolCall(event, data string, _ SessionLogMeta) {
 	r.toolCalls = append(r.toolCalls, event+": "+data)
 }
+
 func (r *recordingSink) LogThink(event, data string, _ SessionLogMeta) {
 	r.thinks = append(r.thinks, event+": "+data)
 }
+
 func (r *recordingSink) LogBug(event, data string, _ SessionLogMeta) {
 	r.bugs = append(r.bugs, event+": "+data)
 }
+
 func (r *recordingSink) LogInfo(event, data string, _ SessionLogMeta) {
 	r.infos = append(r.infos, event+": "+data)
 }

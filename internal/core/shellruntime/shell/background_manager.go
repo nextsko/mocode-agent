@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	// MaxBackgroundJobs is the maximum number of concurrent background jobs allowed
+	// MaxBackgroundJobs is the maximum number of concurrent background jobs allowed.
 	MaxBackgroundJobs = 50
-	// CompletedJobRetentionMinutes is how long to keep completed jobs before auto-cleanup (8 hours)
+	// CompletedJobRetentionMinutes is how long to keep completed jobs before auto-cleanup (8 hours).
 	CompletedJobRetentionMinutes = 8 * 60
 	// BackgroundKillGracePeriod is how long Kill waits for a cooperative shutdown
 	// before escalating or returning.
@@ -299,7 +299,7 @@ func (m *BackgroundShellManager) Statuses() []JobStatus {
 	return out
 }
 
-// Cleanup removes completed jobs that have been finished for more than the retention period
+// Cleanup removes completed jobs that have been finished for more than the retention period.
 func (m *BackgroundShellManager) Cleanup() int {
 	now := time.Now().Unix()
 	retentionSeconds := int64(CompletedJobRetentionMinutes * 60)

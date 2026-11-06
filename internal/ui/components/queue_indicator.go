@@ -8,7 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// QueueStatus 表示队列的当前状态
+// QueueStatus 表示队列的当前状态.
 type QueueStatus struct {
 	SteerDepth       int
 	SteerCapacity    int
@@ -16,10 +16,10 @@ type QueueStatus struct {
 	FollowupCapacity int
 }
 
-// QueueTickMsg 队列动画 tick 消息
+// QueueTickMsg 队列动画 tick 消息.
 type QueueTickMsg struct{}
 
-// QueueIndicator 显示消息队列状态
+// QueueIndicator 显示消息队列状态.
 type QueueIndicator struct {
 	steerDepth       int
 	steerCapacity    int
@@ -30,7 +30,7 @@ type QueueIndicator struct {
 	width            int
 }
 
-// NewQueueIndicator 创建队列指示器
+// NewQueueIndicator 创建队列指示器.
 func NewQueueIndicator() *QueueIndicator {
 	return &QueueIndicator{
 		visible: true,
@@ -38,17 +38,17 @@ func NewQueueIndicator() *QueueIndicator {
 	}
 }
 
-// SetWidth 设置指示器宽度
+// SetWidth 设置指示器宽度.
 func (q *QueueIndicator) SetWidth(width int) {
 	q.width = width
 }
 
-// SetVisible 设置可见性
+// SetVisible 设置可见性.
 func (q *QueueIndicator) SetVisible(visible bool) {
 	q.visible = visible
 }
 
-// Update 更新队列状态
+// Update 更新队列状态.
 func (q *QueueIndicator) Update(status QueueStatus) {
 	q.steerDepth = status.SteerDepth
 	q.steerCapacity = status.SteerCapacity
@@ -56,7 +56,7 @@ func (q *QueueIndicator) Update(status QueueStatus) {
 	q.followupCapacity = status.FollowupCapacity
 }
 
-// UpdateFromMsg 处理消息更新
+// UpdateFromMsg 处理消息更新.
 func (q *QueueIndicator) UpdateFromMsg(msg tea.Msg) tea.Cmd {
 	switch msg.(type) {
 	case QueueTickMsg:
@@ -69,12 +69,12 @@ func (q *QueueIndicator) UpdateFromMsg(msg tea.Msg) tea.Cmd {
 	return nil
 }
 
-// HasMessages 检查是否有待处理消息
+// HasMessages 检查是否有待处理消息.
 func (q *QueueIndicator) HasMessages() bool {
 	return q.steerDepth > 0 || q.followupDepth > 0
 }
 
-// View 渲染队列指示器
+// View 渲染队列指示器.
 func (q *QueueIndicator) View() string {
 	if !q.visible || !q.HasMessages() {
 		return ""
@@ -112,14 +112,14 @@ func (q *QueueIndicator) View() string {
 	return borderStyle.Render(result)
 }
 
-// Tick 启动动画 tick
+// Tick 启动动画 tick.
 func (q *QueueIndicator) Tick() tea.Cmd {
 	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
 		return QueueTickMsg{}
 	})
 }
 
-// StartAnimation 启动动画（如果有消息）
+// StartAnimation 启动动画（如果有消息）.
 func (q *QueueIndicator) StartAnimation() tea.Cmd {
 	if q.HasMessages() {
 		return q.Tick()
@@ -127,7 +127,7 @@ func (q *QueueIndicator) StartAnimation() tea.Cmd {
 	return nil
 }
 
-// Style 返回样式信息
+// Style 返回样式信息.
 type QueueIndicatorStyle struct {
 	SteerStyle    lipgloss.Style
 	FollowupStyle lipgloss.Style
@@ -135,7 +135,7 @@ type QueueIndicatorStyle struct {
 	Separator     string
 }
 
-// DefaultStyle 返回默认样式
+// DefaultStyle 返回默认样式.
 func DefaultQueueIndicatorStyle() QueueIndicatorStyle {
 	return QueueIndicatorStyle{
 		SteerStyle: lipgloss.NewStyle().

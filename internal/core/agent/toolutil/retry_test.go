@@ -31,7 +31,8 @@ func (s *stubTool) Run(_ context.Context, _ fantasy.ToolCall) (fantasy.ToolRespo
 	return fantasy.NewTextResponse("ok"), nil
 }
 
-func (s *stubTool) Info() fantasy.ToolInfo                       { return fantasy.ToolInfo{Name: "stub"} }
+func (s *stubTool) Info() fantasy.ToolInfo { return fantasy.ToolInfo{Name: "stub"} }
+
 func (s *stubTool) ProviderOptions() fantasy.ProviderOptions     { return fantasy.ProviderOptions{} }
 func (s *stubTool) SetProviderOptions(_ fantasy.ProviderOptions) {}
 

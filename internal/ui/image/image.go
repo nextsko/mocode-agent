@@ -251,9 +251,9 @@ func (e Encoding) Render(id string, cols, rows int) string {
 			fg = ansi.IndexedColor(b)
 		} else {
 			fg = color.RGBA{
-				R: uint8(r), //nolint:gosec
-				G: uint8(g), //nolint:gosec
-				B: uint8(b), //nolint:gosec
+				R: uint8(r),
+				G: uint8(g),
+				B: uint8(b),
 				A: 0xff,
 			}
 		}

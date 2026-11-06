@@ -18,7 +18,7 @@ import (
 // truncated.
 const assistantMessageTruncateFormat = "… (%d lines hidden) [click or space to expand]"
 
-// maxCollapsedThinkingHeight defines the maximum height of the thinking
+// maxCollapsedThinkingHeight defines the maximum height of the thinking.
 const maxCollapsedThinkingHeight = 10
 
 // AssistantMessageItem represents an assistant message in the chat UI.

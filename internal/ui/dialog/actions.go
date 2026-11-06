@@ -42,7 +42,7 @@ type ActionSelectModel struct {
 	ReAuthenticate bool
 }
 
-// Messages for commands
+// Messages for commands.
 type (
 	ActionNewSession                  struct{}
 	ActionToggleCompactMode           struct{}

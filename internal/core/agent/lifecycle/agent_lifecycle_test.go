@@ -244,9 +244,11 @@ func (m *scriptedModel) Model() string    { return "scripted-model" }
 func (m *scriptedModel) Generate(context.Context, fantasy.Call) (*fantasy.Response, error) {
 	return nil, errors.New("not implemented")
 }
+
 func (m *scriptedModel) GenerateObject(context.Context, fantasy.ObjectCall) (*fantasy.ObjectResponse, error) {
 	return nil, errors.New("not implemented")
 }
+
 func (m *scriptedModel) StreamObject(context.Context, fantasy.ObjectCall) (fantasy.ObjectStreamResponse, error) {
 	return nil, errors.New("not implemented")
 }

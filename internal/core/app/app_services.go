@@ -39,6 +39,7 @@ func newStoreHistoryService(st *store.Store) *storeHistoryService {
 func newStoreFileTrackerService(st *store.Store) *storeFileTrackerService {
 	return &storeFileTrackerService{store: st.Tracker()}
 }
+
 func (s *storeSessionService) Create(ctx context.Context, title string) (session.Session, error) {
 	sess, err := s.store.Create(ctx, title)
 	if err != nil {

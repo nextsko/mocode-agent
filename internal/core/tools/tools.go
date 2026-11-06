@@ -16,7 +16,7 @@ import (
 	fs "github.com/nextsko/mocode-agent/internal/core/tools/core/fs"
 	shell "github.com/nextsko/mocode-agent/internal/core/tools/core/shell"
 	web "github.com/nextsko/mocode-agent/internal/core/tools/core/web"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/net"
+	netcommon "github.com/nextsko/mocode-agent/internal/core/tools/external/common/net"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 	browsertool "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/browser"
 	gitops "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitops"

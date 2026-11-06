@@ -7,12 +7,12 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/nextsko/mocode-agent/internal/core/tools"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/common"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
 	"github.com/nextsko/mocode-agent/internal/util/anim"
 	"github.com/nextsko/mocode-agent/internal/util/ext"
-	"github.com/nextsko/mocode-agent/internal/core/tools"
 )
 
 func toolOutputPlainContent(sty *styles.Styles, content string, width int, expanded bool) string {

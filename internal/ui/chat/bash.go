@@ -9,9 +9,9 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/nextsko/mocode-agent/internal/core/tools"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
-	"github.com/nextsko/mocode-agent/internal/core/tools"
 )
 
 // -----------------------------------------------------------------------------
@@ -249,7 +249,7 @@ func renderJobPending(sty *styles.Styles, opts *ToolRenderOpts, width int, actio
 }
 
 // jobHeader builds a header for job-related tools.
-// Format: "● Job (Action) PID shellID description..."
+// Format: "● Job (Action) PID shellID description...".
 func jobHeader(sty *styles.Styles, status ToolStatus, action, shellID, description string, width int) string {
 	icon := toolIcon(sty, status)
 	jobPart := sty.Tool.JobToolName.Render("Job")

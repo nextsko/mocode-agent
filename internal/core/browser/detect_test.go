@@ -105,7 +105,7 @@ func (f fakeDirEntry) IsDir() bool       { return f.dir }
 func (f fakeDirEntry) Type() os.FileMode { return 0o755 }
 
 func (f fakeDirEntry) Info() (os.FileInfo, error) {
-	return fakeFileInfo{name: f.name, dir: f.dir}, nil
+	return fakeFileInfo(f), nil
 }
 
 func linuxHost() *fakeHost {

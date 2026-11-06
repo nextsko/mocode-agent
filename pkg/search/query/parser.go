@@ -113,9 +113,10 @@ func splitParens(tokens []rawToken) []rawToken {
 			body := text[:len(text)-1]
 			depth := 0
 			for _, c := range body {
-				if c == '(' {
+				switch c {
+				case '(':
 					depth++
-				} else if c == ')' {
+				case ')':
 					depth--
 				}
 			}

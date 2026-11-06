@@ -658,6 +658,6 @@ func TestMeta(t *testing.T) {
 	require.Positive(t, meta.Priority)
 	require.NotNil(t, meta.NewFunc)
 
-	var provider search.ProviderV2 = meta.NewFunc()
+	provider := meta.NewFunc()
 	require.Equal(t, ProviderID, provider.ID())
 }

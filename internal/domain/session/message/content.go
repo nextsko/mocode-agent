@@ -39,7 +39,7 @@ const (
 	FinishReasonCanceled  FinishReason = "canceled"
 	FinishReasonError     FinishReason = "error"
 
-	// Should never happen
+	// Should never happen.
 	FinishReasonUnknown FinishReason = "unknown"
 )
 

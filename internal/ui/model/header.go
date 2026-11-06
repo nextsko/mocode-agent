@@ -196,10 +196,10 @@ func shimmerHeaderText(t *styles.Styles, text string, frame int) string {
 		if dist < 0 {
 			dist = -dist
 		}
-		switch {
-		case dist == 0:
+		switch dist {
+		case 0:
 			b.WriteString(t.Header.Diagonals.Bold(true).Render(string(r)))
-		case dist == 1:
+		case 1:
 			b.WriteString(t.Header.Charm.Render(string(r)))
 		default:
 			b.WriteString(t.Header.Keystroke.Render(string(r)))

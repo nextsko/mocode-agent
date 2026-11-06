@@ -79,7 +79,7 @@ func getPrompts(ctx context.Context, c *ClientSession) ([]*Prompt, error) {
 	return result.Prompts, nil
 }
 
-// updatePrompts updates the global mcpPrompts and mcpClient2Prompts maps
+// updatePrompts updates the global mcpPrompts and mcpClient2Prompts maps.
 func updatePrompts(mcpName string, prompts []*Prompt) {
 	if len(prompts) == 0 {
 		allPrompts.Del(mcpName)

@@ -5,12 +5,12 @@ import (
 	"strings"
 )
 
-// URLDetector 检测文本中的 URL
+// URLDetector 检测文本中的 URL.
 type URLDetector struct {
 	patterns []*regexp.Regexp
 }
 
-// NewURLDetector 创建 URL 检测器
+// NewURLDetector 创建 URL 检测器.
 func NewURLDetector() *URLDetector {
 	return &URLDetector{
 		patterns: []*regexp.Regexp{
@@ -26,7 +26,7 @@ func NewURLDetector() *URLDetector {
 	}
 }
 
-// Detect 检测文本中的 URL
+// Detect 检测文本中的 URL.
 func (d *URLDetector) Detect(content string) []URLInfo {
 	var urls []URLInfo
 	seen := make(map[string]bool)
@@ -57,7 +57,7 @@ func (d *URLDetector) Detect(content string) []URLInfo {
 	return urls
 }
 
-// DetectInLine 检测单行中的 URL
+// DetectInLine 检测单行中的 URL.
 func (d *URLDetector) DetectInLine(line string, lineNum int) []URLInfo {
 	var urls []URLInfo
 	seen := make(map[string]bool)
@@ -86,7 +86,7 @@ func (d *URLDetector) DetectInLine(line string, lineNum int) []URLInfo {
 	return urls
 }
 
-// IsURL 检查字符串是否是 URL
+// IsURL 检查字符串是否是 URL.
 func (d *URLDetector) IsURL(s string) bool {
 	for _, pattern := range d.patterns {
 		if pattern.MatchString(s) {
@@ -96,7 +96,7 @@ func (d *URLDetector) IsURL(s string) bool {
 	return false
 }
 
-// GetURLType 获取 URL 类型
+// GetURLType 获取 URL 类型.
 func (d *URLDetector) GetURLType(url string) URLType {
 	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
 		return URLTypeWeb
@@ -113,7 +113,7 @@ func (d *URLDetector) GetURLType(url string) URLType {
 	return URLTypeUnknown
 }
 
-// getLineCol 计算位置的行号和列号
+// getLineCol 计算位置的行号和列号.
 func (d *URLDetector) getLineCol(content string, pos int) (int, int) {
 	line := 0
 	col := 0
@@ -133,7 +133,7 @@ func (d *URLDetector) getLineCol(content string, pos int) (int, int) {
 	return line, col
 }
 
-// URLType URL 类型
+// URLType URL 类型.
 type URLType int
 
 const (
@@ -144,7 +144,7 @@ const (
 	URLTypeIP
 )
 
-// String 返回 URL 类型的字符串表示
+// String 返回 URL 类型的字符串表示.
 func (t URLType) String() string {
 	switch t {
 	case URLTypeWeb:
@@ -160,7 +160,7 @@ func (t URLType) String() string {
 	}
 }
 
-// URLDetectorWithCustomPatterns 创建带有自定义模式的 URL 检测器
+// URLDetectorWithCustomPatterns 创建带有自定义模式的 URL 检测器.
 func NewURLDetectorWithCustomPatterns(patterns []string) (*URLDetector, error) {
 	compiled := make([]*regexp.Regexp, 0, len(patterns))
 	for _, p := range patterns {
@@ -174,7 +174,7 @@ func NewURLDetectorWithCustomPatterns(patterns []string) (*URLDetector, error) {
 	return &URLDetector{patterns: compiled}, nil
 }
 
-// AddPattern 添加自定义模式
+// AddPattern 添加自定义模式.
 func (d *URLDetector) AddPattern(pattern string) error {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
@@ -184,7 +184,7 @@ func (d *URLDetector) AddPattern(pattern string) error {
 	return nil
 }
 
-// Patterns 返回所有模式
+// Patterns 返回所有模式.
 func (d *URLDetector) Patterns() []string {
 	patterns := make([]string, len(d.patterns))
 	for i, p := range d.patterns {

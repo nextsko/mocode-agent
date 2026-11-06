@@ -71,7 +71,7 @@ type SubagentTokenUsage struct {
 }
 
 // SubagentCompletedEvent is the payload for TypeSubagentCompleted.
-type SubagentCompletedEvent struct {	// ParentSessionID is the session that dispatched the sub-agent.
+type SubagentCompletedEvent struct { // ParentSessionID is the session that dispatched the sub-agent.
 	ParentSessionID string `json:"parent_session_id"`
 	// ParentToolCallID is the Agent tool call ID that owns the sub-agent.
 	ParentToolCallID string `json:"parent_tool_call_id"`
@@ -115,4 +115,3 @@ type BackgroundJobCompletedEvent struct {
 	// what the job last printed without calling job_output.
 	TailOutput string `json:"tail_output,omitempty"`
 }
-

@@ -11,12 +11,12 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp/util"
 )
 
-// HandleWorkspaceConfiguration handles workspace configuration requests
+// HandleWorkspaceConfiguration handles workspace configuration requests.
 func HandleWorkspaceConfiguration(_ context.Context, _ string, params json.RawMessage) (any, error) {
 	return []map[string]any{{}}, nil
 }
 
-// HandleRegisterCapability handles capability registration requests
+// HandleRegisterCapability handles capability registration requests.
 func HandleRegisterCapability(_ context.Context, _ string, params json.RawMessage) (any, error) {
 	var registerParams protocol.RegistrationParams
 	if err := json.Unmarshal(params, &registerParams); err != nil {
@@ -45,7 +45,7 @@ func HandleRegisterCapability(_ context.Context, _ string, params json.RawMessag
 	return nil, nil
 }
 
-// HandleApplyEdit handles workspace edit requests
+// HandleApplyEdit handles workspace edit requests.
 func HandleApplyEdit(encoding powernap.OffsetEncoding) func(_ context.Context, _ string, params json.RawMessage) (any, error) {
 	return func(_ context.Context, _ string, params json.RawMessage) (any, error) {
 		var edit protocol.ApplyWorkspaceEditParams
@@ -63,25 +63,25 @@ func HandleApplyEdit(encoding powernap.OffsetEncoding) func(_ context.Context, _
 	}
 }
 
-// FileWatchRegistrationHandler is a function that will be called when file watch registrations are received
+// FileWatchRegistrationHandler is a function that will be called when file watch registrations are received.
 type FileWatchRegistrationHandler func(id string, watchers []protocol.FileSystemWatcher)
 
-// fileWatchHandler holds the current handler for file watch registrations
+// fileWatchHandler holds the current handler for file watch registrations.
 var fileWatchHandler FileWatchRegistrationHandler
 
-// RegisterFileWatchHandler sets the handler for file watch registrations
+// RegisterFileWatchHandler sets the handler for file watch registrations.
 func RegisterFileWatchHandler(handler FileWatchRegistrationHandler) {
 	fileWatchHandler = handler
 }
 
-// notifyFileWatchRegistration notifies the handler about new file watch registrations
+// notifyFileWatchRegistration notifies the handler about new file watch registrations.
 func notifyFileWatchRegistration(id string, watchers []protocol.FileSystemWatcher) {
 	if fileWatchHandler != nil {
 		fileWatchHandler(id, watchers)
 	}
 }
 
-// HandleServerMessage handles server messages
+// HandleServerMessage handles server messages.
 func HandleServerMessage(_ context.Context, method string, params json.RawMessage) {
 	var msg protocol.ShowMessageParams
 	if err := json.Unmarshal(params, &msg); err != nil {
@@ -101,7 +101,7 @@ func HandleServerMessage(_ context.Context, method string, params json.RawMessag
 	}
 }
 
-// HandleDiagnostics handles diagnostic notifications from the LSP server
+// HandleDiagnostics handles diagnostic notifications from the LSP server.
 func HandleDiagnostics(client *Client, params json.RawMessage) {
 	var diagParams protocol.PublishDiagnosticsParams
 	if err := json.Unmarshal(params, &diagParams); err != nil {

@@ -200,7 +200,8 @@ func (r *restMock) handler() http.HandlerFunc {
 		_ = json.Unmarshal(body, &decoded)
 		r.mu.Lock()
 		r.calls = append(r.calls, restRecord{
-			header: req.Header.Clone(), body: decoded})
+			header: req.Header.Clone(), body: decoded,
+		})
 		r.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(r.status)
@@ -338,8 +339,10 @@ func TestSearchRESTPath(t *testing.T) {
 
 func TestSearchRESTLimitAndDirectives(t *testing.T) {
 	t.Parallel()
-	rest := &restMock{status: http.StatusOK,
-		body: `{"results":[{"title":"A","url":"https://a","summary":"s1"}]}`}
+	rest := &restMock{
+		status: http.StatusOK,
+		body:   `{"results":[{"title":"A","url":"https://a","summary":"s1"}]}`,
+	}
 	srv := rest.start(t)
 	p := newProvider(srv.Client(), srv.URL, unusedMCPURL)
 
@@ -611,7 +614,8 @@ func TestMCPSessionReuseAndRebuild(t *testing.T) {
 
 	search := func() error {
 		_, err := p.Search(context.Background(), search.SearchParams{
-			Query: "q", AuthStorage: broker})
+			Query: "q", AuthStorage: broker,
+		})
 		return err
 	}
 
@@ -642,12 +646,14 @@ func TestMCPEndpointTracksCredential(t *testing.T) {
 	p := newProvider(srv.Client(), unusedMCPURL, srv.URL)
 
 	_, err := p.Search(context.Background(), search.SearchParams{
-		Query: "q", AuthStorage: keylessBroker()})
+		Query: "q", AuthStorage: keylessBroker(),
+	})
 	require.NoError(t, err)
 	require.Empty(t, mock.firstMethod("tools/call").url.Query().Get("exaApiKey"))
 
 	_, err = p.Search(context.Background(), search.SearchParams{
-		Query: "q", AuthStorage: stubBroker{key: "k1"}})
+		Query: "q", AuthStorage: stubBroker{key: "k1"},
+	})
 	require.NoError(t, err)
 	calls := mock.recorded()
 	var keyed *mcpRequestRecord
@@ -689,7 +695,8 @@ func TestMCPArgumentsMarshalOmitsEmptyNumResults(t *testing.T) {
 	require.JSONEq(t, `{"query":"q"}`, string(b))
 
 	b, err = json.Marshal(buildMCPArguments(searchInput{
-		query: "q", numResults: 5}))
+		query: "q", numResults: 5,
+	}))
 	require.NoError(t, err)
 	require.JSONEq(t, `{"query":"q","numResults":5}`, string(b))
 }
@@ -772,14 +779,16 @@ func TestClassifyMCPHTTP429Hint(t *testing.T) {
 func TestMapMCPError(t *testing.T) {
 	t.Parallel()
 	spe, ok := mapMCPError(&mcpHTTPError{
-		Status: http.StatusTooManyRequests, Body: ""}).(*search.SearchProviderError)
+		Status: http.StatusTooManyRequests, Body: "",
+	}).(*search.SearchProviderError)
 	require.True(t, ok)
 	require.Equal(t, search.ErrorCodeRateLimited, spe.Code)
 	require.Equal(t, 429, spe.HTTPStatus)
 
 	spe, ok = mapMCPError(fmt.Errorf(
 		"sending tools/call: %w", &mcpHTTPError{
-			Status: http.StatusForbidden, Body: "denied"})).(*search.SearchProviderError)
+			Status: http.StatusForbidden, Body: "denied",
+		})).(*search.SearchProviderError)
 	require.True(t, ok)
 	require.Equal(t, search.ErrorCodeForbidden, spe.Code)
 
@@ -845,10 +854,12 @@ func TestThrottlePacesSequentialSearches(t *testing.T) {
 
 	start := time.Now()
 	_, err := p.Search(context.Background(), search.SearchParams{
-		Query: "a", AuthStorage: broker})
+		Query: "a", AuthStorage: broker,
+	})
 	require.NoError(t, err)
 	_, err = p.Search(context.Background(), search.SearchParams{
-		Query: "b", AuthStorage: broker})
+		Query: "b", AuthStorage: broker,
+	})
 	require.NoError(t, err)
 	elapsed := time.Since(start)
 	require.GreaterOrEqual(t, elapsed, 100*time.Millisecond)
@@ -873,7 +884,8 @@ func TestThrottleCancellationPropagates(t *testing.T) {
 	// Occupy the next slot, then cancel while the second search waits.
 	ctx, cancel := context.WithCancel(context.Background())
 	_, err := p.Search(ctx, search.SearchParams{
-		Query: "a", AuthStorage: keylessBroker()})
+		Query: "a", AuthStorage: keylessBroker(),
+	})
 	require.NoError(t, err)
 	waitCtx, waitCancel := context.WithCancel(context.Background())
 	go func() {
@@ -881,7 +893,8 @@ func TestThrottleCancellationPropagates(t *testing.T) {
 		waitCancel()
 	}()
 	_, err = p.Search(waitCtx, search.SearchParams{
-		Query: "b", AuthStorage: keylessBroker()})
+		Query: "b", AuthStorage: keylessBroker(),
+	})
 	require.ErrorIs(t, err, context.Canceled)
 	cancel()
 }

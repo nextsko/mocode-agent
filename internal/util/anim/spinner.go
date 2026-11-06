@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Spinner wraps the bubbles spinner for non-interactive mode
+// Spinner wraps the bubbles spinner for non-interactive mode.
 type Spinner struct {
 	done chan struct{}
 	prog *tea.Program
@@ -40,7 +40,7 @@ func (m spinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// NewSpinner creates a new spinner with the given message
+// NewSpinner creates a new spinner with the given message.
 func NewSpinner(ctx context.Context, cancel context.CancelFunc, animSettings Settings) *Spinner {
 	m := spinnerModel{
 		anim:   New(animSettings),
@@ -55,7 +55,7 @@ func NewSpinner(ctx context.Context, cancel context.CancelFunc, animSettings Set
 	}
 }
 
-// Start begins the spinner animation
+// Start begins the spinner animation.
 func (s *Spinner) Start() {
 	go func() {
 		defer close(s.done)
@@ -68,7 +68,7 @@ func (s *Spinner) Start() {
 	}()
 }
 
-// Stop ends the spinner animation
+// Stop ends the spinner animation.
 func (s *Spinner) Stop() {
 	s.prog.Quit()
 	<-s.done

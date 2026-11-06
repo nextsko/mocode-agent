@@ -10,7 +10,7 @@ import (
 	"charm.land/fantasy"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-	"github.com/nextsko/mocode-agent/internal/core/tools/external/common/ssh"
+	sshcommon "github.com/nextsko/mocode-agent/internal/core/tools/external/common/ssh"
 )
 
 //go:embed ssh_list_hosts.md
@@ -65,7 +65,7 @@ func NewSshListHostsTool(svc *sshcommon.Service) fantasy.AgentTool {
 			sort.Slice(hosts, func(i, j int) bool { return hosts[i].Alias < hosts[j].Alias })
 
 			var b strings.Builder
-			b.WriteString(fmt.Sprintf("Found %d host entries in %s:\n\n", len(hosts), path))
+			fmt.Fprintf(&b, "Found %d host entries in %s:\n\n", len(hosts), path)
 			b.WriteString("| Alias | HostName | User | Port | IdentityFile | ProxyJump |\n")
 			b.WriteString("|---|---|---|---|---|---|\n")
 			for _, h := range hosts {
@@ -77,7 +77,7 @@ func NewSshListHostsTool(svc *sshcommon.Service) fantasy.AgentTool {
 				b.WriteString(h.User)
 				b.WriteString(" | ")
 				if h.Port != 0 {
-					b.WriteString(fmt.Sprintf("%d", h.Port))
+					fmt.Fprintf(&b, "%d", h.Port)
 				}
 				b.WriteString(" | ")
 				b.WriteString(h.IdentityFile)

@@ -116,7 +116,7 @@ func traverseUp(dir string, walkFn func(dir string, owner int) error) error {
 	}
 }
 
-// probeEnt checks if entity at given path exists and belongs to given owner
+// probeEnt checks if entity at given path exists and belongs to given owner.
 func probeEnt(fspath string, owner int) error {
 	_, err := os.Stat(fspath)
 	if err != nil {

@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
-	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
+	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
 
 var namedArgPattern = regexp.MustCompile(`\$([A-Z][A-Z0-9_]*)`)

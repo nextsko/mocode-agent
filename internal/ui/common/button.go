@@ -8,7 +8,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
 )
 
-// ButtonOpts defines the configuration for a single button
+// ButtonOpts defines the configuration for a single button.
 type ButtonOpts struct {
 	// Text is the button label
 	Text string
@@ -22,7 +22,7 @@ type ButtonOpts struct {
 	Padding int
 }
 
-// Button creates a button with an underlined character and selection state
+// Button creates a button with an underlined character and selection state.
 func Button(t *styles.Styles, opts ButtonOpts) string {
 	// Select style based on selection/hover state.
 	style := t.Button.Blurred
@@ -57,7 +57,7 @@ func Button(t *styles.Styles, opts ButtonOpts) string {
 // Spacing is the separator between buttons
 // Use "  " or similar for horizontal layout
 // Use "\n"  for vertical layout
-// Defaults to "  " (horizontal)
+// Defaults to "  " (horizontal).
 func ButtonGroup(t *styles.Styles, buttons []ButtonOpts, spacing string) string {
 	if len(buttons) == 0 {
 		return ""

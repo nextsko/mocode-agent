@@ -164,7 +164,7 @@ func processContextPath(p string, store *config.ConfigStore) []ContextFile {
 	return contexts
 }
 
-// expandPath expands ~ and environment variables in file paths
+// expandPath expands ~ and environment variables in file paths.
 func expandPath(path string, store *config.ConfigStore) string {
 	path = infra.Long(path)
 	// Handle environment variable expansion using the same pattern as config

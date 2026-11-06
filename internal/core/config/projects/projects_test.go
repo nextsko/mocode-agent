@@ -141,7 +141,6 @@ func TestRegisterWithParentDataDir(t *testing.T) {
 	if projects[0].Path != "/home/user/monorepo/packages/app" {
 		t.Errorf("Expected path /home/user/monorepo/packages/app, got %s", projects[0].Path)
 	}
-
 }
 
 func TestRegisterWithExternalDataDir(t *testing.T) {
@@ -168,5 +167,4 @@ func TestRegisterWithExternalDataDir(t *testing.T) {
 	if projects[0].Path != "/home/user/project" {
 		t.Errorf("Expected path /home/user/project, got %s", projects[0].Path)
 	}
-
 }

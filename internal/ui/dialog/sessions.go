@@ -22,7 +22,7 @@ const SessionsID = "session"
 
 type sessionsMode uint8
 
-// Possible modes a session item can be in
+// Possible modes a session item can be in.
 const (
 	sessionsModeNormal sessionsMode = iota
 	sessionsModeDeleting

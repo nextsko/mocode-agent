@@ -148,11 +148,11 @@ func (d *Downhub) shouldInclude(filename string) bool {
 func (r *DocsResult) ToMarkdown() string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("# %s/%s\n\n", r.Owner, r.Repo))
-	sb.WriteString(fmt.Sprintf("共 %d 个文档文件\n\n", r.Count))
+	fmt.Fprintf(&sb, "# %s/%s\n\n", r.Owner, r.Repo)
+	fmt.Fprintf(&sb, "共 %d 个文档文件\n\n", r.Count)
 
 	for _, f := range r.Files {
-		sb.WriteString(fmt.Sprintf("## %s\n\n", f.Path))
+		fmt.Fprintf(&sb, "## %s\n\n", f.Path)
 		sb.WriteString("```\n")
 		content := f.Content
 		if utf8.RuneCountInString(content) > 2000 {

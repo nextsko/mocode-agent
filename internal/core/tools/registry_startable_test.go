@@ -26,7 +26,8 @@ type startablePlugin struct {
 func (s *startablePlugin) Descriptors() []ToolDescriptor                           { return nil }
 func (s *startablePlugin) Build(_ context.Context, _ ToolDeps) []fantasy.AgentTool { return nil }
 func (s *startablePlugin) Start(_ context.Context) error                           { s.starts++; return nil }
-func (s *startablePlugin) Stop(_ context.Context) error                            { s.stops++; return nil }
+
+func (s *startablePlugin) Stop(_ context.Context) error { s.stops++; return nil }
 
 // ─── StartPlugin ──────────────────────────────────────────────────────────────
 

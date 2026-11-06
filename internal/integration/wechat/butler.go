@@ -276,17 +276,17 @@ func (h *llmButlerHandler) buildUserPrompt(ctx context.Context, userID, text, bu
 			if strings.HasPrefix(s.Title, "Butler:") {
 				continue
 			}
-			b.WriteString(fmt.Sprintf("- ID: %s  标题: %s  (%s)\n", s.ID, s.Title, s.CreatedAt))
+			fmt.Fprintf(&b, "- ID: %s  标题: %s  (%s)\n", s.ID, s.Title, s.CreatedAt)
 		}
 		b.WriteString("\n")
 	}
 
 	sessID, ok := h.ctx.Channel.GetSession(userID)
 	if ok && sessID != "" {
-		b.WriteString(fmt.Sprintf("用户 %s 的绑定会话 ID 是: %s\n\n", userID, sessID))
+		fmt.Fprintf(&b, "用户 %s 的绑定会话 ID 是: %s\n\n", userID, sessID)
 	}
 
-	b.WriteString(fmt.Sprintf("用户 %s 说: %s", userID, text))
+	fmt.Fprintf(&b, "用户 %s 说: %s", userID, text)
 	return b.String()
 }
 

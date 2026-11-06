@@ -7,10 +7,10 @@ import (
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
-	fimage "github.com/nextsko/mocode-agent/internal/ui/image"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	wechat "github.com/nextsko/mocode-agent/internal/integration/wechat"
 	"github.com/nextsko/mocode-agent/internal/ui/dialog"
+	fimage "github.com/nextsko/mocode-agent/internal/ui/image"
 	"github.com/nextsko/mocode-agent/internal/ui/slash"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
 	"github.com/nextsko/mocode-agent/internal/ui/util"
