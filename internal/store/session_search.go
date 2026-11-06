@@ -3,12 +3,13 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"path/filepath"
 	"strings"
 	"sync"
-
-	"encoding/json"
 
 	_ "modernc.org/sqlite"
 )
@@ -154,9 +155,16 @@ func (ss *SessionSearch) Rebuild(ctx context.Context) error {
 	sessionsDir := ss.store.sessionsDir()
 	entries, err := readDir(sessionsDir)
 	if err != nil {
-		return nil
+		// A missing sessions directory simply means there is nothing to index
+		// yet; any other failure must surface, otherwise the index is silently
+		// left stale.
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("read sessions dir: %w", err)
 	}
 
+	//nolint:sqlclosecheck // The statement is used inside the ScanLines closure below and is closed by the following defer.
 	stmt, err := tx.PrepareContext(ctx, `INSERT INTO messages (id, session_id, role, content, tool_name, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return fmt.Errorf("prepare insert: %w", err)
@@ -242,6 +250,9 @@ func (ss *SessionSearch) Search(ctx context.Context, query string, limit int) (*
 			continue
 		}
 		sessionIDs = append(sessionIDs, sid)
+	}
+	if err := matchRows.Err(); err != nil {
+		return nil, fmt.Errorf("fts search sessions: %w", err)
 	}
 
 	// For each session, get the best matching message
@@ -332,6 +343,9 @@ func (ss *SessionSearch) Scroll(ctx context.Context, sessionID, aroundMessageID 
 		}
 		results = append(results, r)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("scroll rows: %w", err)
+	}
 
 	return &SearchResponse{
 		Mode:    "scroll",
@@ -374,6 +388,9 @@ func (ss *SessionSearch) Browse(ctx context.Context, limit int) (*SearchResponse
 			s.Title = meta.Title
 		}
 		sessions = append(sessions, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("browse rows: %w", err)
 	}
 
 	return &SearchResponse{
