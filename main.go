@@ -2,6 +2,7 @@
 package main
 
 import (
+	"log"
 	"log/slog"
 	"net/http"
 	_ "net/http/pprof" //nolint:gosec // pprof only registered; endpoint only exposed if MOCODE_PROFILE is set
@@ -10,9 +11,17 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 
 	"github.com/nextsko/mocode-agent/internal/transport/cmd"
+	"github.com/nextsko/mocode-agent/internal/util/netx"
 )
 
 func main() {
+	// Install an explicit resolver before anything performs a network call.
+	// Platforms without /etc/resolv.conf (Android/Termux) otherwise resolve
+	// against 127.0.0.1:53 and [::1]:53.
+	if netx.ConfigureDNS() {
+		log.Printf("DNS resolver configured: %s", netx.Servers()[0])
+	}
+
 	if os.Getenv("MOCODE_PROFILE") != "" {
 		go func() {
 			slog.Info("Serving pprof at localhost:6060")
