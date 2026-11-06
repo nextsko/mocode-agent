@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/ctxcompress"
-	"github.com/nextsko/mocode-agent/internal/core/agent/messages"
+	"github.com/nextsko/mocode-agent/internal/core/agent/llmconv"
 )
 
 // helper: build a fantasy.Message containing a single ToolResultPart with
@@ -30,7 +30,7 @@ func toolMsg(toolCallID, content string) fantasy.Message {
 func firstToolResultText(msg fantasy.Message) string {
 	for _, part := range msg.Content {
 		if tr, ok := fantasy.AsMessagePart[fantasy.ToolResultPart](part); ok {
-			return messages.ExtractToolResultText(tr)
+			return llmconv.ExtractToolResultText(tr)
 		}
 	}
 	return ""
@@ -219,7 +219,7 @@ func TestCompressToolMessage_PreservesNonToolResultParts(t *testing.T) {
 
 	// ToolResult part should have been compressed.
 	if tr, ok := fantasy.AsMessagePart[fantasy.ToolResultPart](result.Content[1]); ok {
-		text := messages.ExtractToolResultText(tr)
+		text := llmconv.ExtractToolResultText(tr)
 		assert.Less(t, len(text), 150*len("compress me\n"),
 			"tool result should have been compressed at distance 40")
 	} else {

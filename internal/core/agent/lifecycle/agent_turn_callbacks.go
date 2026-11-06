@@ -62,7 +62,7 @@ func (a *sessionAgent) prepareStep(ts *turnState) func(callContext context.Conte
 
 		// Final safety: drop messages with empty content arrays to
 		// prevent "messages.content.type is invalid" API errors.
-		prepared.Messages = messages.FilterEmptyContentMessages(prepared.Messages)
+		prepared.Messages = llmconv.FilterEmptyContentMessages(prepared.Messages)
 
 		lastSystemRoleInx := 0
 		systemMessageUpdated := false
@@ -205,7 +205,7 @@ func (a *sessionAgent) onToolInputStart(ts *turnState) func(id string, toolName 
 
 func (a *sessionAgent) onRetry() func(err *fantasy.ProviderError, delay time.Duration) {
 	return func(err *fantasy.ProviderError, delay time.Duration) {
-		slog.Warn("Provider request failed, retrying", messages.ProviderRetryLogFields(err, delay)...)
+		slog.Warn("Provider request failed, retrying", llmconv.ProviderRetryLogFields(err, delay)...)
 	}
 }
 

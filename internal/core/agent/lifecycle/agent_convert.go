@@ -15,7 +15,7 @@ import (
 	"charm.land/fantasy/providers/vercel"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/ctxcompress"
-	"github.com/nextsko/mocode-agent/internal/core/agent/messages"
+	"github.com/nextsko/mocode-agent/internal/core/agent/llmconv"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/util/ext"
@@ -198,8 +198,8 @@ func (a *sessionAgent) compressToolMessage(msg fantasy.Message, distanceFromEnd 
 			continue
 		}
 
-		text := messages.ExtractToolResultText(tr)
-		isErr := messages.IsToolResultError(tr)
+		text := llmconv.ExtractToolResultText(tr)
+		isErr := llmconv.IsToolResultError(tr)
 		cm := ctxcompress.CompressedMessage{
 			Role:     "tool",
 			Content:  text,
@@ -208,7 +208,7 @@ func (a *sessionAgent) compressToolMessage(msg fantasy.Message, distanceFromEnd 
 		}
 		result := a.compressor.Compress(cm, level)
 		if result.Content != text {
-			messages.SetToolResultText(&tr, result.Content)
+			llmconv.SetToolResultText(&tr, result.Content)
 		}
 		compressedParts = append(compressedParts, tr)
 	}

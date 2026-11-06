@@ -96,6 +96,14 @@ var packageRules = []packageRule{
 			"charm.land/",
 		},
 	},
+	{
+		// agent/messages only builds provider-neutral prompt text; framework
+		// message helpers live in core/agent/llmconv.
+		pkg: "github.com/nextsko/mocode-agent/internal/core/agent/messages",
+		forbidden: []string{
+			"charm.land/",
+		},
+	},
 }
 
 // bannedBy reports the first forbidden import matching a rule for pkgPath.

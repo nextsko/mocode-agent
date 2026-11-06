@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nextsko/mocode-agent/internal/core/agent/llmconv"
 	"github.com/nextsko/mocode-agent/internal/core/agent/messages"
 	"github.com/nextsko/mocode-agent/internal/core/tools"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
@@ -806,12 +807,12 @@ func TestPreparePrompt_OrphanedToolUseMixed(t *testing.T) {
 
 func TestProviderRetryLogFields(t *testing.T) {
 	t.Run("nil provider error", func(t *testing.T) {
-		fields := messages.ProviderRetryLogFields(nil, 2*time.Second)
+		fields := llmconv.ProviderRetryLogFields(nil, 2*time.Second)
 		require.Equal(t, []any{"retry_delay", "2s"}, fields)
 	})
 
 	t.Run("provider error with title and message", func(t *testing.T) {
-		fields := messages.ProviderRetryLogFields(&fantasy.ProviderError{
+		fields := llmconv.ProviderRetryLogFields(&fantasy.ProviderError{
 			StatusCode: 429,
 			Title:      "rate limit",
 			Message:    "too many requests",
@@ -825,7 +826,7 @@ func TestProviderRetryLogFields(t *testing.T) {
 	})
 
 	t.Run("provider error without optional strings", func(t *testing.T) {
-		fields := messages.ProviderRetryLogFields(&fantasy.ProviderError{
+		fields := llmconv.ProviderRetryLogFields(&fantasy.ProviderError{
 			StatusCode: 503,
 		}, time.Second)
 		require.Equal(t, []any{
