@@ -14,10 +14,10 @@ var errDockerUnavailable = errors.New("docker unavailable")
 
 func setDockerMCPVersionRunner(t *testing.T, runner func(context.Context) error) {
 	t.Helper()
-	orig := dockerMCPVersionRunner
-	dockerMCPVersionRunner = runner
+	orig := defaultDockerMCPProbe.runVersion
+	defaultDockerMCPProbe.runVersion = runner
 	t.Cleanup(func() {
-		dockerMCPVersionRunner = orig
+		defaultDockerMCPProbe.runVersion = orig
 	})
 }
 

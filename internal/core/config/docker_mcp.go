@@ -8,57 +8,88 @@ import (
 	"time"
 )
 
-var dockerMCPVersionRunner = func(ctx context.Context) error {
-	cmd := exec.CommandContext(ctx, "docker", "mcp", "version")
-	return cmd.Run()
-}
-
+// dockerMCPAvailabilityTTL bounds how long a probe result stays fresh.
 const dockerMCPAvailabilityTTL = 10 * time.Second
-
-var dockerMCPAvailabilityCache struct {
-	mu        sync.Mutex
-	available bool
-	checkedAt time.Time
-	known     bool
-}
 
 // DockerMCPName is the name of the Docker MCP configuration.
 const DockerMCPName = "docker"
+
+// dockerMCPProbe caches the result of probing the local Docker MCP CLI. It is a
+// small state holder rather than package-level mutable state, so tests can
+// construct isolated probes and the cache lifetime is explicit.
+type dockerMCPProbe struct {
+	mu         sync.Mutex
+	known      bool
+	available  bool
+	checkedAt  time.Time
+	runVersion func(context.Context) error
+	now        func() time.Time
+}
+
+// newDockerMCPProbe returns a probe backed by the local docker CLI.
+func newDockerMCPProbe() *dockerMCPProbe {
+	return &dockerMCPProbe{
+		runVersion: func(ctx context.Context) error {
+			return exec.CommandContext(ctx, "docker", "mcp", "version").Run()
+		},
+		now: time.Now,
+	}
+}
+
+// defaultDockerMCPProbe is the process-wide probe used by the package helpers.
+var defaultDockerMCPProbe = newDockerMCPProbe()
+
+// IsAvailable runs 'docker mcp version' and reports whether it succeeded.
+func (p *dockerMCPProbe) IsAvailable(ctx context.Context) bool {
+	return p.runVersion(ctx) == nil
+}
+
+// Cached returns the cached availability and whether it is still fresh.
+func (p *dockerMCPProbe) Cached() (available bool, fresh bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if !p.known {
+		return false, false
+	}
+	if p.now().Sub(p.checkedAt) > dockerMCPAvailabilityTTL {
+		return p.available, false
+	}
+	return p.available, true
+}
+
+// Refresh probes Docker MCP and caches the result.
+func (p *dockerMCPProbe) Refresh(ctx context.Context) bool {
+	available := p.IsAvailable(ctx)
+
+	p.mu.Lock()
+	p.available = available
+	p.checkedAt = p.now()
+	p.known = true
+	p.mu.Unlock()
+
+	return available
+}
 
 // IsDockerMCPAvailable checks if Docker MCP is available by running
 // 'docker mcp version'.
 func IsDockerMCPAvailable() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	err := dockerMCPVersionRunner(ctx)
-	return err == nil
+	return defaultDockerMCPProbe.IsAvailable(ctx)
 }
 
 // DockerMCPAvailabilityCached returns the cached Docker MCP availability and
 // whether the cached value is still fresh.
 func DockerMCPAvailabilityCached() (available bool, known bool) {
-	dockerMCPAvailabilityCache.mu.Lock()
-	defer dockerMCPAvailabilityCache.mu.Unlock()
-
-	if !dockerMCPAvailabilityCache.known {
-		return false, false
-	}
-	if time.Since(dockerMCPAvailabilityCache.checkedAt) > dockerMCPAvailabilityTTL {
-		return dockerMCPAvailabilityCache.available, false
-	}
-	return dockerMCPAvailabilityCache.available, true
+	return defaultDockerMCPProbe.Cached()
 }
 
 // RefreshDockerMCPAvailability refreshes and caches Docker MCP availability.
 func RefreshDockerMCPAvailability() bool {
-	available := IsDockerMCPAvailable()
-	dockerMCPAvailabilityCache.mu.Lock()
-	dockerMCPAvailabilityCache.available = available
-	dockerMCPAvailabilityCache.checkedAt = time.Now()
-	dockerMCPAvailabilityCache.known = true
-	dockerMCPAvailabilityCache.mu.Unlock()
-	return available
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return defaultDockerMCPProbe.Refresh(ctx)
 }
 
 // IsDockerMCPEnabled checks if Docker MCP is already configured.
