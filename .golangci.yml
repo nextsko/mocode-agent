@@ -43,6 +43,11 @@ linters:
         - fmt.Print
         - fmt.Printf
         - fmt.Println
+    gosec:
+      # G104 (unhandled errors) duplicates errcheck, which now gates all new
+      # code; keeping both makes the full report double-count the same lines.
+      excludes:
+        - G104
     revive:
       rules:
         # `exported` (comment/naming on every exported symbol) and

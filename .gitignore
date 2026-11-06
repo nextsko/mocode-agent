@@ -38,6 +38,9 @@ Thumbs.db
 /bin/
 /dist/
 
+# Local lint report (scripts/lint-full.sh default output)
+/golangci.txt
+
 # Local environment variables
 .env
 .env.local

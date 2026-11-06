@@ -310,7 +310,7 @@ func (c *Client) Exec(ctx context.Context, cmd string, timeout time.Duration) (*
 	select {
 	case <-cctx.Done():
 		_ = sess.Signal(ssh.SIGTERM)
-		_ = <-done
+		<-done //nolint:errcheck // channel receive, not an error value
 		return &ExecResult{
 			Stdout:   stdout.String(),
 			Stderr:   stderr.String(),
