@@ -147,7 +147,7 @@ func (c *Client) PollQRStatus(ctx context.Context, baseURL, qrcode string) (*QRS
 	}
 	defer resp.Body.Close()
 	var result QRStatusResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	_ = json.NewDecoder(resp.Body).Decode(&result)
 	return &result, nil
 }
 
@@ -180,7 +180,7 @@ func (c *Client) apiPost(ctx context.Context, baseURL, endpoint, token string, b
 		ErrCode int    `json:"errcode"`
 		ErrMsg  string `json:"errmsg"`
 	}
-	json.Unmarshal(raw, &check)
+	_ = json.Unmarshal(raw, &check)
 	if check.Ret != 0 || check.ErrCode != 0 {
 		code := check.ErrCode
 		if code == 0 {
@@ -207,7 +207,7 @@ func (c *Client) GetUpdates(ctx context.Context, baseURL, token, cursor string) 
 		return nil, err
 	}
 	var result GetUpdatesResponse
-	json.Unmarshal(raw, &result)
+	_ = json.Unmarshal(raw, &result)
 	return &result, nil
 }
 
@@ -233,7 +233,7 @@ func (c *Client) GetConfig(ctx context.Context, baseURL, token, userID, contextT
 		return nil, err
 	}
 	var result GetConfigResponse
-	json.Unmarshal(raw, &result)
+	_ = json.Unmarshal(raw, &result)
 	return &result, nil
 }
 

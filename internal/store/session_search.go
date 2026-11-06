@@ -106,7 +106,7 @@ func (ss *SessionSearch) Open(ctx context.Context) error {
 	`
 	_, err = db.ExecContext(ctx, schema)
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return fmt.Errorf("create session search schema: %w", err)
 	}
 
@@ -146,7 +146,7 @@ func (ss *SessionSearch) Rebuild(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("begin rebuild tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, "DELETE FROM messages"); err != nil {
 		return fmt.Errorf("clear messages: %w", err)
@@ -169,7 +169,7 @@ func (ss *SessionSearch) Rebuild(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("prepare insert: %w", err)
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	for _, entry := range entries {
 		if !entry.IsDir() {
@@ -261,7 +261,7 @@ func (ss *SessionSearch) ReindexSession(ctx context.Context, sessionID string, m
 	if err != nil {
 		return fmt.Errorf("begin reindex tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, `DELETE FROM messages WHERE session_id = ?`, sessionID); err != nil {
 		return fmt.Errorf("clear indexed session %s: %w", sessionID, err)
@@ -307,7 +307,7 @@ func (ss *SessionSearch) Search(ctx context.Context, query string, limit int) (*
 	if err != nil {
 		return nil, fmt.Errorf("fts search sessions: %w", err)
 	}
-	defer matchRows.Close()
+	defer func() { _ = matchRows.Close() }()
 
 	var sessionIDs []string
 	for matchRows.Next() {
@@ -389,7 +389,7 @@ func (ss *SessionSearch) Scroll(ctx context.Context, sessionID, aroundMessageID 
 	if err != nil {
 		return nil, fmt.Errorf("scroll query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []SearchResult
 	for rows.Next() {
@@ -442,7 +442,7 @@ func (ss *SessionSearch) Browse(ctx context.Context, limit int) (*SearchResponse
 	if err != nil {
 		return nil, fmt.Errorf("browse query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sessions []SessionBrief
 	for rows.Next() {

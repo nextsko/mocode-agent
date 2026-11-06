@@ -37,7 +37,7 @@ mocode dirs data
 				}).
 				Row("Config", filepath.Dir(config.GlobalConfig())).
 				Row("Data", filepath.Dir(config.GlobalConfigData()))
-			lipgloss.Println(t)
+			_, _ = lipgloss.Println(t)
 			return
 		}
 		// Not a TTY.

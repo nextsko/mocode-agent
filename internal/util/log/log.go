@@ -77,7 +77,7 @@ func Initialized() bool {
 func Sync() {
 	if logRotator != nil {
 		// Trigger immediate flush by rotating (which flushes current buffer)
-		logRotator.Rotate()
+		_ = logRotator.Rotate()
 	}
 }
 

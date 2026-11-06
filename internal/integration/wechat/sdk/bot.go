@@ -160,7 +160,7 @@ func (b *Bot) Run(ctx context.Context) error {
 			apiErr, isAPI := err.(*protocol.APIError)
 			if isAPI && apiErr.IsSessionExpired() {
 				b.logf("warn", "Session expired — re-login required")
-				auth.ClearCredentials(b.opts.CredPath)
+				_ = auth.ClearCredentials(b.opts.CredPath)
 				b.contextTokens = sync.Map{}
 				b.cursor = ""
 				if _, loginErr := b.Login(pollCtx, true); loginErr != nil {
@@ -454,7 +454,7 @@ func (b *Bot) saveState() {
 		return true
 	})
 	data, _ := json.MarshalIndent(sf, "", "  ")
-	os.MkdirAll(dir, 0o700)
+	_ = os.MkdirAll(dir, 0o700)
 	path := filepath.Join(dir, "state.json")
-	os.WriteFile(path, data, 0o600)
+	_ = os.WriteFile(path, data, 0o600)
 }

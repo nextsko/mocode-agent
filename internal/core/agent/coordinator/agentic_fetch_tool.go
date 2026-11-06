@@ -95,7 +95,7 @@ func (c *Coordinator) agenticFetchTool(_ context.Context, client *http.Client) (
 			if err != nil {
 				return fantasy.NewTextErrorResponse(fmt.Sprintf("Failed to create temporary directory: %s", err)), nil
 			}
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			var fullPrompt string
 

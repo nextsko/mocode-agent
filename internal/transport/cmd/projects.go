@@ -61,7 +61,7 @@ Mocode projects --json
 			for _, p := range projectList {
 				t.Row(p.Path, p.LastAccessed.Local().Format("2006-01-02 15:04"))
 			}
-			lipgloss.Println(t)
+			_, _ = lipgloss.Println(t)
 			return nil
 		}
 

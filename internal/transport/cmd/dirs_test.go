@@ -10,10 +10,10 @@ import (
 )
 
 func init() {
-	os.Setenv("XDG_CONFIG_HOME", "/tmp/fakeconfig")
-	os.Setenv("XDG_DATA_HOME", "/tmp/fakedata")
-	os.Unsetenv("MOCODE_GLOBAL_CONFIG")
-	os.Unsetenv("MOCODE_GLOBAL_DATA")
+	_ = os.Setenv("XDG_CONFIG_HOME", "/tmp/fakeconfig")
+	_ = os.Setenv("XDG_DATA_HOME", "/tmp/fakedata")
+	_ = os.Unsetenv("MOCODE_GLOBAL_CONFIG")
+	_ = os.Unsetenv("MOCODE_GLOBAL_DATA")
 }
 
 func TestDirs(t *testing.T) {

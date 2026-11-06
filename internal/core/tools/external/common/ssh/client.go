@@ -297,7 +297,7 @@ func (c *Client) Exec(ctx context.Context, cmd string, timeout time.Duration) (*
 	if err != nil {
 		return nil, fmt.Errorf("ssh: open session: %w", err)
 	}
-	defer sess.Close()
+	defer func() { _ = sess.Close() }()
 
 	var stdout, stderr strings.Builder
 	sess.Stdout = &stdout
@@ -310,7 +310,7 @@ func (c *Client) Exec(ctx context.Context, cmd string, timeout time.Duration) (*
 	select {
 	case <-cctx.Done():
 		_ = sess.Signal(ssh.SIGTERM)
-		<-done
+		_ = <-done
 		return &ExecResult{
 			Stdout:   stdout.String(),
 			Stderr:   stderr.String(),
@@ -366,7 +366,7 @@ func (c *Client) Download(ctx context.Context, remote, local string) error {
 	if err != nil {
 		return fmt.Errorf("ssh: open session: %w", err)
 	}
-	defer sess.Close()
+	defer func() { _ = sess.Close() }()
 
 	if dir := filepath.Dir(local); dir != "" {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -393,7 +393,7 @@ func scpUpload(c *Client, remote string, mode os.FileMode, data []byte) error {
 	if err != nil {
 		return fmt.Errorf("ssh: open session: %w", err)
 	}
-	defer sess.Close()
+	defer func() { _ = sess.Close() }()
 
 	stdin, err := sess.StdinPipe()
 	if err != nil {

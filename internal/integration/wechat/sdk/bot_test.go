@@ -397,7 +397,7 @@ func TestCredentialsJSON(t *testing.T) {
 	}
 	// Verify JSON field names
 	var m map[string]interface{}
-	json.Unmarshal(data, &m)
+	_ = json.Unmarshal(data, &m)
 	if _, ok := m["baseUrl"]; !ok {
 		t.Fatal("expected camelCase 'baseUrl' in JSON")
 	}

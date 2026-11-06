@@ -205,15 +205,15 @@ func TestResolveAgentsDir_Default(t *testing.T) {
 func setEnv(key, value string) func() {
 	old := os.Getenv(key)
 	if value != "" {
-		os.Setenv(key, value)
+		_ = os.Setenv(key, value)
 	} else {
-		os.Unsetenv(key)
+		_ = os.Unsetenv(key)
 	}
 	return func() {
 		if old != "" {
-			os.Setenv(key, old)
+			_ = os.Setenv(key, old)
 		} else {
-			os.Unsetenv(key)
+			_ = os.Unsetenv(key)
 		}
 	}
 }
@@ -314,7 +314,7 @@ func TestSyncAgentsToDir_VersionMatchSkips(t *testing.T) {
 	for _, e := range entries {
 		if strings.HasSuffix(e.Name(), ".md") {
 			removedFile = filepath.Join(dir, e.Name())
-			os.Remove(removedFile)
+			_ = os.Remove(removedFile)
 			break
 		}
 	}

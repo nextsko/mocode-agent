@@ -95,7 +95,7 @@ func TestNotificationBroadcast(t *testing.T) {
 		svc.Subscribe(ctx) // drain-free: the request stays unread
 		require.True(t, svc.Answer([]Answer{{QuestionID: "q1", Yes: &yes}}))
 	}()
-	svc.Ask(ctx, Request{ID: "batch-1", Questions: []Question{{ID: "q1", Type: TypeYesNo, Text: "x", Description: "d"}}})
+	_, _ = svc.Ask(ctx, Request{ID: "batch-1", Questions: []Question{{ID: "q1", Type: TypeYesNo, Text: "x", Description: "d"}}})
 
 	select {
 	case evt := <-notifs:

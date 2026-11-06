@@ -19,7 +19,7 @@ import (
 func tempDir(t *testing.T) string {
 	t.Helper()
 	dir := filepath.Join(os.TempDir(), "mocode-store-test-"+t.Name())
-	t.Cleanup(func() { os.RemoveAll(dir) })
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	return dir
 }
 
@@ -262,7 +262,7 @@ func TestMessageStore_AppendAndList(t *testing.T) {
 	}
 	s.sessions = newSessionStore(s)
 	s.messages = newMessageStore(s)
-	os.MkdirAll(filepath.Join(s.ProjectDir, "sessions", "sid1"), 0o700)
+	_ = os.MkdirAll(filepath.Join(s.ProjectDir, "sessions", "sid1"), 0o700)
 
 	msg1, err := s.messages.Create(t.Context(), "sid1", message.CreateMessageParams{
 		Role:  message.User,

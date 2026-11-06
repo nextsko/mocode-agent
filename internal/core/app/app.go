@@ -326,7 +326,7 @@ func (app *App) RunNonInteractive(ctx context.Context, output io.Writer, prompt,
 	}
 
 	// force update of agent models before running so mcp tools are loaded
-	app.AgentCoordinator.UpdateModels(ctx)
+	_ = app.AgentCoordinator.UpdateModels(ctx)
 
 	defer stopSpinner()
 

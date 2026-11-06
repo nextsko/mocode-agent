@@ -339,7 +339,7 @@ func doctorBuildCheck(ctx context.Context, cwd string, facts doctorWorkspaceFact
 	outPath := filepath.Join(os.TempDir(), fmt.Sprintf("mocode-doctor-%d", time.Now().UnixNano()))
 	_ = os.MkdirAll(cacheDir, 0o700)
 	_ = os.MkdirAll(tmpDir, 0o700)
-	defer os.Remove(outPath)
+	defer func() { _ = os.Remove(outPath) }()
 
 	buildCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()

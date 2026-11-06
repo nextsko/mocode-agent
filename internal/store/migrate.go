@@ -25,7 +25,7 @@ func MigrateFromSQLite(ctx context.Context, dbPath string, projectPath string) (
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	// store.New resolves the data dir via infra.DataDir itself; no config needed.
 	st, err := New(projectPath, nil)
@@ -47,7 +47,7 @@ func MigrateFromSQLite(ctx context.Context, dbPath string, projectPath string) (
 		}
 		st.Sessions().index.Sessions[sm.ID] = sm.toMeta()
 	}
-	st.Sessions().saveIndex()
+	_ = st.Sessions().saveIndex()
 
 	// Phase 2: Migrate messages
 	fmt.Fprintf(os.Stderr, "Migrating messages...\n")
@@ -63,7 +63,7 @@ func MigrateFromSQLite(ctx context.Context, dbPath string, projectPath string) (
 		}
 
 		sessDir := st.sessionDir(sm.toSession())
-		os.MkdirAll(sessDir, 0o700)
+		_ = os.MkdirAll(sessDir, 0o700)
 		writer := NewJSONLWriter(filepath.Join(sessDir, "messages.jsonl"))
 		for _, jm := range msgs {
 			if err := writer.Append(jm); err != nil {
@@ -88,7 +88,7 @@ func MigrateFromSQLite(ctx context.Context, dbPath string, projectPath string) (
 		}
 
 		sessDir := st.sessionDir(sm.toSession())
-		os.MkdirAll(sessDir, 0o700)
+		_ = os.MkdirAll(sessDir, 0o700)
 		writer := NewJSONLWriter(filepath.Join(sessDir, "files.jsonl"))
 		for _, jf := range files {
 			if err := writer.Append(jf); err != nil {
@@ -137,7 +137,7 @@ func MigrateFromSQLite(ctx context.Context, dbPath string, projectPath string) (
 
 			// Read messages from per-session DB
 			msgs, err := readMessages(ctx, perDB, sid)
-			perDB.Close()
+			_ = perDB.Close()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "  Warning: failed to read messages from %s: %v\n", dbFile, err)
 				continue
@@ -148,7 +148,7 @@ func MigrateFromSQLite(ctx context.Context, dbPath string, projectPath string) (
 
 			sessMeta := st.Sessions().index.Sessions[sid]
 			sessDir := st.sessionDir(sessionMetaToSession(*sessMeta))
-			os.MkdirAll(sessDir, 0o700)
+			_ = os.MkdirAll(sessDir, 0o700)
 
 			writer := NewJSONLWriter(filepath.Join(sessDir, "messages.jsonl"))
 			for _, jm := range msgs {
@@ -281,7 +281,7 @@ func readSessions(ctx context.Context, db *sql.DB) ([]migrationSession, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []migrationSession
 	for rows.Next() {
@@ -306,7 +306,7 @@ func readMessages(ctx context.Context, db *sql.DB, sessionID string) ([]jsonlMes
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []jsonlMessage
 	for rows.Next() {
@@ -328,7 +328,7 @@ func readFiles(ctx context.Context, db *sql.DB, sessionID string) ([]jsonlFile, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []jsonlFile
 	for rows.Next() {

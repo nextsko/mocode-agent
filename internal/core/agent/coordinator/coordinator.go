@@ -204,7 +204,7 @@ func (c *Coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 		sl.LogUser("session_start", prompt, sessionlog.Meta{AgentID: c.activeAgentID})
 		defer func() {
 			sl.LogRuntime("session_end", "turn completed", sessionlog.Meta{AgentID: c.activeAgentID})
-			sl.Close()
+			_ = sl.Close()
 		}()
 	}
 	_ = sl // used below in sub-agent and transfer paths via closure

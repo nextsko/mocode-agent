@@ -12,9 +12,9 @@ import (
 func TestCappedBufferDropsMiddle(t *testing.T) {
 	var b cappedBuffer
 	chunk := strings.Repeat("a", halfCap)
-	b.Write([]byte(chunk))                            // head full
-	b.Write([]byte(strings.Repeat("b", halfCap+300))) // tail fills, oldest b's roll out
-	b.Write([]byte(strings.Repeat("c", 200)))         // tail keeps last halfCap bytes
+	_, _ = b.Write([]byte(chunk))                            // head full
+	_, _ = b.Write([]byte(strings.Repeat("b", halfCap+300))) // tail fills, oldest b's roll out
+	_, _ = b.Write([]byte(strings.Repeat("c", 200)))         // tail keeps last halfCap bytes
 	s := b.String()
 	require.True(t, strings.HasPrefix(s, "aaaa"))
 	require.True(t, strings.HasSuffix(s, "cccc"))

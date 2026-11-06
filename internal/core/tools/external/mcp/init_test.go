@@ -17,7 +17,7 @@ func TestMCPSession_CancelOnClose(t *testing.T) {
 	server := mcp.NewServer(&mcp.Implementation{Name: "test-server"}, nil)
 	serverSession, err := server.Connect(context.Background(), serverTransport, nil)
 	require.NoError(t, err)
-	defer serverSession.Close()
+	defer func() { _ = serverSession.Close() }()
 
 	ctx, cancel := context.WithCancel(context.Background())
 

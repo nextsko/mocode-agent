@@ -127,7 +127,7 @@ func sessionSetup(cmd *cobra.Command) (context.Context, *sessionServices, func()
 		messages: st.Messages(),
 		cfg:      cfg,
 	}
-	return ctx, svc, func() { st.Close() }, nil
+	return ctx, svc, func() { _ = st.Close() }, nil
 }
 
 func runSessionList(cmd *cobra.Command, _ []string) error {

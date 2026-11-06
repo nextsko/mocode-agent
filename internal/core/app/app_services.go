@@ -91,7 +91,7 @@ func (s *storeSessionService) Delete(ctx context.Context, id string) error {
 func (s *storeSessionService) CreateTitleSession(ctx context.Context, pid string) (session.Session, error) {
 	now := time.Now().Unix()
 	sess := session.Session{ID: "title-" + pid, ParentSessionID: pid, Title: "Generate a title", CreatedAt: now, UpdatedAt: now}
-	s.store.Save(ctx, sess)
+	_ = s.store.Save(ctx, sess)
 	s.Publish(pubsub.CreatedEvent, sess)
 	return sess, nil
 }

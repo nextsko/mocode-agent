@@ -87,7 +87,7 @@ func (l *Logger) Log(e Entry) {
 
 	// Write as Markdown-friendly JSON block for easy human + machine reading.
 	line := fmt.Sprintf("```json\n%s\n```\n\n", mustJSON(e))
-	f.WriteString(line)
+	_, _ = f.WriteString(line)
 }
 
 // LogBug records an error or failure.

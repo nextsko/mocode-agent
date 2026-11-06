@@ -33,7 +33,7 @@ var statsCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("open store: %w", err)
 		}
-		defer st.Close()
+		defer func() { _ = st.Close() }()
 
 		total := st.Stats().TotalStats()
 		if total.Sessions == 0 {

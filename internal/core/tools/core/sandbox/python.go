@@ -63,7 +63,7 @@ func NewPyRunTool(permissions permission.Service, workingDir string) fantasy.Age
 			if err != nil {
 				return fantasy.NewTextErrorResponse(fmt.Sprintf("create sandbox dir: %v", err)), nil
 			}
-			defer os.RemoveAll(dir)
+			defer func() { _ = os.RemoveAll(dir) }()
 
 			script := filepath.Join(dir, "main.py")
 			if err := os.WriteFile(script, []byte(params.Code), 0o600); err != nil {

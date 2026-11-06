@@ -71,7 +71,7 @@ func TestBackgroundShellManager_Get(t *testing.T) {
 	}
 
 	// Clean up
-	manager.Kill(bgShell.ID)
+	_ = manager.Kill(bgShell.ID)
 }
 
 func TestBackgroundShellManager_Kill(t *testing.T) {
@@ -136,7 +136,7 @@ func TestBackgroundShell_IsDone(t *testing.T) {
 	}
 
 	// Clean up
-	manager.Kill(bgShell.ID)
+	_ = manager.Kill(bgShell.ID)
 }
 
 func TestBackgroundShell_WithBlockFuncs(t *testing.T) {
@@ -170,7 +170,7 @@ func TestBackgroundShell_WithBlockFuncs(t *testing.T) {
 	}
 
 	// Clean up
-	manager.Kill(bgShell.ID)
+	_ = manager.Kill(bgShell.ID)
 }
 
 func TestBackgroundShellManager_List(t *testing.T) {
@@ -217,8 +217,8 @@ func TestBackgroundShellManager_List(t *testing.T) {
 	}
 
 	// Clean up
-	manager.Kill(bgShell1.ID)
-	manager.Kill(bgShell2.ID)
+	_ = manager.Kill(bgShell1.ID)
+	_ = manager.Kill(bgShell2.ID)
 }
 
 func TestBackgroundShellManager_KillAll(t *testing.T) {

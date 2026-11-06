@@ -509,7 +509,7 @@ func (c *Channel) SetMediaDir(dir string) {
 	c.mu.Lock()
 	c.mediaDir = dir
 	c.mu.Unlock()
-	os.MkdirAll(dir, 0o755)
+	_ = os.MkdirAll(dir, 0o755)
 }
 
 func (c *Channel) handleMessage(ctx context.Context, msg *wechatbot.IncomingMessage) {
@@ -625,7 +625,7 @@ func (c *Channel) downloadAllMedia(ctx context.Context, msg *wechatbot.IncomingM
 			ext = guessExtension(mediaType)
 		}
 		dir := filepath.Join(mediaDir, c.accountID, chatID)
-		os.MkdirAll(dir, 0o755)
+		_ = os.MkdirAll(dir, 0o755)
 		savePath := filepath.Join(dir, fmt.Sprintf("%s_%s%s", mediaType, hashHex, ext))
 
 		if err := os.WriteFile(savePath, data, 0o644); err != nil {
@@ -761,6 +761,6 @@ func (c *Channel) saveRecentMsgs() {
 		entries[k] = ts.Format(time.RFC3339)
 	}
 	data, _ := json.MarshalIndent(entries, "", "  ")
-	os.MkdirAll(filepath.Dir(path), 0o755)
-	os.WriteFile(path, data, 0o644)
+	_ = os.MkdirAll(filepath.Dir(path), 0o755)
+	_ = os.WriteFile(path, data, 0o644)
 }

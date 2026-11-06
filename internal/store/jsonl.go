@@ -53,7 +53,7 @@ func (w *JSONLWriter) Append(value any) error {
 	if err := LockFile(lockFile); err != nil {
 		return fmt.Errorf("lock %s: %w", lockPath, err)
 	}
-	defer UnlockFile(lockFile)
+	defer func() { _ = UnlockFile(lockFile) }()
 
 	// Open the JSONL file for append
 	f, err := os.OpenFile(w.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
@@ -108,7 +108,7 @@ func (w *JSONLWriter) ReadAll(newValue func() any) ([]any, error) {
 	if err := LockFileShared(lockFile); err != nil {
 		return nil, fmt.Errorf("shared lock %s: %w", lockPath, err)
 	}
-	defer UnlockFile(lockFile)
+	defer func() { _ = UnlockFile(lockFile) }()
 
 	f, err := os.Open(w.path)
 	if err != nil {
@@ -162,7 +162,7 @@ func (w *JSONLWriter) ScanLines(fn func(line string) error) error {
 	if err := LockFileShared(lockFile); err != nil {
 		return fmt.Errorf("shared lock %s: %w", lockPath, err)
 	}
-	defer UnlockFile(lockFile)
+	defer func() { _ = UnlockFile(lockFile) }()
 
 	f, err := os.Open(w.path)
 	if err != nil {
@@ -210,7 +210,7 @@ func (w *JSONLWriter) WriteAll(values []any) error {
 	if err := LockFile(lockFile); err != nil {
 		return fmt.Errorf("lock: %w", err)
 	}
-	defer UnlockFile(lockFile)
+	defer func() { _ = UnlockFile(lockFile) }()
 
 	tmpPath := w.path + ".tmp"
 	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
@@ -222,19 +222,19 @@ func (w *JSONLWriter) WriteAll(values []any) error {
 	for _, v := range values {
 		if err := enc.Encode(v); err != nil {
 			f.Close()
-			os.Remove(tmpPath)
+			_ = os.Remove(tmpPath)
 			return fmt.Errorf("encode: %w", err)
 		}
 	}
 	if err := f.Sync(); err != nil {
 		f.Close()
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("fsync: %w", err)
 	}
 	f.Close()
 
 	if err := rename(tmpPath, w.path); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("rename: %w", err)
 	}
 
@@ -249,7 +249,7 @@ func (w *JSONLWriter) Exists() bool {
 
 // Remove deletes the JSONL file and its lock file.
 func (w *JSONLWriter) Remove() error {
-	os.Remove(w.path + ".lock")
+	_ = os.Remove(w.path + ".lock")
 	err := os.Remove(w.path)
 	if os.IsNotExist(err) {
 		return nil
@@ -271,17 +271,17 @@ func WriteJSON(path string, value any) error {
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(value); err != nil {
 		f.Close()
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("encode: %w", err)
 	}
 	if err := f.Sync(); err != nil {
 		f.Close()
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("fsync: %w", err)
 	}
 	f.Close()
 	if err := rename(tmpPath, path); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("rename: %w", err)
 	}
 	return nil

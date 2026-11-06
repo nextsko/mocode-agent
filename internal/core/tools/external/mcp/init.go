@@ -246,7 +246,7 @@ func initClient(ctx context.Context, cfg *config.ConfigStore, name string, m con
 	if err != nil {
 		slog.Error("Error listing tools", "error", err)
 		updateState(name, StateError, err, nil, Counts{})
-		session.Close()
+		_ = session.Close()
 		return err
 	}
 
@@ -254,7 +254,7 @@ func initClient(ctx context.Context, cfg *config.ConfigStore, name string, m con
 	if err != nil {
 		slog.Error("Error listing prompts", "error", err)
 		updateState(name, StateError, err, nil, Counts{})
-		session.Close()
+		_ = session.Close()
 		return err
 	}
 

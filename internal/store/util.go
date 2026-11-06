@@ -97,6 +97,6 @@ func removeQuietly(path string) {
 // parseInt64 parses a string to int64, returning 0 on error.
 func parseInt64(s string) int64 {
 	var v int64
-	fmt.Sscanf(s, "%d", &v)
+	_, _ = fmt.Sscanf(s, "%d", &v)
 	return v
 }

@@ -38,7 +38,7 @@ func NewMediaStore(baseDir string, maxAge time.Duration) *MediaStore {
 	if maxAge <= 0 {
 		maxAge = 24 * time.Hour
 	}
-	os.MkdirAll(baseDir, 0o755)
+	_ = os.MkdirAll(baseDir, 0o755)
 	return &MediaStore{
 		baseDir:  baseDir,
 		entries:  make(map[string]*MediaEntry),
@@ -111,7 +111,7 @@ func (s *MediaStore) ReleaseAll(scope string, deleteFiles bool) {
 	for id, entry := range s.entries {
 		if entry.Scope == scope {
 			if deleteFiles {
-				os.Remove(entry.Path)
+				_ = os.Remove(entry.Path)
 			}
 			delete(s.entries, id)
 		}
@@ -125,7 +125,7 @@ func (s *MediaStore) CleanExpired() {
 	now := time.Now()
 	for id, entry := range s.entries {
 		if now.Sub(entry.CreatedAt) > s.maxAge {
-			os.Remove(entry.Path)
+			_ = os.Remove(entry.Path)
 			delete(s.entries, id)
 		}
 	}

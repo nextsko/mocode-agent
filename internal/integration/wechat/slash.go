@@ -203,7 +203,7 @@ func cmdScreenshot(ctx context.Context, ch *Channel, msg *wechatbot.IncomingMess
 	if err != nil {
 		return fmt.Sprintf("❌ %v", err)
 	}
-	defer os.Remove(path)
+	defer func() { _ = os.Remove(path) }()
 	if msg == nil || msg.UserID == "" {
 		return "❌ 无法确定收件人"
 	}
@@ -229,7 +229,7 @@ func cmdSendFile(_ context.Context, ch *Channel, msg *wechatbot.IncomingMessage,
 		if err != nil {
 			return fmt.Sprintf("❌ 压缩失败: %v", err)
 		}
-		defer os.Remove(compressed)
+		defer func() { _ = os.Remove(compressed) }()
 		path = compressed
 	}
 	if msg == nil || msg.UserID == "" {
@@ -295,7 +295,7 @@ func gzipFile(path string) (string, error) {
 	defer out.Close()
 	w := gzip.NewWriter(out)
 	if _, err := io.Copy(w, in); err != nil {
-		w.Close()
+		_ = w.Close()
 		return "", err
 	}
 	return outPath, w.Close()

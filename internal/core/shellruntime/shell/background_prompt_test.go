@@ -12,7 +12,7 @@ func TestSyncBufferTail(t *testing.T) {
 	t.Parallel()
 
 	sb := &syncBuffer{}
-	sb.WriteString("line1\nline2\nline3\n")
+	_, _ = sb.WriteString("line1\nline2\nline3\n")
 
 	require.Equal(t, "line1\nline2\nline3\n", sb.Tail(1024), "small buffer returned whole")
 	require.Equal(t, "line3\n", sb.Tail(7), "tail cut at line boundary")
@@ -26,7 +26,7 @@ func TestSyncBufferIdleTracking(t *testing.T) {
 	sb := &syncBuffer{}
 	require.Zero(t, sb.IdleMs(), "never written → 0")
 
-	sb.WriteString("x")
+	_, _ = sb.WriteString("x")
 	idle := sb.IdleMs()
 	require.GreaterOrEqual(t, idle, int64(0))
 	require.Less(t, idle, int64(1000), "fresh write → small idle")

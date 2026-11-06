@@ -44,11 +44,11 @@ func TestSyncBufferBoundedIncrementalWrites(t *testing.T) {
 	sb := &syncBuffer{}
 	half := backgroundOutputHalfBytes
 
-	sb.Write(bytes.Repeat([]byte("H"), half)) // fill head
+	_, _ = sb.Write(bytes.Repeat([]byte("H"), half)) // fill head
 
 	// 1536 × 1 KiB chunks roll the tail; only the last half stays.
 	for i := 0; i < 1536; i++ {
-		sb.Write(bytes.Repeat([]byte("x"), 1024))
+		_, _ = sb.Write(bytes.Repeat([]byte("x"), 1024))
 	}
 	require.Equal(t, int64(half+1536*1024), sb.total)
 	require.Equal(t, int64(1536*1024-half), sb.omitted)
@@ -58,7 +58,7 @@ func TestSyncBufferBoundedIncrementalWrites(t *testing.T) {
 
 func TestSyncBufferSmallOutputUnomittedAndTailAligned(t *testing.T) {
 	sb := &syncBuffer{}
-	sb.WriteString("line1\nline2\nline3\nline4\n")
+	_, _ = sb.WriteString("line1\nline2\nline3\nline4\n")
 
 	require.Equal(t, int64(24), sb.total)
 	require.Zero(t, sb.omitted)
@@ -74,7 +74,7 @@ func TestSyncBufferSmallOutputUnomittedAndTailAligned(t *testing.T) {
 func TestSyncBufferIdleMs(t *testing.T) {
 	sb := &syncBuffer{}
 	require.Equal(t, int64(0), sb.IdleMs()) // nothing written yet
-	sb.WriteString("x")
+	_, _ = sb.WriteString("x")
 	require.GreaterOrEqual(t, sb.IdleMs(), int64(0))
 }
 
@@ -222,8 +222,8 @@ func TestBackgroundOutputPersistedToDisk(t *testing.T) {
 func TestSyncBufferOverflowFiresOnce(t *testing.T) {
 	var fired atomic.Int32
 	sb := &syncBuffer{killLimit: 8, onOverflow: func() { fired.Add(1) }}
-	sb.WriteString("1234567890") // crosses the limit once…
-	sb.WriteString("more bytes") // …and again — must fire only once (async guard)
+	_, _ = sb.WriteString("1234567890") // crosses the limit once…
+	_, _ = sb.WriteString("more bytes") // …and again — must fire only once (async guard)
 	require.Eventually(t, func() bool { return fired.Load() == 1 }, time.Second, 5*time.Millisecond)
 	require.True(t, sb.OutputCapped())
 }

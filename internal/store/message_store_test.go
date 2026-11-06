@@ -16,7 +16,7 @@ func TestMessageStore_DeleteAfter(t *testing.T) {
 	}
 	s.sessions = newSessionStore(s)
 	s.messages = newMessageStore(s)
-	os.MkdirAll(filepath.Join(s.ProjectDir, "sessions", "sid1"), 0o700)
+	_ = os.MkdirAll(filepath.Join(s.ProjectDir, "sessions", "sid1"), 0o700)
 
 	// Create 5 messages
 	for i := 0; i < 5; i++ {
@@ -51,7 +51,7 @@ func TestMessageStore_DeleteAfter_ZeroIndex(t *testing.T) {
 	}
 	s.sessions = newSessionStore(s)
 	s.messages = newMessageStore(s)
-	os.MkdirAll(filepath.Join(s.ProjectDir, "sessions", "sid1"), 0o700)
+	_ = os.MkdirAll(filepath.Join(s.ProjectDir, "sessions", "sid1"), 0o700)
 
 	for i := 0; i < 3; i++ {
 		_, err := s.messages.Create(t.Context(), "sid1", message.CreateMessageParams{
@@ -85,7 +85,7 @@ func TestMessageStore_DeleteAfter_InvalidIndex(t *testing.T) {
 	}
 	s.sessions = newSessionStore(s)
 	s.messages = newMessageStore(s)
-	os.MkdirAll(filepath.Join(s.ProjectDir, "sessions", "sid1"), 0o700)
+	_ = os.MkdirAll(filepath.Join(s.ProjectDir, "sessions", "sid1"), 0o700)
 
 	err := s.messages.DeleteAfter(t.Context(), "sid1", -1)
 	if err == nil {
@@ -101,7 +101,7 @@ func TestMessageStore_DeleteAfterMessage(t *testing.T) {
 	}
 	s.sessions = newSessionStore(s)
 	s.messages = newMessageStore(s)
-	os.MkdirAll(filepath.Join(s.ProjectDir, "sessions", "sid1"), 0o700)
+	_ = os.MkdirAll(filepath.Join(s.ProjectDir, "sessions", "sid1"), 0o700)
 
 	// Create messages and track IDs
 	var ids []string
@@ -144,7 +144,7 @@ func TestMessageStore_DeleteAfterMessage_NotFound(t *testing.T) {
 	}
 	s.sessions = newSessionStore(s)
 	s.messages = newMessageStore(s)
-	os.MkdirAll(filepath.Join(s.ProjectDir, "sessions", "sid1"), 0o700)
+	_ = os.MkdirAll(filepath.Join(s.ProjectDir, "sessions", "sid1"), 0o700)
 
 	err := s.messages.DeleteAfterMessage(t.Context(), "sid1", "non-existent-id")
 	if err == nil {
