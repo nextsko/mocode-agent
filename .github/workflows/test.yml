@@ -36,6 +36,28 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+  race:
+    name: Race
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 1
+      GOEXPERIMENT: greenteagc
+      GOPROXY: https://goproxy.cn,direct
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      # The race detector is unavailable on android/arm64, so this job is the
+      # only place data races in the concurrency-heavy packages are caught.
+      - name: Race detector
+        run: go test -race -short -failfast -count=1 -timeout 20m -p 2 ./internal/util/... ./internal/domain/... ./internal/store/... ./internal/core/agent/...
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

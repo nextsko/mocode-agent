@@ -25,10 +25,24 @@ linters:
     - whitespace
     - wrapcheck
   disable:
-    - errcheck
     - ineffassign
     - unused
   settings:
+    errcheck:
+      # New code is gated on unchecked errors; the existing backlog stays visible
+      # in the scheduled full report but does not block merges.
+      check-type-assertions: false
+      check-blank: false
+      # Writing to stdout/stderr and closing is not actionable at call sites.
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - fmt.Print
+        - fmt.Printf
+        - fmt.Println
     revive:
       rules:
         # `exported` (comment/naming on every exported symbol) and
