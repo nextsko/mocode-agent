@@ -28,6 +28,31 @@ linters:
     - errcheck
     - ineffassign
     - unused
+  settings:
+    revive:
+      rules:
+        # `exported` (comment/naming on every exported symbol) and
+        # `unused-parameter` fire on ~1,150 intentionally shaped signatures in
+        # this codebase. Keeping them enabled drowns the linter in style noise
+        # while the genuinely useful revive rules stay on.
+        - name: exported
+          disabled: true
+        - name: unused-parameter
+          disabled: true
+    wrapcheck:
+      # The safety signal is an unwrapped error from a THIRD-PARTY package.
+      # Errors from this module (and from well-known libraries whose errors are
+      # wrapped where context matters) are frequently returned as-is; flagging
+      # every return adds churn without adding error-handling safety.
+      ignore-package-globs:
+        - github.com/nextsko/mocode-agent/*
+        - golang.org/x/sync/*
+        - charm.land/*
+        - github.com/charmbracelet/*
+    goconst:
+      # Three-letter repeats ("bash", "tool", "enabled") in one file are not
+      # worth a constant; five or more in the same package are.
+      min-occurrences: 5
   exclusions:
     generated: lax
     presets:
@@ -42,6 +67,7 @@ linters:
           - gosec
           - wrapcheck
           - godot
+          - goconst
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
