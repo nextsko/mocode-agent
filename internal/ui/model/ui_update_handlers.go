@@ -18,6 +18,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/chat"
 	"github.com/nextsko/mocode-agent/internal/ui/notification"
+	"github.com/nextsko/mocode-agent/internal/ui/pills"
 	"github.com/nextsko/mocode-agent/internal/util/anim"
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 )
@@ -36,10 +37,10 @@ func (m *UI) handleServiceEventMsg(msg tea.Msg) (cmds []tea.Cmd) {
 			break
 		}
 		if m.session != nil && msg.Payload.ID == m.session.ID {
-			prevHasInProgress := hasInProgressTodo(m.session.Todos)
+			prevHasInProgress := pills.HasInProgressTodo(m.session.Todos)
 			m.session = &msg.Payload
 			m.updateTodoContinuationState(m.session.ID, msg.Payload.Todos)
-			if !prevHasInProgress && hasInProgressTodo(m.session.Todos) {
+			if !prevHasInProgress && pills.HasInProgressTodo(m.session.Todos) {
 				m.todoIsSpinning = true
 				cmds = append(cmds, m.todoSpinner.Tick)
 				m.updateLayoutAndSize()
@@ -66,7 +67,7 @@ func (m *UI) handleServiceEventMsg(msg tea.Msg) (cmds []tea.Cmd) {
 			m.chat.RemoveMessage(msg.Payload.ID)
 		}
 		// start the spinner if there is a new message
-		if hasInProgressTodo(m.session.Todos) && m.isAgentBusy() && !m.todoIsSpinning {
+		if pills.HasInProgressTodo(m.session.Todos) && m.isAgentBusy() && !m.todoIsSpinning {
 			m.todoIsSpinning = true
 			m.breathOn = true
 			cmds = append(cmds, m.todoSpinner.Tick, m.breathingCmd())
@@ -290,7 +291,7 @@ func (m *UI) handleAnimMsg(msg tea.Msg) (cmds []tea.Cmd) {
 				cmds = append(cmds, cmd)
 			}
 		}
-		if m.state == uiChat && m.hasSession() && hasInProgressTodo(m.session.Todos) && m.todoIsSpinning {
+		if m.state == uiChat && m.hasSession() && pills.HasInProgressTodo(m.session.Todos) && m.todoIsSpinning {
 			var cmd tea.Cmd
 			m.todoSpinner, cmd = m.todoSpinner.Update(msg)
 			if cmd != nil {

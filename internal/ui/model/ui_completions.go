@@ -3,6 +3,7 @@ package model
 import (
 	"cmp"
 	"context"
+	"github.com/nextsko/mocode-agent/internal/ui/pills"
 	"image"
 	"log/slog"
 	"net/http"
@@ -191,7 +192,7 @@ func (m *UI) closeCompletions() {
 
 func (m *UI) slashCompletionGroups() []completions.SlashGroup {
 	hasSession := m.hasSession()
-	hasTodos := hasSession && hasIncompleteTodos(m.session.Todos)
+	hasTodos := hasSession && pills.HasIncompleteTodos(m.session.Todos)
 	hasQueue := m.promptQueue > 0
 	cfg := m.com.Config()
 

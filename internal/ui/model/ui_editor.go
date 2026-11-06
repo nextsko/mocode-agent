@@ -21,7 +21,7 @@ func (m *UI) openEditor(value string) tea.Cmd {
 		return util.ReportError(err)
 	}
 	tmpPath := tmpfile.Name()
-	defer tmpfile.Close() //nolint:errcheck
+	defer func() { _ = tmpfile.Close() }()
 	if _, err := tmpfile.WriteString(value); err != nil {
 		return util.ReportError(err)
 	}

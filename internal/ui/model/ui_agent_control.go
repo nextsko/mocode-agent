@@ -16,6 +16,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/chat"
 	"github.com/nextsko/mocode-agent/internal/ui/notification"
+	"github.com/nextsko/mocode-agent/internal/ui/pills"
 	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
 
@@ -123,7 +124,7 @@ func (m *UI) maybeAutoContinueTodos(sessionID string) tea.Cmd {
 	if err != nil {
 		return nil
 	}
-	if !hasIncompleteTodos(sess.Todos) {
+	if !pills.HasIncompleteTodos(sess.Todos) {
 		m.updateTodoContinuationState(sessionID, sess.Todos)
 		return nil
 	}

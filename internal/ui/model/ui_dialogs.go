@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"fmt"
+	"github.com/nextsko/mocode-agent/internal/ui/pills"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -182,7 +183,7 @@ func (m *UI) updateTodoContinuationState(sessionID string, todos []session.Todo)
 		return
 	}
 	fp := todoFingerprint(todos)
-	if !hasIncompleteTodos(todos) {
+	if !pills.HasIncompleteTodos(todos) {
 		state.InFlight = false
 		state.Stalled = false
 		state.ConsecutiveNoChanges = 0

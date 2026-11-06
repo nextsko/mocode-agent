@@ -23,6 +23,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/ui/common"
 	"github.com/nextsko/mocode-agent/internal/ui/completions"
 	"github.com/nextsko/mocode-agent/internal/ui/dialog"
+	"github.com/nextsko/mocode-agent/internal/ui/pills"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
 	"github.com/nextsko/mocode-agent/internal/ui/util"
 	"github.com/nextsko/mocode-agent/internal/util/csync"
@@ -627,7 +628,7 @@ func TestPillClickTargetAt(t *testing.T) {
 	require.Equal(t, -1, target.todoIndex)
 
 	ui.promptQueue = 2
-	todoWidth := lipgloss.Width(todoPill(ui.session.Todos, ui.com.Styles.Tool.TodoInProgressIcon.Render(styles.SpinnerIcon), false, false, ui.com.Styles))
+	todoWidth := lipgloss.Width(pills.TodoPill(ui.session.Todos, ui.com.Styles.Tool.TodoInProgressIcon.Render(styles.SpinnerIcon), false, false, ui.com.Styles))
 	queueTarget := ui.pillClickTargetAt(3+todoWidth+2, 1)
 	require.Equal(t, pillClickQueue, queueTarget.kind)
 

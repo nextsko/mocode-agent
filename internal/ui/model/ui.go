@@ -33,6 +33,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/ui/completions"
 	"github.com/nextsko/mocode-agent/internal/ui/dialog"
 	"github.com/nextsko/mocode-agent/internal/ui/notification"
+	"github.com/nextsko/mocode-agent/internal/ui/pills"
 	"github.com/nextsko/mocode-agent/internal/ui/slash"
 	"github.com/nextsko/mocode-agent/internal/ui/util"
 	"github.com/nextsko/mocode-agent/internal/util/anim"
@@ -543,7 +544,7 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd := m.setSessionMessages(msgs); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
-		if hasInProgressTodo(m.session.Todos) {
+		if pills.HasInProgressTodo(m.session.Todos) {
 			// only start spinner if there is an in-progress todo
 			if m.isAgentBusy() {
 				m.todoIsSpinning = true
