@@ -7,7 +7,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	wechat "github.com/nextsko/mocode-agent/internal/integration/wechat"
 	"github.com/nextsko/mocode-agent/internal/ui/common"
 	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
@@ -98,7 +97,7 @@ func splitSlashCommand(value string) (cmd, args string) {
 
 // handleWeChatCommand handles legacy /wechat sub-commands for power users.
 func (m *UI) handleWeChatCommand(args string) tea.Cmd {
-	mgr := wechat.GetManager()
+	mgr := m.com.WeChat
 	switch {
 	case args == "" || args == "ui" || args == "manager":
 		// Already handled by the caller, but keep for safety.

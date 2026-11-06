@@ -7,7 +7,6 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
-	wechat "github.com/nextsko/mocode-agent/internal/integration/wechat"
 	"github.com/nextsko/mocode-agent/internal/ui/dialog"
 	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
@@ -149,7 +148,7 @@ func (m *UI) openWeChatQRDialog() tea.Cmd {
 
 	// Wire the agent handler on the active channel so incoming messages
 	// are processed once the poll loop starts.
-	mgr := wechat.GetManager()
+	mgr := m.com.WeChat
 	if ch := mgr.GetActive(); ch != nil {
 		injectWeChatButler(ch, m.com.Workspace)
 	}

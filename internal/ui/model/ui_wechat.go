@@ -136,7 +136,7 @@ func (w *tuiButlerWorkspace) UpdateModel(provider, model string) error {
 func (m *UI) handleWeChatLogin() tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		mgr := wechat.GetManager()
+		mgr := m.com.WeChat
 		qrCh := make(chan string, 1)
 
 		go func() {
@@ -171,7 +171,7 @@ func (m *UI) handleWeChatLogin() tea.Cmd {
 
 func (m *UI) handleWeChatLogout() tea.Cmd {
 	return func() tea.Msg {
-		wechat.GetManager().StopAll()
+		m.com.WeChat.StopAll()
 		return util.NewInfoMsg("WeChat disconnected")
 	}
 }

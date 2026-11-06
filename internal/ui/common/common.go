@@ -10,6 +10,7 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/integration/wechat"
 	"github.com/nextsko/mocode-agent/internal/transport/workspace"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
 	"github.com/nextsko/mocode-agent/internal/ui/util"
@@ -25,6 +26,9 @@ var AllowedImageTypes = []string{".jpg", ".jpeg", ".png"}
 type Common struct {
 	Workspace workspace.Workspace
 	Styles    *styles.Styles
+	// WeChat is the injected account manager. Injecting it keeps the process-wide
+	// singleton at the composition root instead of inside UI components.
+	WeChat wechat.Accounts
 }
 
 // Config returns the pure-data configuration associated with this [Common] instance.
@@ -33,11 +37,12 @@ func (c *Common) Config() *config.Config {
 }
 
 // DefaultCommon returns the default common UI configurations.
-func DefaultCommon(ws workspace.Workspace) *Common {
+func DefaultCommon(ws workspace.Workspace, accounts wechat.Accounts) *Common {
 	s := styles.ThemeForProvider(largeModelProviderID(ws))
 	return &Common{
 		Workspace: ws,
 		Styles:    &s,
+		WeChat:    accounts,
 	}
 }
 

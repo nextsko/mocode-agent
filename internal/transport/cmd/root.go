@@ -108,7 +108,7 @@ mocode --continue
 			sessionID = sess.ID
 		}
 
-		com := common.DefaultCommon(ws)
+		com := common.DefaultCommon(ws, wechat.GetManager())
 		model := ui.New(com, sessionID, continueLast)
 
 		var env uv.Environ = os.Environ()

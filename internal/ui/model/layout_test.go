@@ -31,7 +31,7 @@ var _ chat.MessageItem = testMessageItem{}
 // It intentionally keeps dependencies minimal so layout behavior can be tested
 // in isolation.
 func newTestUI() *UI {
-	com := common.DefaultCommon(nil)
+	com := common.DefaultCommon(nil, nil)
 
 	ta := textarea.New()
 	ta.SetStyles(com.Styles.Editor.Textarea)

@@ -62,6 +62,24 @@ func GetManager() *AccountManager {
 	return globalManager
 }
 
+// Accounts is the account-management surface the UI depends on. Injecting it
+// through the UI dependency container keeps the process-wide default manager at
+// the composition root instead of inside every dialog.
+type Accounts interface {
+	Login(ctx context.Context, force bool, callbacks LoginCallbacks, client *http.Client) (*AccountInfo, error)
+	GetActive() *Channel
+	Switch(id string) error
+	Start(ctx context.Context, id string) error
+	Stop(id string)
+	Reconnect(ctx context.Context, id string) error
+	Delete(id string) error
+	StopAll()
+	IsRunning(id string) bool
+	List() []AccountInfo
+}
+
+var _ Accounts = (*AccountManager)(nil)
+
 // NewAccountManager creates a new AccountManager.
 func NewAccountManager(storeDir string) *AccountManager {
 	if storeDir == "" {

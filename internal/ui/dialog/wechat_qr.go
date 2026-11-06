@@ -92,7 +92,7 @@ func (d *WeChatQR) StartLogin() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	d.cancelFn = cancel
-	mgr := wechat.GetManager()
+	mgr := d.com.WeChat
 
 	go func() {
 		defer cancel()

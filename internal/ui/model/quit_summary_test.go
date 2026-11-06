@@ -128,7 +128,7 @@ func TestQuitSummaryMethod(t *testing.T) {
 
 	t.Run("returns rendered summary when set", func(t *testing.T) {
 		t.Parallel()
-		com := common.DefaultCommon(nil)
+		com := common.DefaultCommon(nil, nil)
 		ui := &UI{
 			com: com,
 			pendingQuitSummary: &quitSummary{

@@ -8,7 +8,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/nextsko/mocode-agent/internal/core/config"
-	wechat "github.com/nextsko/mocode-agent/internal/integration/wechat"
 	"github.com/nextsko/mocode-agent/internal/ui/dialog"
 	fimage "github.com/nextsko/mocode-agent/internal/ui/image"
 	"github.com/nextsko/mocode-agent/internal/ui/slash"
@@ -302,7 +301,7 @@ func (m *UI) handleDialogAction(action tea.Msg) tea.Cmd {
 		}
 	case dialog.ActionSelectWeChat:
 		m.dialog.CloseDialog(dialog.WeChatManagerID)
-		mgr := wechat.GetManager()
+		mgr := m.com.WeChat
 		if err := mgr.Switch(msg.AccountID); err != nil {
 			cmds = append(cmds, util.CmdHandler(util.NewErrorMsg(err)))
 		} else {
@@ -314,25 +313,25 @@ func (m *UI) handleDialogAction(action tea.Msg) tea.Cmd {
 			cmds = append(cmds, util.CmdHandler(util.NewInfoMsg("Switched to WeChat account: "+msg.AccountID)))
 		}
 	case dialog.ActionWeChatReconnect:
-		mgr := wechat.GetManager()
+		mgr := m.com.WeChat
 		if err := mgr.Reconnect(context.Background(), msg.AccountID); err != nil {
 			cmds = append(cmds, util.CmdHandler(util.NewErrorMsg(err)))
 		} else {
 			cmds = append(cmds, util.CmdHandler(util.NewInfoMsg("Reconnected WeChat account: "+msg.AccountID)))
 		}
 	case dialog.ActionWeChatStart:
-		mgr := wechat.GetManager()
+		mgr := m.com.WeChat
 		if err := mgr.Start(context.Background(), msg.AccountID); err != nil {
 			cmds = append(cmds, util.CmdHandler(util.NewErrorMsg(err)))
 		} else {
 			cmds = append(cmds, util.CmdHandler(util.NewInfoMsg("Started WeChat account: "+msg.AccountID)))
 		}
 	case dialog.ActionWeChatStop:
-		mgr := wechat.GetManager()
+		mgr := m.com.WeChat
 		mgr.Stop(msg.AccountID)
 		cmds = append(cmds, util.CmdHandler(util.NewInfoMsg("Stopped WeChat account: "+msg.AccountID)))
 	case dialog.ActionWeChatDelete:
-		mgr := wechat.GetManager()
+		mgr := m.com.WeChat
 		if err := mgr.Delete(msg.AccountID); err != nil {
 			cmds = append(cmds, util.CmdHandler(util.NewErrorMsg(err)))
 		} else {

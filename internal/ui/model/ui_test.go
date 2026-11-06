@@ -805,7 +805,7 @@ func newTestUIWithConfig(t *testing.T, cfg *config.Config) *UI {
 		queuedPrompts: make(map[string]int),
 		sessionByID:   make(map[string]session.Session),
 	}
-	com := common.DefaultCommon(ws)
+	com := common.DefaultCommon(ws, nil)
 	ta := textarea.New()
 	ta.SetStyles(com.Styles.Editor.Textarea)
 	ta.ShowLineNumbers = false

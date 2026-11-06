@@ -52,7 +52,7 @@ func (d *WeChatSelect) ID() string { return WeChatSelectID }
 
 // HandleMsg implements Dialog.
 func (d *WeChatSelect) HandleMsg(msg tea.Msg) Action {
-	d.accounts = wechat.GetManager().List()
+	d.accounts = d.com.WeChat.List()
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch {
@@ -81,7 +81,7 @@ func (d *WeChatSelect) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	title := common.DialogTitle(t, "WeChat Accounts", min(area.Dx()-4, 60),
 		t.Dialog.TitleGradFromColor, t.Dialog.TitleGradToColor)
 
-	d.accounts = wechat.GetManager().List()
+	d.accounts = d.com.WeChat.List()
 
 	var lines []string
 	if len(d.accounts) == 0 {

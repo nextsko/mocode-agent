@@ -97,7 +97,7 @@ func (d *WeChatManager) stopTick() { d.tickEnabled = false }
 func (d *WeChatManager) ID() string { return WeChatManagerID }
 
 func (d *WeChatManager) refreshAccounts() {
-	d.accounts = wechat.GetManager().List()
+	d.accounts = d.com.WeChat.List()
 	if d.selected >= len(d.accounts) {
 		d.selected = max(0, len(d.accounts)-1)
 	}
@@ -158,7 +158,7 @@ func (d *WeChatManager) HandleMsg(msg tea.Msg) Action {
 		case key.Matches(msg, d.keyMap.Toggle):
 			if d.selected >= 0 && d.selected < len(d.accounts) {
 				id := d.accounts[d.selected].ID
-				if wechat.GetManager().IsRunning(id) {
+				if d.com.WeChat.IsRunning(id) {
 					return ActionWeChatStop{AccountID: id}
 				}
 				return ActionWeChatStart{AccountID: id}
@@ -286,7 +286,7 @@ func (d *WeChatManager) renderAccountDetail(t *styles.Styles, w, h int) string {
 
 	statusStr := wechatStatusIcon(a.Status) + " " + string(a.Status)
 	pollStr := "off"
-	if wechat.GetManager().IsRunning(a.ID) {
+	if d.com.WeChat.IsRunning(a.ID) {
 		pollStr = "running"
 	}
 

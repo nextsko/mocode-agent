@@ -12,7 +12,7 @@ import (
 )
 
 func newTestToast() *Toast {
-	com := common.DefaultCommon(nil)
+	com := common.DefaultCommon(nil, nil)
 	return NewToast(com)
 }
 
