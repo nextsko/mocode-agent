@@ -3,6 +3,7 @@ package config
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -447,10 +448,8 @@ func (h *HookConfig) TimeoutDuration() time.Duration {
 	return time.Duration(h.Timeout) * time.Second
 }
 
-// Config holds the configuration for mocode.
-type Config struct {
-	Schema string `json:"$schema,omitempty"`
-
+// ProviderSection groups provider endpoints and model selection.
+type ProviderSection struct {
 	// We currently only support large/small as values here.
 	Models map[SelectedModelType]SelectedModel `json:"models,omitempty" jsonschema:"description=Model configurations for different model types,example={\"large\":{\"model\":\"gpt-4o\",\"provider\":\"openai\"}}"`
 
@@ -459,20 +458,107 @@ type Config struct {
 
 	// The providers that are configured
 	Providers *csync.Map[string, ProviderConfig] `json:"providers,omitempty" jsonschema:"description=AI provider configurations"`
+}
 
+// ToolingSection groups the tools, MCP servers, and language servers mocode
+// may load.
+type ToolingSection struct {
 	MCP MCPs `json:"mcp,omitempty" jsonschema:"description=Model Context Protocol server configurations"`
 
 	LSP LSPs `json:"lsp,omitempty" jsonschema:"description=Language Server Protocol configurations"`
 
+	Tools Tools `json:"tools,omitzero" jsonschema:"description=Tool configurations"`
+}
+
+// RuntimeSection groups runtime behaviour switches and permission policy.
+type RuntimeSection struct {
 	Options *Options `json:"options,omitempty" jsonschema:"description=General application options"`
 
 	Permissions *Permissions `json:"permissions,omitempty" jsonschema:"description=Permission settings for tool usage"`
+}
 
-	Tools Tools `json:"tools,omitzero" jsonschema:"description=Tool configurations"`
-
+// AutomationSection groups user hooks and agent definitions.
+type AutomationSection struct {
 	Hooks map[string][]HookConfig `json:"hooks,omitempty" jsonschema:"description=User-defined shell commands that fire on hook events (e.g. PreToolUse)"`
 
 	Agents map[string]Agent `json:"-"`
+}
+
+// Config holds the configuration for mocode.
+//
+// It is composed from provider, tooling, runtime, and automation sections. The
+// sections are embedded so existing field access (config.Providers,
+// config.Options, ...) keeps working, while each concern now lives in its own
+// type. Consumers should treat *Config as read-only; the config service is the
+// only writer, and Clone produces a snapshot safe to read from another
+// goroutine.
+type Config struct {
+	Schema string `json:"$schema,omitempty"`
+
+	ProviderSection
+	ToolingSection
+	RuntimeSection
+	AutomationSection
+}
+
+// View is a read-only facade over Config. It exposes derived, immutable values
+// instead of the mutable maps, so read-only consumers (CLI commands, adapters)
+// cannot accidentally change configuration.
+type View struct {
+	cfg *Config
+}
+
+// View returns a read-only facade over the configuration.
+func (c *Config) View() View {
+	return View{cfg: c}
+}
+
+// Configured reports whether at least one provider is enabled.
+func (v View) Configured() bool {
+	return v.cfg != nil && v.cfg.IsConfigured()
+}
+
+// ModelIDs returns sorted "provider/model" identifiers for every enabled
+// provider.
+func (v View) ModelIDs() []string {
+	if v.cfg == nil {
+		return nil
+	}
+	var ids []string
+	for providerID, provider := range v.cfg.Providers.Seq2() {
+		if provider.Disable {
+			continue
+		}
+		for _, model := range provider.Models {
+			ids = append(ids, providerID+"/"+model.ID)
+		}
+	}
+	slices.Sort(ids)
+	return ids
+}
+
+// Clone returns a deep copy of the configuration. The copy is safe to read from
+// another goroutine while the config service keeps mutating the live value.
+func (c *Config) Clone() (*Config, error) {
+	if c == nil {
+		return &Config{}, nil
+	}
+	data, err := json.Marshal(c)
+	if err != nil {
+		return nil, fmt.Errorf("clone config: %w", err)
+	}
+	var out Config
+	if err := json.Unmarshal(data, &out); err != nil {
+		return nil, fmt.Errorf("clone config: %w", err)
+	}
+	// Agents is excluded from JSON; copy it explicitly.
+	if c.Agents != nil {
+		out.Agents = make(map[string]Agent, len(c.Agents))
+		for k, v := range c.Agents {
+			out.Agents[k] = v
+		}
+	}
+	return &out, nil
 }
 
 func (c *Config) EnabledProviders() []ProviderConfig {

@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"sync"
 
 	"github.com/spf13/cobra"
@@ -161,23 +160,12 @@ func (r *mcpRunner) ListModels(_ context.Context, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	cfg := ws.Config()
-	if !cfg.IsConfigured() {
+	view := ws.Config().View()
+	if !view.Configured() {
 		return errors.New("no providers configured - please run 'mocode' to set up a provider interactively")
 	}
-
-	var lines []string
-	for providerID, provider := range cfg.Providers.Seq2() {
-		if provider.Disable {
-			continue
-		}
-		for _, model := range provider.Models {
-			lines = append(lines, providerID+"/"+model.ID)
-		}
-	}
-	sort.Strings(lines)
-	for _, line := range lines {
-		if _, err := fmt.Fprintln(out, line); err != nil {
+	for _, id := range view.ModelIDs() {
+		if _, err := fmt.Fprintln(out, id); err != nil {
 			return fmt.Errorf("write model line: %w", err)
 		}
 	}
