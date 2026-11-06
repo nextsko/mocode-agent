@@ -215,6 +215,21 @@ Project:
 - `.claude/skills`
 - `.cursor/skills`
 
+## MCP Server
+
+Serve mocode to MCP clients over stdio:
+
+```bash
+mocode mcp serve
+```
+
+The server exposes `run` (delegate one non-interactive prompt) and `models`.
+Clients address them as `mcp__mocode__run` / `mcp__mocode__models` when using
+a namespacing harness such as DeepSeek Harness.
+
+See [docs/guides/11-mcp-server.md](docs/guides/11-mcp-server.md) for client
+configuration, environment requirements, and troubleshooting.
+
 ## Logging
 
 Location: `./.mocode/logs/mocode.log`
