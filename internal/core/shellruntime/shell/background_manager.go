@@ -223,7 +223,7 @@ func (m *BackgroundShellManager) Start(ctx context.Context, workingDir string, b
 		}
 
 		bgShell.exitErr = err
-		bgShell.exitCode.Store(int32(ExitCode(err)))
+		bgShell.exitCode.Store(int32(ExitCode(err))) //nolint:gosec // process exit codes are bounded to 8 bits.
 		bgShell.completedAt.Store(time.Now().Unix())
 
 		// Fire the push notification before the done channel closes, so

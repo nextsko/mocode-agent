@@ -2,7 +2,7 @@ package crypto
 
 import (
 	"crypto/aes"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec // MD5 is required by the WeChat file-transfer protocol.
 	"crypto/rand"
 	"encoding/hex"
 )
@@ -24,6 +24,6 @@ func RandomHex(n int) (string, error) {
 
 // MD5Hex returns the MD5 hash of data as hex string.
 func MD5Hex(data []byte) string {
-	h := md5.Sum(data)
+	h := md5.Sum(data) //nolint:gosec // MD5 is required by the WeChat file-transfer protocol.
 	return hex.EncodeToString(h[:])
 }

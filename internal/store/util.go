@@ -81,7 +81,7 @@ func lockPath(path string) string {
 
 // openLock opens or creates a lock file.
 func openLock(path string) (*os.File, error) {
-	return os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
+	return os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 }
 
 // closeQuietly closes a file, ignoring errors.

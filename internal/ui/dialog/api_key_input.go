@@ -30,7 +30,7 @@ const (
 )
 
 // APIKeyInputID is the identifier for the model selection dialog.
-const APIKeyInputID = "api_key_input"
+const APIKeyInputID = "api_key_input" //nolint:gosec // UI widget identifier, not a credential.
 
 // APIKeyInput represents a model selection dialog.
 type APIKeyInput struct {

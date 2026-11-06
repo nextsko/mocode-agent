@@ -169,10 +169,10 @@ func (s *ConfigStore) SetConfigField(scope Scope, key string, value any) error {
 	if err != nil {
 		return fmt.Errorf("failed to set config field %s: %w", key, err)
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return fmt.Errorf("failed to create config directory %q: %w", path, err)
 	}
-	if err := os.WriteFile(path, []byte(newValue), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(newValue), 0o600); err != nil { //nolint:gosec // path derives from an internal config key.
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
@@ -204,10 +204,10 @@ func (s *ConfigStore) RemoveConfigField(scope Scope, key string) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete config field %s: %w", key, err)
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return fmt.Errorf("failed to create config directory %q: %w", path, err)
 	}
-	if err := os.WriteFile(path, []byte(newValue), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(newValue), 0o600); err != nil { //nolint:gosec // path derives from an internal config key.
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 

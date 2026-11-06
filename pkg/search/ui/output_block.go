@@ -176,7 +176,7 @@ func hashOutputBlockOptions(opts OutputBlockOptions) uint64 {
 func hashInt(h io.Writer, v int) {
 	var buf [8]byte
 	for i := range buf {
-		buf[i] = byte(v >> (8 * i))
+		buf[i] = byte(v >> (8 * i)) //nolint:gosec // intentional byte extraction for a length prefix.
 	}
 	_, _ = h.Write(buf[:])
 }

@@ -44,7 +44,7 @@ func (w *JSONLWriter) Append(value any) error {
 
 	// Acquire lock on sidecar lock file
 	lockPath := w.path + ".lock"
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o644)
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return fmt.Errorf("open lock file %s: %w", lockPath, err)
 	}
@@ -56,7 +56,7 @@ func (w *JSONLWriter) Append(value any) error {
 	defer func() { _ = UnlockFile(lockFile) }()
 
 	// Open the JSONL file for append
-	f, err := os.OpenFile(w.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(w.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return fmt.Errorf("open %s: %w", w.path, err)
 	}
@@ -99,7 +99,7 @@ func (w *JSONLWriter) ReadAll(newValue func() any) ([]any, error) {
 
 	// Acquire shared lock on sidecar lock file
 	lockPath := w.path + ".lock"
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o644)
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("open lock file %s: %w", lockPath, err)
 	}
@@ -153,7 +153,7 @@ func (w *JSONLWriter) ScanLines(fn func(line string) error) error {
 
 	// Acquire shared lock on sidecar lock file
 	lockPath := w.path + ".lock"
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o644)
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return fmt.Errorf("open lock file %s: %w", lockPath, err)
 	}
@@ -201,7 +201,7 @@ func (w *JSONLWriter) WriteAll(values []any) error {
 	}
 
 	lockPath := w.path + ".lock"
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o644)
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return fmt.Errorf("open lock file: %w", err)
 	}
@@ -213,7 +213,7 @@ func (w *JSONLWriter) WriteAll(values []any) error {
 	defer func() { _ = UnlockFile(lockFile) }()
 
 	tmpPath := w.path + ".tmp"
-	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("open temp: %w", err)
 	}
@@ -263,7 +263,7 @@ func WriteJSON(path string, value any) error {
 		return fmt.Errorf("mkdir %s: %w", filepath.Dir(path), err)
 	}
 	tmpPath := path + ".tmp"
-	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("open %s: %w", tmpPath, err)
 	}

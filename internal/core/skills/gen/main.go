@@ -38,7 +38,7 @@ var categoryOrder = []string{
 
 // categoryOf maps every builtin skill to a category. A skill missing here lands
 // in "其他" — keep this in sync (gen_test.go fails on drift only for the doc).
-var categoryOf = map[string]string{
+var categoryOf = map[string]string{ //nolint:gosec // static skill catalogue, no credentials.
 	"using-agent-skills": "元技能 · 发现与自省", "find-skills": "元技能 · 发现与自省",
 	"using-superpowers": "元技能 · 发现与自省", "writing-skills": "元技能 · 发现与自省",
 	"dot-skill": "元技能 · 发现与自省", "deep-roles": "元技能 · 发现与自省",
@@ -129,7 +129,7 @@ func main() {
 		os.Exit(1)
 	}
 	dst := filepath.Join(root, "docs", "skills-and-roles", "README.md")
-	if err := os.WriteFile(dst, []byte(out), 0o644); err != nil {
+	if err := os.WriteFile(dst, []byte(out), 0o600); err != nil {
 		fmt.Fprintln(os.Stderr, "gen:", err)
 		os.Exit(1)
 	}
@@ -213,7 +213,7 @@ func readModes(dir string) ([]modeInfo, error) {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		data, err := os.ReadFile(filepath.Join(dir, e.Name())) //nolint:gosec // walks the embedded template directory.
 		if err != nil {
 			return nil, err
 		}

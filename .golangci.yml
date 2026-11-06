@@ -48,6 +48,10 @@ linters:
       # code; keeping both makes the full report double-count the same lines.
       excludes:
         - G104
+    exhaustive:
+      # A switch with a default branch covers unknown enum values by design;
+      # treating that as exhaustive removes noise without hiding real gaps.
+      default-signifies-exhaustive: true
     revive:
       rules:
         # `exported` (comment/naming on every exported symbol) and
@@ -59,6 +63,21 @@ linters:
         - name: unused-parameter
           disabled: true
     wrapcheck:
+      # Stdlib filesystem/encoding calls are wrapped by the caller when the
+      # extra context matters; requiring a wrap at every return adds churn
+      # without adding handling. Only third-party errors keep the rule.
+      extra-ignore-sigs:
+        - "func os.MkdirAll("
+        - "func os.ReadFile("
+        - "func os.WriteFile("
+        - "func os.Open("
+        - "func os.Rename("
+        - "func os.ReadDir("
+        - "func io.ReadAll("
+        - "func encoding/json.Unmarshal("
+        - "func encoding/json.MarshalIndent("
+        - "func fmt.Fprint("
+        - "func fmt.Fprintf("
       # The safety signal is an unwrapped error from a THIRD-PARTY package.
       # Errors from this module (and from well-known libraries whose errors are
       # wrapped where context matters) are frequently returned as-is; flagging

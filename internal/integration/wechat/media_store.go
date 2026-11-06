@@ -38,7 +38,7 @@ func NewMediaStore(baseDir string, maxAge time.Duration) *MediaStore {
 	if maxAge <= 0 {
 		maxAge = 24 * time.Hour
 	}
-	_ = os.MkdirAll(baseDir, 0o755)
+	_ = os.MkdirAll(baseDir, 0o750)
 	return &MediaStore{
 		baseDir:  baseDir,
 		entries:  make(map[string]*MediaEntry),
@@ -141,7 +141,7 @@ func (s *MediaStore) Count() int {
 func generateMediaID() string {
 	var buf [16]byte
 	for i := range buf {
-		buf[i] = byte(time.Now().UnixNano() >> (8 * uint(i%8)))
+		buf[i] = byte(time.Now().UnixNano() >> (8 * uint(i%8))) //nolint:gosec // intentional byte extraction for a randomized name.
 	}
 	return filepath.Base(string(buf[:]))
 }

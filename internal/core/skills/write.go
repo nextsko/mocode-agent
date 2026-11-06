@@ -157,7 +157,7 @@ func writeSkillDir(dir string, s *Skill, now time.Time) (WriteResult, error) {
 		return WriteResult{}, fmt.Errorf("skill is invalid at %s: %w", dir, err)
 	}
 
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return WriteResult{}, fmt.Errorf("creating skill directory %s: %w", dir, err)
 	}
 
@@ -218,7 +218,7 @@ func backupExisting(root, name, target string, now time.Time) (string, error) {
 	}
 
 	dir := filepath.Join(root, BackupDirName, name)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return "", fmt.Errorf("creating backup directory %s: %w", dir, err)
 	}
 
@@ -232,7 +232,7 @@ func backupExisting(root, name, target string, now time.Time) (string, error) {
 		dst = filepath.Join(dir, stamp+"-"+strconv.Itoa(i)+".md")
 	}
 
-	if err := os.WriteFile(dst, data, 0o644); err != nil {
+	if err := os.WriteFile(dst, data, 0o600); err != nil {
 		return "", fmt.Errorf("writing backup %s: %w", dst, err)
 	}
 	return dst, nil

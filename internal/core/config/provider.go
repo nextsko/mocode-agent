@@ -68,7 +68,7 @@ func UpdateProviders(pathOrURL string) error {
 			return fmt.Errorf("failed to fetch providers from Catwalk: %w", err)
 		}
 	default:
-		content, err := os.ReadFile(pathOrURL)
+		content, err := os.ReadFile(pathOrURL) //nolint:gosec // cache path derives from the internal provider name.
 		if err != nil {
 			return fmt.Errorf("failed to read file: %w", err)
 		}
@@ -164,7 +164,7 @@ func (c cache[T]) Get() (T, string, error) {
 
 func (c cache[T]) Store(v T) error {
 	slog.Info("Saving provider data to disk", "path", c.path)
-	if err := os.MkdirAll(filepath.Dir(c.path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(c.path), 0o750); err != nil {
 		return fmt.Errorf("failed to create directory for provider cache: %w", err)
 	}
 
@@ -173,7 +173,7 @@ func (c cache[T]) Store(v T) error {
 		return fmt.Errorf("failed to marshal provider data: %w", err)
 	}
 
-	if err := os.WriteFile(c.path, data, 0o644); err != nil {
+	if err := os.WriteFile(c.path, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write provider data to cache: %w", err)
 	}
 	return nil

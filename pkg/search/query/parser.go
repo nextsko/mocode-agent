@@ -25,7 +25,7 @@ var groupCounter atomic.Uint64
 // nextGroupID allocates the next unique OR-group id; ids start at 1 so
 // that 0 can mark "no group".
 func nextGroupID() int {
-	return int(groupCounter.Add(1))
+	return int(groupCounter.Add(1)) //nolint:gosec // monotonic counter bounded by the group count.
 }
 
 // isQuote reports whether r is an ASCII or curly double quote.

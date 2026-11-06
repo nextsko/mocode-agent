@@ -79,7 +79,7 @@ func applyTextEdits(uri protocol.DocumentURI, edits []protocol.TextEdit, encodin
 		newContent.WriteString(lineEnding)
 	}
 
-	if err := os.WriteFile(path, []byte(newContent.String()), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(newContent.String()), 0o600); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
@@ -184,7 +184,7 @@ func applyDocumentChange(change protocol.DocumentChange, encoding powernap.Offse
 				}
 			}
 		}
-		if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(""), 0o600); err != nil {
 			return fmt.Errorf("failed to create file: %w", err)
 		}
 	}

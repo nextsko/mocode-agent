@@ -98,7 +98,7 @@ func SyncAgentsToDir(dir string) error {
 		return nil
 	}
 
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("create agents dir: %w", err)
 	}
 
@@ -124,13 +124,13 @@ func SyncAgentsToDir(dir string) error {
 			continue
 		}
 
-		if err := os.WriteFile(targetPath, data, 0o644); err != nil {
+		if err := os.WriteFile(targetPath, data, 0o600); err != nil {
 			slog.Warn("Failed to write agent file", "path", targetPath, "error", err)
 			continue
 		}
 	}
 
-	if err := os.WriteFile(filepath.Join(dir, agentsVersionFile), []byte(AgentsVersion+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, agentsVersionFile), []byte(AgentsVersion+"\n"), 0o600); err != nil {
 		return fmt.Errorf("write version file: %w", err)
 	}
 

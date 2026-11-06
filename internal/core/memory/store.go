@@ -261,7 +261,7 @@ func (s *Store) Forget(_ context.Context, relPath string) (string, error) {
 	archiveDir := filepath.Join(s.root, ArchiveDir)
 	archived := filepath.Join(archiveDir, s.now().UTC().Format("20060102T150405")+"-"+filepath.Base(absPath))
 
-	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
+	if err := os.MkdirAll(archiveDir, 0o750); err != nil {
 		return "", fmt.Errorf("creating archive directory: %w", err)
 	}
 	if err := os.Rename(absPath, archived); err != nil {
@@ -390,7 +390,7 @@ func (s *Store) checkInsideRoot(absPath string) error {
 
 // writeFileAtomic writes data into dir and renames it over target.
 func writeFileAtomic(dir, target string, data []byte) error {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("creating %s: %w", dir, err)
 	}
 

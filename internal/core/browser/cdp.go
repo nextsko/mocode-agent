@@ -39,12 +39,12 @@ func discoverEndpoint(ctx context.Context, baseURL string) (string, string, erro
 	ctx, cancel := context.WithTimeout(ctx, httpDiscoveryTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil) //nolint:gosec // CDP endpoint is the browser devtools URL the tool was asked to drive.
 	if err != nil {
 		return "", "", err
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec // same CDP endpoint; the tool drives the browser by design.
 	if err != nil {
 		return "", "", fmt.Errorf("querying %s: %w", url, err)
 	}

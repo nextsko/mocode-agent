@@ -145,10 +145,10 @@ func restoreFilesAt(files []history.File, workingDir string, cutoff int64) (rest
 			continue
 		}
 
-		if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(absPath), 0o750); err != nil {
 			return restored, removed, fmt.Errorf("create parent for %s: %w", path, err)
 		}
-		if err := os.WriteFile(absPath, []byte(target.Content), 0o644); err != nil {
+		if err := os.WriteFile(absPath, []byte(target.Content), 0o600); err != nil {
 			return restored, removed, fmt.Errorf("restore %s: %w", path, err)
 		}
 		restored++
@@ -183,7 +183,7 @@ func rollbackRepoDir(sess sessionpkg.Session, workingDir string) (string, error)
 }
 
 func commitRollbackState(repoDir, workingDir string, state map[string]string, msg string) error {
-	if err := os.MkdirAll(repoDir, 0o755); err != nil {
+	if err := os.MkdirAll(repoDir, 0o750); err != nil {
 		return err
 	}
 	repo, err := git.PlainOpen(repoDir)
@@ -207,10 +207,10 @@ func commitRollbackState(repoDir, workingDir string, state map[string]string, ms
 			continue
 		}
 		dst := filepath.Join(repoDir, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
 			return err
 		}
-		if err := os.WriteFile(dst, []byte(content), 0o644); err != nil {
+		if err := os.WriteFile(dst, []byte(content), 0o600); err != nil {
 			return err
 		}
 		if _, err := wt.Add(rel); err != nil {

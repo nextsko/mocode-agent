@@ -60,7 +60,7 @@ type Logger struct {
 // baseDir is typically infra.SessionLogsDir()/.
 func NewLogger(baseDir, sessionID string) (*Logger, error) {
 	dir := filepath.Join(baseDir, sessionID)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, fmt.Errorf("create session log dir: %w", err)
 	}
 	return &Logger{
@@ -158,7 +158,7 @@ func (l *Logger) getFile(cat string) (*os.File, error) {
 		return f, nil
 	}
 	path := filepath.Join(l.dir, cat+".md")
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return nil, err
 	}

@@ -43,7 +43,7 @@ func runInDir(ctx context.Context, dir string, argv []string, env []string, time
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec // sandbox executes the caller-provided argv by design.
 	cmd.Dir = dir
 	if env != nil {
 		cmd.Env = env

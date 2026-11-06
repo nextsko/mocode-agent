@@ -400,7 +400,7 @@ func (c *Channel) saveSessions() error {
 		sessions[userID] = sessionID
 		return true
 	})
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(sessions, "", "  ")
@@ -408,7 +408,7 @@ func (c *Channel) saveSessions() error {
 		return err
 	}
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		return err
 	}
 	return os.Rename(tmp, path)
@@ -509,7 +509,7 @@ func (c *Channel) SetMediaDir(dir string) {
 	c.mu.Lock()
 	c.mediaDir = dir
 	c.mu.Unlock()
-	_ = os.MkdirAll(dir, 0o755)
+	_ = os.MkdirAll(dir, 0o750)
 }
 
 func (c *Channel) handleMessage(ctx context.Context, msg *wechatbot.IncomingMessage) {
@@ -625,10 +625,10 @@ func (c *Channel) downloadAllMedia(ctx context.Context, msg *wechatbot.IncomingM
 			ext = guessExtension(mediaType)
 		}
 		dir := filepath.Join(mediaDir, c.accountID, chatID)
-		_ = os.MkdirAll(dir, 0o755)
+		_ = os.MkdirAll(dir, 0o750)
 		savePath := filepath.Join(dir, fmt.Sprintf("%s_%s%s", mediaType, hashHex, ext))
 
-		if err := os.WriteFile(savePath, data, 0o644); err != nil {
+		if err := os.WriteFile(savePath, data, 0o600); err != nil {
 			slog.Error("WeChat media save failed", "path", savePath, "error", err)
 			return nil
 		}
@@ -761,6 +761,6 @@ func (c *Channel) saveRecentMsgs() {
 		entries[k] = ts.Format(time.RFC3339)
 	}
 	data, _ := json.MarshalIndent(entries, "", "  ")
-	_ = os.MkdirAll(filepath.Dir(path), 0o755)
-	_ = os.WriteFile(path, data, 0o644)
+	_ = os.MkdirAll(filepath.Dir(path), 0o750)
+	_ = os.WriteFile(path, data, 0o600)
 }

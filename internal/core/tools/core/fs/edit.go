@@ -122,7 +122,7 @@ func createNewFile(edit editContext, filePath, content string, call fantasy.Tool
 	}
 
 	dir := filepath.Dir(filePath)
-	if err = os.MkdirAll(dir, 0o755); err != nil {
+	if err = os.MkdirAll(dir, 0o750); err != nil {
 		return fantasy.ToolResponse{}, fmt.Errorf("failed to create parent directories: %w", err)
 	}
 
@@ -158,7 +158,7 @@ func createNewFile(edit editContext, filePath, content string, call fantasy.Tool
 		return toolutil.NewPermissionDeniedResponse(), nil
 	}
 
-	err = os.WriteFile(filePath, []byte(content), 0o644)
+	err = os.WriteFile(filePath, []byte(content), 0o600)
 	if err != nil {
 		return fantasy.ToolResponse{}, fmt.Errorf("failed to write file: %w", err)
 	}
@@ -281,7 +281,7 @@ func deleteContent(edit editContext, filePath, oldString string, replaceAll bool
 		newContent, _ = fsext.ToWindowsLineEndings(newContent)
 	}
 
-	err = os.WriteFile(filePath, []byte(newContent), 0o644)
+	err = os.WriteFile(filePath, []byte(newContent), 0o600)
 	if err != nil {
 		return fantasy.ToolResponse{}, fmt.Errorf("failed to write file: %w", err)
 	}
@@ -412,7 +412,7 @@ func replaceContent(edit editContext, filePath, oldString, newString string, rep
 		newContent, _ = fsext.ToWindowsLineEndings(newContent)
 	}
 
-	err = os.WriteFile(filePath, []byte(newContent), 0o644)
+	err = os.WriteFile(filePath, []byte(newContent), 0o600)
 	if err != nil {
 		return fantasy.ToolResponse{}, fmt.Errorf("failed to write file: %w", err)
 	}

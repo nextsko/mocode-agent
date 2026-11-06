@@ -59,13 +59,13 @@ func Export(messages []message.Message, options Options) (Result, error) {
 	}
 
 	dir := DefaultDir
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return Result{}, err
 	}
 
 	path := filepath.Join(dir, fmt.Sprintf("session-%s-%s.%s", SanitizeName(options.SessionID), options.Now.Format("20060102-150405"), ext))
 	content := Render(options.SessionID, options.Format, messages, options.Now)
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		return Result{}, err
 	}
 
@@ -83,12 +83,12 @@ func ExportSummary(options SummaryOptions) (Result, error) {
 		options.Now = time.Now()
 	}
 	dir := SummaryDir
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return Result{}, err
 	}
 	path := filepath.Join(dir, fmt.Sprintf("summary-%s-%s.md", SanitizeName(options.SessionID), options.Now.Format("20060102-150405")))
 	content := RenderSummaryMarkdown(options)
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		return Result{}, err
 	}
 	return Result{Path: path, Format: "md", MessageCount: 1}, nil
@@ -254,7 +254,7 @@ func ExportRecents(opts RecentExportOptions) (Result, error) {
 	}
 
 	dir := RecentsDir
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return Result{}, err
 	}
 
@@ -273,7 +273,7 @@ func ExportRecents(opts RecentExportOptions) (Result, error) {
 		}
 		WriteMarkdownMessage(&b, msg)
 	}
-	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(b.String()), 0o600); err != nil {
 		return Result{}, err
 	}
 

@@ -912,7 +912,7 @@ func writeFile(path, prefix, ext string, data []byte) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolving output path: %w", err)
 	}
-	if err := os.WriteFile(abs, data, 0o644); err != nil {
+	if err := os.WriteFile(abs, data, 0o600); err != nil {
 		return "", fmt.Errorf("writing %s: %w", abs, err)
 	}
 	return abs, nil

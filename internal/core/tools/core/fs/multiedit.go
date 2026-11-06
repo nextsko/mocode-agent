@@ -150,7 +150,7 @@ func processMultiEditWithCreation(edit multiEditContext, params MultiEditParams,
 
 	// Create parent directories
 	dir := filepath.Dir(params.FilePath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fantasy.ToolResponse{}, fmt.Errorf("failed to create parent directories: %w", err)
 	}
 
@@ -210,7 +210,7 @@ func processMultiEditWithCreation(edit multiEditContext, params MultiEditParams,
 	}
 
 	// Write the file
-	err = os.WriteFile(params.FilePath, []byte(currentContent), 0o644)
+	err = os.WriteFile(params.FilePath, []byte(currentContent), 0o600)
 	if err != nil {
 		return fantasy.ToolResponse{}, fmt.Errorf("failed to write file: %w", err)
 	}
@@ -356,7 +356,7 @@ func processMultiEditExistingFile(edit multiEditContext, params MultiEditParams,
 	}
 
 	// Write the updated content
-	err = os.WriteFile(params.FilePath, []byte(currentContent), 0o644)
+	err = os.WriteFile(params.FilePath, []byte(currentContent), 0o600)
 	if err != nil {
 		return fantasy.ToolResponse{}, fmt.Errorf("failed to write file: %w", err)
 	}

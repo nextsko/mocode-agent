@@ -3,7 +3,7 @@ package wechatbot
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec // MD5 is required by the WeChat file-transfer protocol.
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -317,7 +317,7 @@ func (b *Bot) cdnUpload(ctx context.Context, creds *auth.Credentials, data []byt
 	}
 	fileKey := hex.EncodeToString(fileKeyBuf[:])
 
-	rawMD5 := md5.Sum(data)
+	rawMD5 := md5.Sum(data) //nolint:gosec // MD5 is required by the WeChat file-transfer protocol.
 	rawMD5Hex := hex.EncodeToString(rawMD5[:])
 
 	uploadResp, err := b.client.GetUploadURL(ctx, creds.BaseURL, creds.Token, protocol.GetUploadURLRequest{

@@ -155,7 +155,11 @@ func (s *Server) Start(ctx context.Context, port int) (string, error) {
 	}()
 	go func() {
 		<-ctx.Done()
-		_ = s.Stop(context.Background())
+		// The request context is already cancelled; derive a fresh bounded
+		// context so shutdown still gets a deadline.
+		stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		_ = s.Stop(stopCtx)
 	}()
 	return s.url, nil
 }

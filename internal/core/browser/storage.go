@@ -342,7 +342,7 @@ func WriteStateFile(path string, st *BrowserState) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, raw, 0o644)
+	return os.WriteFile(path, raw, 0o600)
 }
 
 // ReadStateFile reads a state previously written by WriteStateFile.

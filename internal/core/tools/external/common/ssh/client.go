@@ -369,7 +369,7 @@ func (c *Client) Download(ctx context.Context, remote, local string) error {
 	defer func() { _ = sess.Close() }()
 
 	if dir := filepath.Dir(local); dir != "" {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return fmt.Errorf("ssh: mkdir local %s: %w", dir, err)
 		}
 	}
@@ -434,7 +434,7 @@ func AgentAuth() AuthMethod {
 		if sock == "" {
 			return nil, errors.New("SSH_AUTH_SOCK not set")
 		}
-		conn, err := net.Dial("unix", sock)
+		conn, err := net.Dial("unix", sock) //nolint:gosec // unix socket path comes from the SSH agent configuration.
 		if err != nil {
 			return nil, fmt.Errorf("dial agent: %w", err)
 		}

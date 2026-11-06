@@ -191,7 +191,7 @@ func Launch(ctx context.Context, c Candidate, opts LaunchOptions) (*Session, err
 
 	args := launchArgs(c, opts, profileDir, runningAsRoot())
 
-	cmd := exec.Command(c.Path, args...)
+	cmd := exec.Command(c.Path, args...) //nolint:gosec // browser binary path comes from detection, not untrusted input.
 	// Chrome writes "DevTools listening on ws://..." to stderr, which is how we
 	// learn the port it picked. Capturing stderr is therefore load-bearing, not
 	// just diagnostics.

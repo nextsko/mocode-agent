@@ -206,7 +206,7 @@ func windsurfWorkflowItems() []completions.AtCompletionValue {
 			}
 			seenPaths[path] = true
 			seenTokens[token] = true
-			content, err := os.ReadFile(path)
+			content, err := os.ReadFile(path) //nolint:gosec // walk root is the user data directory.
 			if err != nil {
 				return nil
 			}

@@ -455,7 +455,7 @@ func createTransport(ctx context.Context, m config.MCPConfig, cfg *config.Config
 		if strings.TrimSpace(command) == "" {
 			return nil, fmt.Errorf("mcp stdio config requires a non-empty 'command' field")
 		}
-		cmd := exec.CommandContext(ctx, infra.Long(command), m.Args...)
+		cmd := exec.CommandContext(ctx, infra.Long(command), m.Args...) //nolint:gosec // MCP server command comes from user configuration by design.
 		cmd.Env = append(os.Environ(), m.ResolvedEnv()...)
 		return &mcp.CommandTransport{
 			Command: cmd,
@@ -516,7 +516,7 @@ func mcpTimeout(m config.MCPConfig) time.Duration {
 func stdioCheck(old *exec.Cmd) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, old.Path, old.Args...)
+	cmd := exec.CommandContext(ctx, old.Path, old.Args...) //nolint:gosec // same MCP server command; configuration is trusted.
 	cmd.Env = old.Env
 	out, err := cmd.CombinedOutput()
 	if err == nil || errors.Is(ctx.Err(), context.DeadlineExceeded) {
