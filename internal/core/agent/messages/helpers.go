@@ -9,6 +9,7 @@ import (
 
 	"charm.land/fantasy"
 
+	"github.com/nextsko/mocode-agent/internal/core/agent/llmconv"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 )
@@ -70,7 +71,7 @@ func FilterEmptyContentMessages(msgs []fantasy.Message) []fantasy.Message {
 }
 
 func FilterOrphanedToolResults(m message.Message, knownToolCallIDs map[string]struct{}) (fantasy.Message, bool) {
-	aiMsgs := m.ToAIMessage()
+	aiMsgs := llmconv.ToAIMessage(m)
 	if len(aiMsgs) == 0 {
 		return fantasy.Message{}, false
 	}

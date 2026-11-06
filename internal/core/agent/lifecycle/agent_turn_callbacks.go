@@ -13,6 +13,7 @@ import (
 	"charm.land/fantasy/providers/google"
 	"charm.land/fantasy/providers/openai"
 
+	"github.com/nextsko/mocode-agent/internal/core/agent/llmconv"
 	"github.com/nextsko/mocode-agent/internal/core/agent/loopdetect"
 	"github.com/nextsko/mocode-agent/internal/core/agent/messages"
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
@@ -155,7 +156,7 @@ func (a *sessionAgent) onReasoningEnd(ts *turnState) func(id string, reasoning f
 		}
 		if openaiData, ok := reasoning.ProviderMetadata[openai.Name]; ok {
 			if reasoning, ok := openaiData.(*openai.ResponsesReasoningMetadata); ok {
-				(*ts.assistant).SetReasoningResponsesData(reasoning)
+				(*ts.assistant).SetReasoningResponsesData(llmconv.ToDomainReasoningData(reasoning))
 			}
 		}
 		(*ts.assistant).FinishThinking()

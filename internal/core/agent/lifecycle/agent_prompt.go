@@ -9,6 +9,7 @@ import (
 
 	"charm.land/fantasy"
 
+	"github.com/nextsko/mocode-agent/internal/core/agent/llmconv"
 	"github.com/nextsko/mocode-agent/internal/core/agent/messages"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
@@ -85,7 +86,7 @@ If not, please feel free to ignore. Again do not mention this message to the use
 			}
 			continue
 		}
-		aiMsgs := m.ToAIMessage()
+		aiMsgs := llmconv.ToAIMessage(m)
 		if !supportsImages {
 			aiMsgs = messages.FilterImagePartsFromMessages(aiMsgs)
 		}

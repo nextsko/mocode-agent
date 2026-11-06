@@ -88,6 +88,14 @@ var packageRules = []packageRule{
 			"github.com/nextsko/mocode-agent/internal/core/agent",
 		},
 	},
+	{
+		// The domain layer owns provider-neutral types. LLM framework and
+		// provider SDK types belong to the adapters in core/agent/llmconv.
+		pkg: "github.com/nextsko/mocode-agent/internal/domain",
+		forbidden: []string{
+			"charm.land/",
+		},
+	},
 }
 
 // bannedBy reports the first forbidden import matching a rule for pkgPath.
