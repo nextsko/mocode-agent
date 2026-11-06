@@ -108,7 +108,7 @@ mocode --continue
 			sessionID = sess.ID
 		}
 
-		com := common.DefaultCommon(ws, wechat.GetManager())
+		com := common.DefaultCommon(ws, processServices.wechat)
 		model := ui.New(com, sessionID, continueLast)
 
 		var env uv.Environ = os.Environ()
@@ -392,7 +392,7 @@ func setupLocalWorkspaceAt(ctx context.Context, cwd string, debug, yolo bool) (w
 	// dependency direction transport -> integration -> (core port) clean; the
 	// core tool layer only knows the domain messenger.Messenger interface.
 	if appInstance.AgentCoordinator != nil {
-		appInstance.AgentCoordinator.SetMessenger(wechat.AsMessenger(wechat.GetManager()))
+		appInstance.AgentCoordinator.SetMessenger(wechat.AsMessenger(processServices.wechat))
 	}
 
 	// Wire the spinner themer port: transport -> ui/styles adapter -> domain.theme port.

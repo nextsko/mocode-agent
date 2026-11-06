@@ -49,19 +49,6 @@ type AccountManager struct {
 	runnerWG sync.WaitGroup
 }
 
-var (
-	globalManager     *AccountManager
-	globalManagerOnce sync.Once
-)
-
-// GetManager returns the global AccountManager, creating it if needed.
-func GetManager() *AccountManager {
-	globalManagerOnce.Do(func() {
-		globalManager = NewAccountManager("")
-	})
-	return globalManager
-}
-
 // Accounts is the account-management surface the UI depends on. Injecting it
 // through the UI dependency container keeps the process-wide default manager at
 // the composition root instead of inside every dialog.
