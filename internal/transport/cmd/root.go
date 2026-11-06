@@ -357,13 +357,17 @@ func setupWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error) {
 func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error) {
 	debug, _ := cmd.Flags().GetBool("debug")
 	yolo, _ := cmd.Flags().GetBool("yolo")
-	ctx := cmd.Context()
-
 	cwd, err := ResolveCwd(cmd)
 	if err != nil {
 		return nil, nil, err
 	}
+	return setupLocalWorkspaceAt(cmd.Context(), cwd, debug, yolo)
+}
 
+// setupLocalWorkspaceAt creates an in-process app.App rooted at cwd. It is the
+// directory-explicit form of setupLocalWorkspace, used by commands that switch
+// projects at runtime (for example `mcp serve`).
+func setupLocalWorkspaceAt(ctx context.Context, cwd string, debug, yolo bool) (workspace.Workspace, func(), error) {
 	store, err := config.Init(cwd, debug)
 	if err != nil {
 		return nil, nil, err
