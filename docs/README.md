@@ -57,6 +57,7 @@
 | 09 | [guides/09-ci-fix-log.md](guides/09-ci-fix-log.md) | CI/CD 修复历史记录 |
 | 10 | [guides/10-mcp-configuration.md](guides/10-mcp-configuration.md) | mocode 作为 MCP 客户端：配置与验证 |
 | 11 | [guides/11-mcp-server.md](guides/11-mcp-server.md) | 原生 MCP Server：把 run/models 暴露给外部客户端 |
+| 12 | [guides/12-release-checklist.md](guides/12-release-checklist.md) | 发布门禁、步骤、回滚与交接 |
 
 ### 参考研究（外部项目深度分析）
 
