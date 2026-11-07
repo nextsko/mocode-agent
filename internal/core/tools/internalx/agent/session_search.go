@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"charm.land/fantasy"
-
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 	"github.com/nextsko/mocode-agent/internal/store"
@@ -24,21 +22,6 @@ type SessionSearchParams struct {
 	AroundMessageID string `json:"around_message_id,omitempty" description:"Anchor message ID to scroll around (use with session_id)"`
 	Window          int    `json:"window,omitempty" description:"Number of messages before/after anchor for scroll mode (default 5)"`
 	Limit           int    `json:"limit,omitempty" description:"Maximum number of results (default 10 for search, 20 for browse)"`
-}
-
-// NewSessionSearchTool is the legacy fantasy-typed constructor. New code should
-// use NewSessionSearchPortTool and wrap it at the agent boundary.
-func NewSessionSearchTool(se *store.SessionSearch) fantasy.AgentTool {
-	return fantasy.NewAgentTool(
-		SessionSearchToolName,
-		toolutil.FirstLineDescription(sessionSearchDescription),
-		func(ctx context.Context, params SessionSearchParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			text, meta, err := runSessionSearch(ctx, se, params)
-			if err != nil {
-				return fantasy.ToolResponse{}, err
-			}
-			return fantasy.WithResponseMetadata(fantasy.NewTextResponse(text), meta), nil
-		})
 }
 
 // NewSessionSearchPortTool is the framework-agnostic contract.Tool form of the
@@ -110,8 +93,7 @@ func (t *sessionSearchPort) Execute(ctx context.Context, _ contract.ToolContext,
 }
 
 // runSessionSearch dispatches between discovery, scroll, and browse and returns
-// the rendered text plus the structured payload (used as response metadata by
-// both the fantasy wrapper and the port implementation).
+// the rendered text plus the structured payload (used as response metadata).
 func runSessionSearch(ctx context.Context, se *store.SessionSearch, params SessionSearchParams) (string, any, error) {
 	switch {
 	case params.Query != "":

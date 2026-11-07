@@ -1,7 +1,6 @@
 package agenttools
 
 import (
-	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -12,8 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"charm.land/fantasy"
 )
 
 const MocodeLogsToolName = "mocode_logs"
@@ -53,17 +50,6 @@ var sensitiveKeys = []string{
 
 type MocodeLogsParams struct {
 	Lines int `json:"lines,omitempty" description:"Number of recent log entries to return (default 50, max 100)"`
-}
-
-func NewMocodeLogsTool(logFile string) fantasy.AgentTool {
-	return fantasy.NewAgentTool(
-		MocodeLogsToolName,
-		string(mocodeLogsDescription),
-		func(ctx context.Context, params MocodeLogsParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			result := runMocodeLogs(logFile, params)
-			return fantasy.NewTextResponse(result), nil
-		},
-	)
 }
 
 // runMocodeLogs reads and formats the last N log entries from the given file.

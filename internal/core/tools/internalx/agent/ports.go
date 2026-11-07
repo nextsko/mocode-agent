@@ -86,7 +86,7 @@ func NewTodosPortTool(sessions session.Service) contract.Tool {
 }
 
 // runTodos applies an update to the session's todo list and renders the text
-// summary. Shared by the legacy fantasy constructor and the port.
+// summary.
 func runTodos(ctx context.Context, sessions session.Service, params TodosParams) (string, TodosResponseMetadata, error) {
 	sessionID := toolutil.GetSessionFromContext(ctx)
 	if sessionID == "" {
@@ -393,4 +393,87 @@ func NewMocodeLogsPortTool(logFile string) contract.Tool {
 		}
 		return contract.ToolResult{Content: runMocodeLogs(logFile, params)}, nil
 	})
+}
+
+// ─── memory (port) ───────────────────────────────────────────────────────────
+
+// NewMemoryPortTool is the framework-agnostic form of the memory tool.
+func NewMemoryPortTool(deps MemoryDeps) contract.Tool {
+	deps = normalizeMemoryDeps(deps)
+	return contract.NewFunc(MemoryToolName, toolutil.FirstLineDescription(memoryDescription), map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"action": map[string]any{
+				"type":        "string",
+				"enum":        []string{"write", "list", "search", "extract", "forget"},
+				"description": "write stores an entry; list and search browse them; extract promotes a session memory into the durable global tier; forget archives one.",
+			},
+			"title":   map[string]any{"type": "string", "description": "For action=write: a one-line title."},
+			"body":    map[string]any{"type": "string", "description": "For action=write: the markdown content."},
+			"scope":   map[string]any{"type": "string", "enum": []string{"session", "global"}, "description": "For action=write: session (default) keeps it with this session; global makes it durable."},
+			"kind":    map[string]any{"type": "string", "enum": []string{"note", "lesson", "decision", "fact"}, "description": "For action=write or extract: what sort of memory this is."},
+			"tags":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Free-form labels to make the entry findable later."},
+			"path":    map[string]any{"type": "string", "description": "Root-relative path of an entry. Required for extract and forget."},
+			"query":   map[string]any{"type": "string", "description": "For action=search: the text to look for."},
+			"session": map[string]any{"type": "string", "description": "For action=list, search or extract: restrict to one session."},
+			"limit":   map[string]any{"type": "integer", "description": "Maximum entries to return."},
+		},
+		"required": []string{"action"},
+	}, func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+		var params MemoryParams
+		if err := json.Unmarshal(args, &params); err != nil {
+			return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
+		}
+		out, err := runMemory(ctx, deps, params)
+		if err != nil {
+			return contract.ToolResult{}, err
+		}
+		return outcomeToResult(out), nil
+	})
+}
+
+// ─── learn (port) ────────────────────────────────────────────────────────────
+
+// NewLearnPortTool is the framework-agnostic form of the learn tool.
+func NewLearnPortTool(deps LearnDeps) contract.Tool {
+	return contract.NewFunc(LearnToolName, toolutil.FirstLineDescription(learnDescription), map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"action": map[string]any{
+				"type":        "string",
+				"enum":        []string{"create", "refine", "list"},
+				"description": "create writes a new skill, refine rewrites an existing one, list surveys what already exists",
+			},
+			"name":         map[string]any{"type": "string", "description": "Skill name in kebab-case. Required for create and refine."},
+			"description":  map[string]any{"type": "string", "description": "One-line trigger description starting with 'Use when'."},
+			"instructions": map[string]any{"type": "string", "description": "The full markdown body of SKILL.md."},
+			"reason":       map[string]any{"type": "string", "description": "One sentence on why this is worth remembering."},
+		},
+		"required": []string{"action"},
+	}, func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+		var params LearnParams
+		if err := json.Unmarshal(args, &params); err != nil {
+			return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
+		}
+		callID, _ := toolutil.ToolCallIDFromCtx(ctx)
+		out, err := runLearn(ctx, deps, params, callID)
+		if err != nil {
+			return contract.ToolResult{}, err
+		}
+		return outcomeToResult(out), nil
+	})
+}
+
+// outcomeToResult converts an internal outcome into the port result.
+func outcomeToResult(o toolOutcome) contract.ToolResult {
+	res := contract.ToolResult{StopTurn: o.StopTurn}
+	if o.Err {
+		res.Error = fmt.Errorf("%s", o.Text)
+	} else {
+		res.Content = o.Text
+	}
+	if o.Meta != nil {
+		res.Metadata = map[string]any{"result": o.Meta}
+	}
+	return res
 }

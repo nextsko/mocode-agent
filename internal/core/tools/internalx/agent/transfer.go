@@ -9,8 +9,6 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
-
-	"charm.land/fantasy"
 )
 
 const (
@@ -151,26 +149,6 @@ func (t *TransferTracker) countUnique() int {
 	return len(seen)
 }
 
-// NewTransferTool creates a transfer_to_agent tool with the legacy callback
-// signature.  New code should prefer NewTransferToolWithController.
-func NewTransferTool(availableAgents []string, onTransfer TransferCallback) fantasy.AgentTool {
-	return NewTransferToolWithCallback(availableAgents, onTransfer)
-}
-
-// NewTransferToolWithCallback is the explicit backward-compat entry point.
-// The legacy callback receives the message field directly via the else-if
-// path in newTransferToolCore; do not wrap it as a controller.
-func NewTransferToolWithCallback(availableAgents []string, onTransfer TransferCallback) fantasy.AgentTool {
-	return newTransferToolCore(availableAgents, nil, onTransfer)
-}
-
-// NewTransferToolWithController creates a transfer_to_agent tool using the
-// structured TransferController interface.  Pass nil to skip policy enforcement.
-// Inspired by trpc-agent-go/agent/transfer_controller.go.
-func NewTransferToolWithController(availableAgents []string, ctrl TransferController) fantasy.AgentTool {
-	return newTransferToolCore(availableAgents, ctrl, nil)
-}
-
 // transferPort is the framework-agnostic form of transfer_to_agent. It owns
 // the per-tool tracker so handoff limits survive across calls.
 type transferPort struct {
@@ -293,23 +271,4 @@ func (t *transferPort) run(ctx context.Context, params TransferParams) (string, 
 	}
 	msg += fmt.Sprintf(" (transfer %d/%d)", t.tracker.Count(), t.tracker.maxHandoffs)
 	return msg, false
-}
-
-// newTransferToolCore is the shared legacy implementation.
-func newTransferToolCore(
-	availableAgents []string,
-	ctrl TransferController,
-	legacyCb TransferCallback,
-) fantasy.AgentTool {
-	port := newTransferPort(availableAgents, ctrl, legacyCb)
-	return fantasy.NewParallelAgentTool(
-		TransferToolName,
-		toolutil.FirstLineDescription(transferDescription),
-		func(ctx context.Context, params TransferParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			text, isErr := port.run(ctx, params)
-			if isErr {
-				return fantasy.NewTextErrorResponse(text), nil
-			}
-			return fantasy.NewTextResponse(text), nil
-		})
 }

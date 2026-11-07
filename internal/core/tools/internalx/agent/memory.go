@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/fantasy"
-
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/memory"
 )
@@ -82,25 +80,18 @@ type MemoryResponseMetadata struct {
 	IndexRebuilt bool   `json:"index_rebuilt,omitempty"`
 }
 
-// NewMemoryTool creates the session memory tool.
-func NewMemoryTool(deps MemoryDeps) fantasy.AgentTool {
+// normalizeMemoryDeps applies the defaults the tool relies on.
+func normalizeMemoryDeps(deps MemoryDeps) MemoryDeps {
 	if deps.Indexer == nil && deps.Store != nil {
 		deps.Indexer = memory.NewFileIndexer(deps.Store)
 	}
 	if deps.Now == nil {
 		deps.Now = func() time.Time { return time.Now().UTC() }
 	}
-
-	return fantasy.NewAgentTool(
-		MemoryToolName,
-		toolutil.FirstLineDescription(memoryDescription),
-		func(ctx context.Context, params MemoryParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			return runMemory(ctx, deps, params)
-		},
-	)
+	return deps
 }
 
-func runMemory(ctx context.Context, deps MemoryDeps, p MemoryParams) (fantasy.ToolResponse, error) {
+func runMemory(ctx context.Context, deps MemoryDeps, p MemoryParams) (toolOutcome, error) {
 	if deps.Store == nil {
 		return memError("memory is not configured for this session"), nil
 	}
@@ -124,7 +115,7 @@ func runMemory(ctx context.Context, deps MemoryDeps, p MemoryParams) (fantasy.To
 }
 
 // memoryWrite stores one entry and refreshes the index.
-func memoryWrite(ctx context.Context, deps MemoryDeps, p MemoryParams) (fantasy.ToolResponse, error) {
+func memoryWrite(ctx context.Context, deps MemoryDeps, p MemoryParams) (toolOutcome, error) {
 	scope := memory.Scope(strings.ToLower(strings.TrimSpace(p.Scope)))
 	if scope == "" {
 		// Session is the default because it is the safe direction: promoting
@@ -185,11 +176,11 @@ func memoryWrite(ctx context.Context, deps MemoryDeps, p MemoryParams) (fantasy.
 	if idx != nil {
 		meta.Total = idx.Total()
 	}
-	return fantasy.WithResponseMetadata(fantasy.NewTextResponse(b.String()), meta), nil
+	return withMeta(okOutcome(b.String()), meta), nil
 }
 
 // memoryList lists entries, newest first.
-func memoryList(ctx context.Context, deps MemoryDeps, p MemoryParams) (fantasy.ToolResponse, error) {
+func memoryList(ctx context.Context, deps MemoryDeps, p MemoryParams) (toolOutcome, error) {
 	scope, errResp := scopeFromParam(p, false)
 	if errResp != nil {
 		return *errResp, nil
@@ -235,11 +226,11 @@ func memoryList(ctx context.Context, deps MemoryDeps, p MemoryParams) (fantasy.T
 	if scope != "" {
 		meta.Scope = string(scope)
 	}
-	return fantasy.WithResponseMetadata(fantasy.NewTextResponse(b.String()), meta), nil
+	return withMeta(okOutcome(b.String()), meta), nil
 }
 
 // memorySearch finds entries by text.
-func memorySearch(ctx context.Context, deps MemoryDeps, p MemoryParams) (fantasy.ToolResponse, error) {
+func memorySearch(ctx context.Context, deps MemoryDeps, p MemoryParams) (toolOutcome, error) {
 	query := strings.TrimSpace(p.Query)
 	if query == "" {
 		return memError("query is required for action=search"), nil
@@ -279,11 +270,11 @@ func memorySearch(ctx context.Context, deps MemoryDeps, p MemoryParams) (fantasy
 	}
 
 	meta := MemoryResponseMetadata{Action: memActionSearch, Results: len(matches)}
-	return fantasy.WithResponseMetadata(fantasy.NewTextResponse(b.String()), meta), nil
+	return withMeta(okOutcome(b.String()), meta), nil
 }
 
 // memoryExtract promotes a session entry into the global tier.
-func memoryExtract(ctx context.Context, deps MemoryDeps, p MemoryParams) (fantasy.ToolResponse, error) {
+func memoryExtract(ctx context.Context, deps MemoryDeps, p MemoryParams) (toolOutcome, error) {
 	kind := memory.Kind(strings.ToLower(strings.TrimSpace(p.Kind)))
 	if kind != "" && !kind.Valid() {
 		return memError(fmt.Sprintf("invalid kind %q: expected one of note, lesson, decision, fact", p.Kind)), nil
@@ -352,11 +343,11 @@ func memoryExtract(ctx context.Context, deps MemoryDeps, p MemoryParams) (fantas
 		Action: memActionExtract, Scope: string(memory.ScopeGlobal),
 		Path: res.RelPath, PromotedTo: res.RelPath, Created: res.Created,
 	}
-	return fantasy.WithResponseMetadata(fantasy.NewTextResponse(b.String()), meta), nil
+	return withMeta(okOutcome(b.String()), meta), nil
 }
 
 // memoryForget archives an entry.
-func memoryForget(ctx context.Context, deps MemoryDeps, p MemoryParams) (fantasy.ToolResponse, error) {
+func memoryForget(ctx context.Context, deps MemoryDeps, p MemoryParams) (toolOutcome, error) {
 	target := strings.TrimSpace(p.Path)
 	if target == "" {
 		return memError("path is required for action=forget (list or search first to find it)"), nil
@@ -374,7 +365,7 @@ func memoryForget(ctx context.Context, deps MemoryDeps, p MemoryParams) (fantasy
 		target, archived)
 
 	meta := MemoryResponseMetadata{Action: memActionForget, Path: target, ArchivedTo: archived}
-	return fantasy.WithResponseMetadata(fantasy.NewTextResponse(text), meta), nil
+	return withMeta(okOutcome(text), meta), nil
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -389,7 +380,7 @@ func memorySessionID(ctx context.Context, explicit string) string {
 }
 
 // scopeFromParam reads the scope parameter, reporting a bad value.
-func scopeFromParam(p MemoryParams, allowEmpty bool) (memory.Scope, *fantasy.ToolResponse) {
+func scopeFromParam(p MemoryParams, allowEmpty bool) (memory.Scope, *toolOutcome) {
 	raw := strings.ToLower(strings.TrimSpace(p.Scope))
 	if raw == "" {
 		if allowEmpty {
@@ -439,6 +430,6 @@ func renderEntryLine(e *memory.Entry) string {
 	return line
 }
 
-func memError(msg string) fantasy.ToolResponse {
-	return fantasy.NewTextErrorResponse(msg)
+func memError(msg string) toolOutcome {
+	return errOutcome(msg)
 }

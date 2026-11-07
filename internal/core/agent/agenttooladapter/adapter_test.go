@@ -9,28 +9,28 @@ import (
 	"charm.land/fantasy"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nextsko/mocode-agent/internal/core/tools"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 )
 
 func fantasyCall(input string) fantasy.ToolCall { return fantasy.ToolCall{Input: input} }
 
-// fakeTool is a scriptable tools.Tool.
+// fakeTool is a scriptable contract.Tool.
 type fakeTool struct {
-	schema  tools.Schema
-	result  tools.ToolResult
+	schema  contract.Schema
+	result  contract.ToolResult
 	err     error
 	gotArgs json.RawMessage
-	gotCtx  tools.ToolContext
+	gotCtx  contract.ToolContext
 	ran     bool
 }
 
 func (f *fakeTool) Name() string        { return f.schema.Name }
 func (f *fakeTool) Description() string { return f.schema.Description }
-func (f *fakeTool) Schema() tools.Schema {
+func (f *fakeTool) Schema() contract.Schema {
 	return f.schema
 }
 
-func (f *fakeTool) Execute(_ context.Context, tctx tools.ToolContext, args json.RawMessage) (tools.ToolResult, error) {
+func (f *fakeTool) Execute(_ context.Context, tctx contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
 	f.ran = true
 	f.gotCtx = tctx
 	f.gotArgs = args
@@ -47,7 +47,7 @@ func TestInfoCarriesSchema(t *testing.T) {
 		},
 		"required": []any{"query"},
 	}
-	tool := &fakeTool{schema: tools.Schema{
+	tool := &fakeTool{schema: contract.Schema{
 		Name:        "demo",
 		Description: "demo tool",
 		Parameters:  params,
@@ -57,7 +57,9 @@ func TestInfoCarriesSchema(t *testing.T) {
 	info := adapter.Info()
 	require.Equal(t, "demo", info.Name)
 	require.Equal(t, "demo tool", info.Description)
-	require.Equal(t, params, info.Parameters)
+	require.Equal(t, map[string]any{
+		"query": map[string]any{"type": "string"},
+	}, info.Parameters)
 	require.Equal(t, []string{"query"}, info.Required)
 }
 
@@ -65,8 +67,8 @@ func TestRunPassesArgumentsAndMapsText(t *testing.T) {
 	t.Parallel()
 
 	tool := &fakeTool{
-		schema: tools.Schema{Name: "demo"},
-		result: tools.ToolResult{
+		schema: contract.Schema{Name: "demo"},
+		result: contract.ToolResult{
 			Content:  "hello",
 			Metadata: map[string]any{"k": "v"},
 		},
@@ -85,8 +87,8 @@ func TestRunMapsToolResultError(t *testing.T) {
 	t.Parallel()
 
 	tool := &fakeTool{
-		schema: tools.Schema{Name: "demo"},
-		result: tools.ToolResult{Error: errors.New("boom")},
+		schema: contract.Schema{Name: "demo"},
+		result: contract.ToolResult{Error: errors.New("boom")},
 	}
 	resp, err := New(tool, nil).Run(t.Context(), fantasyCall(`{}`))
 	require.NoError(t, err)
@@ -97,7 +99,7 @@ func TestRunMapsToolResultError(t *testing.T) {
 func TestRunPropagatesExecuteError(t *testing.T) {
 	t.Parallel()
 
-	tool := &fakeTool{schema: tools.Schema{Name: "demo"}, err: errors.New("hard failure")}
+	tool := &fakeTool{schema: contract.Schema{Name: "demo"}, err: errors.New("hard failure")}
 	_, err := New(tool, nil).Run(t.Context(), fantasyCall(`{}`))
 	require.Error(t, err)
 }
@@ -106,10 +108,10 @@ func TestRunMapsImageAttachment(t *testing.T) {
 	t.Parallel()
 
 	tool := &fakeTool{
-		schema: tools.Schema{Name: "demo"},
-		result: tools.ToolResult{
+		schema: contract.Schema{Name: "demo"},
+		result: contract.ToolResult{
 			Content: "shot",
-			Attachments: []tools.Attachment{{
+			Attachments: []contract.Attachment{{
 				MimeType: "image/png",
 				Content:  []byte{0x89, 0x50},
 			}},
@@ -132,7 +134,7 @@ func TestNewWithContextBuildsFreshContextPerCall(t *testing.T) {
 
 	calls := 0
 	cleanups := 0
-	adapter := NewWithContext(&fakeTool{schema: tools.Schema{Name: "demo"}}, func(context.Context) (tools.ToolContext, func()) {
+	adapter := NewWithContext(&fakeTool{schema: contract.Schema{Name: "demo"}}, func(context.Context) (contract.ToolContext, func()) {
 		calls++
 		return noContext{}, func() { cleanups++ }
 	})
@@ -148,7 +150,7 @@ func TestNewWithContextBuildsFreshContextPerCall(t *testing.T) {
 func TestProviderOptionsRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	adapter := New(&fakeTool{schema: tools.Schema{Name: "demo"}}, nil)
+	adapter := New(&fakeTool{schema: contract.Schema{Name: "demo"}}, nil)
 	opts := fantasy.ProviderOptions{"k": fakeOptsData{}}
 	adapter.SetProviderOptions(opts)
 	require.Equal(t, opts, adapter.ProviderOptions())

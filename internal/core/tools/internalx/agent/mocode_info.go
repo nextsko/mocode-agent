@@ -1,13 +1,10 @@
 package agenttools
 
 import (
-	"context"
 	_ "embed"
 	"fmt"
 	"slices"
 	"strings"
-
-	"charm.land/fantasy"
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
@@ -22,21 +19,6 @@ const MocodeInfoToolName = "mocode_info"
 var mocodeInfoDescription []byte
 
 type MocodeInfoParams struct{}
-
-func NewMocodeInfoTool(
-	cfg *config.ConfigStore,
-	lspManager *lsp.Manager,
-	allSkills []*skills.Skill,
-	activeSkills []*skills.Skill,
-	skillTracker *skills.Tracker,
-) fantasy.AgentTool {
-	return fantasy.NewAgentTool(
-		MocodeInfoToolName,
-		string(mocodeInfoDescription),
-		func(ctx context.Context, _ MocodeInfoParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			return fantasy.NewTextResponse(buildMocodeInfo(cfg, lspManager, allSkills, activeSkills, skillTracker)), nil
-		})
-}
 
 func buildMocodeInfo(cfg *config.ConfigStore, lspManager *lsp.Manager, allSkills []*skills.Skill, activeSkills []*skills.Skill, skillTracker *skills.Tracker) string {
 	var b strings.Builder

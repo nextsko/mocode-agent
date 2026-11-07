@@ -41,7 +41,7 @@ func memDeps(t *testing.T, session string) (MemoryDeps, context.Context, string)
 
 func runMem(t *testing.T, deps MemoryDeps, ctx context.Context, input string) fantasy.ToolResponse {
 	t.Helper()
-	resp, err := NewMemoryTool(deps).Run(ctx, fantasy.ToolCall{
+	resp, err := asAgentTool(NewMemoryPortTool(deps)).Run(ctx, fantasy.ToolCall{
 		ID: "call-1", Name: MemoryToolName, Input: input,
 	})
 	require.NoError(t, err)
@@ -64,7 +64,7 @@ func TestMemory_InvalidAction(t *testing.T) {
 func TestMemory_UnconfiguredStore(t *testing.T) {
 	t.Parallel()
 
-	resp, err := NewMemoryTool(MemoryDeps{}).Run(context.Background(),
+	resp, err := asAgentTool(NewMemoryPortTool(MemoryDeps{})).Run(context.Background(),
 		fantasy.ToolCall{ID: "c", Name: MemoryToolName, Input: `{"action":"list"}`})
 	require.NoError(t, err)
 	assert.True(t, resp.IsError)
@@ -332,7 +332,7 @@ func TestMemory_WriteWithoutASessionContextFails(t *testing.T) {
 func TestMemory_SchemaExposesActionEnum(t *testing.T) {
 	t.Parallel()
 
-	info := NewMemoryTool(MemoryDeps{}).Info()
+	info := asAgentTool(NewMemoryPortTool(MemoryDeps{})).Info()
 	assert.Equal(t, MemoryToolName, info.Name)
 
 	action, ok := info.Parameters["action"].(map[string]any)
@@ -355,7 +355,7 @@ func TestMemory_SchemaExposesActionEnum(t *testing.T) {
 func TestMemory_DescriptionIsUsable(t *testing.T) {
 	t.Parallel()
 
-	desc := NewMemoryTool(MemoryDeps{}).Info().Description
+	desc := asAgentTool(NewMemoryPortTool(MemoryDeps{})).Info().Description
 	assert.NotEmpty(t, desc)
 	assert.Greater(t, len(desc), 40)
 	assert.False(t, strings.HasPrefix(desc, "//"), "the //go:embed directive must not leak")

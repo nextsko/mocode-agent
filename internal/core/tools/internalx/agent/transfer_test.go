@@ -144,7 +144,7 @@ func TestNewTransferTool_Controller_BlocksTransfer(t *testing.T) {
 			return TransferDecision{}, nil
 		},
 	}
-	tool := NewTransferToolWithController([]string{"blocked-agent", "allowed-agent"}, ctrl)
+	tool := asAgentTool(NewTransferPortToolWithController([]string{"blocked-agent", "allowed-agent"}, ctrl))
 	resp, err := tool.Run(context.Background(), fantasy.ToolCall{
 		ID: "x", Name: TransferToolName,
 		Input: `{"agent_name":"blocked-agent"}`,
@@ -163,7 +163,7 @@ func TestNewTransferTool_Controller_AllowsTransfer(t *testing.T) {
 			return TransferDecision{}, nil
 		},
 	}
-	tool := NewTransferToolWithController([]string{"allowed-agent"}, ctrl)
+	tool := asAgentTool(NewTransferPortToolWithController([]string{"allowed-agent"}, ctrl))
 	resp, err := tool.Run(context.Background(), fantasy.ToolCall{
 		ID: "x", Name: TransferToolName,
 		Input: `{"agent_name":"allowed-agent"}`,
@@ -175,7 +175,7 @@ func TestNewTransferTool_Controller_AllowsTransfer(t *testing.T) {
 
 func TestNewTransferTool_NilController_StillWorks(t *testing.T) {
 	t.Parallel()
-	tool := NewTransferToolWithController([]string{"agent-x"}, nil)
+	tool := asAgentTool(NewTransferPortToolWithController([]string{"agent-x"}, nil))
 	resp, err := tool.Run(context.Background(), fantasy.ToolCall{
 		ID: "x", Name: TransferToolName,
 		Input: `{"agent_name":"agent-x"}`,
@@ -191,7 +191,7 @@ func TestNewTransferToolWithCallback_Shim_BackwardCompat(t *testing.T) {
 		gotFrom, gotTo, gotMsg = from, to, msg
 		return nil
 	})
-	tool := NewTransferToolWithCallback([]string{"agent-y"}, cb)
+	tool := asAgentTool(NewTransferPortTool([]string{"agent-y"}, cb))
 	resp, err := tool.Run(context.Background(), fantasy.ToolCall{
 		ID: "x", Name: TransferToolName,
 		Input: `{"agent_name":"agent-y","message":"hello"}`,

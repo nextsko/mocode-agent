@@ -35,7 +35,7 @@ func (f *fakeGate) Request(_ context.Context, opts permission.CreatePermissionRe
 
 func run(t *testing.T, deps LearnDeps, input string) fantasy.ToolResponse {
 	t.Helper()
-	resp, err := NewLearnTool(deps).Run(context.Background(), fantasy.ToolCall{
+	resp, err := asAgentTool(NewLearnPortTool(deps)).Run(context.Background(), fantasy.ToolCall{
 		ID: "call-1", Name: LearnToolName, Input: input,
 	})
 	require.NoError(t, err)
@@ -400,7 +400,7 @@ func TestLearn_PermissionErrorIsHardFailure(t *testing.T) {
 	t.Parallel()
 
 	gate := &fakeGate{allow: true, err: errors.New("boom")}
-	_, err := NewLearnTool(LearnDeps{Root: t.TempDir(), Permissions: gate, Now: fixedNow}).Run(
+	_, err := asAgentTool(NewLearnPortTool(LearnDeps{Root: t.TempDir(), Permissions: gate, Now: fixedNow})).Run(
 		context.Background(),
 		fantasy.ToolCall{
 			ID: "call-1", Name: LearnToolName,
@@ -418,7 +418,7 @@ func TestLearn_PermissionErrorIsHardFailure(t *testing.T) {
 func TestLearn_SchemaExposesActionEnum(t *testing.T) {
 	t.Parallel()
 
-	info := NewLearnTool(LearnDeps{}).Info()
+	info := asAgentTool(NewLearnPortTool(LearnDeps{})).Info()
 	assert.Equal(t, LearnToolName, info.Name)
 
 	// ToolInfo.Parameters is a flat map of property name → property schema
@@ -446,7 +446,7 @@ func TestLearn_SchemaExposesActionEnum(t *testing.T) {
 func TestLearn_DescriptionIsUsable(t *testing.T) {
 	t.Parallel()
 
-	desc := NewLearnTool(LearnDeps{}).Info().Description
+	desc := asAgentTool(NewLearnPortTool(LearnDeps{})).Info().Description
 	assert.NotEmpty(t, desc)
 	assert.Greater(t, len(desc), 40, "description should orient the model, got %q", desc)
 	assert.False(t, strings.HasPrefix(desc, "//"), "the //go:embed directive must not leak into the description")

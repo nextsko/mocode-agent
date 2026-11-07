@@ -14,8 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/fantasy"
-
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
@@ -96,30 +94,16 @@ type LearnResponseMetadata struct {
 	Total     int    `json:"total,omitempty"`
 }
 
-// NewLearnTool creates the learn tool, which turns a finished task into a
-// durable skill: it writes <root>/<name>/SKILL.md, stamping provenance
-// metadata so agent-authored skills stay distinguishable from hand-written and
-// bundled ones.
-func NewLearnTool(deps LearnDeps) fantasy.AgentTool {
-	return fantasy.NewAgentTool(
-		LearnToolName,
-		toolutil.FirstLineDescription(learnDescription),
-		func(ctx context.Context, params LearnParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			return runLearn(ctx, deps, params, call)
-		},
-	)
-}
-
 // runLearn dispatches on the requested action. Every failure the model can
 // correct is reported as a soft error response so the turn keeps going.
-func runLearn(ctx context.Context, deps LearnDeps, p LearnParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
+func runLearn(ctx context.Context, deps LearnDeps, p LearnParams, callID string) (toolOutcome, error) {
 	switch action := strings.ToLower(strings.TrimSpace(p.Action)); action {
 	case learnActionList:
 		return learnList(deps)
 	case learnActionCreate:
-		return learnCreate(ctx, deps, p, call)
+		return learnCreate(ctx, deps, p, callID)
 	case learnActionRefine:
-		return learnRefine(ctx, deps, p, call)
+		return learnRefine(ctx, deps, p, callID)
 	case "":
 		return softError(fmt.Sprintf("action is required: one of %s, %s, %s",
 			learnActionCreate, learnActionRefine, learnActionList)), nil
@@ -133,7 +117,7 @@ func runLearn(ctx context.Context, deps LearnDeps, p LearnParams, call fantasy.T
 // it can pick create vs refine without guessing. Non-builtin skills are listed
 // in full; bundled ones are collapsed to a bare name list purely so the model
 // can avoid colliding with them.
-func learnList(deps LearnDeps) (fantasy.ToolResponse, error) {
+func learnList(deps LearnDeps) (toolOutcome, error) {
 	var user, builtin []*skills.Skill
 	for _, s := range sortedKnown(deps.Known) {
 		if s.Builtin {
@@ -180,13 +164,13 @@ func learnList(deps LearnDeps) (fantasy.ToolResponse, error) {
 	}
 
 	meta := LearnResponseMetadata{Action: learnActionList, Total: len(user) + len(builtin)}
-	return fantasy.WithResponseMetadata(fantasy.NewTextResponse(sb.String()), meta), nil
+	return withMeta(okOutcome(sb.String()), meta), nil
 }
 
 // learnCreate writes a brand-new skill. It refuses names that would shadow an
 // existing one so that a "create" never silently changes what another skill
 // does.
-func learnCreate(ctx context.Context, deps LearnDeps, p LearnParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
+func learnCreate(ctx context.Context, deps LearnDeps, p LearnParams, callID string) (toolOutcome, error) {
 	name, errResp := resolveWriteRequest(deps, p.Name, p.Description, p.Instructions, learnActionCreate)
 	if errResp != nil {
 		return *errResp, nil
@@ -233,9 +217,9 @@ func learnCreate(ctx context.Context, deps LearnDeps, p LearnParams, call fantas
 		return softError(fmt.Sprintf("failed to render skill: %v", err)), nil
 	}
 
-	granted, resp, err := requestWrite(ctx, deps, call, name, dir, learnActionCreate, "", string(data))
+	granted, resp, err := requestWrite(ctx, deps, callID, name, dir, learnActionCreate, "", string(data))
 	if err != nil {
-		return fantasy.ToolResponse{}, err
+		return toolOutcome{}, err
 	}
 	if !granted {
 		return *resp, nil
@@ -254,12 +238,12 @@ func learnCreate(ctx context.Context, deps LearnDeps, p LearnParams, call fantas
 	}
 
 	metaOut := LearnResponseMetadata{Action: learnActionCreate, Name: name, Path: res.Path, Revision: 1}
-	return fantasy.WithResponseMetadata(fantasy.NewTextResponse(sb.String()), metaOut), nil
+	return withMeta(okOutcome(sb.String()), metaOut), nil
 }
 
 // learnRefine rewrites the body of an existing skill in place, preserving its
 // provenance.
-func learnRefine(ctx context.Context, deps LearnDeps, p LearnParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
+func learnRefine(ctx context.Context, deps LearnDeps, p LearnParams, callID string) (toolOutcome, error) {
 	name, errResp := resolveWriteRequest(deps, p.Name, "", p.Instructions, learnActionRefine)
 	if errResp != nil {
 		return *errResp, nil
@@ -319,9 +303,9 @@ func learnRefine(ctx context.Context, deps LearnDeps, p LearnParams, call fantas
 	}
 
 	previous, _ := os.ReadFile(filepath.Join(dir, skills.SkillFileName))
-	granted, resp, err := requestWrite(ctx, deps, call, name, dir, learnActionRefine, string(previous), string(data))
+	granted, resp, err := requestWrite(ctx, deps, callID, name, dir, learnActionRefine, string(previous), string(data))
 	if err != nil {
-		return fantasy.ToolResponse{}, err
+		return toolOutcome{}, err
 	}
 	if !granted {
 		return *resp, nil
@@ -347,7 +331,7 @@ func learnRefine(ctx context.Context, deps LearnDeps, p LearnParams, call fantas
 		Backup:    res.Backup,
 		Overwrote: res.Overwrote,
 	}
-	return fantasy.WithResponseMetadata(fantasy.NewTextResponse(sb.String()), metaOut), nil
+	return withMeta(okOutcome(sb.String()), metaOut), nil
 }
 
 // requestWrite asks for approval before a skill is written. It reports whether
@@ -356,9 +340,9 @@ func learnRefine(ctx context.Context, deps LearnDeps, p LearnParams, call fantas
 func requestWrite(
 	ctx context.Context,
 	deps LearnDeps,
-	call fantasy.ToolCall,
+	callID string,
 	name, dir, action, oldContent, newContent string,
-) (granted bool, resp *fantasy.ToolResponse, err error) {
+) (granted bool, resp *toolOutcome, err error) {
 	if deps.Permissions == nil {
 		return true, nil, nil
 	}
@@ -372,7 +356,7 @@ func requestWrite(
 	ok, err := deps.Permissions.Request(ctx, permission.CreatePermissionRequest{
 		SessionID:   toolutil.GetSessionFromContext(ctx),
 		Path:        path,
-		ToolCallID:  call.ID,
+		ToolCallID:  callID,
 		ToolName:    LearnToolName,
 		Action:      action,
 		Description: fmt.Sprintf("%s skill %q at %s", verb, name, path),
@@ -388,7 +372,7 @@ func requestWrite(
 		return false, nil, err
 	}
 	if !ok {
-		denied := toolutil.NewPermissionDeniedResponse()
+		denied := deniedOutcome()
 		return false, &denied, nil
 	}
 	return true, nil, nil
@@ -396,7 +380,7 @@ func requestWrite(
 
 // resolveWriteRequest validates the fields shared by create and refine,
 // returning the normalised name or a ready-to-return soft error response.
-func resolveWriteRequest(deps LearnDeps, rawName, description, instructions, action string) (string, *fantasy.ToolResponse) {
+func resolveWriteRequest(deps LearnDeps, rawName, description, instructions, action string) (string, *toolOutcome) {
 	name := strings.TrimSpace(rawName)
 	if name == "" {
 		resp := softError(fmt.Sprintf("name is required for action=%s", action))
@@ -504,8 +488,8 @@ func sortedKnown(known []*skills.Skill) []*skills.Skill {
 	return out
 }
 
-func softError(msg string) fantasy.ToolResponse {
-	return fantasy.NewTextErrorResponse(msg)
+func softError(msg string) toolOutcome {
+	return errOutcome(msg)
 }
 
 func truncateForMessage(s string) string {

@@ -113,6 +113,14 @@ var packageRules = []packageRule{
 			"github.com/nextsko/mocode-agent/internal/",
 		},
 	},
+	{
+		// Every tool in this package is ported to tools.Tool; the adapter owns
+		// the fantasy boundary, so the package must stay framework-free.
+		pkg: "github.com/nextsko/mocode-agent/internal/core/tools/internalx/agent",
+		forbidden: []string{
+			"charm.land/",
+		},
+	},
 }
 
 // bannedBy reports the first forbidden import matching a rule for pkgPath.

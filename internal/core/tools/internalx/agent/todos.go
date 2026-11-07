@@ -1,12 +1,8 @@
 package agenttools
 
 import (
-	"context"
 	_ "embed"
 
-	"charm.land/fantasy"
-
-	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 )
 
@@ -32,19 +28,4 @@ type TodosResponseMetadata struct {
 	JustStarted   string         `json:"just_started,omitempty"`
 	Completed     int            `json:"completed"`
 	Total         int            `json:"total"`
-}
-
-// NewTodosTool is the legacy fantasy-typed constructor; new code should use
-// NewTodosPortTool and wrap it at the agent boundary.
-func NewTodosTool(sessions session.Service) fantasy.AgentTool {
-	return fantasy.NewAgentTool(
-		TodosToolName,
-		toolutil.FirstLineDescription(todosDescription),
-		func(ctx context.Context, params TodosParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			text, meta, err := runTodos(ctx, sessions, params)
-			if err != nil {
-				return fantasy.ToolResponse{}, err
-			}
-			return fantasy.WithResponseMetadata(fantasy.NewTextResponse(text), meta), nil
-		})
 }

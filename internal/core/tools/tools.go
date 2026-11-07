@@ -141,15 +141,6 @@ const (
 	MemoryToolName         = agenttools.MemoryToolName
 )
 
-var (
-	NewThinkTool          = agenttools.NewThinkTool
-	NewTodosTool          = agenttools.NewTodosTool
-	NewTransferTool       = agenttools.NewTransferTool
-	NewSessionSummaryTool = agenttools.NewSessionSummaryTool
-	NewLearnTool          = agenttools.NewLearnTool
-	NewMemoryTool         = agenttools.NewMemoryTool
-)
-
 type (
 	LearnParams            = agenttools.LearnParams
 	MemoryParams           = agenttools.MemoryParams

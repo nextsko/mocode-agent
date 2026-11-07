@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/nextsko/mocode-agent/internal/core/agent/agenttooladapter"
+
 	"charm.land/fantasy"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
@@ -116,14 +118,14 @@ type ToolDeps struct {
 	WrapPort func(Tool) fantasy.AgentTool
 }
 
-// portOrLegacy wraps a migrated tools.Tool when the agent boundary injected a
-// wrapper, and falls back to the legacy fantasy constructor otherwise (tests
-// and callers that build the registry without an adapter).
-func (d ToolDeps) portOrLegacy(port Tool, legacy func() fantasy.AgentTool) fantasy.AgentTool {
+// wrapPort wraps a migrated tools.Tool with the agent adapter. The coordinator
+// injects WrapPort (per-call context); the fallback keeps the registry usable
+// for tests and non-coordinator callers with a stateless adapter.
+func (d ToolDeps) wrapPort(port Tool) fantasy.AgentTool {
 	if d.WrapPort != nil {
 		return d.WrapPort(port)
 	}
-	return legacy()
+	return agenttooladapter.New(port, nil)
 }
 
 // NewHTTPFactory builds the canonical outbound-HTTP factory from the config
@@ -472,35 +474,13 @@ func (sessionPlugin) Descriptors() []ToolDescriptor {
 
 func (sessionPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	t := []fantasy.AgentTool{
-		deps.portOrLegacy(
-			agenttools.NewTodosPortTool(deps.Sessions),
-			func() fantasy.AgentTool { return agenttools.NewTodosTool(deps.Sessions) },
-		),
-		deps.portOrLegacy(
-			agenttools.NewSessionExportPortTool(deps.Messages, deps.Cfg.WorkingDir()),
-			func() fantasy.AgentTool {
-				return agenttools.NewSessionExportTool(deps.Messages, deps.Cfg.WorkingDir())
-			},
-		),
-		deps.portOrLegacy(
-			agenttools.NewMessageExportPortTool(deps.Messages, deps.Cfg.WorkingDir()),
-			func() fantasy.AgentTool {
-				return agenttools.NewMessageExportTool(deps.Messages, deps.Cfg.WorkingDir())
-			},
-		),
-		deps.portOrLegacy(
-			agenttools.NewSessionSummaryPortTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), deps.SummarySchedule),
-			func() fantasy.AgentTool {
-				return agenttools.NewSessionSummaryTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), deps.SummarySchedule)
-			},
-		),
+		deps.wrapPort(agenttools.NewTodosPortTool(deps.Sessions)),
+		deps.wrapPort(agenttools.NewSessionExportPortTool(deps.Messages, deps.Cfg.WorkingDir())),
+		deps.wrapPort(agenttools.NewMessageExportPortTool(deps.Messages, deps.Cfg.WorkingDir())),
+		deps.wrapPort(agenttools.NewSessionSummaryPortTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), deps.SummarySchedule)),
 	}
 	if deps.SessionSearch != nil {
-		if deps.WrapPort != nil {
-			t = append(t, deps.WrapPort(agenttools.NewSessionSearchPortTool(deps.SessionSearch)))
-		} else {
-			t = append(t, agenttools.NewSessionSearchTool(deps.SessionSearch))
-		}
+		t = append(t, deps.wrapPort(agenttools.NewSessionSearchPortTool(deps.SessionSearch)))
 	}
 	return t
 }
@@ -518,16 +498,8 @@ func (mocodePlugin) Descriptors() []ToolDescriptor {
 
 func (mocodePlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{
-		deps.portOrLegacy(
-			agenttools.NewMocodeInfoPortTool(deps.Cfg, deps.LSPManager, deps.AllSkills, deps.ActiveSkills, deps.SkillTracker),
-			func() fantasy.AgentTool {
-				return agenttools.NewMocodeInfoTool(deps.Cfg, deps.LSPManager, deps.AllSkills, deps.ActiveSkills, deps.SkillTracker)
-			},
-		),
-		deps.portOrLegacy(
-			agenttools.NewMocodeLogsPortTool(log.MainLogPath(infra.DataDir())),
-			func() fantasy.AgentTool { return agenttools.NewMocodeLogsTool(log.MainLogPath(infra.DataDir())) },
-		),
+		deps.wrapPort(agenttools.NewMocodeInfoPortTool(deps.Cfg, deps.LSPManager, deps.AllSkills, deps.ActiveSkills, deps.SkillTracker)),
+		deps.wrapPort(agenttools.NewMocodeLogsPortTool(log.MainLogPath(infra.DataDir()))),
 	}
 }
 
@@ -551,10 +523,7 @@ func (lspPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 		return nil
 	}
 	return []fantasy.AgentTool{
-		deps.portOrLegacy(
-			agenttools.NewDiagnosticsPortTool(deps.LSPManager),
-			func() fantasy.AgentTool { return agenttools.NewDiagnosticsTool(deps.LSPManager) },
-		),
+		deps.wrapPort(agenttools.NewDiagnosticsPortTool(deps.LSPManager)),
 		lsp.NewReferencesTool(deps.LSPManager),
 		lsp.NewLSPRestartTool(deps.LSPManager),
 	}
@@ -612,7 +581,7 @@ func (thinkPlugin) Descriptors() []ToolDescriptor {
 }
 
 func (thinkPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
-	return []fantasy.AgentTool{deps.portOrLegacy(agenttools.NewThinkPortTool(), agenttools.NewThinkTool)}
+	return []fantasy.AgentTool{deps.wrapPort(agenttools.NewThinkPortTool())}
 }
 
 // ─── plugin/learn ─────────────────────────────────────────────────────────────
@@ -636,11 +605,11 @@ func (learnPlugin) Descriptors() []ToolDescriptor {
 }
 
 func (learnPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
-	return []fantasy.AgentTool{agenttools.NewLearnTool(agenttools.LearnDeps{
+	return []fantasy.AgentTool{deps.wrapPort(agenttools.NewLearnPortTool(agenttools.LearnDeps{
 		Permissions: deps.Permissions,
 		Root:        learnSkillsRoot(deps),
 		Known:       deps.AllSkills,
-	})}
+	}))}
 }
 
 // learnSkillsRoot resolves where learned skills are written: the highest
@@ -733,10 +702,10 @@ func (memoryPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool 
 	if store == nil {
 		return nil
 	}
-	return []fantasy.AgentTool{agenttools.NewMemoryTool(agenttools.MemoryDeps{
+	return []fantasy.AgentTool{deps.wrapPort(agenttools.NewMemoryPortTool(agenttools.MemoryDeps{
 		Store:   store,
 		Indexer: memory.NewFileIndexer(store),
-	})}
+	}))}
 }
 
 // memoryStore returns the process-wide session memory store.

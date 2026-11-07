@@ -113,4 +113,7 @@ type ToolResult struct {
 	Error       error
 	Attachments []Attachment
 	Metadata    map[string]any
+	// StopTurn asks the agent runtime to end the turn after this result
+	// (e.g. the user denied a permission prompt).
+	StopTurn bool
 }

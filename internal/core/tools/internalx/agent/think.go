@@ -2,12 +2,7 @@
 package agenttools
 
 import (
-	"context"
 	_ "embed"
-
-	"charm.land/fantasy"
-
-	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 )
 
 //go:embed think.md
@@ -24,22 +19,4 @@ type ThinkParams struct {
 // ThinkResponseMetadata holds metadata returned with a think tool response.
 type ThinkResponseMetadata struct {
 	Thought string `json:"thought"`
-}
-
-// NewThinkTool creates a stateless scratchpad tool that lets the agent record
-// reasoning steps before taking any real action. It never retrieves external
-// data or mutates state; it simply echoes the thought back so the model can
-// reference it in subsequent turns.
-func NewThinkTool() fantasy.AgentTool {
-	return fantasy.NewAgentTool(
-		ThinkToolName,
-		toolutil.FirstLineDescription(thinkDescription),
-		func(_ context.Context, params ThinkParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			meta := ThinkResponseMetadata(params)
-			return fantasy.WithResponseMetadata(
-				fantasy.NewTextResponse(params.Thought),
-				meta,
-			), nil
-		},
-	)
 }

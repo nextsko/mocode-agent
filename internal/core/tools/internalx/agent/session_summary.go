@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/fantasy"
-
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
@@ -39,21 +37,6 @@ type SessionSummaryMetadata struct {
 	SummaryMessageID string `json:"summary_message_id,omitempty"`
 	SummaryPath      string `json:"summary_path,omitempty"`
 	Scheduled        bool   `json:"scheduled,omitempty"`
-}
-
-// NewSessionSummaryTool is the legacy fantasy-typed constructor; new code
-// should use NewSessionSummaryPortTool and wrap it at the agent boundary.
-func NewSessionSummaryTool(sessions session.Service, messages message.Service, workingDir string, schedule SessionSummaryScheduler) fantasy.AgentTool {
-	return fantasy.NewAgentTool(
-		SessionSummaryToolName,
-		"Inspect or schedule summarization for the current session.",
-		func(ctx context.Context, params SessionSummaryParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			text, metadata, err := runSessionSummary(ctx, sessions, messages, workingDir, schedule, params)
-			if err != nil {
-				return fantasy.NewTextErrorResponse(err.Error()), nil
-			}
-			return fantasy.WithResponseMetadata(fantasy.NewTextResponse(text), metadata), nil
-		})
 }
 
 // NewSessionSummaryPortTool is the framework-agnostic form of session_summary.
