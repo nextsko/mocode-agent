@@ -116,6 +116,16 @@ type ToolDeps struct {
 	WrapPort func(Tool) fantasy.AgentTool
 }
 
+// portOrLegacy wraps a migrated tools.Tool when the agent boundary injected a
+// wrapper, and falls back to the legacy fantasy constructor otherwise (tests
+// and callers that build the registry without an adapter).
+func (d ToolDeps) portOrLegacy(port Tool, legacy func() fantasy.AgentTool) fantasy.AgentTool {
+	if d.WrapPort != nil {
+		return d.WrapPort(port)
+	}
+	return legacy()
+}
+
 // NewHTTPFactory builds the canonical outbound-HTTP factory from the config
 // store: config's proxy-aware transport plus the resolved proxy URL (needed
 // by non-http.Client stacks such as go-git). The composition root calls this
@@ -462,8 +472,16 @@ func (sessionPlugin) Descriptors() []ToolDescriptor {
 
 func (sessionPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	t := []fantasy.AgentTool{
-		agenttools.NewTodosTool(deps.Sessions),
-		agenttools.NewSessionExportTool(deps.Messages, deps.Cfg.WorkingDir()),
+		deps.portOrLegacy(
+			agenttools.NewTodosPortTool(deps.Sessions),
+			func() fantasy.AgentTool { return agenttools.NewTodosTool(deps.Sessions) },
+		),
+		deps.portOrLegacy(
+			agenttools.NewSessionExportPortTool(deps.Messages, deps.Cfg.WorkingDir()),
+			func() fantasy.AgentTool {
+				return agenttools.NewSessionExportTool(deps.Messages, deps.Cfg.WorkingDir())
+			},
+		),
 		agenttools.NewMessageExportTool(deps.Messages, deps.Cfg.WorkingDir()),
 		agenttools.NewSessionSummaryTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), deps.SummarySchedule),
 	}
@@ -572,8 +590,8 @@ func (thinkPlugin) Descriptors() []ToolDescriptor {
 	}
 }
 
-func (thinkPlugin) Build(_ context.Context, _ ToolDeps) []fantasy.AgentTool {
-	return []fantasy.AgentTool{agenttools.NewThinkTool()}
+func (thinkPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	return []fantasy.AgentTool{deps.portOrLegacy(agenttools.NewThinkPortTool(), agenttools.NewThinkTool)}
 }
 
 // ─── plugin/learn ─────────────────────────────────────────────────────────────

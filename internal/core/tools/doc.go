@@ -89,20 +89,20 @@
 //     via type aliases, so implementations can import them without a cycle.
 //     core/agent/agent_tool_context.go implements the ToolContext port, and
 //     core/agent/agenttooladapter converts a tools.Tool into fantasy.AgentTool.
-//   - Pilot migrated: session_search is implemented as a tools.Tool
-//     (NewSessionSearchPortTool) and wrapped by the adapter through
-//     ToolDeps.WrapPort; the legacy fantasy constructor remains as a fallback
-//     for callers that do not inject the wrapper.
+//   - Migrated so far: session_search, todos, think, and session_export are
+//     implemented as tools.Tool (…PortTool constructors) and wrapped by the
+//     adapter through ToolDeps.WrapPort; legacy fantasy constructors remain as
+//     fallbacks for callers that do not inject the wrapper.
 //   - Remaining: the other 40+ builtin constructors still return
 //     fantasy.AgentTool directly, and this package still imports fantasy,
 //     core/config, and core/agent/toolutil. Migrate tools one at a time to
 //     tools.Tool and drop the legacy constructors; only then can layercheck
 //     ban fantasy imports here.
 //   - Adapter wiring: the coordinator injects a context factory, so every
-//     Execute call gets a fresh ToolContext carrying the working directory.
-//     Session id, permission and telemetry adapters are still TODO; until they
-//     land the placeholder context denies permissions rather than allowing
-//     them silently.
+//     Execute call gets a fresh ToolContext carrying the session id (from the
+//     run context), the working directory, and a permission checker that
+//     prompts through permission.Service (deny-by-default). MCP handles and
+//     telemetry callbacks are still TODO and degrade to no-ops.
 //   - Coordinator-owned tools (agent, agentic_fetch, transfer_to_agent) are
 //     built outside the registry because they call back into coordinator
 //     state; their descriptors are mirrored in coordinatorToolNames().

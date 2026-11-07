@@ -26,7 +26,7 @@ type Adapter struct {
 	tctx tools.ToolContext
 	// newCtx, when set, produces a fresh context per Execute call (the correct
 	// shape for request-scoped state). It takes precedence over tctx.
-	newCtx func() (tools.ToolContext, func())
+	newCtx func(ctx context.Context) (tools.ToolContext, func())
 	opts   fantasy.ProviderOptions
 }
 
@@ -38,7 +38,7 @@ func New(tool tools.Tool, tctx tools.ToolContext) *Adapter {
 
 // NewWithContext creates an adapter that builds a fresh tools.ToolContext for
 // every Execute call. The returned cleanup func is invoked after the call.
-func NewWithContext(tool tools.Tool, factory func() (tools.ToolContext, func())) *Adapter {
+func NewWithContext(tool tools.Tool, factory func(ctx context.Context) (tools.ToolContext, func())) *Adapter {
 	return &Adapter{tool: tool, newCtx: factory}
 }
 
@@ -62,7 +62,7 @@ func (a *Adapter) Run(ctx context.Context, call fantasy.ToolCall) (fantasy.ToolR
 	tctx := a.tctx
 	cleanup := func() {}
 	if a.newCtx != nil {
-		tctx, cleanup = a.newCtx()
+		tctx, cleanup = a.newCtx(ctx)
 	}
 	defer cleanup()
 	if tctx == nil {

@@ -132,7 +132,7 @@ func TestNewWithContextBuildsFreshContextPerCall(t *testing.T) {
 
 	calls := 0
 	cleanups := 0
-	adapter := NewWithContext(&fakeTool{schema: tools.Schema{Name: "demo"}}, func() (tools.ToolContext, func()) {
+	adapter := NewWithContext(&fakeTool{schema: tools.Schema{Name: "demo"}}, func(context.Context) (tools.ToolContext, func()) {
 		calls++
 		return noContext{}, func() { cleanups++ }
 	})

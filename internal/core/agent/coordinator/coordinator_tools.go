@@ -24,6 +24,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/agent/failover"
 	"github.com/nextsko/mocode-agent/internal/core/agent/lifecycle"
 	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
+	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/shellruntime/screencap"
 	"github.com/nextsko/mocode-agent/internal/core/tools"
@@ -300,12 +301,20 @@ func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 		HTTP:          c.httpFactory,
 		WrapPort: func(tool tools.Tool) fantasy.AgentTool {
 			workingDir := c.cfg.WorkingDir()
-			return agenttooladapter.NewWithContext(tool, func() (tools.ToolContext, func()) {
-				// Session id and permission/telemetry adapters are still being
-				// wired; the tools migrated so far are context-free, and the
-				// placeholder context denies permissions instead of allowing
-				// them silently.
-				return NewToolContext("", workingDir, nil, nil, nil)
+			return agenttooladapter.NewWithContext(tool, func(ctx context.Context) (tools.ToolContext, func()) {
+				sessionID := toolutil.GetSessionFromContext(ctx)
+				// Permissions are requested lazily by tools that call
+				// Allow(name); the adapter carries the request context so the
+				// prompt path matches the legacy tools.
+				checker := permissionCheckerAdapter{
+					ctx:       ctx,
+					svc:       c.permissions,
+					sessionID: sessionID,
+				}
+				// MCP handles and telemetry callbacks are still TODO; the
+				// context degrades to no-op adapters.
+				tctx, cleanup := NewToolContext(sessionID, workingDir, checker, nil, nil)
+				return tctx, cleanup
 			})
 		},
 	}
