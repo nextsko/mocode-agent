@@ -74,7 +74,7 @@ func NewSshUploadTool(svc *sshcommon.Service, permissions permission.Service) fa
 				ctx, permissions, sessionID,
 				sshcommon.SshUploadToolName, "upload", params.Host,
 				fmt.Sprintf("Upload %s → %s:%s", params.Local, params.Host, params.Remote),
-				call, SshUploadPermissionsParams(params),
+				call.ID, SshUploadPermissionsParams(params),
 			)
 			if err != nil {
 				return fantasy.ToolResponse{}, err

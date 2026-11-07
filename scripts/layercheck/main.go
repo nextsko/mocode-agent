@@ -121,6 +121,28 @@ var packageRules = []packageRule{
 			"charm.land/",
 		},
 	},
+	{
+		// The question tool is ported; keep it framework-free.
+		pkg: "github.com/nextsko/mocode-agent/internal/core/tools/core/question",
+		forbidden: []string{
+			"charm.land/",
+		},
+	},
+	{
+		// SSH helpers were decoupled from the framework; tool wrappers live in
+		// external/systems/ssh and are ported separately.
+		pkg: "github.com/nextsko/mocode-agent/internal/core/tools/external/common/ssh",
+		forbidden: []string{
+			"charm.land/",
+		},
+	},
+	{
+		// The screenshot tool is ported; the adapter owns the framework edge.
+		pkg: "github.com/nextsko/mocode-agent/internal/core/shellruntime/screencap",
+		forbidden: []string{
+			"charm.land/",
+		},
+	},
 }
 
 // bannedBy reports the first forbidden import matching a rule for pkgPath.

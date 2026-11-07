@@ -76,7 +76,7 @@ func NewSshExecTool(svc *sshcommon.Service, permissions permission.Service) fant
 				ctx, permissions, sessionID,
 				sshcommon.SshExecToolName, "execute", params.Host,
 				fmt.Sprintf("Run command on %s: %s", params.Host, sshcommon.TruncateForPrompt(params.Command, 80)),
-				call, SshExecPermissionsParams(params),
+				call.ID, SshExecPermissionsParams(params),
 			)
 			if err != nil {
 				return fantasy.ToolResponse{}, err

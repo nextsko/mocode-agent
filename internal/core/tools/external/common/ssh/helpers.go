@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"charm.land/fantasy"
-
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 )
@@ -34,7 +32,7 @@ func RequestPermission(
 	ctx context.Context,
 	svc permission.Service,
 	sessionID, toolName, action, host, description string,
-	call fantasy.ToolCall,
+	callID string,
 	params any,
 ) (bool, error) {
 	if svc == nil {
@@ -49,7 +47,7 @@ func RequestPermission(
 	granted, err := svc.Request(ctx, permission.CreatePermissionRequest{
 		SessionID:   sessionID,
 		Path:        host,
-		ToolCallID:  call.ID,
+		ToolCallID:  callID,
 		ToolName:    toolName,
 		Action:      action,
 		Description: desc,

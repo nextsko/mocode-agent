@@ -68,7 +68,7 @@ func NewSshDownloadTool(svc *sshcommon.Service, permissions permission.Service) 
 				ctx, permissions, sessionID,
 				sshcommon.SshDownloadToolName, "download", params.Host,
 				fmt.Sprintf("Download %s:%s → %s", params.Host, params.Remote, params.Local),
-				call, SshDownloadPermissionsParams(params),
+				call.ID, SshDownloadPermissionsParams(params),
 			)
 			if err != nil {
 				return fantasy.ToolResponse{}, err

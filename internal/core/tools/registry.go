@@ -375,7 +375,7 @@ func (questionPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentToo
 	if deps.Questions == nil {
 		return nil
 	}
-	return []fantasy.AgentTool{agentquestion.NewQuestionTool(deps.Questions)}
+	return []fantasy.AgentTool{deps.wrapPort(agentquestion.NewQuestionPortTool(deps.Questions))}
 }
 
 // ─── builtin/file ─────────────────────────────────────────────────────────────

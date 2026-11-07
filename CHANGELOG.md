@@ -31,8 +31,9 @@ All notable changes to mocode are documented here. The format follows
   enforces this, and `agent/messages` keeps the same rule.
 - Tool contracts moved to the leaf `core/tools/contract` package (re-exported
   as `tools.*` aliases); an `agenttooladapter` converts `tools.Tool` into the
-  runtime `fantasy.AgentTool`; all twelve agent tools are migrated and the
-  package no longer imports the framework (layercheck enforces it). The
+  runtime `fantasy.AgentTool`; all twelve agent tools are migrated and that
+  package no longer imports the framework (layercheck enforces it); the
+  question tool, SSH helpers and the screenshot tool are ported as well. The
   coordinator supplies a per-call
   context with session id, working directory and a prompting permission
   checker. layercheck keeps the contract package dependency-free (leaf).

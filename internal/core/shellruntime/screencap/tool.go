@@ -2,27 +2,42 @@ package screencap
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
-	"charm.land/fantasy"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 )
 
-// NewAgentTool creates a screenshot tool for the agent.
-func NewAgentTool(outputDir string) fantasy.AgentTool {
-	type input struct {
-		Reason string `json:"reason" jsonschema:"description=Brief reason for taking the screenshot."`
-	}
-	return fantasy.NewAgentTool(
-		"screenshot",
+// ScreenshotToolName is the registered tool name.
+const ScreenshotToolName = "screenshot"
+
+// NewTool creates the framework-agnostic screenshot tool.
+func NewTool(outputDir string) contract.Tool {
+	return contract.NewFunc(
+		ScreenshotToolName,
 		"Capture a screenshot of the current screen and save as PNG. Use when asked to see what's on screen.",
-		func(ctx context.Context, in input, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"reason": map[string]any{
+					"type":        "string",
+					"description": "Brief reason for taking the screenshot.",
+				},
+			},
+		},
+		func(_ context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+			var in struct {
+				Reason string `json:"reason"`
+			}
+			if len(args) > 0 {
+				if err := json.Unmarshal(args, &in); err != nil {
+					return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
+				}
+			}
 			path, err := CapturePNG(outputDir)
 			if err != nil {
-				return fantasy.ToolResponse{}, fmt.Errorf("screenshot: %w", err)
+				return contract.ToolResult{}, fmt.Errorf("screenshot: %w", err)
 			}
-			return fantasy.ToolResponse{
-				Content: fmt.Sprintf("Screenshot saved: %s", path),
-			}, nil
-		},
-	)
+			return contract.Text(fmt.Sprintf("Screenshot saved: %s", path)), nil
+		})
 }

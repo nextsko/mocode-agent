@@ -8,10 +8,9 @@ import (
 	"fmt"
 	"strings"
 
-	"charm.land/fantasy"
-
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/question"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 )
 
 const QuestionToolName = "question"
@@ -81,61 +80,93 @@ type QuestionChoice struct {
 	Description string `json:"description,omitempty" description:"Optional description for this choice"`
 }
 
-// NewQuestionTool creates a new question tool.
-func NewQuestionTool(svc question.Service) fantasy.AgentTool {
-	return fantasy.NewAgentTool(
+// NewQuestionPortTool is the framework-agnostic form of the question tool.
+func NewQuestionPortTool(svc question.Service) contract.Tool {
+	return contract.NewFunc(
 		QuestionToolName,
 		questionDescription,
-		func(ctx context.Context, params QuestionParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			sessionID := toolutil.GetSessionFromContext(ctx)
-
-			if len(params.Questions) == 0 {
-				return fantasy.NewTextErrorResponse("at least one question is required"), nil
-			}
-			if len(params.Questions) > question.MaxQuestions {
-				return fantasy.NewTextErrorResponse(fmt.Sprintf("exceeds maximum of %d questions per batch (got %d). Split into multiple batches and tell the user there will be follow-up questions", question.MaxQuestions, len(params.Questions))), nil
-			}
-
-			questions := make([]question.Question, len(params.Questions))
-			for i, item := range params.Questions {
-				qType := question.Type(item.Type)
-				if qType != question.TypeYesNo && qType != question.TypeSingleChoice && qType != question.TypeMultiChoice && qType != question.TypeFreeText {
-					label := item.Label
-					if label == "" {
-						label = item.Question
-					}
-					return fantasy.NewTextErrorResponse(fmt.Sprintf("question %d [%s]: invalid type %q (must be yes_no, single_choice, multi_choice, or free_text)", i+1, label, item.Type)), nil
-				}
-				questions[i] = question.Question{
-					Type:        qType,
-					Label:       item.Label,
-					Text:        item.Question,
-					Description: item.Description,
-					Choices:     convertChoices(item.GetChoices()),
-				}
-			}
-
-			req := question.Request{
-				SessionID:          sessionID,
-				ToolCallID:         call.ID,
-				Questions:          questions,
-				ConfirmTitle:       params.ConfirmTitle,
-				ConfirmDescription: params.ConfirmDescription,
-			}
-
-			answers, err := svc.Ask(ctx, req)
-			if err != nil {
-				if errors.Is(err, question.ErrCancelled) {
-					resp := fantasy.NewTextErrorResponse("User cancelled this question")
-					resp.StopTurn = true
-					return resp, nil
-				}
-				return fantasy.NewTextErrorResponse(err.Error()), nil
-			}
-
-			return formatAnswers(answers, questions)
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"questions": map[string]any{
+					"type":        "array",
+					"description": "List of questions to present. Single item = no tabs, multiple = tabbed form.",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"label":       map[string]any{"type": "string", "description": "Short tab header label (3 words max)."},
+							"type":        map[string]any{"type": "string", "description": "The type of question: yes_no, single_choice, multi_choice, or free_text"},
+							"question":    map[string]any{"type": "string", "description": "The question text"},
+							"description": map[string]any{"type": "string", "description": "Required markdown description shown below the question"},
+							"choices":     map[string]any{"type": "array", "items": map[string]any{"type": "object"}, "description": "List of choices"},
+							"options":     map[string]any{"type": "array", "items": map[string]any{"type": "object"}, "description": "Alias for choices"},
+						},
+					},
+				},
+				"confirm_title":       map[string]any{"type": "string", "description": "Title for the confirmation tab."},
+				"confirm_description": map[string]any{"type": "string", "description": "Description for the confirmation tab."},
+			},
+			"required": []string{"questions"},
 		},
-	)
+		func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+			var params QuestionParams
+			if err := json.Unmarshal(args, &params); err != nil {
+				return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
+			}
+			callID, _ := toolutil.ToolCallIDFromCtx(ctx)
+			return runQuestion(ctx, svc, params, callID)
+		})
+}
+
+// runQuestion validates the batch and asks the user.
+func runQuestion(ctx context.Context, svc question.Service, params QuestionParams, callID string) (contract.ToolResult, error) {
+	sessionID := toolutil.GetSessionFromContext(ctx)
+
+	if len(params.Questions) == 0 {
+		return contract.Error("at least one question is required"), nil
+	}
+	if len(params.Questions) > question.MaxQuestions {
+		return contract.Error(fmt.Sprintf("exceeds maximum of %d questions per batch (got %d). Split into multiple batches and tell the user there will be follow-up questions", question.MaxQuestions, len(params.Questions))), nil
+	}
+
+	questions := make([]question.Question, len(params.Questions))
+	for i, item := range params.Questions {
+		qType := question.Type(item.Type)
+		if qType != question.TypeYesNo && qType != question.TypeSingleChoice && qType != question.TypeMultiChoice && qType != question.TypeFreeText {
+			label := item.Label
+			if label == "" {
+				label = item.Question
+			}
+			return contract.Error(fmt.Sprintf("question %d [%s]: invalid type %q (must be yes_no, single_choice, multi_choice, or free_text)", i+1, label, item.Type)), nil
+		}
+		questions[i] = question.Question{
+			Type:        qType,
+			Label:       item.Label,
+			Text:        item.Question,
+			Description: item.Description,
+			Choices:     convertChoices(item.GetChoices()),
+		}
+	}
+
+	req := question.Request{
+		SessionID:          sessionID,
+		ToolCallID:         callID,
+		Questions:          questions,
+		ConfirmTitle:       params.ConfirmTitle,
+		ConfirmDescription: params.ConfirmDescription,
+	}
+
+	answers, err := svc.Ask(ctx, req)
+	if err != nil {
+		if errors.Is(err, question.ErrCancelled) {
+			res := contract.Error("User cancelled this question")
+			res.StopTurn = true
+			return res, nil
+		}
+		return contract.Error(err.Error()), nil
+	}
+
+	return formatAnswers(answers, questions)
 }
 
 func convertChoices(in []QuestionChoice) []question.Choice {
@@ -147,7 +178,7 @@ func convertChoices(in []QuestionChoice) []question.Choice {
 }
 
 // formatAnswers converts answers into a tool response string for the LLM.
-func formatAnswers(answers []question.Answer, questions []question.Question) (fantasy.ToolResponse, error) {
+func formatAnswers(answers []question.Answer, questions []question.Question) (contract.ToolResult, error) {
 	var b strings.Builder
 	for i, answer := range answers {
 		if i > 0 {
@@ -159,11 +190,11 @@ func formatAnswers(answers []question.Answer, questions []question.Question) (fa
 		formatted, _ := formatAnswer(&answer, question.Type(""))
 		b.WriteString(formatted.Content)
 	}
-	return fantasy.NewTextResponse(b.String()), nil
+	return contract.Text(b.String()), nil
 }
 
 // formatAnswer formats a single answer for the LLM.
-func formatAnswer(answer *question.Answer, _ question.Type) (fantasy.ToolResponse, error) {
+func formatAnswer(answer *question.Answer, _ question.Type) (contract.ToolResult, error) {
 	var b strings.Builder
 
 	switch {
@@ -200,5 +231,5 @@ func formatAnswer(answer *question.Answer, _ question.Type) (fantasy.ToolRespons
 		}
 	}
 
-	return fantasy.NewTextResponse(b.String()), nil
+	return contract.Text(b.String()), nil
 }

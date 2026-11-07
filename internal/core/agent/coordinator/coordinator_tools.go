@@ -332,7 +332,7 @@ func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 
 	// ── Screenshot tools ─────────────────────────────────────────────────────
 	screenshotDir := infra.ScreenshotsDir()
-	allTools = append(allTools, screencap.NewAgentTool(screenshotDir))
+	allTools = append(allTools, agenttooladapter.NewWithContext(screencap.NewTool(screenshotDir), c.portToolContextFactory()))
 
 	// ── Messaging tools (coordinator-owned, always available regardless of AllowedTools) ─
 	messengerPort := c.messenger
