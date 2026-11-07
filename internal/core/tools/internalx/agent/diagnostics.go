@@ -19,16 +19,17 @@ const DiagnosticsToolName = "lsp_diagnostics"
 //go:embed diagnostics.md
 var diagnosticsDescription []byte
 
+// NewDiagnosticsTool is the legacy fantasy-typed constructor; new code should
+// use NewDiagnosticsPortTool and wrap it at the agent boundary.
 func NewDiagnosticsTool(lspManager *lsp.Manager) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		DiagnosticsToolName,
 		toolutil.FirstLineDescription(diagnosticsDescription),
-		func(ctx context.Context, params DiagnosticsParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			if lspManager.Clients().Len() == 0 {
-				return fantasy.NewTextErrorResponse("no LSP clients available"), nil
+		func(ctx context.Context, params DiagnosticsParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
+			out, err := runDiagnostics(ctx, lspManager, params)
+			if err != nil {
+				return fantasy.NewTextErrorResponse(err.Error()), nil
 			}
-			lsp.NotifyLSPs(ctx, lspManager, params.FilePath)
-			output := lsp.GetDiagnostics(params.FilePath, lspManager)
-			return fantasy.NewTextResponse(output), nil
+			return fantasy.NewTextResponse(out), nil
 		})
 }

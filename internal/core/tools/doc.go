@@ -89,10 +89,12 @@
 //     via type aliases, so implementations can import them without a cycle.
 //     core/agent/agent_tool_context.go implements the ToolContext port, and
 //     core/agent/agenttooladapter converts a tools.Tool into fantasy.AgentTool.
-//   - Migrated so far: session_search, todos, think, and session_export are
+//   - Migrated so far (10 of 12 tools in internalx/agent): session_search,
+//     todos, think, session_export, message_export, lsp_diagnostics,
+//     mocode_info, mocode_logs, session_summary and transfer_to_agent are
 //     implemented as tools.Tool (…PortTool constructors) and wrapped by the
-//     adapter through ToolDeps.WrapPort; legacy fantasy constructors remain as
-//     fallbacks for callers that do not inject the wrapper.
+//     adapter. memory and learn still use fantasy directly; legacy constructors
+//     remain as fallbacks until the package can drop fantasy entirely.
 //   - Remaining: the other 40+ builtin constructors still return
 //     fantasy.AgentTool directly, and this package still imports fantasy,
 //     core/config, and core/agent/toolutil. Migrate tools one at a time to

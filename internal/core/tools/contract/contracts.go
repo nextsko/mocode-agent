@@ -46,6 +46,12 @@ type Capable interface {
 	Capabilities() []Capability
 }
 
+// ParallelTool marks a tool as safe to run in parallel with other tools.
+// The agent adapter surfaces it through fantasy.ToolInfo.Parallel.
+type ParallelTool interface {
+	Parallel() bool
+}
+
 // ToolProvider groups related tools behind a named bundle. Providers
 // (e.g. the MCP bridge) may return a fresh slice from Tools() each call
 // to reflect live state; static providers may return a stable slice.

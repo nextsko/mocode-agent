@@ -12,6 +12,7 @@ type (
 	Tool              = contract.Tool
 	Capable           = contract.Capable
 	ToolProvider      = contract.ToolProvider
+	ParallelTool      = contract.ParallelTool
 	ToolContext       = contract.ToolContext
 	PermissionChecker = contract.PermissionChecker
 	MCPHandles        = contract.MCPHandles

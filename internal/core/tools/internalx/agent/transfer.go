@@ -3,10 +3,12 @@ package agenttools
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 
 	"charm.land/fantasy"
 )
@@ -169,70 +171,145 @@ func NewTransferToolWithController(availableAgents []string, ctrl TransferContro
 	return newTransferToolCore(availableAgents, ctrl, nil)
 }
 
-// newTransferToolCore is the shared implementation.
-// cb is only non-nil in the legacy path so we can forward the message field.
+// transferPort is the framework-agnostic form of transfer_to_agent. It owns
+// the per-tool tracker so handoff limits survive across calls.
+type transferPort struct {
+	availableAgents []string
+	ctrl            TransferController
+	legacyCb        TransferCallback
+	tracker         *TransferTracker
+}
+
+func newTransferPort(availableAgents []string, ctrl TransferController, legacyCb TransferCallback) *transferPort {
+	return &transferPort{
+		availableAgents: availableAgents,
+		ctrl:            ctrl,
+		legacyCb:        legacyCb,
+		tracker:         NewTransferTracker(MaxTransfers),
+	}
+}
+
+// NewTransferPortTool is the framework-agnostic constructor for the legacy
+// callback signature.
+func NewTransferPortTool(availableAgents []string, onTransfer TransferCallback) contract.Tool {
+	return newTransferPort(availableAgents, nil, onTransfer)
+}
+
+// NewTransferPortToolWithController is the framework-agnostic constructor for
+// the structured controller interface.
+func NewTransferPortToolWithController(availableAgents []string, ctrl TransferController) contract.Tool {
+	return newTransferPort(availableAgents, ctrl, nil)
+}
+
+func (t *transferPort) Name() string { return TransferToolName }
+
+func (t *transferPort) Description() string {
+	return toolutil.FirstLineDescription(transferDescription)
+}
+
+func (t *transferPort) Schema() contract.Schema {
+	return contract.Schema{
+		Name:        TransferToolName,
+		Description: t.Description(),
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"agent_name": map[string]any{
+					"type":        "string",
+					"description": "Name of the agent to transfer control to",
+				},
+				"message": map[string]any{
+					"type":        "string",
+					"description": "Optional message with context for the target agent",
+				},
+			},
+			"required": []string{"agent_name"},
+		},
+	}
+}
+
+// Parallel implements contract.ParallelTool: transfers never touch shared files.
+func (t *transferPort) Parallel() bool { return true }
+
+func (t *transferPort) Execute(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+	var params TransferParams
+	if len(args) > 0 {
+		if err := json.Unmarshal(args, &params); err != nil {
+			return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
+		}
+	}
+	text, isErr := t.run(ctx, params)
+	if isErr {
+		return contract.ToolResult{Error: fmt.Errorf("%s", text)}, nil
+	}
+	return contract.ToolResult{Content: text}, nil
+}
+
+// run executes one transfer and reports whether the text is an error message.
+func (t *transferPort) run(ctx context.Context, params TransferParams) (string, bool) {
+	if params.AgentName == "" {
+		return "agent_name is required", true
+	}
+
+	if !t.tracker.CanTransfer() {
+		msg := fmt.Sprintf("Transfer limit reached (%d/%d). Cannot transfer anymore.",
+			t.tracker.Count(), t.tracker.maxHandoffs)
+		if t.tracker.isRepetitive() {
+			msg = fmt.Sprintf("Transfer loop detected: only %d unique agent(s) in the last %d transfers. "+
+				"Refusing further transfers to prevent infinite loops.",
+				t.tracker.countUnique(), t.tracker.windowSize)
+		}
+		return msg, true
+	}
+
+	target := strings.TrimSpace(params.AgentName)
+	found := false
+	for _, a := range t.availableAgents {
+		if a == target {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Sprintf("Agent %q is not available. Available agents: %s",
+			target, strings.Join(t.availableAgents, ", ")), true
+	}
+
+	if t.ctrl != nil {
+		if _, err := t.ctrl.OnTransfer(ctx, "", target); err != nil {
+			return fmt.Sprintf("Transfer failed: %v", err), true
+		}
+	} else if t.legacyCb != nil {
+		if err := t.legacyCb(ctx, "", target, params.Message); err != nil {
+			return fmt.Sprintf("Transfer failed: %v", err), true
+		}
+	}
+
+	t.tracker.RecordTransfer(target)
+
+	msg := fmt.Sprintf("Control transferred to agent %q.", target)
+	if params.Message != "" {
+		msg += fmt.Sprintf(" Context: %s", params.Message)
+	}
+	msg += fmt.Sprintf(" (transfer %d/%d)", t.tracker.Count(), t.tracker.maxHandoffs)
+	return msg, false
+}
+
+// newTransferToolCore is the shared legacy implementation.
 func newTransferToolCore(
 	availableAgents []string,
 	ctrl TransferController,
 	legacyCb TransferCallback,
 ) fantasy.AgentTool {
-	tracker := NewTransferTracker(MaxTransfers)
-
+	port := newTransferPort(availableAgents, ctrl, legacyCb)
 	return fantasy.NewParallelAgentTool(
 		TransferToolName,
 		toolutil.FirstLineDescription(transferDescription),
-		func(ctx context.Context, params TransferParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			if params.AgentName == "" {
-				return fantasy.NewTextErrorResponse("agent_name is required"), nil
+		func(ctx context.Context, params TransferParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
+			text, isErr := port.run(ctx, params)
+			if isErr {
+				return fantasy.NewTextErrorResponse(text), nil
 			}
-
-			// Check if transfer is allowed (absolute cap + repetition check).
-			if !tracker.CanTransfer() {
-				msg := fmt.Sprintf("Transfer limit reached (%d/%d). Cannot transfer anymore.",
-					tracker.Count(), tracker.maxHandoffs)
-				if tracker.isRepetitive() {
-					msg = fmt.Sprintf("Transfer loop detected: only %d unique agent(s) in the last %d transfers. "+
-						"Refusing further transfers to prevent infinite loops.",
-						tracker.countUnique(), tracker.windowSize)
-				}
-				return fantasy.NewTextErrorResponse(msg), nil
-			}
-
-			// Validate target agent exists.
-			target := strings.TrimSpace(params.AgentName)
-			found := false
-			for _, a := range availableAgents {
-				if a == target {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return fantasy.NewTextErrorResponse(
-					fmt.Sprintf("Agent %q is not available. Available agents: %s",
-						target, strings.Join(availableAgents, ", ")),
-				), nil
-			}
-
-			// Execute controller (structured) or legacy callback.
-			if ctrl != nil {
-				if _, err := ctrl.OnTransfer(ctx, "", target); err != nil {
-					return fantasy.NewTextErrorResponse(fmt.Sprintf("Transfer failed: %v", err)), nil
-				}
-			} else if legacyCb != nil {
-				if err := legacyCb(ctx, "", target, params.Message); err != nil {
-					return fantasy.NewTextErrorResponse(fmt.Sprintf("Transfer failed: %v", err)), nil
-				}
-			}
-
-			tracker.RecordTransfer(target)
-
-			msg := fmt.Sprintf("Control transferred to agent %q.", target)
-			if params.Message != "" {
-				msg += fmt.Sprintf(" Context: %s", params.Message)
-			}
-			msg += fmt.Sprintf(" (transfer %d/%d)", tracker.Count(), tracker.maxHandoffs)
-
-			return fantasy.NewTextResponse(msg), nil
+			return fantasy.NewTextResponse(text), nil
 		})
 }

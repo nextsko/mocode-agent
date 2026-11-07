@@ -482,8 +482,18 @@ func (sessionPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool
 				return agenttools.NewSessionExportTool(deps.Messages, deps.Cfg.WorkingDir())
 			},
 		),
-		agenttools.NewMessageExportTool(deps.Messages, deps.Cfg.WorkingDir()),
-		agenttools.NewSessionSummaryTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), deps.SummarySchedule),
+		deps.portOrLegacy(
+			agenttools.NewMessageExportPortTool(deps.Messages, deps.Cfg.WorkingDir()),
+			func() fantasy.AgentTool {
+				return agenttools.NewMessageExportTool(deps.Messages, deps.Cfg.WorkingDir())
+			},
+		),
+		deps.portOrLegacy(
+			agenttools.NewSessionSummaryPortTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), deps.SummarySchedule),
+			func() fantasy.AgentTool {
+				return agenttools.NewSessionSummaryTool(deps.Sessions, deps.Messages, deps.Cfg.WorkingDir(), deps.SummarySchedule)
+			},
+		),
 	}
 	if deps.SessionSearch != nil {
 		if deps.WrapPort != nil {
@@ -508,8 +518,16 @@ func (mocodePlugin) Descriptors() []ToolDescriptor {
 
 func (mocodePlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{
-		agenttools.NewMocodeInfoTool(deps.Cfg, deps.LSPManager, deps.AllSkills, deps.ActiveSkills, deps.SkillTracker),
-		agenttools.NewMocodeLogsTool(log.MainLogPath(infra.DataDir())),
+		deps.portOrLegacy(
+			agenttools.NewMocodeInfoPortTool(deps.Cfg, deps.LSPManager, deps.AllSkills, deps.ActiveSkills, deps.SkillTracker),
+			func() fantasy.AgentTool {
+				return agenttools.NewMocodeInfoTool(deps.Cfg, deps.LSPManager, deps.AllSkills, deps.ActiveSkills, deps.SkillTracker)
+			},
+		),
+		deps.portOrLegacy(
+			agenttools.NewMocodeLogsPortTool(log.MainLogPath(infra.DataDir())),
+			func() fantasy.AgentTool { return agenttools.NewMocodeLogsTool(log.MainLogPath(infra.DataDir())) },
+		),
 	}
 }
 
@@ -533,7 +551,10 @@ func (lspPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 		return nil
 	}
 	return []fantasy.AgentTool{
-		agenttools.NewDiagnosticsTool(deps.LSPManager),
+		deps.portOrLegacy(
+			agenttools.NewDiagnosticsPortTool(deps.LSPManager),
+			func() fantasy.AgentTool { return agenttools.NewDiagnosticsTool(deps.LSPManager) },
+		),
 		lsp.NewReferencesTool(deps.LSPManager),
 		lsp.NewLSPRestartTool(deps.LSPManager),
 	}

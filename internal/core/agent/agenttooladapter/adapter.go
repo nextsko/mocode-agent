@@ -49,11 +49,16 @@ func (a *Adapter) Info() fantasy.ToolInfo {
 	if params == nil {
 		params = map[string]any{}
 	}
+	parallel := false
+	if p, ok := a.tool.(tools.ParallelTool); ok {
+		parallel = p.Parallel()
+	}
 	return fantasy.ToolInfo{
 		Name:        firstNonEmpty(s.Name, a.tool.Name()),
 		Description: firstNonEmpty(s.Description, a.tool.Description()),
 		Parameters:  params,
 		Required:    requiredFields(params),
+		Parallel:    parallel,
 	}
 }
 

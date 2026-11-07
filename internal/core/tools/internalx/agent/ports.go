@@ -8,7 +8,10 @@ import (
 	"time"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/skills"
 	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
+	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/domain/session/sessionexport"
@@ -232,4 +235,162 @@ func runSessionExport(ctx context.Context, messages message.Service, workingDir 
 		return "", nil, err
 	}
 	return fmt.Sprintf("Session exported to %s", result.Path), result, nil
+}
+
+// ─── diagnostics (port) ──────────────────────────────────────────────────────
+
+// NewDiagnosticsPortTool is the framework-agnostic form of lsp_diagnostics.
+func NewDiagnosticsPortTool(lspManager *lsp.Manager) contract.Tool {
+	return contract.NewFunc(DiagnosticsToolName, toolutil.FirstLineDescription(diagnosticsDescription), map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"file_path": map[string]any{
+				"type":        "string",
+				"description": "The path to the file to get diagnostics for (leave empty for project diagnostics)",
+			},
+		},
+	}, func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+		var params DiagnosticsParams
+		if len(args) > 0 {
+			if err := json.Unmarshal(args, &params); err != nil {
+				return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
+			}
+		}
+		out, err := runDiagnostics(ctx, lspManager, params)
+		if err != nil {
+			return contract.ToolResult{Error: err}, nil
+		}
+		return contract.ToolResult{Content: out}, nil
+	})
+}
+
+// runDiagnostics refreshes LSP diagnostics and renders them.
+func runDiagnostics(ctx context.Context, lspManager *lsp.Manager, params DiagnosticsParams) (string, error) {
+	if lspManager.Clients().Len() == 0 {
+		return "", fmt.Errorf("no LSP clients available")
+	}
+	lsp.NotifyLSPs(ctx, lspManager, params.FilePath)
+	return lsp.GetDiagnostics(params.FilePath, lspManager), nil
+}
+
+// ─── message_export (port) ───────────────────────────────────────────────────
+
+// NewMessageExportPortTool is the framework-agnostic form of message_export.
+func NewMessageExportPortTool(messages message.Service, workingDir string) contract.Tool {
+	return contract.NewFunc(MessageExportToolName, "Export selected messages to .mocode/export/recents/<dir>_<time>.md. If no message_ids given, exports the last assistant reply.", map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"message_ids": map[string]any{
+				"type":        "array",
+				"items":       map[string]any{"type": "string"},
+				"description": "Specific message IDs to export. If empty, exports the last assistant reply.",
+			},
+			"format": map[string]any{
+				"type":        "string",
+				"description": "Export format: markdown, md, or obsidian-md. Defaults to markdown",
+			},
+		},
+	}, func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+		var params MessageExportParams
+		if len(args) > 0 {
+			if err := json.Unmarshal(args, &params); err != nil {
+				return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
+			}
+		}
+		text, meta, err := runMessageExport(ctx, messages, workingDir, params)
+		if err != nil {
+			return contract.ToolResult{Error: err}, nil
+		}
+		return contract.ToolResult{Content: text, Metadata: map[string]any{"result": meta}}, nil
+	})
+}
+
+// runMessageExport writes selected messages to the recents export directory.
+func runMessageExport(ctx context.Context, messages message.Service, workingDir string, params MessageExportParams) (string, any, error) {
+	sessionID := toolutil.GetSessionFromContext(ctx)
+	if sessionID == "" {
+		return "", nil, fmt.Errorf("session ID is required for export")
+	}
+
+	format := strings.TrimSpace(params.Format)
+	if format == "" {
+		format = "markdown"
+	}
+
+	var msgs []message.Message
+	if len(params.MessageIDs) > 0 {
+		for _, id := range params.MessageIDs {
+			msg, err := messages.Get(ctx, id)
+			if err != nil {
+				return "", nil, fmt.Errorf("get message %s: %w", id, err)
+			}
+			msgs = append(msgs, msg)
+		}
+	} else {
+		all, err := messages.List(ctx, sessionID)
+		if err != nil {
+			return "", nil, fmt.Errorf("list messages: %w", err)
+		}
+		for i := len(all) - 1; i >= 0; i-- {
+			if all[i].Role == message.Assistant && all[i].Content().Text != "" {
+				msgs = append(msgs, all[i])
+				break
+			}
+		}
+		if len(msgs) == 0 {
+			return "", nil, fmt.Errorf("no assistant reply found to export")
+		}
+	}
+
+	result, err := sessionexport.ExportRecents(sessionexport.RecentExportOptions{
+		Messages:   msgs,
+		WorkingDir: workingDir,
+		Format:     format,
+		Now:        time.Now(),
+	})
+	if err != nil {
+		return "", nil, err
+	}
+	return fmt.Sprintf("Exported %d message(s) to %s", len(msgs), result.Path), result, nil
+}
+
+// ─── mocode_info (port) ──────────────────────────────────────────────────────
+
+// NewMocodeInfoPortTool is the framework-agnostic form of the mocode_info tool.
+func NewMocodeInfoPortTool(
+	cfg *config.ConfigStore,
+	lspManager *lsp.Manager,
+	allSkills []*skills.Skill,
+	activeSkills []*skills.Skill,
+	skillTracker *skills.Tracker,
+) contract.Tool {
+	return contract.NewFunc(MocodeInfoToolName, string(mocodeInfoDescription), map[string]any{
+		"type":       "object",
+		"properties": map[string]any{},
+	}, func(_ context.Context, _ contract.ToolContext, _ json.RawMessage) (contract.ToolResult, error) {
+		return contract.ToolResult{Content: buildMocodeInfo(cfg, lspManager, allSkills, activeSkills, skillTracker)}, nil
+	})
+}
+
+// ─── mocode_logs (port) ──────────────────────────────────────────────────────
+
+// NewMocodeLogsPortTool is the framework-agnostic form of the mocode_logs tool.
+func NewMocodeLogsPortTool(logFile string) contract.Tool {
+	return contract.NewFunc(MocodeLogsToolName, string(mocodeLogsDescription), map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"lines": map[string]any{
+				"type":        "integer",
+				"description": "Number of log lines to read from the end of the log file",
+			},
+		},
+	}, func(_ context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+		var params MocodeLogsParams
+		if len(args) > 0 {
+			if err := json.Unmarshal(args, &params); err != nil {
+				return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
+			}
+		}
+		return contract.ToolResult{Content: runMocodeLogs(logFile, params)}, nil
+	})
 }

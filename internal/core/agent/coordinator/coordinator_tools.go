@@ -28,6 +28,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/shellruntime/screencap"
 	"github.com/nextsko/mocode-agent/internal/core/tools"
+	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/agent"
 	"github.com/nextsko/mocode-agent/internal/domain/messenger"
 	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/qjebbs/go-jsons"
@@ -300,22 +301,7 @@ func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 		SessionSearch: c.sessionSearch,
 		HTTP:          c.httpFactory,
 		WrapPort: func(tool tools.Tool) fantasy.AgentTool {
-			workingDir := c.cfg.WorkingDir()
-			return agenttooladapter.NewWithContext(tool, func(ctx context.Context) (tools.ToolContext, func()) {
-				sessionID := toolutil.GetSessionFromContext(ctx)
-				// Permissions are requested lazily by tools that call
-				// Allow(name); the adapter carries the request context so the
-				// prompt path matches the legacy tools.
-				checker := permissionCheckerAdapter{
-					ctx:       ctx,
-					svc:       c.permissions,
-					sessionID: sessionID,
-				}
-				// MCP handles and telemetry callbacks are still TODO; the
-				// context degrades to no-op adapters.
-				tctx, cleanup := NewToolContext(sessionID, workingDir, checker, nil, nil)
-				return tctx, cleanup
-			})
+			return agenttooladapter.NewWithContext(tool, c.portToolContextFactory())
 		},
 	}
 	allTools = append(allTools, c.toolRegistry.Build(ctx, deps)...)
@@ -340,7 +326,8 @@ func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 			}
 			return nil
 		}
-		allTools = append(allTools, tools.NewTransferTool(agentCfg.SubAgents, onTransfer))
+		transferPort := agenttools.NewTransferPortTool(agentCfg.SubAgents, onTransfer)
+		allTools = append(allTools, agenttooladapter.NewWithContext(transferPort, c.portToolContextFactory()))
 	}
 
 	// ── Screenshot tools ─────────────────────────────────────────────────────
@@ -549,4 +536,17 @@ func isExactoSupported(modelID string) bool {
 		"qwen/qwen3-coder",
 	}
 	return slices.Contains(supportedModels, modelID)
+}
+
+// portToolContextFactory builds the per-call tools.ToolContext for migrated
+// tools: session id from the run context, working directory from config, and a
+// prompting permission checker. MCP handles and telemetry callbacks are TODO.
+func (c *Coordinator) portToolContextFactory() func(ctx context.Context) (tools.ToolContext, func()) {
+	workingDir := c.cfg.WorkingDir()
+	return func(ctx context.Context) (tools.ToolContext, func()) {
+		sessionID := toolutil.GetSessionFromContext(ctx)
+		checker := permissionCheckerAdapter{ctx: ctx, svc: c.permissions, sessionID: sessionID}
+		tctx, cleanup := NewToolContext(sessionID, workingDir, checker, nil, nil)
+		return tctx, cleanup
+	}
 }

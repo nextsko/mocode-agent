@@ -31,8 +31,9 @@ All notable changes to mocode are documented here. The format follows
   enforces this, and `agent/messages` keeps the same rule.
 - Tool contracts moved to the leaf `core/tools/contract` package (re-exported
   as `tools.*` aliases); an `agenttooladapter` converts `tools.Tool` into the
-  runtime `fantasy.AgentTool`; `session_search`, `todos`, `think` and
-  `session_export` are migrated, and the coordinator supplies a per-call
+  runtime `fantasy.AgentTool`; ten of twelve agent tools are migrated
+  (`session_search`, `todos`, `think`, exports, diagnostics, mocode info/logs,
+  session summary, transfer), and the coordinator supplies a per-call
   context with session id, working directory and a prompting permission
   checker. layercheck keeps the contract package dependency-free (leaf).
 - WeChat account manager is created at the command boundary and injected into
