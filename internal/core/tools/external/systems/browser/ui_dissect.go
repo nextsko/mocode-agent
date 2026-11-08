@@ -23,7 +23,7 @@ const UIDissectToolName = "ui_dissect"
 
 // UIDissectParams controls the dissection actions.
 type UIDissectParams struct {
-	Action    string               `json:"action" enum:"map,review,replicate,diff,system,brand,tokens,skill,dynamic,retro,list" description:"map builds the full structural map; review returns only aesthetic findings; replicate emits a skeleton for one component; list shows saved maps."`
+	Action    string               `json:"action" enum:"map,review,replicate,diff,system,brand,tokens,skill,dynamic,retro,evolve,list" description:"map builds the full structural map; review returns only aesthetic findings; replicate emits a skeleton for one component; list shows saved maps."`
 	URL       string               `json:"url,omitempty" description:"Optional URL to navigate to before measuring; omit to use the current page."`
 	Component string               `json:"component,omitempty" description:"Component id (c1, c2, …) from a map, required for action=replicate."`
 	Baseline  string               `json:"baseline,omitempty" description:"For action=diff: path to a saved map JSON, or 'latest' (default)."`
@@ -43,7 +43,7 @@ func NewUIDissectPortTool(manager *corebrowser.Manager, workingDir string) contr
 			"properties": map[string]any{
 				fieldAction: map[string]any{
 					"type":        "string",
-					"enum":        []string{"map", "review", "replicate", "diff", "system", "brand", "tokens", "skill", "dynamic", "retro", subActionList},
+					"enum":        []string{"map", "review", "replicate", "diff", "system", "brand", "tokens", "skill", "dynamic", "retro", "evolve", subActionList},
 					"description": "map builds the full structural map; review returns only aesthetic findings; replicate emits a skeleton for one component; list shows saved maps.",
 				},
 				"url": map[string]any{
@@ -112,9 +112,9 @@ func runUIDissect(ctx context.Context, manager *corebrowser.Manager, workingDir 
 			return contract.Text("No UI maps saved yet. Run action=map first."), nil
 		}
 		return contract.Text("Saved UI maps:\n- " + strings.Join(entries, "\n- ")), nil
-	case "map", "review", "replicate", "brand", "tokens", "skill", "dynamic", "retro":
+	case "map", "review", "replicate", "brand", "tokens", "skill", "dynamic", "retro", "evolve":
 	default:
-		return contract.Error(`action must be one of: map, review, replicate, diff, system, brand, tokens, skill, dynamic, retro, list`), nil
+		return contract.Error(`action must be one of: map, review, replicate, diff, system, brand, tokens, skill, dynamic, retro, evolve, list`), nil
 	}
 
 	if strings.EqualFold(params.Action, "dynamic") {
@@ -122,6 +122,9 @@ func runUIDissect(ctx context.Context, manager *corebrowser.Manager, workingDir 
 	}
 	if strings.EqualFold(params.Action, "retro") {
 		return renderRetro(workingDir)
+	}
+	if strings.EqualFold(params.Action, "evolve") {
+		return renderEvolve(workingDir)
 	}
 
 	raw, mode, err := measurePage(ctx, manager, params.URL)
@@ -340,7 +343,9 @@ func runDiff(ctx context.Context, manager *corebrowser.Manager, workingDir strin
 		default:
 			return contract.Text("No baseline map yet. Run action=map first, then diff again."), nil
 		}
-		return finishDiff(uidissect.Compare(base, cur), workingDir, params.Save), nil
+		d := uidissect.Compare(base, cur)
+		recordEvolution(d, workingDir)
+		return finishDiff(d, workingDir, params.Save), nil
 	}
 
 	if len(maps) < 2 {
@@ -353,7 +358,9 @@ func runDiff(ctx context.Context, manager *corebrowser.Manager, workingDir strin
 			return contract.Error(err.Error()), nil
 		}
 	}
-	return finishDiff(uidissect.Compare(base, cur), workingDir, params.Save), nil
+	d := uidissect.Compare(base, cur)
+	recordEvolution(d, workingDir)
+	return finishDiff(d, workingDir, params.Save), nil
 }
 
 func finishDiff(d uidissect.Diff, workingDir string, save *bool) contract.ToolResult {
@@ -463,7 +470,8 @@ func renderRetro(workingDir string) (contract.ToolResult, error) {
 	if len(maps) == 0 {
 		return contract.Text("No saved maps yet. Run action=map on a few pages, then look back."), nil
 	}
-	t := uidissect.BuildTaste(maps)
+	evolution, _ := uidissect.LoadEvolution(workingDir)
+	t := uidissect.BuildTaste(maps, evolution...)
 	path, err := uidissect.SaveTaste(t, workingDir)
 	if err != nil {
 		return contract.Error("failed to save retrospective: " + err.Error()), nil //nolint:nilerr // tool-level error is reported as text to the model.
@@ -480,7 +488,42 @@ func updateTaste(workingDir string) (string, error) {
 	if len(maps) == 0 {
 		return "", nil
 	}
-	return uidissect.SaveTaste(uidissect.BuildTaste(maps), workingDir)
+	evolution, _ := uidissect.LoadEvolution(workingDir)
+	return uidissect.SaveTaste(uidissect.BuildTaste(maps, evolution...), workingDir)
+}
+
+// recordEvolution appends one regression run to the improvement log and
+// refreshes the retrospective so the taste model sees the new data point.
+func recordEvolution(d uidissect.Diff, workingDir string) {
+	entry := uidissect.EvolutionEntry{
+		At:         time.Now().UTC(),
+		BaseURL:    d.BaseURL,
+		CurrentURL: d.CurrentURL,
+		BaseScore:  d.BaseScore,
+		CurScore:   d.CurScore,
+		Delta:      d.CurScore - d.BaseScore,
+		Changes:    len(d.Changes),
+	}
+	if err := uidissect.AppendEvolution(entry, workingDir); err == nil {
+		_, _ = updateTaste(workingDir)
+	}
+}
+
+// renderEvolve turns the retrospective into a rulebook skill draft.
+func renderEvolve(workingDir string) (contract.ToolResult, error) {
+	maps, err := uidissect.LoadMaps(workingDir)
+	if err != nil {
+		return contract.Error("failed to load maps: " + err.Error()), nil //nolint:nilerr // tool-level error is reported as text to the model.
+	}
+	evolution, _ := uidissect.LoadEvolution(workingDir)
+	t := uidissect.BuildTaste(maps, evolution...)
+	path, err := uidissect.SaveRulesSkill(t, workingDir)
+	if err != nil {
+		return contract.Error("failed to stage rules skill: " + err.Error()), nil //nolint:nilerr // tool-level error is reported as text to the model.
+	}
+	name, desc, body := uidissect.RulesSkillDraft(t)
+	text := fmt.Sprintf("Rulebook skill staged: `%s`\n\nTo persist it, call `learn` with:\n- name: %s\n- description: %s\n\n---\n\n%s", path, name, desc, uidissect.RenderSkillMarkdown(name, desc, body))
+	return contract.Text(truncateForModel(text, 14000)), nil
 }
 
 // updateSystem re-mines the site design system from all saved maps.

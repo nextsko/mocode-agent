@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -280,4 +281,41 @@ func TestBuildTasteFindsRecurringLessons(t *testing.T) {
 	joined := strings.Join(taste.Lessons, "\n")
 	assert.Contains(t, joined, "contrast")
 	assert.Contains(t, RenderTaste(taste), "审美复盘")
+}
+
+func TestEvolutionAndRulesSkill(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	base := Build(fixture())
+	cur := Build(fixture())
+	cur.Score = base.Score - 6
+	d := Compare(base, cur)
+	require.NotZero(t, d.BaseScore)
+
+	require.NoError(t, AppendEvolution(EvolutionEntry{
+		At: time.Now().UTC(), BaseURL: base.URL, CurrentURL: cur.URL,
+		BaseScore: base.Score, CurScore: cur.Score, Delta: cur.Score - base.Score, Changes: len(d.Changes),
+	}, dir))
+	require.NoError(t, AppendEvolution(EvolutionEntry{
+		At: time.Now().UTC(), BaseURL: cur.URL, CurrentURL: base.URL,
+		BaseScore: cur.Score, CurScore: base.Score, Delta: base.Score - cur.Score, Changes: 2,
+	}, dir))
+
+	entries, err := LoadEvolution(dir)
+	require.NoError(t, err)
+	require.Len(t, entries, 2)
+	stats := SummarizeEvolution(entries)
+	assert.Equal(t, 2, stats.Runs)
+	assert.Equal(t, 1, stats.Improved)
+	assert.Equal(t, 1, stats.Degraded)
+
+	taste := BuildTaste([]Map{base, cur}, entries...)
+	assert.NotEmpty(t, taste.Evolution)
+	assert.Contains(t, RenderTaste(taste), "进化记录")
+
+	name, desc, body := RulesSkillDraft(taste)
+	assert.Equal(t, "ui-taste-rules", name)
+	assert.True(t, strings.HasPrefix(desc, "Use when"))
+	assert.Contains(t, body, "回归纪律")
+	assert.Contains(t, body, "规则")
 }

@@ -114,3 +114,22 @@ go test -count=1 -run 'TestUIDissect' ./internal/core/tools/external/systems/bro
 - 分数：100 − error×8 − warn×3 − info×1（下限 0）。
 
 复盘的目的是让“审美”变成可积累的规则：重复出现的问题会自动升级为 lesson，下一次改造直接带着规则走。
+
+## 审美进化闭环（v0.16.0）
+
+`diff` 不再只是一次对比，而是**记分**：
+
+- 每次 `diff` 自动追加 `.mocode/ui/evolution.jsonl`：
+  `{base_score, cur_score, delta, changes, at}`；
+- `retro` 的“进化记录”展示：回归次数、改善/退化次数、平均 Δ、最近 30 次明细；
+- `evolve` 把复盘结果生成 **规则手册 skill 草稿**（`ui-taste-rules`）：
+  规则来自真实重复问题 + 回归纪律，交给 `learn` 即可落库。
+
+闭环：
+
+```text
+map → review → 修复 → diff（记分）→ retro（复盘）→ evolve（沉淀规则）→ 下一轮
+```
+
+真实验证（`TestUIDissectEvolve_RealPages`）：example.com + go.dev/learn 两页
+map → diff（检查 evolution.jsonl）→ retro（含进化记录）→ evolve（规则草稿）全通过。

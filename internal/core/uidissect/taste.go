@@ -31,12 +31,14 @@ type ScorePoint struct {
 // Taste is the retrospective: what keeps going wrong, how the score moves,
 // and which rules the project should adopt next.
 type Taste struct {
-	GeneratedAt time.Time    `json:"generated_at"`
-	Pages       int          `json:"pages"`
-	AvgScore    float64      `json:"avg_score"`
-	ScoreTrend  []ScorePoint `json:"score_trend"`
-	Recurring   []Recurring  `json:"recurring"`
-	Lessons     []string     `json:"lessons"`
+	GeneratedAt time.Time        `json:"generated_at"`
+	Pages       int              `json:"pages"`
+	AvgScore    float64          `json:"avg_score"`
+	ScoreTrend  []ScorePoint     `json:"score_trend"`
+	Recurring   []Recurring      `json:"recurring"`
+	Lessons     []string         `json:"lessons"`
+	Evolution   []EvolutionEntry `json:"evolution,omitempty"`
+	EvolutionSt EvolutionStats   `json:"evolution_stats"`
 }
 
 var numberRE = regexp.MustCompile(`[0-9]+(?:\.[0-9]+)?`)
@@ -49,8 +51,9 @@ func findingKey(f Finding) string {
 }
 
 // BuildTaste aggregates saved maps into a retrospective.
-func BuildTaste(maps []Map) Taste {
-	t := Taste{GeneratedAt: time.Now().UTC(), Pages: len(maps)}
+func BuildTaste(maps []Map, evolution ...EvolutionEntry) Taste {
+	t := Taste{GeneratedAt: time.Now().UTC(), Pages: len(maps), Evolution: evolution}
+	t.EvolutionSt = SummarizeEvolution(evolution)
 	type agg struct {
 		Recurring
 		pages map[string]bool
@@ -152,6 +155,13 @@ func RenderTaste(t Taste) string {
 		for _, r := range t.Recurring {
 			fmt.Fprintf(&b, "| %s | %d | %d | %s |\n", r.Category, r.Count, r.Pages, truncate(strings.ReplaceAll(r.Message, "|", "\\|"), 70))
 		}
+	}
+	b.WriteString("\n## 进化记录\n\n")
+	if len(t.Evolution) == 0 {
+		b.WriteString("_No regression runs yet — use action=diff after a change to record whether the score improved._\n")
+	} else {
+		fmt.Fprintf(&b, "- Runs: %d · improved: %d · degraded: %d · avg Δ: %.1f\n\n", t.EvolutionSt.Runs, t.EvolutionSt.Improved, t.EvolutionSt.Degraded, t.EvolutionSt.AvgDelta)
+		b.WriteString(RenderEvolution(t.Evolution))
 	}
 	b.WriteString("\n## 沉淀出的规则\n\n")
 	for _, l := range t.Lessons {

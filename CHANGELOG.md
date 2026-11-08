@@ -5,6 +5,15 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
+## [0.16.0] - 2026-11-09
+
+### Added
+
+- **审美进化闭环**: `ui_dissect action=diff` 现在会把每次回归的分数变化写入
+  `.mocode/ui/evolution.jsonl`；`action=retro` 增加“进化记录”（改善/退化/平均 Δ）；
+  新增 `action=evolve` 把复盘沉淀为 learn-ready 的规则手册 skill 草稿（ui-taste-rules）。
+- 真实验证：两页真实页面 map → diff → retro → evolve 全链路通过。
+
 ## [0.15.0] - 2026-11-09
 
 ### Added

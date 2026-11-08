@@ -10,7 +10,8 @@ Actions:
 - tokens: compare current page against the brand baseline (off-brand / unused).
 - skill: stage a learn-ready SKILL.md draft for the page or one component.
 - dynamic: execute interaction `steps` (click/fill/press/hover/scroll/wait), measuring a state after each step plus the diff between consecutive states. Requires a live browser.
-- retro: aesthetic retrospective across all saved maps — score trend, recurring issues, and the rules the project should adopt.
+- retro: aesthetic retrospective across all saved maps — score trend, recurring issues, evolution history, and the rules the project should adopt.
+- evolve: turn the retrospective into a learn-ready rulebook skill draft (ui-taste-rules) that accumulates project aesthetic rules.
 - list: show saved maps.
 
 Notes:

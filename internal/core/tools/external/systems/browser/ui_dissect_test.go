@@ -3,6 +3,7 @@ package browser
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,7 +37,7 @@ func TestUIDissectTool_SchemaExposesActions(t *testing.T) {
 	require.True(t, ok)
 	action, ok := props["action"].(map[string]any)
 	require.True(t, ok)
-	assert.ElementsMatch(t, []string{"map", "review", "replicate", "diff", "system", "brand", "tokens", "skill", "dynamic", "retro", subActionList}, action["enum"])
+	assert.ElementsMatch(t, []string{"map", "review", "replicate", "diff", "system", "brand", "tokens", "skill", "dynamic", "retro", "evolve", subActionList}, action["enum"])
 }
 
 // TestUIDissectTool_RealURL is an opt-in integration check: set
@@ -198,4 +199,39 @@ func TestUIDissectRetro_RealPages(t *testing.T) {
 	require.NoError(t, res.Error)
 	assert.Contains(t, res.Content, "审美复盘")
 	assert.Contains(t, res.Content, "Pages: 2")
+}
+
+// TestUIDissectEvolve_RealPages runs map → diff → retro → evolve on real pages.
+func TestUIDissectEvolve_RealPages(t *testing.T) {
+	u1 := os.Getenv("UIDISSECT_REAL_URL")
+	u2 := os.Getenv("UIDISSECT_REAL_URL2")
+	if u1 == "" || u2 == "" {
+		t.Skip("set UIDISSECT_REAL_URL and UIDISSECT_REAL_URL2 to run the evolve check")
+	}
+	dir := t.TempDir()
+	tool := NewUIDissectPortTool(nil, dir)
+	for _, u := range []string{u1, u2} {
+		res, err := tool.Execute(context.Background(), nil, []byte(`{"action":"map","url":"`+u+`"}`))
+		require.NoError(t, err)
+		require.NoError(t, res.Error)
+	}
+	res, err := tool.Execute(context.Background(), nil, []byte(`{"action":"diff"}`))
+	require.NoError(t, err)
+	require.NoError(t, res.Error)
+	assert.Contains(t, res.Content, "UI 视觉回归")
+
+	evo, err := os.ReadFile(filepath.Join(dir, ".mocode", "ui", "evolution.jsonl"))
+	require.NoError(t, err, "diff must append to the improvement log")
+	assert.Contains(t, string(evo), "delta")
+
+	res, err = tool.Execute(context.Background(), nil, []byte(`{"action":"retro"}`))
+	require.NoError(t, err)
+	require.NoError(t, res.Error)
+	assert.Contains(t, res.Content, "进化记录")
+
+	res, err = tool.Execute(context.Background(), nil, []byte(`{"action":"evolve"}`))
+	require.NoError(t, err)
+	require.NoError(t, res.Error)
+	assert.Contains(t, res.Content, "Rulebook skill staged")
+	assert.Contains(t, res.Content, "ui-taste-rules")
 }

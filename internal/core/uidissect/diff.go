@@ -20,6 +20,8 @@ type Change struct {
 type Diff struct {
 	BaseURL     string         `json:"base_url"`
 	CurrentURL  string         `json:"current_url"`
+	BaseScore   int            `json:"base_score"`
+	CurScore    int            `json:"cur_score"`
 	GeneratedAt time.Time      `json:"generated_at"`
 	Summary     map[string]int `json:"summary"`
 	Changes     []Change       `json:"changes"`
@@ -33,6 +35,8 @@ func Compare(base, cur Map) Diff {
 	d := Diff{
 		BaseURL:     base.URL,
 		CurrentURL:  cur.URL,
+		BaseScore:   base.Score,
+		CurScore:    cur.Score,
 		GeneratedAt: time.Now().UTC(),
 		Summary:     map[string]int{},
 	}
