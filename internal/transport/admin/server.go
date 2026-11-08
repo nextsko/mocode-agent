@@ -20,6 +20,8 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/catwalkconv"
 	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/flywheel"
+	"github.com/nextsko/mocode-agent/internal/core/memgraph"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 	"github.com/nextsko/mocode-agent/internal/transport/workspace"
 )
@@ -213,8 +215,29 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /mcp/server/delete", s.handleMCPServerDelete)
 	mux.HandleFunc("POST /mcp/server/toggle", s.handleMCPServerToggle)
 	mux.HandleFunc("GET /mcp/tools", s.handleMCPTools)
+	mux.HandleFunc("GET /knowledge", s.handleKnowledge)
 	mux.HandleFunc("POST /wechat/start", s.handleWeChatStart)
 	mux.HandleFunc("GET /wechat/status", s.handleWeChatStatus)
+}
+
+// handleKnowledge reports the flywheel and memory-graph state, so the admin
+// panel can show what the agent has accumulated without opening a session.
+func (s *Server) handleKnowledge(w http.ResponseWriter, _ *http.Request) {
+	workingDir := s.workspace.WorkingDir()
+	tasks, _ := flywheel.LoadTasks(workingDir)
+	skills, _ := flywheel.LoadSkills(workingDir)
+	mem, memErr := memgraph.Open(workingDir)
+	nodes, edges := 0, 0
+	if memErr == nil {
+		g := mem.Graph()
+		nodes, edges = len(g.Nodes), len(g.Edges)
+	}
+	writeJSON(w, map[string]any{
+		"working_dir":  workingDir,
+		"flywheel":     flywheel.BuildReport(tasks, skills),
+		"memory_nodes": nodes,
+		"memory_edges": edges,
+	})
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {

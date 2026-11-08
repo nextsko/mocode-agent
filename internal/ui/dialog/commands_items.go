@@ -359,6 +359,25 @@ func (c *Commands) defaultCommands() []*CommandItem {
 	}
 	commands = append(commands, NewParentCommandItem(t, "group_tools", "Tools", "", toolsCommands...))
 
+	// ── Knowledge ──
+	if c.hasSession {
+		knowledgeCommands := []*CommandItem{
+			NewCommandItem(t, "flywheel_report", "Flywheel Report", "/flywheel", ActionRunCustomCommand{
+				Content: "运行 flywheel 工具 action=report，然后用中文简要总结当前技能排行、最近任务与最优路径。",
+			}),
+			NewCommandItem(t, "flywheel_context", "Flywheel Context Digest", "/context", ActionRunCustomCommand{
+				Content: "运行 flywheel 工具 action=context，输出当前上下文摘要（预算 600 字符以内）。",
+			}),
+			NewCommandItem(t, "memgraph_persona", "Persona & Profile Card", "/persona", ActionRunCustomCommand{
+				Content: "运行 memgraph 工具 action=persona，展示 AI 人格与用户画像卡；若为空，说明当前还没有沉淀。",
+			}),
+			NewCommandItem(t, "memgraph_conflicts", "Memory Conflicts", "/conflicts", ActionRunCustomCommand{
+				Content: "运行 memgraph 工具 action=conflicts；若有冲突，说明如何用 supersedes 解决，不要直接删除历史。",
+			}),
+		}
+		commands = append(commands, NewParentCommandItem(t, "group_knowledge", "Knowledge", "", knowledgeCommands...))
+	}
+
 	// ── Settings ──
 	settingsCommands := make([]*CommandItem, 0, 8)
 	settingsCommands = append(settingsCommands, []*CommandItem{

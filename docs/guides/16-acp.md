@@ -54,7 +54,8 @@ mocode acp --yolo     # 自动批准所有权限（仅限可信环境）
 
 ## 当前边界（诚实说明）
 
-- 客户端 fs / terminal / elicitation 方法尚未被本地工具调用（工具在进程内执行）；
+- 客户端 fs / terminal / elicitation 能力未委派：mocode 的工具针对本地工作区执行
+  （与编辑器同机场景一致），因此读取/写入走本地文件系统，而不是 ACP 的 fs 方法；
 - `reject_always` 在**会话内**记住拒绝（同一工具后续不再询问），但不跨会话持久化；
 - `session/load` 现在会回放文本 + tool_call / tool_result，但不重放 reasoning。
 

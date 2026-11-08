@@ -57,3 +57,8 @@ memgraph action=export                     # graph.json / graph.mmd / graph.html
 
 `forget` 会删除节点与所有关联边；`events.jsonl` 保留操作痕迹（不含被删内容），
 便于审计“何时被要求忘记”，但不再承载原始证据。
+
+## TUI 命令
+
+- `/persona`：人格 + 用户画像卡；
+- `/conflicts`：记忆冲突及 supersedes 处理建议。

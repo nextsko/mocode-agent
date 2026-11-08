@@ -137,6 +137,14 @@ func (c *CommandItem) Label() string {
 		return "/file"
 	case "open_external_editor":
 		return "/editor"
+	case "flywheel_report":
+		return "/flywheel"
+	case "flywheel_context":
+		return "/context"
+	case "memgraph_persona":
+		return "/persona"
+	case "memgraph_conflicts":
+		return "/conflicts"
 	case "enable_docker_mcp":
 		return "/mcp-enable"
 	case "disable_docker_mcp":

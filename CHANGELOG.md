@@ -5,6 +5,15 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
+## [0.24.0] - 2026-11-09
+
+### Added
+
+- **TUI Knowledge 命令组**: `/flywheel`、`/context`、`/persona`、`/conflicts`，
+  直接触发对应工具并汇报，知识库不再只能靠自然语言调用。
+- **Admin `/api/knowledge`**: 返回飞轮报告与记忆图节点/边计数，面板可展示累积状态。
+- 文档补充 ACP 能力边界：本地工具不委派客户端 fs/terminal（同机工作区设计）。
+
 ## [0.23.0] - 2026-11-09
 
 ### Added
