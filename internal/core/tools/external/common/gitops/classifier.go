@@ -88,12 +88,12 @@ func Classify(fc FileChange) FileClass {
 		c.Type = TypeCI
 
 	// Build / dependency files
-	case isBuild(fc.Path, ext, base):
+	case isBuild(ext, base):
 		c.Type = TypeChore
 		c.Scope = "deps"
 
 	// Config files
-	case isConfig(fc.Path, ext, base, dir):
+	case isConfig(ext, base, dir):
 		c.Type = TypeConfig
 
 	// Untracked → feat (new file, after doc/build checks)
@@ -217,7 +217,7 @@ func isCI(path string) bool {
 		filepath.Base(path) == "docker-compose.yml"
 }
 
-func isBuild(path, ext, base string) bool {
+func isBuild(ext, base string) bool {
 	return base == "go.mod" || base == "go.sum" ||
 		base == "package.json" || base == "package-lock.json" ||
 		base == "yarn.lock" || base == "pnpm-lock.yaml" ||
@@ -226,7 +226,7 @@ func isBuild(path, ext, base string) bool {
 		ext == ".goreleaser.yml" || ext == ".goreleaser.yaml"
 }
 
-func isConfig(path, ext, base, dir string) bool {
+func isConfig(ext, base, dir string) bool {
 	return ext == ".toml" || ext == ".yaml" || ext == ".yml" ||
 		ext == ".json" && !strings.Contains(dir, "node_modules") ||
 		base == ".env" || strings.HasPrefix(base, ".env.") ||

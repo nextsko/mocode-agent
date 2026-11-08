@@ -223,7 +223,11 @@ func compileRoutePattern(glob string) (*regexp.Regexp, error) {
 	if !strings.Contains(glob, "://") {
 		expr = `.*` + expr + `(?:[?#].*)?`
 	}
-	return regexp.Compile(`^` + expr + `$`)
+	re, err := regexp.Compile(`^` + expr + `$`)
+	if err != nil {
+		return nil, fmt.Errorf("compiling glob pattern %q: %w", glob, err)
+	}
+	return re, nil
 }
 
 // Route installs or replaces an interception rule for pattern.

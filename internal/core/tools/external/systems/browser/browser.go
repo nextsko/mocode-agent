@@ -608,73 +608,78 @@ func renderTabs(tabs []corebrowser.TabInfo) string {
 	return b.String()
 }
 
+// cookieStorageAction handles the cookie flavor of action=storage.
+func cookieStorageAction(ctx context.Context, session *corebrowser.Session, p BrowserParams, op string) (contract.ToolResult, error) {
+	switch op {
+	case "list":
+		cookies, err := session.Cookies(ctx)
+		if err != nil {
+			return softError(fmt.Sprintf("reading cookies: %v", err)), nil
+		}
+		if len(cookies) == 0 {
+			return contract.WithMetadata(
+				contract.Text("No cookies set."),
+				BrowserResponseMetadata{Action: actionStorage, Count: 0},
+			), nil
+		}
+		var b strings.Builder
+		fmt.Fprintf(&b, "%d cookie(s):\n", len(cookies))
+		for _, c := range cookies {
+			fmt.Fprintf(&b, "  %s\n", c)
+		}
+		return contract.WithMetadata(
+			contract.Text(b.String()),
+			BrowserResponseMetadata{Action: actionStorage, Count: len(cookies)},
+		), nil
+
+	case "set":
+		if strings.TrimSpace(p.Name) == "" {
+			return softError("name is required to set a cookie"), nil
+		}
+		if err := session.SetCookie(ctx, corebrowser.CookieSetter{
+			Name: p.Name, Value: p.Value, Domain: p.Domain,
+		}); err != nil {
+			return softError(fmt.Sprintf("setting the cookie: %v", err)), nil
+		}
+		return contract.WithMetadata(
+			contract.Text(fmt.Sprintf("Cookie %s set.", p.Name)),
+			BrowserResponseMetadata{Action: actionStorage, Count: 1},
+		), nil
+
+	case "remove":
+		if err := session.DeleteCookies(ctx, p.Name, p.Domain); err != nil {
+			return softError(fmt.Sprintf("removing the cookie: %v", err)), nil
+		}
+		return contract.WithMetadata(
+			contract.Text(fmt.Sprintf("Cookie %s removed.", p.Name)),
+			BrowserResponseMetadata{Action: actionStorage},
+		), nil
+
+	case "clear":
+		if err := session.ClearCookies(ctx); err != nil {
+			return softError(fmt.Sprintf("clearing cookies: %v", err)), nil
+		}
+		return contract.WithMetadata(
+			contract.Text("All cookies cleared."),
+			BrowserResponseMetadata{Action: actionStorage},
+		), nil
+
+	default:
+		return softError("op for storage kind=cookies must be one of list, set, remove, clear"), nil
+	}
+}
+
 // storageAction handles action=storage over cookies and web storage.
 func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserParams) (contract.ToolResult, error) {
 	op := opOf(p, "list")
 
 	if strings.EqualFold(strings.TrimSpace(p.Kind), "cookies") {
-		switch op {
-		case "list":
-			cookies, err := session.Cookies(ctx)
-			if err != nil {
-				return softError(fmt.Sprintf("reading cookies: %v", err)), nil
-			}
-			if len(cookies) == 0 {
-				return contract.WithMetadata(
-					contract.Text("No cookies set."),
-					BrowserResponseMetadata{Action: actionStorage, Count: 0},
-				), nil
-			}
-			var b strings.Builder
-			fmt.Fprintf(&b, "%d cookie(s):\n", len(cookies))
-			for _, c := range cookies {
-				fmt.Fprintf(&b, "  %s\n", c)
-			}
-			return contract.WithMetadata(
-				contract.Text(b.String()),
-				BrowserResponseMetadata{Action: actionStorage, Count: len(cookies)},
-			), nil
-
-		case "set":
-			if strings.TrimSpace(p.Name) == "" {
-				return softError("name is required to set a cookie"), nil
-			}
-			if err := session.SetCookie(ctx, corebrowser.CookieSetter{
-				Name: p.Name, Value: p.Value, Domain: p.Domain,
-			}); err != nil {
-				return softError(fmt.Sprintf("setting the cookie: %v", err)), nil
-			}
-			return contract.WithMetadata(
-				contract.Text(fmt.Sprintf("Cookie %s set.", p.Name)),
-				BrowserResponseMetadata{Action: actionStorage, Count: 1},
-			), nil
-
-		case "remove":
-			if err := session.DeleteCookies(ctx, p.Name, p.Domain); err != nil {
-				return softError(fmt.Sprintf("removing the cookie: %v", err)), nil
-			}
-			return contract.WithMetadata(
-				contract.Text(fmt.Sprintf("Cookie %s removed.", p.Name)),
-				BrowserResponseMetadata{Action: actionStorage},
-			), nil
-
-		case "clear":
-			if err := session.ClearCookies(ctx); err != nil {
-				return softError(fmt.Sprintf("clearing cookies: %v", err)), nil
-			}
-			return contract.WithMetadata(
-				contract.Text("All cookies cleared."),
-				BrowserResponseMetadata{Action: actionStorage},
-			), nil
-
-		default:
-			return softError("op for storage kind=cookies must be one of list, set, remove, clear"), nil
-		}
+		return cookieStorageAction(ctx, session, p, op)
 	}
 
 	// Web storage (local / session).
 	if _, err := corebrowser.StorageKind(p.Kind); err != nil {
-		return softError("kind is required for action=storage: cookies, local, or session"), nil
+		return softError("kind is required for action=storage: cookies, local, or session"), nil //nolint:nilerr // The lookup error is reported through the structured soft error.
 	}
 
 	switch op {

@@ -91,6 +91,8 @@ func (s *SessionItem) Render(width int) string {
 	case sessionsModeUpdating:
 		styles.ItemBlurred = s.t.Dialog.Sessions.RenamingItemBlurred
 		styles.ItemFocused = s.t.Dialog.Sessions.RenamingingItemFocused
+	case sessionsModeNormal:
+		// The default item styles set above already cover this mode.
 		if s.focused {
 			const cursorPadding = 1
 			inputWidth := max(0, width-styles.ItemFocused.GetHorizontalFrameSize()-cursorPadding)

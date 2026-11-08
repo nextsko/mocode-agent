@@ -104,36 +104,17 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 			// Acquire-or-enqueue critical section: either this loop already
 			// owns the next turn (busyOwned handed over by the end-of-turn
 			// section below) or we atomically decide busy-vs-queue.
-			a.runMu.Lock()
-			var ok bool
-			genCtx, cancelTurn, ok = a.beginTurnLocked(sessionID, runCtx)
-			if !ok {
-				if haveCurrent {
-					// Busy: queue the call and return silently. The running
-					// dispatcher picks it up at its next turn boundary.
-					a.appendQueueLocked(sessionID, current)
-					a.runMu.Unlock()
-					return nil, nil
-				}
-				// Continuation lost the race to another Run: that dispatcher
-				// owns the queue now; nothing more for us to do here.
-				a.runMu.Unlock()
-				break
-			}
-			if !haveCurrent {
-				// Continuation mode (post-summarize): the next call comes
-				// from the queue head; user-queued prompts run first.
-				next, hasNext := a.popQueueLocked(sessionID)
-				if !hasNext {
-					a.activeRequests.Del(sessionID)
-					cancelTurn(nil)
-					a.runMu.Unlock()
-					break
-				}
-				current = next
+			var state acquireTurnState
+			genCtx, cancelTurn, current, state = a.acquireTurn(sessionID, runCtx, haveCurrent, current)
+			switch state {
+			case acquireTurnAcquired:
+				// Fall through to dispatch the claimed turn below.
+			case acquireTurnQueued:
+				return nil, nil
+			case acquireTurnDrained:
+				return a.callbacks.RunAfterAgent(runCtx, &lastCall, lastResult, nil)
 			}
 			busyOwned = true
-			a.runMu.Unlock()
 		}
 
 		outcome := a.runTurn(runCtx, genCtx, current)
@@ -385,107 +366,7 @@ func (a *sessionAgent) runTurn(ctx context.Context, genCtx context.Context, call
 	a.eventPromptResponded(call.SessionID, time.Since(startTime).Truncate(time.Second))
 
 	if err != nil {
-		isCancelErr := errors.Is(err, context.Canceled)
-		if currentAssistant == nil {
-			return turnOutcome{result: result, err: err}
-		}
-		// Ensure we finish thinking on error to close the reasoning state.
-		currentAssistant.FinishThinking()
-		toolCalls := currentAssistant.ToolCalls()
-		// INFO: we use the parent context here because the genCtx has been cancelled.
-		msgs, createErr := a.messages.List(ctx, currentAssistant.SessionID)
-		if createErr != nil {
-			return turnOutcome{err: createErr}
-		}
-		for _, tc := range toolCalls {
-			if !tc.Finished {
-				tc.Finished = true
-				tc.Input = "{}"
-				currentAssistant.AddToolCall(tc)
-				updateErr := a.messages.Update(ctx, *currentAssistant)
-				if updateErr != nil {
-					return turnOutcome{err: updateErr}
-				}
-			}
-
-			found := false
-			for _, msg := range msgs {
-				if msg.Role == message.Tool {
-					for _, tr := range msg.ToolResults() {
-						if tr.ToolCallID == tc.ID {
-							found = true
-							break
-						}
-					}
-				}
-				if found {
-					break
-				}
-			}
-			if found {
-				continue
-			}
-			content := "There was an error while executing the tool"
-			if isCancelErr {
-				content = "Error: user cancelled assistant tool calling"
-			}
-			toolResult := message.ToolResult{
-				ToolCallID: tc.ID,
-				Name:       tc.Name,
-				Content:    content,
-				IsError:    true,
-			}
-			_, createErr = a.messages.Create(ctx, currentAssistant.SessionID, message.CreateMessageParams{
-				Role: message.Tool,
-				Parts: []message.ContentPart{
-					toolResult,
-				},
-			})
-			if createErr != nil {
-				return turnOutcome{err: createErr}
-			}
-		}
-		var fantasyErr *fantasy.Error
-		var providerErr *fantasy.ProviderError
-		const defaultTitle = "Provider Error"
-		// Detect context-window-exceeded errors so we can recover by
-		// summarizing and retrying instead of bubbling the error to
-		// the user.
-		ctxTooLarge := false
-		if !isCancelErr && errors.As(err, &providerErr) && providerErr.IsContextTooLarge() && !a.disableAutoSummarize {
-			ctxTooLarge = true
-		}
-		if isCancelErr {
-			currentAssistant.AddFinish(message.FinishReasonCanceled, "User canceled request", "")
-		} else if ctxTooLarge {
-			currentAssistant.AddFinish(message.FinishReasonError, "Context Too Large", "Context window exceeded; summarizing and retrying.")
-		} else if errors.As(err, &providerErr) {
-			currentAssistant.AddFinish(message.FinishReasonError, cmp.Or(ext.Capitalize(providerErr.Title), defaultTitle), providerErr.Message)
-		} else if errors.As(err, &fantasyErr) {
-			currentAssistant.AddFinish(message.FinishReasonError, cmp.Or(ext.Capitalize(fantasyErr.Title), defaultTitle), fantasyErr.Message)
-		} else {
-			currentAssistant.AddFinish(message.FinishReasonError, defaultTitle, err.Error())
-		}
-		// Note: we use the parent context here because the genCtx has been
-		// cancelled.
-		updateErr := a.messages.Update(ctx, *currentAssistant)
-		if updateErr != nil {
-			return turnOutcome{err: updateErr}
-		}
-		if ctxTooLarge {
-			slog.Warn(
-				"Context window exceeded; summarizing and retrying",
-				"session_id", call.SessionID,
-				"max_tokens", providerErr.ContextMaxTokens,
-				"used_tokens", providerErr.ContextUsedTokens,
-			)
-			// Busy release + Summarize + retry re-dispatch happen in the
-			// dispatcher loop (Run) so they stay atomic with queue dispatch.
-			retryCall := call
-			retryCall.Prompt = fmt.Sprintf("The previous turn was interrupted because the context window was exceeded. Please continue with the original request: `%s`", call.Prompt)
-			return turnOutcome{ctxTooLarge: true, retryCall: &retryCall, err: err}
-		}
-		return turnOutcome{err: err}
+		return a.handleStreamError(ctx, call, currentAssistant, result, err)
 	}
 
 	// Send notification that agent has finished its turn (skip for
@@ -505,6 +386,163 @@ func (a *sessionAgent) runTurn(ctx context.Context, genCtx context.Context, call
 	}
 
 	return turnOutcome{result: result}
+}
+
+// handleStreamError finalizes the assistant message after a streaming error,
+// closes out unfinished tool calls and reports how the dispatcher should
+// proceed (context-too-large recovery vs plain error).
+func (a *sessionAgent) handleStreamError(
+	ctx context.Context,
+	call SessionAgentCall,
+	currentAssistant *message.Message,
+	result *fantasy.AgentResult,
+	err error,
+) turnOutcome {
+	isCancelErr := errors.Is(err, context.Canceled)
+	if currentAssistant == nil {
+		return turnOutcome{result: result, err: err}
+	}
+	// Ensure we finish thinking on error to close the reasoning state.
+	currentAssistant.FinishThinking()
+	toolCalls := currentAssistant.ToolCalls()
+	// INFO: we use the parent context here because the genCtx has been cancelled.
+	msgs, createErr := a.messages.List(ctx, currentAssistant.SessionID)
+	if createErr != nil {
+		return turnOutcome{err: createErr}
+	}
+	for _, tc := range toolCalls {
+		if !tc.Finished {
+			tc.Finished = true
+			tc.Input = "{}"
+			currentAssistant.AddToolCall(tc)
+			updateErr := a.messages.Update(ctx, *currentAssistant)
+			if updateErr != nil {
+				return turnOutcome{err: updateErr}
+			}
+		}
+
+		found := false
+		for _, msg := range msgs {
+			if msg.Role == message.Tool {
+				for _, tr := range msg.ToolResults() {
+					if tr.ToolCallID == tc.ID {
+						found = true
+						break
+					}
+				}
+			}
+			if found {
+				break
+			}
+		}
+		if found {
+			continue
+		}
+		content := "There was an error while executing the tool"
+		if isCancelErr {
+			content = "Error: user cancelled assistant tool calling"
+		}
+		toolResult := message.ToolResult{
+			ToolCallID: tc.ID,
+			Name:       tc.Name,
+			Content:    content,
+			IsError:    true,
+		}
+		_, createErr = a.messages.Create(ctx, currentAssistant.SessionID, message.CreateMessageParams{
+			Role: message.Tool,
+			Parts: []message.ContentPart{
+				toolResult,
+			},
+		})
+		if createErr != nil {
+			return turnOutcome{err: createErr}
+		}
+	}
+	var fantasyErr *fantasy.Error
+	var providerErr *fantasy.ProviderError
+	const defaultTitle = "Provider Error"
+	// Detect context-window-exceeded errors so we can recover by
+	// summarizing and retrying instead of bubbling the error to
+	// the user.
+	ctxTooLarge := !isCancelErr && errors.As(err, &providerErr) && providerErr.IsContextTooLarge() && !a.disableAutoSummarize
+	if isCancelErr {
+		currentAssistant.AddFinish(message.FinishReasonCanceled, "User canceled request", "")
+	} else if ctxTooLarge {
+		currentAssistant.AddFinish(message.FinishReasonError, "Context Too Large", "Context window exceeded; summarizing and retrying.")
+	} else if errors.As(err, &providerErr) {
+		currentAssistant.AddFinish(message.FinishReasonError, cmp.Or(ext.Capitalize(providerErr.Title), defaultTitle), providerErr.Message)
+	} else if errors.As(err, &fantasyErr) {
+		currentAssistant.AddFinish(message.FinishReasonError, cmp.Or(ext.Capitalize(fantasyErr.Title), defaultTitle), fantasyErr.Message)
+	} else {
+		currentAssistant.AddFinish(message.FinishReasonError, defaultTitle, err.Error())
+	}
+	// Note: we use the parent context here because the genCtx has been
+	// cancelled.
+	updateErr := a.messages.Update(ctx, *currentAssistant)
+	if updateErr != nil {
+		return turnOutcome{err: updateErr}
+	}
+	if ctxTooLarge {
+		slog.Warn(
+			"Context window exceeded; summarizing and retrying",
+			"session_id", call.SessionID,
+			"max_tokens", providerErr.ContextMaxTokens,
+			"used_tokens", providerErr.ContextUsedTokens,
+		)
+		// Busy release + Summarize + retry re-dispatch happen in the
+		// dispatcher loop (Run) so they stay atomic with queue dispatch.
+		retryCall := call
+		retryCall.Prompt = fmt.Sprintf("The previous turn was interrupted because the context window was exceeded. Please continue with the original request: `%s`", call.Prompt)
+		return turnOutcome{ctxTooLarge: true, retryCall: &retryCall, err: err}
+	}
+	return turnOutcome{err: err}
+}
+
+// acquireTurnState reports how the acquire-or-enqueue critical section resolved.
+type acquireTurnState int
+
+const (
+	// acquireTurnAcquired means this dispatcher now owns the next turn.
+	acquireTurnAcquired acquireTurnState = iota
+	// acquireTurnQueued means the call was handed to the running dispatcher.
+	acquireTurnQueued
+	// acquireTurnDrained means the queue holds no next call for this Run.
+	acquireTurnDrained
+)
+
+// acquireTurn runs the acquire-or-enqueue critical section for the turn
+// dispatcher. It claims the next turn, queues the current call behind a running
+// dispatcher, or reports that there is nothing left to dispatch.
+func (a *sessionAgent) acquireTurn(sessionID string, runCtx context.Context, haveCurrent bool, current SessionAgentCall) (context.Context, context.CancelCauseFunc, SessionAgentCall, acquireTurnState) {
+	a.runMu.Lock()
+	genCtx, cancelTurn, ok := a.beginTurnLocked(sessionID, runCtx)
+	if !ok {
+		if haveCurrent {
+			// Busy: queue the call and return silently. The running
+			// dispatcher picks it up at its next turn boundary.
+			a.appendQueueLocked(sessionID, current)
+			a.runMu.Unlock()
+			return nil, nil, current, acquireTurnQueued
+		}
+		// Continuation lost the race to another Run: that dispatcher owns
+		// the queue now; nothing more for us to do here.
+		a.runMu.Unlock()
+		return nil, nil, current, acquireTurnDrained
+	}
+	if !haveCurrent {
+		// Continuation mode (post-summarize): the next call comes from the
+		// queue head; user-queued prompts run first.
+		next, hasNext := a.popQueueLocked(sessionID)
+		if !hasNext {
+			a.activeRequests.Del(sessionID)
+			cancelTurn(nil)
+			a.runMu.Unlock()
+			return nil, nil, current, acquireTurnDrained
+		}
+		current = next
+	}
+	a.runMu.Unlock()
+	return genCtx, cancelTurn, current, acquireTurnAcquired
 }
 
 func (a *sessionAgent) Summarize(ctx context.Context, sessionID string, opts fantasy.ProviderOptions) (string, error) {

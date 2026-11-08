@@ -122,9 +122,7 @@ func (m *UI) handleDialogAction(action tea.Msg) tea.Cmd {
 	case dialog.ActionToggleCompactMode:
 		cmds = append(cmds, m.toggleCompactMode())
 	case dialog.ActionTogglePills:
-		if cmd := m.togglePillsExpanded(); cmd != nil {
-			cmds = append(cmds, cmd)
-		}
+		m.togglePillsExpanded()
 	case dialog.ActionSetSessionTodos:
 		if cmd := m.saveSessionTodos(msg.Todos); cmd != nil {
 			cmds = append(cmds, cmd)
@@ -211,27 +209,7 @@ func (m *UI) handleDialogAction(action tea.Msg) tea.Cmd {
 			break
 		}
 		if msg.Args == nil && msg.URL == "" {
-			cfg := m.com.Config()
-			proxyURL := "http://127.0.0.1:7890"
-			noProxy := "localhost,127.0.0.1"
-			if cfg != nil && cfg.Options != nil && cfg.Options.Network != nil {
-				if cfg.Options.Network.ProxyURL != "" {
-					proxyURL = cfg.Options.Network.ProxyURL
-				}
-				if cfg.Options.Network.NoProxy != "" {
-					noProxy = cfg.Options.Network.NoProxy
-				}
-			}
-			m.dialog.OpenDialog(dialog.NewArguments(
-				m.com,
-				"Network Proxy",
-				"Configure a local proxy for provider tests, fetch/download, web search, MCP HTTP/SSE, and admin APIs.",
-				[]slash.Argument{
-					{ID: "PROXY_URL", Title: "Proxy URL", Description: proxyURL, Required: true},
-					{ID: "NO_PROXY", Title: "No Proxy", Description: noProxy},
-				},
-				msg,
-			))
+			m.openProxyConfigDialog(msg)
 			break
 		}
 		cmds = append(cmds, m.setProxyURL(msg))
@@ -438,6 +416,48 @@ func (m *UI) handleDialogAction(action tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// afterPreferredModelChange applies the follow-up work of a successful model
+// switch: the live theme swap and defaulting the small model when it is unset.
+func (m *UI) afterPreferredModelChange(msg dialog.ActionSelectModel, providerID string, cfg *config.Config) []tea.Cmd {
+	var cmds []tea.Cmd
+	if msg.ModelType == config.SelectedModelTypeLarge {
+		// Swap the theme live based on the newly selected large
+		// model's provider.
+		m.applyTheme(styles.ThemeForProvider(providerID))
+	}
+	if _, ok := cfg.Models[config.SelectedModelTypeSmall]; ok {
+		return cmds
+	}
+	// Ensure small model is set when unset.
+	smallModel := m.com.Workspace.GetDefaultSmallModel(providerID)
+	if err := m.com.Workspace.UpdatePreferredModel(config.ScopeGlobal, config.SelectedModelTypeSmall, smallModel); err != nil {
+		cmds = append(cmds, util.ReportError(err))
+	}
+	return cmds
+}
+
+// openProxyConfigDialog opens the proxy configuration form prefilled with the
+// current network settings.
+func (m *UI) openProxyConfigDialog(msg dialog.ActionSetProxyURL) {
+	proxyURL := "http://127.0.0.1:7890"
+	noProxy := "localhost,127.0.0.1"
+	cfg := m.com.Config()
+	if cfg != nil && cfg.Options != nil && cfg.Options.Network != nil {
+		proxyURL = cmp.Or(cfg.Options.Network.ProxyURL, proxyURL)
+		noProxy = cmp.Or(cfg.Options.Network.NoProxy, noProxy)
+	}
+	m.dialog.OpenDialog(dialog.NewArguments(
+		m.com,
+		"Network Proxy",
+		"Configure a local proxy for provider tests, fetch/download, web search, MCP HTTP/SSE, and admin APIs.",
+		[]slash.Argument{
+			{ID: "PROXY_URL", Title: "Proxy URL", Description: proxyURL, Required: true},
+			{ID: "NO_PROXY", Title: "No Proxy", Description: noProxy},
+		},
+		msg,
+	))
+}
+
 func (m *UI) handleSelectModel(msg dialog.ActionSelectModel) tea.Cmd {
 	var cmds []tea.Cmd
 
@@ -467,18 +487,7 @@ func (m *UI) handleSelectModel(msg dialog.ActionSelectModel) tea.Cmd {
 	if err := m.com.Workspace.UpdatePreferredModel(config.ScopeGlobal, msg.ModelType, msg.Model); err != nil {
 		cmds = append(cmds, util.ReportError(err))
 	} else {
-		if msg.ModelType == config.SelectedModelTypeLarge {
-			// Swap the theme live based on the newly selected large
-			// model's provider.
-			m.applyTheme(styles.ThemeForProvider(providerID))
-		}
-		if _, ok := cfg.Models[config.SelectedModelTypeSmall]; !ok {
-			// Ensure small model is set is unset.
-			smallModel := m.com.Workspace.GetDefaultSmallModel(providerID)
-			if err := m.com.Workspace.UpdatePreferredModel(config.ScopeGlobal, config.SelectedModelTypeSmall, smallModel); err != nil {
-				cmds = append(cmds, util.ReportError(err))
-			}
-		}
+		cmds = append(cmds, m.afterPreferredModelChange(msg, providerID, cfg)...)
 	}
 
 	cmds = append(cmds, func() tea.Msg {

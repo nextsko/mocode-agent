@@ -3,6 +3,7 @@ package toolutil
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"math/rand/v2"
@@ -130,7 +131,7 @@ func (r *retryTool) Run(ctx context.Context, call fantasy.ToolCall) (fantasy.Too
 		if d := r.policy.delay(attempt); d > 0 {
 			select {
 			case <-ctx.Done():
-				return resp, ctx.Err()
+				return resp, fmt.Errorf("retry interrupted: %w", ctx.Err())
 			case <-time.After(d):
 			}
 		}

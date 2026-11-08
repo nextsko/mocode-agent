@@ -111,7 +111,10 @@ func runDoctor(cmd *cobra.Command, opts doctorOptions) error {
 	if opts.JSON {
 		enc := json.NewEncoder(cmd.OutOrStdout())
 		enc.SetIndent("", "  ")
-		return enc.Encode(report)
+		if err := enc.Encode(report); err != nil {
+			return fmt.Errorf("encode doctor report: %w", err)
+		}
+		return nil
 	}
 
 	okCount, warnCount, failCount, skipCount := doctorStatusCounts(report.Checks)
@@ -158,7 +161,7 @@ func collectDoctorReport(ctx context.Context, cmd *cobra.Command, opts doctorOpt
 	report.Checks = append(
 		report.Checks,
 		doctorBinaryCheck(),
-		doctorRuntimeCheck(cwd, facts),
+		doctorRuntimeCheck(facts),
 		doctorConfigDirCheck(filepath.Dir(config.GlobalConfig())),
 		doctorDataDirCheck(filepath.Dir(config.GlobalConfigData())),
 		doctorConfigFilesCheck(cwd),

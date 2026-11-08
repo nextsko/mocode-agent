@@ -153,7 +153,7 @@ type enginePage struct {
 // fetchPage executes req with client and returns the response page.
 // Transport-level failures map onto a provider error tagged with
 // providerID so the fan-out records a classified engine failure.
-func fetchPage(ctx context.Context, client *http.Client, providerID string, req *http.Request) (enginePage, error) {
+func fetchPage(client *http.Client, providerID string, req *http.Request) (enginePage, error) {
 	if client == nil {
 		client = &http.Client{}
 	}
@@ -273,11 +273,11 @@ func (c *cooldownState) clock() time.Time {
 	return time.Now()
 }
 
-// trigger starts or restarts the backoff window lasting d from now.
-func (c *cooldownState) trigger(d time.Duration) {
+// trigger starts or restarts the backoff window from now.
+func (c *cooldownState) trigger() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.until = c.clock().Add(d)
+	c.until = c.clock().Add(cooldownDuration)
 }
 
 // active reports whether the backoff window still holds.

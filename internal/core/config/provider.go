@@ -32,8 +32,12 @@ var (
 	providerErr  error
 )
 
-// file to cache provider data.
-func cachePathFor(name string) string {
+// providersCacheFile is the cache file name for the provider list.
+const providersCacheFile = "providers"
+
+// cachePathFor returns the cache file path for the provider list.
+func cachePathFor() string {
+	name := providersCacheFile
 	xdgDataHome := os.Getenv("XDG_DATA_HOME")
 	if xdgDataHome != "" {
 		return filepath.Join(xdgDataHome, appName, name+".json")
@@ -42,7 +46,7 @@ func cachePathFor(name string) string {
 	// return the path to the main data directory
 	// for windows, it should be in `%LOCALAPPDATA%/Mocode/`
 	// for linux and macOS, it should be in `$HOME/.local/share/mocode/`
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		localAppData := os.Getenv("LOCALAPPDATA")
 		if localAppData == "" {
 			localAppData = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local")
@@ -80,11 +84,11 @@ func UpdateProviders(pathOrURL string) error {
 		}
 	}
 
-	if err := newCache[[]catwalk.Provider](cachePathFor("providers")).Store(providers); err != nil {
+	if err := newCache[[]catwalk.Provider](cachePathFor()).Store(providers); err != nil {
 		return fmt.Errorf("failed to save providers to cache: %w", err)
 	}
 
-	slog.Info("Providers updated successfully", "count", len(providers), "from", pathOrURL, "to", cachePathFor("providers"))
+	slog.Info("Providers updated successfully", "count", len(providers), "from", pathOrURL, "to", cachePathFor())
 	return nil
 }
 
@@ -99,7 +103,7 @@ func ProvidersWithCache(cfg *Config) ([]catwalk.Provider, error) {
 
 		if !customProvidersOnly {
 			// Load catwalk providers from cache
-			catwalkCache := newCache[[]catwalk.Provider](cachePathFor("providers"))
+			catwalkCache := newCache[[]catwalk.Provider](cachePathFor())
 			catwalkProviders, _, err := catwalkCache.Get()
 			if err == nil {
 				providers.Append(catwalkProviders...)
@@ -173,7 +177,7 @@ func (c cache[T]) Store(v T) error {
 		return fmt.Errorf("failed to marshal provider data: %w", err)
 	}
 
-	if err := os.WriteFile(c.path, data, 0o600); err != nil {
+	if err := os.WriteFile(c.path, data, 0o600); err != nil { //nolint:gosec // c.path is derived from the app data dir, not user input.
 		return fmt.Errorf("failed to write provider data to cache: %w", err)
 	}
 	return nil

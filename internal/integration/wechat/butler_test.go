@@ -118,11 +118,12 @@ func TestSessionKey(t *testing.T) {
 
 func TestExtractAssistantAfter(t *testing.T) {
 	t.Parallel()
-	msgs := []MsgInfo{
-		{Role: "user", Content: "hi"},
-		{Role: "assistant", Content: "old"},
-		{Role: "user", Content: "again"},
-	}
+	msgs := make([]MsgInfo, 0, 4)
+	msgs = append(msgs,
+		MsgInfo{Role: "user", Content: "hi"},
+		MsgInfo{Role: "assistant", Content: "old"},
+		MsgInfo{Role: "user", Content: "again"},
+	)
 	if got := extractAssistantAfter(msgs, 2); got != "" {
 		t.Fatalf("expected empty before new assistant, got %q", got)
 	}

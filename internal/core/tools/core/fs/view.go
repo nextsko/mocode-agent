@@ -390,7 +390,10 @@ func (s *LineScanner) Text() string {
 }
 
 func (s *LineScanner) Err() error {
-	return s.scanner.Err()
+	if err := s.scanner.Err(); err != nil {
+		return fmt.Errorf("scan lines: %w", err)
+	}
+	return nil
 }
 
 // isInSkillsPath reports whether filePath lies inside a configured skills

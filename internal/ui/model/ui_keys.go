@@ -14,6 +14,127 @@ import (
 	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
 
+// switchAgentByDigit returns the command that switches to the agent bound to
+// ctrl+<digit>, or nil when nothing should happen.
+func (m *UI) switchAgentByDigit(key string) tea.Cmd {
+	agents := m.com.Workspace.AvailableAgents()
+	idx := int(key[5] - '1') // "ctrl+1" → index 0
+	if idx < 0 || idx >= len(agents) {
+		return nil
+	}
+	targetID := agents[idx].ID
+	if targetID == m.com.Workspace.CurrentAgentID() || m.isAgentBusy() {
+		return nil
+	}
+	name := agents[idx].Name
+	return func() tea.Msg {
+		if err := m.com.Workspace.SwitchAgent(context.Background(), targetID); err != nil {
+			return util.NewErrorMsg(err)
+		}
+		return util.NewInfoMsg("Switched to " + name)
+	}
+}
+
+// handleCompletionSelection feeds msg to the open completion list. It reports
+// handled=true together with the resulting command when a selection was
+// consumed, in which case the caller must stop processing the key.
+func (m *UI) handleCompletionSelection(msg tea.KeyPressMsg) (tea.Cmd, bool) {
+	selection, ok := m.completions.Update(msg)
+	if !ok {
+		return nil, false
+	}
+
+	var cmds []tea.Cmd
+	switch sel := selection.(type) {
+	case completions.SelectionMsg[completions.FileCompletionValue]:
+		cmds = append(cmds, m.insertFileCompletion(sel.Value.Path))
+		if !sel.KeepOpen {
+			m.closeCompletions()
+		}
+	case completions.SelectionMsg[completions.ResourceCompletionValue]:
+		cmds = append(cmds, m.insertMCPResourceCompletion(sel.Value))
+		if !sel.KeepOpen {
+			m.closeCompletions()
+		}
+	case completions.SelectionMsg[completions.AtCompletionValue]:
+		cmds = append(cmds, m.insertAtCompletion(sel.Value))
+		if !sel.KeepOpen && !sel.Value.IsCategory {
+			m.closeCompletions()
+		}
+	case completions.SelectionMsg[completions.SlashCompletionValue]:
+		prevHeight := m.textarea.Height()
+		m.textarea.Reset()
+		m.editorAllSelected = false
+		if cmd := m.handleTextareaHeightChange(prevHeight); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		m.closeCompletions()
+		// MRU: remember the accepted command so the bare "/" menu surfaces it
+		// first next time (grok-build idea).
+		completions.RecordSlashUse(sel.Value.Command)
+		if sel.Value.Msg != nil {
+			// Handle the action directly without going through the message
+			// queue, so it works even when no dialog is currently open.
+			if cmd := m.handleDialogAction(sel.Value.Msg); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		} else if cmd, handled := m.handleSlashCommand(sel.Value.Command); handled && cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		return tea.Batch(cmds...), true
+	case completions.ClosedMsg:
+		m.completionsOpen = false
+	}
+	return tea.Batch(cmds...), true
+}
+
+// refilterCompletionsAfterEdit re-filters the open completion list after the
+// textarea changed, closing it when the cursor moved before the trigger.
+func (m *UI) refilterCompletionsAfterEdit(key string) {
+	// Skip filtering on the initial @ / / keystroke since items may load async.
+	if !m.completionsOpen || key == "@" || key == "/" {
+		return
+	}
+
+	// Close completions if cursor moved before start.
+	if len(m.textarea.Value()) <= m.completionsStartIndex {
+		m.closeCompletions()
+		return
+	}
+
+	if key == "space" {
+		// Close on space — unless the space enters argument completion
+		// territory (e.g. "/agents " → mode list).
+		if !m.updateSlashArgCompletions() {
+			m.closeCompletions()
+		}
+		return
+	}
+
+	// Extract current word and filter.
+	word := m.textareaWord()
+	if m.completionsSlashMode {
+		switch {
+		case m.updateSlashArgCompletions():
+			// Argument completion handled above.
+		case strings.HasPrefix(word, "/"):
+			m.completionsQuery = word[1:]
+			m.completions.Filter(m.completionsQuery)
+		default:
+			m.closeCompletions()
+		}
+		return
+	}
+	if strings.HasPrefix(word, "@") {
+		m.completionsQuery = word[1:]
+		m.completions.Filter(m.completionsQuery)
+		return
+	}
+	if m.completionsOpen {
+		m.closeCompletions()
+	}
+}
+
 func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 	var cmds []tea.Cmd
 
@@ -40,23 +161,17 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 			return true
 		case key.Matches(msg, m.keyMap.Chat.TogglePills):
 			if m.state == uiChat && m.hasSession() {
-				if cmd := m.togglePillsExpanded(); cmd != nil {
-					cmds = append(cmds, cmd)
-				}
+				m.togglePillsExpanded()
 				return true
 			}
 		case key.Matches(msg, m.keyMap.Chat.PillLeft):
 			if m.state == uiChat && m.hasSession() && m.pillsExpanded && m.focus != uiFocusEditor {
-				if cmd := m.switchPillSection(-1); cmd != nil {
-					cmds = append(cmds, cmd)
-				}
+				m.switchPillSection(-1)
 				return true
 			}
 		case key.Matches(msg, m.keyMap.Chat.PillRight):
 			if m.state == uiChat && m.hasSession() && m.pillsExpanded && m.focus != uiFocusEditor {
-				if cmd := m.switchPillSection(1); cmd != nil {
-					cmds = append(cmds, cmd)
-				}
+				m.switchPillSection(1)
 				return true
 			}
 		case key.Matches(msg, m.keyMap.Suspend):
@@ -69,18 +184,8 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		// Handle ctrl+1 through ctrl+9 for quick agent switching.
 		if msg.String() >= "ctrl+1" && msg.String() <= "ctrl+9" {
-			agents := m.com.Workspace.AvailableAgents()
-			idx := int(msg.String()[5] - '1') // "ctrl+1" → index 0
-			if idx >= 0 && idx < len(agents) {
-				targetID := agents[idx].ID
-				if targetID != m.com.Workspace.CurrentAgentID() && !m.isAgentBusy() {
-					cmds = append(cmds, func() tea.Msg {
-						if err := m.com.Workspace.SwitchAgent(context.Background(), targetID); err != nil {
-							return util.NewErrorMsg(err)
-						}
-						return util.NewInfoMsg("Switched to " + agents[idx].Name)
-					})
-				}
+			if cmd := m.switchAgentByDigit(msg.String()); cmd != nil {
+				cmds = append(cmds, cmd)
 			}
 			return true
 		}
@@ -139,50 +244,8 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 		case uiFocusEditor:
 			// Handle completions if open.
 			if m.completionsOpen {
-				if msg, ok := m.completions.Update(msg); ok {
-					switch msg := msg.(type) {
-					case completions.SelectionMsg[completions.FileCompletionValue]:
-						cmds = append(cmds, m.insertFileCompletion(msg.Value.Path))
-						if !msg.KeepOpen {
-							m.closeCompletions()
-						}
-					case completions.SelectionMsg[completions.ResourceCompletionValue]:
-						cmds = append(cmds, m.insertMCPResourceCompletion(msg.Value))
-						if !msg.KeepOpen {
-							m.closeCompletions()
-						}
-					case completions.SelectionMsg[completions.AtCompletionValue]:
-						cmds = append(cmds, m.insertAtCompletion(msg.Value))
-						if !msg.KeepOpen && !msg.Value.IsCategory {
-							m.closeCompletions()
-						}
-					case completions.SelectionMsg[completions.SlashCompletionValue]:
-						prevHeight := m.textarea.Height()
-						m.textarea.Reset()
-						m.editorAllSelected = false
-						if cmd := m.handleTextareaHeightChange(prevHeight); cmd != nil {
-							cmds = append(cmds, cmd)
-						}
-						m.closeCompletions()
-						// MRU: remember the accepted command so the bare "/"
-						// menu surfaces it first next time (grok-build idea).
-						completions.RecordSlashUse(msg.Value.Command)
-						if msg.Value.Msg != nil {
-							// Handle the action directly without going through the message
-							// queue, so it works even when no dialog is currently open.
-							if cmd := m.handleDialogAction(msg.Value.Msg); cmd != nil {
-								cmds = append(cmds, cmd)
-							}
-						} else if cmd, handled := m.handleSlashCommand(msg.Value.Command); handled {
-							if cmd != nil {
-								cmds = append(cmds, cmd)
-							}
-						}
-						return tea.Batch(cmds...)
-					case completions.ClosedMsg:
-						m.completionsOpen = false
-					}
-					return tea.Batch(cmds...)
+				if cmd, handled := m.handleCompletionSelection(msg); handled {
+					return cmd
 				}
 			}
 
@@ -408,40 +471,7 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 
 				// After updating textarea, check if we need to filter completions.
 				// Skip filtering on the initial @ / / keystroke since items may load async.
-				if m.completionsOpen && msg.String() != "@" && msg.String() != "/" {
-					newValue := m.textarea.Value()
-					newIdx := len(newValue)
-
-					// Close completions if cursor moved before start.
-					if newIdx <= m.completionsStartIndex {
-						m.closeCompletions()
-					} else if msg.String() == "space" && !m.updateSlashArgCompletions() {
-						// Close on space — unless the space enters argument
-						// completion territory (e.g. "/agents " → mode list).
-						m.closeCompletions()
-					} else if msg.String() != "space" {
-						// Extract current word and filter.
-						word := m.textareaWord()
-						if m.completionsSlashMode {
-							if m.updateSlashArgCompletions() {
-								// Argument completion handled above.
-							} else if strings.HasPrefix(word, "/") {
-								m.completionsQuery = word[1:]
-								m.completions.Filter(m.completionsQuery)
-							} else {
-								m.closeCompletions()
-							}
-						} else if m.completionsAtMode && strings.HasPrefix(word, "@") {
-							m.completionsQuery = word[1:]
-							m.completions.Filter(m.completionsQuery)
-						} else if strings.HasPrefix(word, "@") {
-							m.completionsQuery = word[1:]
-							m.completions.Filter(m.completionsQuery)
-						} else if m.completionsOpen {
-							m.closeCompletions()
-						}
-					}
-				}
+				m.refilterCompletionsAfterEdit(msg.String())
 			}
 		case uiFocusMain:
 			switch {

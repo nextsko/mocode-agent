@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -166,7 +167,7 @@ func NewURLDetectorWithCustomPatterns(patterns []string) (*URLDetector, error) {
 	for _, p := range patterns {
 		re, err := regexp.Compile(p)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("compile URL pattern %q: %w", p, err)
 		}
 		compiled = append(compiled, re)
 	}
@@ -178,7 +179,7 @@ func NewURLDetectorWithCustomPatterns(patterns []string) (*URLDetector, error) {
 func (d *URLDetector) AddPattern(pattern string) error {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return err
+		return fmt.Errorf("compile URL pattern %q: %w", pattern, err)
 	}
 	d.patterns = append(d.patterns, re)
 	return nil

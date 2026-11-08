@@ -15,17 +15,39 @@ type parsedDiffFile struct {
 	after  string
 }
 
+// fileBuilder accumulates the before/after sides of one file in a diff.
+type fileBuilder struct {
+	path   string
+	before strings.Builder
+	after  strings.Builder
+}
+
+// applyNewFilePath applies a "+++ " target-path header to the file list,
+// starting a new entry when no file has been opened yet.
+func applyNewFilePath(files []fileBuilder, currentIdx int, line string) ([]fileBuilder, int) {
+	p := strings.TrimPrefix(line, "+++ ")
+	p = strings.TrimPrefix(p, "b/")
+	if idx := strings.Index(p, "\t"); idx >= 0 {
+		p = p[:idx]
+	}
+	if currentIdx < 0 {
+		if p == "/dev/null" {
+			return files, currentIdx
+		}
+		files = append(files, fileBuilder{path: p})
+		return files, len(files) - 1
+	}
+	if p != "/dev/null" && (files[currentIdx].path == "" || strings.HasPrefix(files[currentIdx].path, "/dev/null")) {
+		files[currentIdx].path = p
+	}
+	return files, currentIdx
+}
+
 func looksLikeDiff(content string) bool {
 	return diff.IsUnifiedDiff(content)
 }
 
 func parseUnifiedDiff(content string) []parsedDiffFile {
-	type fileBuilder struct {
-		path   string
-		before strings.Builder
-		after  strings.Builder
-	}
-
 	var files []fileBuilder
 	currentIdx := -1
 	inHunk := false
@@ -73,21 +95,7 @@ func parseUnifiedDiff(content string) []parsedDiffFile {
 		}
 
 		if strings.HasPrefix(line, "+++ ") && !inHunk {
-			p := strings.TrimPrefix(line, "+++ ")
-			p = strings.TrimPrefix(p, "b/")
-			if idx := strings.Index(p, "\t"); idx >= 0 {
-				p = p[:idx]
-			}
-			if currentIdx < 0 {
-				if p != "/dev/null" {
-					files = append(files, fileBuilder{path: p})
-					currentIdx = len(files) - 1
-				}
-				continue
-			}
-			if p != "/dev/null" && (files[currentIdx].path == "" || strings.HasPrefix(files[currentIdx].path, "/dev/null")) {
-				files[currentIdx].path = p
-			}
+			files, currentIdx = applyNewFilePath(files, currentIdx, line)
 			continue
 		}
 

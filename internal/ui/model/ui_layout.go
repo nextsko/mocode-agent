@@ -39,6 +39,59 @@ func (m *UI) updateSize() {
 	m.renderPills()
 }
 
+// layoutCompactChat computes the compact chat layout, where the header, chat,
+// pills and editor stack vertically with no sidebar.
+func (m *UI) layoutCompactChat(uiLayout *uiLayout, appRect, area image.Rectangle, editorHeight int) {
+	// Layout
+	//
+	// compact-header
+	// ------
+	// main
+	// ------
+	// editor
+	// ------
+	// help
+	const compactHeaderHeight = 1
+	var headerRect, mainRect image.Rectangle
+	layout.Vertical(
+		layout.Len(compactHeaderHeight),
+		layout.Fill(1),
+	).Split(appRect).Assign(&headerRect, &mainRect)
+	detailsHeight := min(sessionDetailsMaxHeight, area.Dy()-1) // One row for the header
+	var sessionDetailsArea image.Rectangle
+	layout.Vertical(
+		layout.Len(detailsHeight),
+		layout.Fill(1),
+	).Split(appRect).Assign(&sessionDetailsArea, new(image.Rectangle))
+	uiLayout.sessionDetails = sessionDetailsArea
+	uiLayout.sessionDetails.Min.Y += compactHeaderHeight // adjust for header
+	// Add one line gap between header and main content
+	mainRect.Min.Y += 1
+	var editorRect image.Rectangle
+	layout.Vertical(
+		layout.Len(mainRect.Dy()-editorHeight),
+		layout.Fill(1),
+	).Split(mainRect).Assign(&mainRect, &editorRect)
+	mainRect.Max.X -= 1 // Add padding right
+	uiLayout.header = headerRect
+	pillsHeight := m.pillsAreaHeight()
+	if pillsHeight > 0 {
+		pillsHeight = min(pillsHeight, mainRect.Dy())
+		var chatRect, pillsRect image.Rectangle
+		layout.Vertical(
+			layout.Len(mainRect.Dy()-pillsHeight),
+			layout.Fill(1),
+		).Split(mainRect).Assign(&chatRect, &pillsRect)
+		uiLayout.main = chatRect
+		uiLayout.pills = pillsRect
+	} else {
+		uiLayout.main = mainRect
+	}
+	// Add bottom margin to main
+	uiLayout.main.Max.Y -= 1
+	uiLayout.editor = editorRect
+}
+
 func (m *UI) generateLayout(w, h int) uiLayout {
 	// The screen area we're working with
 	area := image.Rect(0, 0, w, h)
@@ -126,54 +179,7 @@ func (m *UI) generateLayout(w, h int) uiLayout {
 
 	case uiChat:
 		if m.isCompact {
-			// Layout
-			//
-			// compact-header
-			// ------
-			// main
-			// ------
-			// editor
-			// ------
-			// help
-			const compactHeaderHeight = 1
-			var headerRect, mainRect image.Rectangle
-			layout.Vertical(
-				layout.Len(compactHeaderHeight),
-				layout.Fill(1),
-			).Split(appRect).Assign(&headerRect, &mainRect)
-			detailsHeight := min(sessionDetailsMaxHeight, area.Dy()-1) // One row for the header
-			var sessionDetailsArea image.Rectangle
-			layout.Vertical(
-				layout.Len(detailsHeight),
-				layout.Fill(1),
-			).Split(appRect).Assign(&sessionDetailsArea, new(image.Rectangle))
-			uiLayout.sessionDetails = sessionDetailsArea
-			uiLayout.sessionDetails.Min.Y += compactHeaderHeight // adjust for header
-			// Add one line gap between header and main content
-			mainRect.Min.Y += 1
-			var editorRect image.Rectangle
-			layout.Vertical(
-				layout.Len(mainRect.Dy()-editorHeight),
-				layout.Fill(1),
-			).Split(mainRect).Assign(&mainRect, &editorRect)
-			mainRect.Max.X -= 1 // Add padding right
-			uiLayout.header = headerRect
-			pillsHeight := m.pillsAreaHeight()
-			if pillsHeight > 0 {
-				pillsHeight = min(pillsHeight, mainRect.Dy())
-				var chatRect, pillsRect image.Rectangle
-				layout.Vertical(
-					layout.Len(mainRect.Dy()-pillsHeight),
-					layout.Fill(1),
-				).Split(mainRect).Assign(&chatRect, &pillsRect)
-				uiLayout.main = chatRect
-				uiLayout.pills = pillsRect
-			} else {
-				uiLayout.main = mainRect
-			}
-			// Add bottom margin to main
-			uiLayout.main.Max.Y -= 1
-			uiLayout.editor = editorRect
+			m.layoutCompactChat(&uiLayout, appRect, area, editorHeight)
 		} else {
 			// Layout
 			//

@@ -14,7 +14,8 @@ import (
 
 // helper: build a fantasy.Message containing a single ToolResultPart with
 // the given tool call ID and text content.
-func toolMsg(toolCallID, content string) fantasy.Message {
+func toolMsg(content string) fantasy.Message {
+	const toolCallID = "call_1"
 	return fantasy.Message{
 		Role: fantasy.MessageRoleTool,
 		Content: []fantasy.MessagePart{
@@ -40,7 +41,7 @@ func TestCompressToolMessage_NilCompressor(t *testing.T) {
 	t.Parallel()
 
 	a := &sessionAgent{} // compressor is nil
-	original := toolMsg("call_1", "some content")
+	original := toolMsg("some content")
 	result := a.compressToolMessage(original, 50, nil)
 
 	require.Equal(t, original, result, "nil compressor should return msg unchanged")
@@ -54,7 +55,7 @@ func TestCompressToolMessage_LevelFull(t *testing.T) {
 	}
 
 	content := strings.Repeat("this is a line of output\n", 200)
-	original := toolMsg("call_1", content)
+	original := toolMsg(content)
 
 	// distance 5 → within RecentWindow(10) → LevelFull
 	result := a.compressToolMessage(original, 5, map[string]string{"call_1": "bash"})
@@ -74,7 +75,7 @@ func TestCompressToolMessage_LevelTrim_BashTool(t *testing.T) {
 		lines = append(lines, "output line "+strings.Repeat("x", 20))
 	}
 	content := strings.Join(lines, "\n")
-	original := toolMsg("call_1", content)
+	original := toolMsg(content)
 
 	// distance 15 → LevelTrim, toolName=bash
 	result := a.compressToolMessage(original, 15, map[string]string{"call_1": "bash"})
@@ -100,7 +101,7 @@ func TestCompressToolMessage_LevelTrim_NoToolName(t *testing.T) {
 		lines = append(lines, "output line "+strings.Repeat("x", 20))
 	}
 	content := strings.Join(lines, "\n")
-	original := toolMsg("call_1", content)
+	original := toolMsg(content)
 
 	// distance 15 → LevelTrim, no tool name in map
 	result := a.compressToolMessage(original, 15, nil)
@@ -125,7 +126,7 @@ func TestCompressToolMessage_LevelTrim_ErrorLinesPreserved(t *testing.T) {
 		lines = append(lines, "normal output line")
 	}
 	content := strings.Join(lines, "\n")
-	original := toolMsg("call_1", content)
+	original := toolMsg(content)
 
 	// distance 15 → LevelTrim, toolName=bash (has Error KeepPattern)
 	result := a.compressToolMessage(original, 15, map[string]string{"call_1": "bash"})
@@ -147,7 +148,7 @@ func TestCompressToolMessage_LevelCompact(t *testing.T) {
 		lines = append(lines, "line "+strings.Repeat("y", 30))
 	}
 	content := strings.Join(lines, "\n")
-	original := toolMsg("call_1", content)
+	original := toolMsg(content)
 
 	// distance 40 → LevelCompact (30..59)
 	result := a.compressToolMessage(original, 40, map[string]string{"call_1": "bash"})
@@ -164,7 +165,7 @@ func TestCompressToolMessage_LevelSummary(t *testing.T) {
 	}
 
 	content := strings.Repeat("historical content line\n", 150)
-	original := toolMsg("call_1", content)
+	original := toolMsg(content)
 
 	// distance 70 → LevelSummary (60+)
 	result := a.compressToolMessage(original, 70, map[string]string{"call_1": "bash"})
@@ -181,7 +182,7 @@ func TestCompressToolMessage_ShortContentUnchanged(t *testing.T) {
 	}
 
 	content := "short output\nonly a few lines"
-	original := toolMsg("call_1", content)
+	original := toolMsg(content)
 
 	// Even at LevelTrim distance, short content should be unchanged.
 	result := a.compressToolMessage(original, 15, map[string]string{"call_1": "bash"})

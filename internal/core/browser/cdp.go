@@ -41,7 +41,7 @@ func discoverEndpoint(ctx context.Context, baseURL string) (string, string, erro
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil) //nolint:gosec // CDP endpoint is the browser devtools URL the tool was asked to drive.
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("creating discovery request for %s: %w", url, err)
 	}
 
 	resp, err := http.DefaultClient.Do(req) //nolint:gosec // same CDP endpoint; the tool drives the browser by design.
@@ -307,7 +307,7 @@ func (c *cdpConn) Close() error {
 	c.markClosed()
 
 	if err != nil && !errors.Is(err, websocket.ErrCloseSent) {
-		return err
+		return fmt.Errorf("closing browser websocket: %w", err)
 	}
 	return nil
 }

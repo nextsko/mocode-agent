@@ -70,6 +70,8 @@ func (t *TransferToolRenderer) RenderTool(sty *styles.Styles, width int, opts *T
 		icon = sty.Tool.IconError.String()
 	case ToolStatusCanceled:
 		icon = sty.Tool.IconCancelled.String()
+	default:
+		// Awaiting-permission calls keep the header icon-less.
 	}
 	if icon != "" {
 		header = icon + " " + header
@@ -99,6 +101,8 @@ func defaultTransferRender(sty *styles.Styles, tc message.ToolCall, status ToolS
 		icon = sty.Tool.IconError.String()
 	case ToolStatusCanceled:
 		icon = sty.Tool.IconCancelled.String()
+	default:
+		// Awaiting-permission calls keep the pending icon.
 	}
 	text := sty.Tool.NameNormal.Render("transfer_to_agent")
 	detail := sty.Messages.NoContent.Render(tc.Input)

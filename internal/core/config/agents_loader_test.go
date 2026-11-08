@@ -164,7 +164,7 @@ tools = ["read_file", "grep", "edit"]
 
 func TestResolveAgentsDir_EnvOverrides(t *testing.T) {
 	envDir := t.TempDir()
-	restore := setEnv("MOCODE_AGENTS_DIR", envDir)
+	restore := setEnv(envDir)
 	defer restore()
 
 	cfg := &Config{Options: &Options{AgentsDir: "/other/path"}}
@@ -173,7 +173,7 @@ func TestResolveAgentsDir_EnvOverrides(t *testing.T) {
 }
 
 func TestResolveAgentsDir_OptionsAgentsDir(t *testing.T) {
-	restore := setEnv("MOCODE_AGENTS_DIR", "")
+	restore := setEnv("")
 	defer restore()
 
 	cfg := &Config{Options: &Options{AgentsDir: "/custom/agents"}}
@@ -182,7 +182,7 @@ func TestResolveAgentsDir_OptionsAgentsDir(t *testing.T) {
 }
 
 func TestResolveAgentsDir_ExpandTilde(t *testing.T) {
-	restore := setEnv("MOCODE_AGENTS_DIR", "")
+	restore := setEnv("")
 	defer restore()
 
 	cfg := &Config{Options: &Options{AgentsDir: "~/.custom-agents"}}
@@ -193,7 +193,7 @@ func TestResolveAgentsDir_ExpandTilde(t *testing.T) {
 }
 
 func TestResolveAgentsDir_Default(t *testing.T) {
-	restore := setEnv("MOCODE_AGENTS_DIR", "")
+	restore := setEnv("")
 	defer restore()
 
 	cfg := &Config{Options: nil}
@@ -202,7 +202,8 @@ func TestResolveAgentsDir_Default(t *testing.T) {
 	assert.Contains(t, got, filepath.Join("mocode", "agents"))
 }
 
-func setEnv(key, value string) func() {
+func setEnv(value string) func() {
+	const key = "MOCODE_AGENTS_DIR"
 	old := os.Getenv(key)
 	if value != "" {
 		_ = os.Setenv(key, value)

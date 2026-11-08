@@ -16,7 +16,7 @@ import (
 
 // markProjectInitialized marks the current project as initialized in the config.
 func (m *UI) markProjectInitialized() tea.Msg {
-	// TODO: handle error so we show it in the tui footer
+	// Future work: surface the error in the TUI footer rather than only logging it.
 	err := m.com.Workspace.MarkProjectInitialized()
 	if err != nil {
 		slog.Error(err.Error())
@@ -68,7 +68,7 @@ func (m *UI) initializeProject() tea.Cmd {
 
 // skipInitializeProject skips project initialization and transitions to the landing view.
 func (m *UI) skipInitializeProject() tea.Cmd {
-	// TODO: initialize the project
+	// Future work: initialize the project here instead of at startup.
 	m.setState(uiLanding, uiFocusEditor)
 	// mark the project as initialized
 	return m.markProjectInitialized

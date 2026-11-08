@@ -649,7 +649,7 @@ func quickStyle(o quickStyleOpts) Styles {
 	// Agentic fetch styles
 	s.Tool.AgenticFetchPromptTag = base.Bold(true).Padding(0, 1).MarginLeft(2).Background(o.success).Foreground(o.separator)
 
-	// Todo styles
+	// To-do list styles
 	s.Tool.TodoRatio = base.Foreground(o.infoMostSubtle)
 	s.Tool.TodoCompletedIcon = base.Foreground(o.success)
 	s.Tool.TodoInProgressIcon = base.Foreground(o.successMostSubtle)

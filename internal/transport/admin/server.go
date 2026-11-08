@@ -130,7 +130,7 @@ func (s *Server) Start(ctx context.Context, port int) (string, error) {
 	var lc net.ListenConfig
 	ln, err := lc.Listen(ctx, "tcp", addr)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("listen on %s: %w", addr, err)
 	}
 	token, err := randomAdminToken()
 	if err != nil {
@@ -184,7 +184,10 @@ func (s *Server) stopLocked(ctx context.Context) error {
 	s.server = nil
 	s.listener = nil
 	s.url = ""
-	return err
+	if err != nil {
+		return fmt.Errorf("shutdown admin server: %w", err)
+	}
+	return nil
 }
 
 func (s *Server) routes(mux *http.ServeMux) {
@@ -737,7 +740,7 @@ func writeError(w http.ResponseWriter, status int, err error) {
 func randomAdminToken() (string, error) {
 	buf := make([]byte, 16)
 	if _, err := rand.Read(buf); err != nil {
-		return "", err
+		return "", fmt.Errorf("generate admin token: %w", err)
 	}
 	return hex.EncodeToString(buf), nil
 }

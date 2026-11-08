@@ -39,6 +39,8 @@ Options:
 // Note that this is somewhat of a reimplmentation of the CLI of the glorious
 // github.com/itchyny/gojq, and we'd ideally get the CLI exposed upstream to
 // avoid this falling out of sync.
+//
+//nolint:wrapcheck // interp.ExitStatus is a shell control-flow sentinel; wrapping it would change the message the shell reports.
 func handleJQ(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	var (
 		rawOutput  bool
@@ -248,14 +250,7 @@ func readInputs(stdin io.Reader, files []string, nullInput, rawInput, slurp bool
 func writeValue(w io.Writer, v any, raw, compact, join bool) error {
 	if raw {
 		if s, ok := v.(string); ok {
-			if _, err := fmt.Fprint(w, s); err != nil {
-				return err
-			}
-			if !join {
-				_, err := fmt.Fprint(w, "\n")
-				return err
-			}
-			return nil
+			return writeRawString(w, s, join)
 		}
 	}
 
@@ -270,8 +265,22 @@ func writeValue(w io.Writer, v any, raw, compact, join bool) error {
 		return err
 	}
 	if _, writeErr := w.Write(bs); writeErr != nil {
-		return writeErr
+		return fmt.Errorf("write output: %w", writeErr)
 	}
 	_, err = fmt.Fprint(w, "\n")
 	return err
+}
+
+// writeRawString writes s without JSON quoting, followed by a newline unless
+// join is set.
+func writeRawString(w io.Writer, s string, join bool) error {
+	if _, err := fmt.Fprint(w, s); err != nil {
+		return fmt.Errorf("write raw output: %w", err)
+	}
+	if !join {
+		if _, err := fmt.Fprint(w, "\n"); err != nil {
+			return fmt.Errorf("write raw output newline: %w", err)
+		}
+	}
+	return nil
 }

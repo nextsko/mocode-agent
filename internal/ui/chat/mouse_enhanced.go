@@ -99,7 +99,7 @@ func (h *EnhancedMouseHandler) HandleMouseClick(btn ansi.MouseButton, x, y int) 
 	case 3:
 		// 三击: 选择行
 		h.clickCount = 0
-		return h.handleTripleClick(x, y)
+		return h.handleTripleClick(y)
 	}
 
 	return nil
@@ -173,7 +173,7 @@ func (h *EnhancedMouseHandler) handleDoubleClick(x, y int) tea.Cmd {
 }
 
 // handleTripleClick 处理三击.
-func (h *EnhancedMouseHandler) handleTripleClick(x, y int) tea.Cmd {
+func (h *EnhancedMouseHandler) handleTripleClick(y int) tea.Cmd {
 	// 选择行
 	line := h.getLineAt(y)
 	if line != "" {
@@ -223,32 +223,32 @@ func (h *EnhancedMouseHandler) isInURL(x, y int) bool {
 
 // getWordAt 获取指定位置的单词.
 func (h *EnhancedMouseHandler) getWordAt(x, y int) string {
-	// TODO: 实现从内容中获取单词
+	// Future work: extract the word at the position from the rendered content.
 	return ""
 }
 
 // getLineAt 获取指定行的内容.
 func (h *EnhancedMouseHandler) getLineAt(y int) string {
-	// TODO: 实现从内容中获取行
+	// Future work: extract the line content from the rendered content.
 	return ""
 }
 
 // getTextBetween 获取两个位置之间的文本.
 func (h *EnhancedMouseHandler) getTextBetween(y, startX, endX int) string {
-	// TODO: 实现从内容中获取文本
+	// Future work: extract the text between two positions from the rendered content.
 	return ""
 }
 
 // getTextBetweenLines 获取两行之间的文本.
 func (h *EnhancedMouseHandler) getTextBetweenLines(startY, endY int) string {
-	// TODO: 实现从内容中获取多行文本
+	// Future work: extract the text between two lines from the rendered content.
 	return ""
 }
 
 // openURL 打开 URL.
 func (h *EnhancedMouseHandler) openURL(url string) tea.Cmd {
 	return func() tea.Msg {
-		// TODO: 实现打开 URL
+		// Future work: open the URL in the system browser.
 		return nil
 	}
 }
@@ -256,7 +256,7 @@ func (h *EnhancedMouseHandler) openURL(url string) tea.Cmd {
 // toggleExpand 切换展开/折叠.
 func (h *EnhancedMouseHandler) toggleExpand(x, y int) tea.Cmd {
 	return func() tea.Msg {
-		// TODO: 实现展开/折叠
+		// Future work: expand or collapse the block under the cursor.
 		return nil
 	}
 }
@@ -264,7 +264,7 @@ func (h *EnhancedMouseHandler) toggleExpand(x, y int) tea.Cmd {
 // copyToClipboard 复制到剪贴板.
 func (h *EnhancedMouseHandler) copyToClipboard(content string) tea.Cmd {
 	return func() tea.Msg {
-		// TODO: 实现复制到剪贴板
+		// Future work: copy content to the system clipboard.
 		return nil
 	}
 }
@@ -319,43 +319,37 @@ func (h *EnhancedMouseHandler) RenderSelection(content string, width int) string
 	var result []string
 
 	for i, line := range lines {
-		if i >= h.selection.Start.Y && i <= h.selection.End.Y {
-			if i == h.selection.Start.Y && i == h.selection.End.Y {
-				// 单行选择
-				start := h.selection.Start.X
-				end := h.selection.End.X
-				if start > len(line) {
-					start = len(line)
-				}
-				if end > len(line) {
-					end = len(line)
-				}
-				selected := line[start:end]
-				result = append(result, line[:start]+selectedStyle.Render(selected)+line[end:])
-			} else if i == h.selection.Start.Y {
-				// 多行选择开始
-				start := h.selection.Start.X
-				if start > len(line) {
-					start = len(line)
-				}
-				result = append(result, line[:start]+selectedStyle.Render(line[start:]))
-			} else if i == h.selection.End.Y {
-				// 多行选择结束
-				end := h.selection.End.X
-				if end > len(line) {
-					end = len(line)
-				}
-				result = append(result, selectedStyle.Render(line[:end])+line[end:])
-			} else {
-				// 多行选择中间
-				result = append(result, selectedStyle.Render(line))
-			}
-		} else {
-			result = append(result, line)
-		}
+		result = append(result, h.renderSelectedLine(i, line, selectedStyle))
 	}
 
 	return strings.Join(result, "\n")
+}
+
+// renderSelectedLine renders one row of the selected region, applying the
+// highlight style to the portion covered by the current selection.
+func (h *EnhancedMouseHandler) renderSelectedLine(i int, line string, selectedStyle lipgloss.Style) string {
+	if i < h.selection.Start.Y || i > h.selection.End.Y {
+		return line
+	}
+
+	// 单行选择
+	if i == h.selection.Start.Y && i == h.selection.End.Y {
+		start := min(h.selection.Start.X, len(line))
+		end := min(h.selection.End.X, len(line))
+		return line[:start] + selectedStyle.Render(line[start:end]) + line[end:]
+	}
+	// 多行选择开始
+	if i == h.selection.Start.Y {
+		start := min(h.selection.Start.X, len(line))
+		return line[:start] + selectedStyle.Render(line[start:])
+	}
+	// 多行选择结束
+	if i == h.selection.End.Y {
+		end := min(h.selection.End.X, len(line))
+		return selectedStyle.Render(line[:end]) + line[end:]
+	}
+	// 多行选择中间
+	return selectedStyle.Render(line)
 }
 
 // abs 返回绝对值.

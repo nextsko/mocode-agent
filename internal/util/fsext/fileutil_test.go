@@ -70,7 +70,7 @@ func TestGlobWithDoubleStar(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, truncated)
 
-		var relativeMatches []string
+		relativeMatches := make([]string, 0, len(matches))
 		for _, match := range matches {
 			rel, err := filepath.Rel(testDir, match)
 			require.NoError(t, err)
@@ -99,7 +99,7 @@ func TestGlobWithDoubleStar(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, truncated)
 
-		var relativeMatches []string
+		relativeMatches := make([]string, 0, len(matches))
 		for _, match := range matches {
 			rel, err := filepath.Rel(testDir, match)
 			require.NoError(t, err)

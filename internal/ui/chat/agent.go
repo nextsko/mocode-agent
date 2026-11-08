@@ -177,27 +177,7 @@ func (r *AgentToolRenderContext) RenderTool(sty *styles.Styles, width int, opts 
 	// with every sub-agent tool call and wreck the chat layout; the full tree
 	// stays available in the expanded (audit) view below.
 	if !opts.ExpandedContent {
-		var parts []string
-		parts = append(parts, header)
-		var summaryParts []string
-		if len(r.agent.nestedTools) > 0 {
-			summaryParts = append(summaryParts, fmt.Sprintf("%d tool calls", len(r.agent.nestedTools)))
-		}
-		if r.agent.statusSummary != "" {
-			summaryParts = append(summaryParts, r.agent.statusSummary)
-		}
-		if len(summaryParts) > 0 {
-			parts = append(parts, sty.Tool.StateWaiting.Render(strings.Join(summaryParts, " · ")))
-		}
-		if !opts.HasResult() && !opts.IsCanceled() && opts.Anim != nil {
-			parts = append(parts, opts.Anim.Render())
-		}
-		result := lipgloss.JoinVertical(lipgloss.Left, parts...)
-		if opts.HasResult() && opts.Result.Content != "" {
-			body := toolOutputMarkdownContent(sty, opts.Result.Content, cappedWidth-toolBodyLeftPaddingTotal, opts.ExpandedContent)
-			return joinToolParts(result, body)
-		}
-		return result
+		return r.renderSummaryMode(sty, header, cappedWidth, opts)
 	}
 
 	// Expanded audit view: the full nested-tool tree.
@@ -239,6 +219,34 @@ func (r *AgentToolRenderContext) RenderTool(sty *styles.Styles, width int, opts 
 		return joinToolParts(result, body)
 	}
 
+	return result
+}
+
+// renderSummaryMode renders the prime-agent style summary: the chat stream
+// carries ONE status line instead of the full nested-tool tree. The tree used
+// to grow with every sub-agent tool call and wreck the chat layout; the full
+// tree stays available in the expanded (audit) view.
+func (r *AgentToolRenderContext) renderSummaryMode(sty *styles.Styles, header string, cappedWidth int, opts *ToolRenderOpts) string {
+	var parts []string
+	parts = append(parts, header)
+	var summaryParts []string
+	if len(r.agent.nestedTools) > 0 {
+		summaryParts = append(summaryParts, fmt.Sprintf("%d tool calls", len(r.agent.nestedTools)))
+	}
+	if r.agent.statusSummary != "" {
+		summaryParts = append(summaryParts, r.agent.statusSummary)
+	}
+	if len(summaryParts) > 0 {
+		parts = append(parts, sty.Tool.StateWaiting.Render(strings.Join(summaryParts, " · ")))
+	}
+	if !opts.HasResult() && !opts.IsCanceled() && opts.Anim != nil {
+		parts = append(parts, opts.Anim.Render())
+	}
+	result := lipgloss.JoinVertical(lipgloss.Left, parts...)
+	if opts.HasResult() && opts.Result.Content != "" {
+		body := toolOutputMarkdownContent(sty, opts.Result.Content, cappedWidth-toolBodyLeftPaddingTotal, opts.ExpandedContent)
+		return joinToolParts(result, body)
+	}
 	return result
 }
 

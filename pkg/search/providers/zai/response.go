@@ -60,21 +60,11 @@ func parseSearchPayload(result *mcp.CallToolResult) (*zaiPayload, error) {
 	var candidates []any
 	var textParts []string
 
-	if structured := result.StructuredContent; structured != nil {
-		if obj, ok := structured.(map[string]any); ok {
-			if err := zaiDirectError(obj); err != nil {
-				return nil, err
-			}
-			candidates = append(candidates, obj)
-			for _, key := range []string{"data", "result"} {
-				if nested, ok := obj[key]; ok {
-					candidates = append(candidates, nested)
-				}
-			}
-		} else {
-			candidates = append(candidates, structured)
-		}
+	fromStructured, err := structuredCandidates(result.StructuredContent)
+	if err != nil {
+		return nil, err
 	}
+	candidates = append(candidates, fromStructured...)
 
 	for _, text := range contentTexts(result) {
 		parsed, ok := parseTextJSON(text)
@@ -99,6 +89,27 @@ func parseSearchPayload(result *mcp.CallToolResult) (*zaiPayload, error) {
 		return payload, nil
 	}
 	return payload, nil
+}
+
+// structuredCandidates flattens StructuredContent into payload candidates.
+func structuredCandidates(structured any) ([]any, error) {
+	if structured == nil {
+		return nil, nil
+	}
+	obj, ok := structured.(map[string]any)
+	if !ok {
+		return []any{structured}, nil
+	}
+	if err := zaiDirectError(obj); err != nil {
+		return nil, err
+	}
+	candidates := []any{obj}
+	for _, key := range []string{"data", "result"} {
+		if nested, ok := obj[key]; ok {
+			candidates = append(candidates, nested)
+		}
+	}
+	return candidates, nil
 }
 
 // zaiDirectError inspects a structured payload for the non-JSON-RPC
@@ -126,7 +137,7 @@ func zaiDirectError(obj map[string]any) error {
 			strconv.FormatFloat(code, 'f', -1, 64), message)
 	}
 	return &search.SearchProviderError{
-		Provider:   "zai",
+		Provider:   zaiProviderID,
 		Message:    text,
 		HTTPStatus: int(code),
 	}

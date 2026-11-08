@@ -130,17 +130,14 @@ func (s *ConfigStore) LoadedPaths() []string {
 }
 
 // configPath returns the file path for the given scope.
-func (s *ConfigStore) configPath(scope Scope) (string, error) {
-	return s.globalDataPath, nil
+func (s *ConfigStore) configPath() string {
+	return s.globalDataPath
 }
 
 // HasConfigField checks whether a key exists in the config file for the given
 // scope.
 func (s *ConfigStore) HasConfigField(scope Scope, key string) bool {
-	path, err := s.configPath(scope)
-	if err != nil {
-		return false
-	}
+	path := s.configPath()
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return false
@@ -152,10 +149,7 @@ func (s *ConfigStore) HasConfigField(scope Scope, key string) bool {
 // After a successful write, it automatically reloads config to keep in-memory
 // state fresh.
 func (s *ConfigStore) SetConfigField(scope Scope, key string, value any) error {
-	path, err := s.configPath(scope)
-	if err != nil {
-		return fmt.Errorf("%s: %w", key, err)
-	}
+	path := s.configPath()
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -191,10 +185,7 @@ func (s *ConfigStore) SetConfigField(scope Scope, key string, value any) error {
 // After a successful write, it automatically reloads config to keep in-memory
 // state fresh.
 func (s *ConfigStore) RemoveConfigField(scope Scope, key string) error {
-	path, err := s.configPath(scope)
-	if err != nil {
-		return fmt.Errorf("%s: %w", key, err)
-	}
+	path := s.configPath()
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("failed to read config file: %w", err)
@@ -267,7 +258,7 @@ func (s *ConfigStore) SetProviderAPIKey(scope Scope, providerID string, apiKey a
 			s.SetConfigField(scope, fmt.Sprintf("providers.%s.api_key", providerID), v.AccessToken),
 			s.SetConfigField(scope, fmt.Sprintf("providers.%s.oauth", providerID), v),
 		); err != nil {
-			return err
+			return fmt.Errorf("failed to save token to config file: %w", err)
 		}
 		setKeyOrToken = func() {
 			providerConfig.APIKey = v.AccessToken

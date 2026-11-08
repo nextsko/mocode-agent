@@ -245,7 +245,7 @@ func loadAgentFile(path, id string, disabledTools []string) (Agent, error) {
 
 	var raw andyCodeAgentConfig
 	if _, err := toml.Decode(string(data), &raw); err != nil {
-		return Agent{}, err
+		return Agent{}, fmt.Errorf("parsing agent file %s: %w", path, err)
 	}
 
 	name := raw.Name

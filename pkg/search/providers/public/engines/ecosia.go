@@ -98,13 +98,13 @@ func (e *EcosiaEngine) Fetch(ctx context.Context, client *http.Client, queryStri
 		}
 	}
 	setNavigationHeaders(req.Header, e.homeURL)
-	page, err := fetchPage(ctx, client, EcosiaID, req)
+	page, err := fetchPage(client, EcosiaID, req)
 	if err != nil {
 		return nil, err
 	}
 
 	if isEcosiaBlocked(page) {
-		e.cooldown.trigger(cooldownDuration)
+		e.cooldown.trigger()
 		return nil, challengeError(EcosiaID, ecosiaBlockedMessage)
 	}
 	if page.status < 200 || page.status >= 300 {

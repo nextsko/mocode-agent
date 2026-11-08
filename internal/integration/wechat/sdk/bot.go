@@ -154,6 +154,7 @@ func (b *Bot) Run(ctx context.Context) error {
 		if err != nil {
 			if pollCtx.Err() != nil {
 				b.logf("info", "Long-poll loop stopped")
+				//nolint:nilerr // The poll was canceled on purpose; stopping is not a failure.
 				return nil
 			}
 
@@ -320,7 +321,7 @@ func (b *Bot) logf(level, format string, args ...interface{}) {
 	if b.opts.LogLevel == "silent" {
 		return
 	}
-	slog.Debug("wechatbot", "msg", fmt.Sprintf(format, args...))
+	slog.Debug("wechatbot", "severity", level, "msg", fmt.Sprintf(format, args...))
 }
 
 func detectType(items []MessageItem) ContentType {

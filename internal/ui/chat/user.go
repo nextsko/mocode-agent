@@ -95,8 +95,9 @@ func (m *UserMessageItem) ID() string {
 
 // renderAttachments renders attachments.
 func (m *UserMessageItem) renderAttachments(width int) string {
-	var attachments []message.Attachment
-	for _, at := range m.message.BinaryContent() {
+	binaryContent := m.message.BinaryContent()
+	attachments := make([]message.Attachment, 0, len(binaryContent))
+	for _, at := range binaryContent {
 		attachments = append(attachments, message.Attachment{
 			FileName: at.Path,
 			MimeType: at.MIMEType,

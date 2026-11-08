@@ -67,7 +67,7 @@ func writeConfigStaleness(b *strings.Builder, cfg *config.ConfigStore) {
 	}
 
 	if len(staleness.Errors) > 0 {
-		var paths []string
+		paths := make([]string, 0, len(staleness.Errors))
 		for path := range staleness.Errors {
 			paths = append(paths, path)
 		}
@@ -190,54 +190,7 @@ func writeLSP(b *strings.Builder, lspManager *lsp.Manager, cfg *config.ConfigSto
 }
 
 func writeMCP(b *strings.Builder, states map[string]mcp.ClientInfo, cfg *config.ConfigStore) {
-	// Write runtime MCP states
-	if len(states) > 0 {
-		type entry struct {
-			name        string
-			state       mcp.State
-			err         error
-			tools       int
-			resources   int
-			connectedAt string
-		}
-		var entries []entry
-		for name, info := range states {
-			e := entry{
-				name:  name,
-				state: info.State,
-				err:   info.Error,
-			}
-			if info.State == mcp.StateConnected {
-				e.tools = info.Counts.Tools
-				e.resources = info.Counts.Resources
-				if !info.ConnectedAt.IsZero() {
-					e.connectedAt = info.ConnectedAt.Format("15:04:05")
-				}
-			}
-			entries = append(entries, e)
-		}
-		slices.SortFunc(entries, func(a, b entry) int { return strings.Compare(a.name, b.name) })
-		b.WriteString("[mcp]\n")
-		for _, e := range entries {
-			switch e.state {
-			case mcp.StateConnected:
-				if e.connectedAt != "" {
-					fmt.Fprintf(b, "%s = connected (%d tools, %d resources) since %s\n", e.name, e.tools, e.resources, e.connectedAt)
-				} else {
-					fmt.Fprintf(b, "%s = connected (%d tools, %d resources)\n", e.name, e.tools, e.resources)
-				}
-			case mcp.StateError:
-				if e.err != nil {
-					fmt.Fprintf(b, "%s = error: %s\n", e.name, e.err.Error())
-				} else {
-					fmt.Fprintf(b, "%s = error\n", e.name)
-				}
-			default:
-				fmt.Fprintf(b, "%s = %s\n", e.name, e.state)
-			}
-		}
-		b.WriteString("\n")
-	}
+	writeMCPStates(b, states)
 
 	// Write configured but not running MCP servers
 	c := cfg.Config()
@@ -273,6 +226,59 @@ func writeMCP(b *strings.Builder, states map[string]mcp.ClientInfo, cfg *config.
 			b.WriteString("\n")
 		}
 	}
+}
+
+// writeMCPStates writes the runtime state of the running MCP servers.
+func writeMCPStates(b *strings.Builder, states map[string]mcp.ClientInfo) {
+	if len(states) == 0 {
+		return
+	}
+
+	type entry struct {
+		name        string
+		state       mcp.State
+		err         error
+		tools       int
+		resources   int
+		connectedAt string
+	}
+	entries := make([]entry, 0, len(states))
+	for name, info := range states {
+		e := entry{
+			name:  name,
+			state: info.State,
+			err:   info.Error,
+		}
+		if info.State == mcp.StateConnected {
+			e.tools = info.Counts.Tools
+			e.resources = info.Counts.Resources
+			if !info.ConnectedAt.IsZero() {
+				e.connectedAt = info.ConnectedAt.Format("15:04:05")
+			}
+		}
+		entries = append(entries, e)
+	}
+	slices.SortFunc(entries, func(a, b entry) int { return strings.Compare(a.name, b.name) })
+	b.WriteString("[mcp]\n")
+	for _, e := range entries {
+		switch e.state {
+		case mcp.StateConnected:
+			if e.connectedAt != "" {
+				fmt.Fprintf(b, "%s = connected (%d tools, %d resources) since %s\n", e.name, e.tools, e.resources, e.connectedAt)
+			} else {
+				fmt.Fprintf(b, "%s = connected (%d tools, %d resources)\n", e.name, e.tools, e.resources)
+			}
+		case mcp.StateError:
+			if e.err != nil {
+				fmt.Fprintf(b, "%s = error: %s\n", e.name, e.err.Error())
+			} else {
+				fmt.Fprintf(b, "%s = error\n", e.name)
+			}
+		default:
+			fmt.Fprintf(b, "%s = %s\n", e.name, e.state)
+		}
+	}
+	b.WriteString("\n")
 }
 
 func writeSkills(b *strings.Builder, allSkills []*skills.Skill, activeSkills []*skills.Skill, tracker *skills.Tracker, cfg *config.ConfigStore) {
@@ -373,7 +379,7 @@ func writeOptions(b *strings.Builder, cfg *config.ConfigStore) {
 		key   string
 		value string
 	}
-	var opts []kv
+	opts := make([]kv, 0, 4)
 
 	opts = append(opts, kv{"data_directory", infra.DataDir()})
 	opts = append(opts, kv{"debug", fmt.Sprintf("%v", c.Options.Debug)})

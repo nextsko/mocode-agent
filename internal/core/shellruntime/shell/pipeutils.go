@@ -83,6 +83,8 @@ func pipeUtilsHandler(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 
 // pipeErr prints a GNU-style diagnostic and returns a non-fatal exit status so
 // the surrounding script keeps running with $? set to 1.
+//
+//nolint:wrapcheck // interp.ExitStatus is a shell control-flow sentinel; wrapping it would change the shell's error text.
 func pipeErr(name, msg string, stderr io.Writer) error {
 	fmt.Fprintf(stderr, "%s: %s\n", name, msg)
 	return interp.ExitStatus(1)

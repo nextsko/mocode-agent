@@ -53,7 +53,7 @@ func GroupFiles(result *ScanResult) *CommitPlan {
 	}
 
 	// Step 1: Classify every file
-	var classes []FileClass
+	classes := make([]FileClass, 0, len(result.Files))
 	classChanges := make(map[FileClass][]FileChange)
 	for _, fc := range result.Files {
 		cl := Classify(fc)

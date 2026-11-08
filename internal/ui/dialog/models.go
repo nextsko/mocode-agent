@@ -14,6 +14,7 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/ui/common"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
 	"github.com/nextsko/mocode-agent/internal/ui/util"
 )
 
@@ -450,34 +451,13 @@ func (m *Models) setProviderItems() error {
 	}
 
 	if len(recentItems) > 0 {
-		recentGroup := NewModelGroup(t, "Recently used", false)
-
-		var validRecentItems []config.SelectedModel
-		for _, recent := range recentItems {
-			key := modelKey(recent.Provider, recent.Model)
-			item, ok := itemsMap[key]
-			if !ok {
-				continue
-			}
-
-			// Show provider for recent items
-			item = NewModelItem(t, item.prov, item.model, m.modelType, true)
-			item.showProvider = true
-
-			validRecentItems = append(validRecentItems, recent)
-			recentGroup.AppendItems(item)
-			if recent.Model == currentModel.Model && recent.Provider == currentModel.Provider {
-				selectedItemID = item.ID()
-			}
+		recentGroup, recentSelectedID, err := m.buildRecentGroup(t, recentItems, itemsMap, currentModel, selectedType)
+		if err != nil {
+			return err
 		}
-
-		if len(validRecentItems) != len(recentItems) {
-			// FIXME: Does this need to be here? Is it mutating the config during a read?
-			if err := m.com.Workspace.SetConfigField(config.ScopeGlobal, fmt.Sprintf("recent_models.%s", selectedType), validRecentItems); err != nil {
-				return fmt.Errorf("failed to update recent models: %w", err)
-			}
+		if recentSelectedID != "" {
+			selectedItemID = recentSelectedID
 		}
-
 		if len(recentGroup.Items) > 0 {
 			groups = append([]ModelGroup{recentGroup}, groups...)
 		}
@@ -494,6 +474,50 @@ func (m *Models) setProviderItems() error {
 	}
 
 	return nil
+}
+
+// buildRecentGroup builds the "Recently used" group, pruning entries that no
+// longer resolve and persisting the pruned list when it shrank. It returns the
+// group and the item ID to preselect, if any.
+func (m *Models) buildRecentGroup(
+	t *styles.Styles,
+	recentItems []config.SelectedModel,
+	itemsMap map[string]*ModelItem,
+	currentModel config.SelectedModel,
+	selectedType config.SelectedModelType,
+) (ModelGroup, string, error) {
+	recentGroup := NewModelGroup(t, "Recently used", false)
+	selectedID := ""
+
+	validRecentItems := make([]config.SelectedModel, 0, len(recentItems))
+	for _, recent := range recentItems {
+		key := modelKey(recent.Provider, recent.Model)
+		item, ok := itemsMap[key]
+		if !ok {
+			continue
+		}
+
+		// Show provider for recent items.
+		item = NewModelItem(t, item.prov, item.model, m.modelType, true)
+		item.showProvider = true
+
+		validRecentItems = append(validRecentItems, recent)
+		recentGroup.AppendItems(item)
+		if recent.Model == currentModel.Model && recent.Provider == currentModel.Provider {
+			selectedID = item.ID()
+		}
+	}
+
+	if len(validRecentItems) == len(recentItems) {
+		return recentGroup, selectedID, nil
+	}
+
+	// Review: this mutates the config during a read; confirm the side effect
+	// is still wanted and move it out of the view path if not.
+	if err := m.com.Workspace.SetConfigField(config.ScopeGlobal, fmt.Sprintf("recent_models.%s", selectedType), validRecentItems); err != nil {
+		return recentGroup, selectedID, fmt.Errorf("failed to update recent models: %w", err)
+	}
+	return recentGroup, selectedID, nil
 }
 
 func modelKey(providerID, modelID string) string {

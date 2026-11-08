@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"fmt"
 	"image/color"
 
 	"github.com/alecthomas/chroma/v2"
@@ -49,10 +50,12 @@ func SyntaxHighlight(st *styles.Styles, source, fileName string, bg color.Color)
 	// Tokenize and format
 	it, err := l.Tokenise(nil, source)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("tokenise source: %w", err)
 	}
 
 	var buf bytes.Buffer
-	err = f.Format(&buf, s, it)
-	return buf.String(), err
+	if err := f.Format(&buf, s, it); err != nil {
+		return buf.String(), fmt.Errorf("format highlighted source: %w", err)
+	}
+	return buf.String(), nil
 }

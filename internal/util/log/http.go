@@ -3,6 +3,7 @@ package log
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -69,7 +70,7 @@ func (h *HTTPRoundTripLogger) RoundTrip(req *http.Request) (*http.Response, erro
 			"duration_ms", duration.Milliseconds(),
 			"error", err,
 		)
-		return resp, err
+		return resp, fmt.Errorf("round trip %s %s: %w", req.Method, req.URL, err)
 	}
 
 	save, resp.Body, err = drainBody(resp.Body)
@@ -132,10 +133,10 @@ func drainBody(b io.ReadCloser) (r1, r2 io.ReadCloser, err error) {
 	}
 	var buf bytes.Buffer
 	if _, err = buf.ReadFrom(b); err != nil {
-		return nil, b, err
+		return nil, b, fmt.Errorf("buffer body: %w", err)
 	}
 	if err = b.Close(); err != nil {
-		return nil, b, err
+		return nil, b, fmt.Errorf("close body: %w", err)
 	}
 	return io.NopCloser(&buf), io.NopCloser(bytes.NewReader(buf.Bytes())), nil
 }

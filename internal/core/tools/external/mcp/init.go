@@ -50,7 +50,10 @@ type ClientSession struct {
 // Close cancels the session context and then closes the underlying session.
 func (s *ClientSession) Close() error {
 	s.cancel()
-	return s.ClientSession.Close()
+	if err := s.ClientSession.Close(); err != nil {
+		return fmt.Errorf("close MCP session: %w", err)
+	}
+	return nil
 }
 
 var (
@@ -195,7 +198,7 @@ func Initialize(ctx context.Context, permissions permission.Service, cfg *config
 				}
 			}()
 
-			if err := initClient(ctx, cfg, name, m, cfg.Resolver()); err != nil {
+			if err := initClient(ctx, cfg, name, m); err != nil {
 				slog.Debug("Failed to initialize MCP client", "name", name, "error", err)
 			}
 		}(name, m)
@@ -211,7 +214,7 @@ func WaitForInit(ctx context.Context) error {
 	case <-initDone:
 		return nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("wait for MCP init: %w", ctx.Err())
 	}
 }
 
@@ -228,11 +231,11 @@ func InitializeSingle(ctx context.Context, name string, cfg *config.ConfigStore)
 		return nil
 	}
 
-	return initClient(ctx, cfg, name, m, cfg.Resolver())
+	return initClient(ctx, cfg, name, m)
 }
 
 // initClient initializes a single MCP client with the given configuration.
-func initClient(ctx context.Context, cfg *config.ConfigStore, name string, m config.MCPConfig, resolver config.VariableResolver) error {
+func initClient(ctx context.Context, cfg *config.ConfigStore, name string, m config.MCPConfig) error {
 	// Set initial starting state.
 	updateState(name, StateStarting, nil, nil, Counts{})
 
@@ -336,6 +339,8 @@ func updateState(name string, state State, err error, client *ClientSession, cou
 		info.ConnectedAt = time.Now()
 	case StateError:
 		sessions.Del(name)
+	default:
+		// Disabled and starting states need no extra bookkeeping here.
 	}
 	states.Set(name, info)
 
@@ -506,7 +511,11 @@ func (rt headerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 	if next == nil {
 		next = http.DefaultTransport
 	}
-	return next.RoundTrip(req)
+	resp, err := next.RoundTrip(req)
+	if err != nil {
+		return nil, fmt.Errorf("MCP request round trip: %w", err)
+	}
+	return resp, nil
 }
 
 func mcpTimeout(m config.MCPConfig) time.Duration {

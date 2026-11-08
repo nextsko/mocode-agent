@@ -1,7 +1,6 @@
 package model
 
 import (
-	tea "charm.land/bubbletea/v2"
 	"github.com/nextsko/mocode-agent/internal/core/question"
 	"github.com/nextsko/mocode-agent/internal/ui/dialog"
 )
@@ -57,7 +56,7 @@ import (
 
 // openQuestionDialog opens the AskUser question form (crush-compatible) for
 // a question batch. The form blocks the tool call until answered.
-func (m *UI) openQuestionDialog(batch question.Request) tea.Cmd {
+func (m *UI) openQuestionDialog(batch question.Request) {
 	// Close any existing question form first to prevent stacking.
 	m.dialog.CloseDialog(dialog.QuestionFormID)
 
@@ -78,7 +77,6 @@ func (m *UI) openQuestionDialog(batch question.Request) tea.Cmd {
 	m.dialog.OpenDialog(dialog.NewQuestionDialog(form))
 	form.SetFocused(true)
 	m.updateLayoutAndSize()
-	return nil
 }
 
 // handleQuestionNotification dismisses an open question form when any client

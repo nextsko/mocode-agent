@@ -20,15 +20,13 @@ import (
 )
 
 func lookupConfigs(cwd string) []string {
-	// prepend default config paths
-	configPaths := []string{
-		GlobalConfig(),
-		GlobalConfigData(),
-	}
-
 	configNames := []string{appName + ".json", "." + appName + ".json"}
 
 	foundConfigs, err := fsext.Lookup(cwd, configNames...)
+
+	// prepend default config paths
+	configPaths := make([]string, 0, 2+len(foundConfigs))
+	configPaths = append(configPaths, GlobalConfig(), GlobalConfigData())
 	if err != nil {
 		// returns at least default configs
 		return configPaths
@@ -73,7 +71,7 @@ func loadFromBytes(configs [][]byte) (*Config, error) {
 
 	data, err := jsons.Merge(configs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("merging config files: %w", err)
 	}
 	var config Config
 	if err := json.Unmarshal(data, &config); err != nil {
@@ -125,7 +123,7 @@ func GlobalCacheDir() string {
 	if xdgCacheHome := os.Getenv("XDG_CACHE_HOME"); xdgCacheHome != "" {
 		return filepath.Join(xdgCacheHome, appName)
 	}
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		localAppData := cmp.Or(
 			os.Getenv("LOCALAPPDATA"),
 			filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local"),
@@ -146,7 +144,7 @@ func GlobalConfigData() string {
 	// return the path to the main data directory
 	// for windows, it should be in `%LOCALAPPDATA%/mocode/`
 	// for linux and macOS, it should be in `$HOME/.local/share/mocode/`
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		localAppData := cmp.Or(
 			os.Getenv("LOCALAPPDATA"),
 			filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local"),
@@ -188,7 +186,7 @@ func GlobalSkillsDirs() []string {
 
 	// On Windows, also load from app data on top of `$HOME/.config/mocode`.
 	// This is here mostly for backwards compatibility.
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		appData := cmp.Or(
 			os.Getenv("LOCALAPPDATA"),
 			filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local"),

@@ -65,7 +65,10 @@ func ClearCredentials(path string) error {
 	if path == "" {
 		path = DefaultCredPath()
 	}
-	return os.Remove(path)
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("remove credentials %s: %w", path, err)
+	}
+	return nil
 }
 
 // LoginOptions configures the login flow.

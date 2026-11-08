@@ -20,6 +20,10 @@ import (
 
 // Default REST and public MCP endpoints.
 const (
+	// exaProviderID is the canonical provider identifier used in metadata,
+	// credentials, and error payloads.
+	exaProviderID = "exa"
+
 	exaAPIURL = "https://api.exa.ai/search"
 	exaMCPURL = "https://mcp.exa.ai/mcp"
 
@@ -69,7 +73,7 @@ func newProvider(httpClient *http.Client, restURL, mcpURL string) *Provider {
 // done by the integration layer, not by this package's init.
 func Meta() search.ProviderMeta {
 	return search.ProviderMeta{
-		ID:       "exa",
+		ID:       exaProviderID,
 		Label:    "Exa",
 		Priority: 10,
 		NewFunc:  func() search.ProviderV2 { return New(nil) },
@@ -77,7 +81,7 @@ func Meta() search.ProviderMeta {
 }
 
 // ID implements search.ProviderV2.
-func (p *Provider) ID() string { return "exa" }
+func (p *Provider) ID() string { return exaProviderID }
 
 // Label implements search.ProviderV2.
 func (p *Provider) Label() string { return "Exa" }
@@ -86,7 +90,7 @@ func (p *Provider) Label() string { return "Exa" }
 func resolveOpts(sessionID string) search.ResolveOpts {
 	return search.ResolveOpts{
 		EnvKey:    "EXA_API_KEY",
-		AuthID:    "exa",
+		AuthID:    exaProviderID,
 		SessionID: sessionID,
 	}
 }
@@ -101,8 +105,8 @@ func (p *Provider) IsAvailable(
 	if broker == nil {
 		return false, nil
 	}
-	if _, err := broker.Resolve(ctx, "exa", resolveOpts("")); err != nil {
-		return false, nil
+	if _, err := broker.Resolve(ctx, exaProviderID, resolveOpts("")); err != nil {
+		return false, nil //nolint:nilerr // Availability probing: a missing credential simply means "not available".
 	}
 	return true, nil
 }
@@ -186,7 +190,7 @@ func (p *Provider) Search(
 	in := buildInput(params)
 	apiKey := ""
 	if params.AuthStorage != nil {
-		if key, err := params.AuthStorage.Resolve(ctx, "exa",
+		if key, err := params.AuthStorage.Resolve(ctx, exaProviderID,
 			resolveOpts(params.SessionID)); err == nil {
 			apiKey = key
 		}
@@ -214,7 +218,7 @@ func (p *Provider) Search(
 // status when one exists.
 func searchError(status int, message string) *search.SearchProviderError {
 	return &search.SearchProviderError{
-		Provider: "exa", Message: message, HTTPStatus: status,
+		Provider: exaProviderID, Message: message, HTTPStatus: status,
 	}
 }
 
@@ -249,7 +253,7 @@ func buildSearchResponse(
 	in searchInput,
 	authMode string,
 ) *search.SearchResponse {
-	out := &search.SearchResponse{Provider: "exa", AuthMode: authMode, RequestID: res.RequestID}
+	out := &search.SearchResponse{Provider: exaProviderID, AuthMode: authMode, RequestID: res.RequestID}
 	urlResults := make([]exaResult, 0, len(res.Results))
 	for _, r := range res.Results {
 		if r.URL == "" {
@@ -313,14 +317,15 @@ func snippet(r exaResult) string {
 	for _, candidate := range snippetFallbacks(r) {
 		candidate = strings.TrimSpace(candidate)
 		if candidate != "" {
-			return truncateRunes(candidate, maxSnippetChars)
+			return truncateRunes(candidate)
 		}
 	}
 	return ""
 }
 
-// truncateRunes clamps s to at most max runes.
-func truncateRunes(s string, max int) string {
+// truncateRunes clamps s to at most maxSnippetChars runes.
+func truncateRunes(s string) string {
+	max := maxSnippetChars
 	if max <= 0 {
 		return s
 	}
@@ -362,35 +367,35 @@ var creditBodyPattern = regexp.MustCompile(
 func classifyRESTHTTP(status int, body string) *search.SearchProviderError {
 	if creditBodyPattern.MatchString(body) {
 		return &search.SearchProviderError{
-			Provider: "exa", Code: search.ErrorCodeBilling,
+			Provider: exaProviderID, Code: search.ErrorCodeBilling,
 			Message: "credits exhausted", HTTPStatus: status,
 		}
 	}
 	switch status {
 	case 402:
 		return &search.SearchProviderError{
-			Provider: "exa", Code: search.ErrorCodeBilling,
+			Provider: exaProviderID, Code: search.ErrorCodeBilling,
 			Message: "402 credits exhausted", HTTPStatus: status,
 		}
 	case 401:
 		return &search.SearchProviderError{
-			Provider: "exa", Code: search.ErrorCodeUnauthorized,
+			Provider: exaProviderID, Code: search.ErrorCodeUnauthorized,
 			Message: "401 unauthorized", HTTPStatus: status,
 		}
 	case 403:
 		return &search.SearchProviderError{
-			Provider: "exa", Code: search.ErrorCodeForbidden,
+			Provider: exaProviderID, Code: search.ErrorCodeForbidden,
 			Message: "403 forbidden", HTTPStatus: status,
 		}
 	case 429:
 		return &search.SearchProviderError{
-			Provider: "exa", Code: search.ErrorCodeRateLimited,
+			Provider: exaProviderID, Code: search.ErrorCodeRateLimited,
 			Message: "429 rate limited", HTTPStatus: status,
 		}
 	}
 	if status >= 500 {
 		return &search.SearchProviderError{
-			Provider: "exa", Code: search.ErrorCodeServerError,
+			Provider: exaProviderID, Code: search.ErrorCodeServerError,
 			Message: fmt.Sprintf("%d server error", status), HTTPStatus: status,
 		}
 	}
@@ -402,13 +407,13 @@ func classifyRESTHTTP(status int, body string) *search.SearchProviderError {
 func classifyMCPHTTP(status int, body string) *search.SearchProviderError {
 	if creditBodyPattern.MatchString(body) {
 		return &search.SearchProviderError{
-			Provider: "exa", Code: search.ErrorCodeBilling,
+			Provider: exaProviderID, Code: search.ErrorCodeBilling,
 			Message: "credits exhausted", HTTPStatus: status,
 		}
 	}
 	if status == 429 {
 		return &search.SearchProviderError{
-			Provider: "exa", Code: search.ErrorCodeRateLimited,
+			Provider: exaProviderID, Code: search.ErrorCodeRateLimited,
 			Message: "MCP rate limit reached (429); configure an Exa API key" +
 				" for higher limits",
 			HTTPStatus: status,
@@ -418,9 +423,9 @@ func classifyMCPHTTP(status int, body string) *search.SearchProviderError {
 		return spe
 	}
 	return &search.SearchProviderError{
-		Provider: "exa",
+		Provider: exaProviderID,
 		Message: fmt.Sprintf("Exa MCP request failed (%d): %s",
-			status, truncateRunes(body, maxSnippetChars)),
+			status, truncateRunes(body)),
 		HTTPStatus: status,
 	}
 }

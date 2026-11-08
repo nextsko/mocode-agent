@@ -13,17 +13,25 @@ import (
 	agentcore "github.com/nextsko/mocode-agent/internal/core/agent"
 )
 
+// Check names are stable, user-facing identifiers: tests and callers match on
+// them, so they live in one place instead of being repeated at every return.
+const (
+	doctorCheckNameProviderConnectivity = "Provider connectivity"
+	doctorCheckNameModelConfig          = "Model configuration"
+	doctorCheckNameSubagentTUI          = "TUI / subagent"
+)
+
 func doctorProviderConnectivityCheck(loaded *doctorLoadedConfig, loadErr error) doctorCheck {
 	if loadErr != nil {
 		return doctorCheck{
-			Name:    "Provider connectivity",
+			Name:    doctorCheckNameProviderConnectivity,
 			Status:  doctorStatusSkip,
 			Summary: "skipping provider connectivity because effective config failed to load",
 		}
 	}
 	if loaded == nil || loaded.cfg == nil {
 		return doctorCheck{
-			Name:    "Provider connectivity",
+			Name:    doctorCheckNameProviderConnectivity,
 			Status:  doctorStatusSkip,
 			Summary: "no effective config available for provider connectivity checks",
 		}
@@ -33,7 +41,7 @@ func doctorProviderConnectivityCheck(loaded *doctorLoadedConfig, loadErr error) 
 	enabled := cfg.EnabledProviders()
 	if len(enabled) == 0 {
 		return doctorCheck{
-			Name:    "Provider connectivity",
+			Name:    doctorCheckNameProviderConnectivity,
 			Status:  doctorStatusSkip,
 			Summary: "no enabled providers configured",
 		}
@@ -76,21 +84,21 @@ func doctorProviderConnectivityCheck(loaded *doctorLoadedConfig, loadErr error) 
 	switch {
 	case failCount > 0:
 		return doctorCheck{
-			Name:    "Provider connectivity",
+			Name:    doctorCheckNameProviderConnectivity,
 			Status:  doctorStatusFail,
 			Summary: doctorProviderConnectivitySummary(okCount, warnCount, failCount, categoryCounts),
 			Details: details,
 		}
 	case warnCount > 0:
 		return doctorCheck{
-			Name:    "Provider connectivity",
+			Name:    doctorCheckNameProviderConnectivity,
 			Status:  doctorStatusWarn,
 			Summary: doctorProviderConnectivitySummary(okCount, warnCount, failCount, categoryCounts),
 			Details: details,
 		}
 	default:
 		return doctorCheck{
-			Name:    "Provider connectivity",
+			Name:    doctorCheckNameProviderConnectivity,
 			Status:  doctorStatusOK,
 			Summary: doctorProviderConnectivitySummary(okCount, warnCount, failCount, categoryCounts),
 			Details: details,
@@ -101,14 +109,14 @@ func doctorProviderConnectivityCheck(loaded *doctorLoadedConfig, loadErr error) 
 func doctorModelConfigCheck(loaded *doctorLoadedConfig, loadErr error) doctorCheck {
 	if loadErr != nil {
 		return doctorCheck{
-			Name:    "Model configuration",
+			Name:    doctorCheckNameModelConfig,
 			Status:  doctorStatusSkip,
 			Summary: "skipping model checks because effective config failed to load",
 		}
 	}
 	if loaded == nil || loaded.cfg == nil {
 		return doctorCheck{
-			Name:    "Model configuration",
+			Name:    doctorCheckNameModelConfig,
 			Status:  doctorStatusSkip,
 			Summary: "no effective config available for model checks",
 		}
@@ -117,7 +125,7 @@ func doctorModelConfigCheck(loaded *doctorLoadedConfig, loadErr error) doctorChe
 	cfg := loaded.cfg
 	if !cfg.IsConfigured() {
 		return doctorCheck{
-			Name:    "Model configuration",
+			Name:    doctorCheckNameModelConfig,
 			Status:  doctorStatusSkip,
 			Summary: "no enabled providers configured, skipping model checks",
 		}
@@ -159,14 +167,14 @@ func doctorModelConfigCheck(loaded *doctorLoadedConfig, loadErr error) doctorChe
 	if len(failures) > 0 {
 		details = append(details, failures...)
 		return doctorCheck{
-			Name:    "Model configuration",
+			Name:    doctorCheckNameModelConfig,
 			Status:  doctorStatusFail,
 			Summary: "one or more configured models failed to resolve",
 			Details: details,
 		}
 	}
 	return doctorCheck{
-		Name:    "Model configuration",
+		Name:    doctorCheckNameModelConfig,
 		Status:  doctorStatusOK,
 		Summary: "selected large/small models resolve successfully",
 		Details: details,
@@ -176,14 +184,14 @@ func doctorModelConfigCheck(loaded *doctorLoadedConfig, loadErr error) doctorChe
 func doctorSubagentTUICheck(loaded *doctorLoadedConfig, loadErr error) doctorCheck {
 	if loadErr != nil {
 		return doctorCheck{
-			Name:    "TUI / subagent",
+			Name:    doctorCheckNameSubagentTUI,
 			Status:  doctorStatusSkip,
 			Summary: "skipping TUI/subagent checks because effective config failed to load",
 		}
 	}
 	if loaded == nil || loaded.cfg == nil {
 		return doctorCheck{
-			Name:    "TUI / subagent",
+			Name:    doctorCheckNameSubagentTUI,
 			Status:  doctorStatusSkip,
 			Summary: "no effective config available for TUI/subagent checks",
 		}
@@ -203,7 +211,7 @@ func doctorSubagentTUICheck(loaded *doctorLoadedConfig, loadErr error) doctorChe
 	}
 	if len(enabledAgents) == 0 {
 		return doctorCheck{
-			Name:    "TUI / subagent",
+			Name:    doctorCheckNameSubagentTUI,
 			Status:  doctorStatusFail,
 			Summary: "no enabled agent modes are available",
 		}
@@ -261,7 +269,7 @@ func doctorSubagentTUICheck(loaded *doctorLoadedConfig, loadErr error) doctorChe
 	if len(failures) > 0 {
 		details = append(details, failures...)
 		return doctorCheck{
-			Name:    "TUI / subagent",
+			Name:    doctorCheckNameSubagentTUI,
 			Status:  doctorStatusFail,
 			Summary: "detected invalid active-mode or subagent topology",
 			Details: details,
@@ -273,14 +281,14 @@ func doctorSubagentTUICheck(loaded *doctorLoadedConfig, loadErr error) doctorChe
 	if len(warnings) > 0 {
 		details = append(details, warnings...)
 		return doctorCheck{
-			Name:    "TUI / subagent",
+			Name:    doctorCheckNameSubagentTUI,
 			Status:  doctorStatusWarn,
 			Summary: "subagent topology is valid, but some TUI/delegation caveats were detected",
 			Details: details,
 		}
 	}
 	return doctorCheck{
-		Name:    "TUI / subagent",
+		Name:    doctorCheckNameSubagentTUI,
 		Status:  doctorStatusOK,
 		Summary: "active mode and subagent topology look healthy",
 		Details: details,

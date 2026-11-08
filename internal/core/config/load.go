@@ -205,17 +205,18 @@ func (c *Config) setDefaults(workingDir string) {
 		}
 	} else if c.Options.Attribution.TrailerStyle == "" {
 		// Migrate deprecated co_authored_by or apply default
-		if c.Options.Attribution.CoAuthoredBy != nil {
-			if *c.Options.Attribution.CoAuthoredBy {
-				c.Options.Attribution.TrailerStyle = TrailerStyleCoAuthoredBy
-			} else {
-				c.Options.Attribution.TrailerStyle = TrailerStyleNone
-			}
-		} else {
-			c.Options.Attribution.TrailerStyle = TrailerStyleNone
-		}
+		c.Options.Attribution.TrailerStyle = defaultTrailerStyle(c.Options.Attribution.CoAuthoredBy)
 	}
 	c.Options.InitializeAs = cmp.Or(c.Options.InitializeAs, defaultInitializeAs)
+}
+
+// defaultTrailerStyle migrates the deprecated co_authored_by flag to a trailer
+// style, defaulting to TrailerStyleNone.
+func defaultTrailerStyle(coAuthoredBy *bool) TrailerStyle {
+	if coAuthoredBy != nil && *coAuthoredBy {
+		return TrailerStyleCoAuthoredBy
+	}
+	return TrailerStyleNone
 }
 
 // applyLSPDefaults applies default values from powernap to LSP configurations.

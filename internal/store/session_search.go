@@ -119,9 +119,11 @@ func (ss *SessionSearch) Close() error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 	if ss.db != nil {
-		err := ss.db.Close()
+		db := ss.db
 		ss.db = nil
-		return err
+		if err := db.Close(); err != nil {
+			return fmt.Errorf("close session search db: %w", err)
+		}
 	}
 	return nil
 }
@@ -164,7 +166,6 @@ func (ss *SessionSearch) Rebuild(ctx context.Context) error {
 		return fmt.Errorf("read sessions dir: %w", err)
 	}
 
-	//nolint:sqlclosecheck // The statement is used inside the ScanLines closure below and is closed by the following defer.
 	stmt, err := tx.PrepareContext(ctx, `INSERT INTO messages (id, session_id, role, content, tool_name, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return fmt.Errorf("prepare insert: %w", err)
@@ -182,7 +183,7 @@ func (ss *SessionSearch) Rebuild(ctx context.Context) error {
 		}
 		err := writer.ScanLines(func(line string) error {
 			var jm jsonlMessage
-			if err := json.Unmarshal([]byte(line), &jm); err != nil {
+			if !decodeJSONLine(line, &jm) {
 				return nil
 			}
 			content := extractSearchText(jm.Parts)
@@ -197,7 +198,10 @@ func (ss *SessionSearch) Rebuild(ctx context.Context) error {
 		}
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit rebuild tx: %w", err)
+	}
+	return nil
 }
 
 // IndexMessage adds or replaces a single message in the FTS5 index.

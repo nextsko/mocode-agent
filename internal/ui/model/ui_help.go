@@ -61,9 +61,11 @@ func (m *UI) ShortHelp() []key.Binding {
 			if m.pillsExpanded && pills.HasIncompleteTodos(m.session.Todos) && m.promptQueue > 0 {
 				binds = append(binds, k.Chat.PillLeft)
 			}
+		default:
+			// No bindings are bound to the no-focus state.
 		}
 	default:
-		// TODO: other states
+		// Future work: handle the remaining states.
 		// if m.session == nil {
 		// no session selected
 		binds = append(
@@ -176,6 +178,8 @@ func (m *UI) FullHelp() [][]key.Binding {
 			if m.pillsExpanded && pills.HasIncompleteTodos(m.session.Todos) && m.promptQueue > 0 {
 				binds = append(binds, []key.Binding{k.Chat.PillLeft})
 			}
+		default:
+			// No bindings are bound to the no-focus state.
 		}
 	default:
 		if m.session == nil {

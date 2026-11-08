@@ -49,7 +49,7 @@ func RunTool(ctx context.Context, cfg *config.ConfigStore, name, toolName string
 		Arguments: args,
 	})
 	if err != nil {
-		return ToolResult{}, err
+		return ToolResult{}, fmt.Errorf("call tool %s: %w", toolName, err)
 	}
 
 	if len(result.Content) == 0 {
@@ -137,7 +137,7 @@ func getTools(ctx context.Context, session *ClientSession) ([]*Tool, error) {
 	// which is valid per MCP spec, but we still need to call ListTools to discover tools.
 	result, err := session.ListTools(ctx, &mcp.ListToolsParams{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list tools: %w", err)
 	}
 	return result.Tools, nil
 }

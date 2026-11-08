@@ -17,6 +17,13 @@ import (
 	"github.com/nextsko/mocode-agent/internal/domain/session/sessionexport"
 )
 
+// Shared JSON-schema and response-metadata keys for the port tools.
+const (
+	schemaActionKey = "action"
+	schemaEnumKey   = "enum"
+	metaResultKey   = "result"
+)
+
 // ─── think (port) ─────────────────────────────────────────────────────────────
 
 // NewThinkPortTool is the framework-agnostic form of the think tool.
@@ -81,7 +88,7 @@ func NewTodosPortTool(sessions session.Service) contract.Tool {
 		if err != nil {
 			return contract.ToolResult{}, err
 		}
-		return contract.ToolResult{Content: text, Metadata: map[string]any{"result": meta}}, nil
+		return contract.ToolResult{Content: text, Metadata: map[string]any{metaResultKey: meta}}, nil
 	})
 }
 
@@ -160,6 +167,8 @@ func runTodos(ctx context.Context, sessions session.Service, params TodosParams)
 			pendingCount++
 		case session.TodoStatusInProgress:
 			inProgressCount++
+		default:
+			// Completed todos are counted above; other statuses add nothing.
 		}
 	}
 
@@ -199,9 +208,9 @@ func NewSessionExportPortTool(messages message.Service, workingDir string) contr
 		}
 		text, meta, err := runSessionExport(ctx, messages, workingDir, params)
 		if err != nil {
-			return contract.ToolResult{Error: err}, nil
+			return contract.ToolResult{Error: err}, nil //nolint:nilerr // Tool-level failures are reported in the result, not as a Go error.
 		}
-		return contract.ToolResult{Content: text, Metadata: map[string]any{"result": meta}}, nil
+		return contract.ToolResult{Content: text, Metadata: map[string]any{metaResultKey: meta}}, nil
 	})
 }
 
@@ -258,7 +267,7 @@ func NewDiagnosticsPortTool(lspManager *lsp.Manager) contract.Tool {
 		}
 		out, err := runDiagnostics(ctx, lspManager, params)
 		if err != nil {
-			return contract.ToolResult{Error: err}, nil
+			return contract.ToolResult{Error: err}, nil //nolint:nilerr // Tool-level failures are reported in the result, not as a Go error.
 		}
 		return contract.ToolResult{Content: out}, nil
 	})
@@ -299,9 +308,9 @@ func NewMessageExportPortTool(messages message.Service, workingDir string) contr
 		}
 		text, meta, err := runMessageExport(ctx, messages, workingDir, params)
 		if err != nil {
-			return contract.ToolResult{Error: err}, nil
+			return contract.ToolResult{Error: err}, nil //nolint:nilerr // Tool-level failures are reported in the result, not as a Go error.
 		}
-		return contract.ToolResult{Content: text, Metadata: map[string]any{"result": meta}}, nil
+		return contract.ToolResult{Content: text, Metadata: map[string]any{metaResultKey: meta}}, nil
 	})
 }
 
@@ -317,29 +326,9 @@ func runMessageExport(ctx context.Context, messages message.Service, workingDir 
 		format = "markdown"
 	}
 
-	var msgs []message.Message
-	if len(params.MessageIDs) > 0 {
-		for _, id := range params.MessageIDs {
-			msg, err := messages.Get(ctx, id)
-			if err != nil {
-				return "", nil, fmt.Errorf("get message %s: %w", id, err)
-			}
-			msgs = append(msgs, msg)
-		}
-	} else {
-		all, err := messages.List(ctx, sessionID)
-		if err != nil {
-			return "", nil, fmt.Errorf("list messages: %w", err)
-		}
-		for i := len(all) - 1; i >= 0; i-- {
-			if all[i].Role == message.Assistant && all[i].Content().Text != "" {
-				msgs = append(msgs, all[i])
-				break
-			}
-		}
-		if len(msgs) == 0 {
-			return "", nil, fmt.Errorf("no assistant reply found to export")
-		}
+	msgs, err := selectExportMessages(ctx, messages, sessionID, params.MessageIDs)
+	if err != nil {
+		return "", nil, err
 	}
 
 	result, err := sessionexport.ExportRecents(sessionexport.RecentExportOptions{
@@ -352,6 +341,33 @@ func runMessageExport(ctx context.Context, messages message.Service, workingDir 
 		return "", nil, err
 	}
 	return fmt.Sprintf("Exported %d message(s) to %s", len(msgs), result.Path), result, nil
+}
+
+// selectExportMessages returns the explicitly requested messages, or the most
+// recent assistant reply when no IDs are given.
+func selectExportMessages(ctx context.Context, messages message.Service, sessionID string, ids []string) ([]message.Message, error) {
+	if len(ids) > 0 {
+		msgs := make([]message.Message, 0, len(ids))
+		for _, id := range ids {
+			msg, err := messages.Get(ctx, id)
+			if err != nil {
+				return nil, fmt.Errorf("get message %s: %w", id, err)
+			}
+			msgs = append(msgs, msg)
+		}
+		return msgs, nil
+	}
+
+	all, err := messages.List(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("list messages: %w", err)
+	}
+	for i := len(all) - 1; i >= 0; i-- {
+		if all[i].Role == message.Assistant && all[i].Content().Text != "" {
+			return []message.Message{all[i]}, nil
+		}
+	}
+	return nil, fmt.Errorf("no assistant reply found to export")
 }
 
 // ─── mocode_info (port) ──────────────────────────────────────────────────────
@@ -403,22 +419,22 @@ func NewMemoryPortTool(deps MemoryDeps) contract.Tool {
 	return contract.NewFunc(MemoryToolName, toolutil.FirstLineDescription(memoryDescription), map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"action": map[string]any{
+			schemaActionKey: map[string]any{
 				"type":        "string",
-				"enum":        []string{"write", "list", "search", "extract", "forget"},
+				schemaEnumKey: []string{"write", "list", "search", "extract", "forget"},
 				"description": "write stores an entry; list and search browse them; extract promotes a session memory into the durable global tier; forget archives one.",
 			},
 			"title":   map[string]any{"type": "string", "description": "For action=write: a one-line title."},
 			"body":    map[string]any{"type": "string", "description": "For action=write: the markdown content."},
-			"scope":   map[string]any{"type": "string", "enum": []string{"session", "global"}, "description": "For action=write: session (default) keeps it with this session; global makes it durable."},
-			"kind":    map[string]any{"type": "string", "enum": []string{"note", "lesson", "decision", "fact"}, "description": "For action=write or extract: what sort of memory this is."},
+			"scope":   map[string]any{"type": "string", schemaEnumKey: []string{"session", "global"}, "description": "For action=write: session (default) keeps it with this session; global makes it durable."},
+			"kind":    map[string]any{"type": "string", schemaEnumKey: []string{"note", "lesson", "decision", "fact"}, "description": "For action=write or extract: what sort of memory this is."},
 			"tags":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Free-form labels to make the entry findable later."},
 			"path":    map[string]any{"type": "string", "description": "Root-relative path of an entry. Required for extract and forget."},
 			"query":   map[string]any{"type": "string", "description": "For action=search: the text to look for."},
 			"session": map[string]any{"type": "string", "description": "For action=list, search or extract: restrict to one session."},
 			"limit":   map[string]any{"type": "integer", "description": "Maximum entries to return."},
 		},
-		"required": []string{"action"},
+		"required": []string{schemaActionKey},
 	}, func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
 		var params MemoryParams
 		if err := json.Unmarshal(args, &params); err != nil {
@@ -439,9 +455,9 @@ func NewLearnPortTool(deps LearnDeps) contract.Tool {
 	return contract.NewFunc(LearnToolName, toolutil.FirstLineDescription(learnDescription), map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"action": map[string]any{
+			schemaActionKey: map[string]any{
 				"type":        "string",
-				"enum":        []string{"create", "refine", "list"},
+				schemaEnumKey: []string{"create", "refine", "list"},
 				"description": "create writes a new skill, refine rewrites an existing one, list surveys what already exists",
 			},
 			"name":         map[string]any{"type": "string", "description": "Skill name in kebab-case. Required for create and refine."},
@@ -449,7 +465,7 @@ func NewLearnPortTool(deps LearnDeps) contract.Tool {
 			"instructions": map[string]any{"type": "string", "description": "The full markdown body of SKILL.md."},
 			"reason":       map[string]any{"type": "string", "description": "One sentence on why this is worth remembering."},
 		},
-		"required": []string{"action"},
+		"required": []string{schemaActionKey},
 	}, func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
 		var params LearnParams
 		if err := json.Unmarshal(args, &params); err != nil {
@@ -473,7 +489,7 @@ func outcomeToResult(o toolOutcome) contract.ToolResult {
 		res.Content = o.Text
 	}
 	if o.Meta != nil {
-		res.Metadata = map[string]any{"result": o.Meta}
+		res.Metadata = map[string]any{metaResultKey: o.Meta}
 	}
 	return res
 }

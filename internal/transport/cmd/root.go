@@ -233,7 +233,7 @@ func Execute() {
 		return
 	}
 
-	// FIXME: config.Load uses slog internally during provider resolution,
+	// Future work: config.Load uses slog internally during provider resolution,
 	// but the file-based logger isn't set up until after config is loaded
 	// (because the log path depends on the data directory from config).
 	// This creates a window where slog calls in config.Load leak to
@@ -410,7 +410,7 @@ func MaybePrependStdin(prompt string) (string, error) {
 	}
 	fi, err := os.Stdin.Stat()
 	if err != nil {
-		return prompt, err
+		return prompt, fmt.Errorf("stat stdin: %w", err)
 	}
 	// Check if stdin is a named pipe ( | ) or regular file ( < ).
 	if fi.Mode()&os.ModeNamedPipe == 0 && !fi.Mode().IsRegular() {

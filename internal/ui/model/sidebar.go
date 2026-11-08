@@ -9,6 +9,7 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/ultraviolet/layout"
 
+	"github.com/nextsko/mocode-agent/internal/transport/workspace"
 	"github.com/nextsko/mocode-agent/internal/ui/common"
 )
 
@@ -20,25 +21,7 @@ func (m *UI) modelInfo(width int) string {
 	providerName := ""
 
 	if model != nil {
-		// Get provider name first
-		providerConfig, ok := m.com.Config().Providers.Get(model.ModelCfg.Provider)
-		if ok {
-			providerName = providerConfig.Name
-
-			// Only check reasoning if model can reason
-			if model.CatwalkCfg.CanReason {
-				if len(model.CatwalkCfg.ReasoningLevels) == 0 {
-					if model.ModelCfg.Think {
-						reasoningInfo = "Thinking On"
-					} else {
-						reasoningInfo = "Thinking Off"
-					}
-				} else {
-					reasoningEffort := cmp.Or(model.ModelCfg.ReasoningEffort, model.CatwalkCfg.DefaultReasoningEffort)
-					reasoningInfo = fmt.Sprintf("Reasoning %s", common.FormatReasoningEffort(reasoningEffort))
-				}
-			}
-		}
+		providerName, reasoningInfo = m.modelProviderInfo(model)
 	}
 
 	var modelContext *common.ModelContextInfo
@@ -54,6 +37,26 @@ func (m *UI) modelInfo(width int) string {
 		modelName = model.CatwalkCfg.Name
 	}
 	return common.ModelInfo(m.com.Styles, modelName, providerName, reasoningInfo, modelContext, width, nil)
+}
+
+// modelProviderInfo resolves the display name of the model's provider and a
+// short summary of its reasoning configuration.
+func (m *UI) modelProviderInfo(model *workspace.AgentModel) (providerName, reasoningInfo string) {
+	providerConfig, ok := m.com.Config().Providers.Get(model.ModelCfg.Provider)
+	if !ok {
+		return "", ""
+	}
+	if !model.CatwalkCfg.CanReason {
+		return providerConfig.Name, ""
+	}
+	if len(model.CatwalkCfg.ReasoningLevels) > 0 {
+		reasoningEffort := cmp.Or(model.ModelCfg.ReasoningEffort, model.CatwalkCfg.DefaultReasoningEffort)
+		return providerConfig.Name, fmt.Sprintf("Reasoning %s", common.FormatReasoningEffort(reasoningEffort))
+	}
+	if model.ModelCfg.Think {
+		return providerConfig.Name, "Thinking On"
+	}
+	return providerConfig.Name, "Thinking Off"
 }
 
 // getDynamicHeightLimits will give us the num of items to show in each section based on the height

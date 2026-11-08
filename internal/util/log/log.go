@@ -84,7 +84,9 @@ func Sync() {
 // Close ensures all logs are flushed and the file is properly closed.
 func Close() error {
 	if logRotator != nil {
-		return logRotator.Close()
+		if err := logRotator.Close(); err != nil {
+			return fmt.Errorf("close log rotator: %w", err)
+		}
 	}
 	return nil
 }

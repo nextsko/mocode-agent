@@ -2,6 +2,7 @@ package exa
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -38,7 +39,7 @@ var nextRequestAt time.Time
 // returns early on context cancellation.
 func waitForSearchSlot(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
-		return err
+		return fmt.Errorf("wait for search slot: %w", err)
 	}
 	delay := searchDelayMs.Load()
 	if delay <= 0 {
@@ -59,7 +60,7 @@ func waitForSearchSlot(ctx context.Context) error {
 	defer timer.Stop()
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("wait for search slot: %w", ctx.Err())
 	case <-timer.C:
 		return nil
 	}

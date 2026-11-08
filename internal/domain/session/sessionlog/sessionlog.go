@@ -2,17 +2,12 @@
 // self-evolving agent system. Each session writes categorized log files
 // into a session directory, enabling post-hoc analysis by the evolution agent.
 //
-// Directory structure (under infra.SessionLogsDir()/<session-id>/):
-//
-//	bug.md       - errors, failures, exceptions encountered
-//	info.md      - decisions, milestones, key findings
-//	runtime.md   - execution state transitions, agent switches
-//	toolcall.md  - tool invocations, parameters, results, timing
-//	thinks.md    - reasoning traces from model responses
-//	user.md      - user prompts and interactions
-//	todo.md      - task tracking throughout session
-//	changes.md   - file modifications, git activity
-//	summary.md   - auto-generated session summary on close
+// Logs live under infra.SessionLogsDir()/<session-id>/, one markdown file per
+// category named "<category>.md". The category set and the human-readable
+// titles are defined by catName; between them they cover errors and
+// exceptions, decisions and milestones, runtime state transitions, tool
+// calls, reasoning traces, user interactions, task tracking, file and git
+// changes, and the auto-generated closing summary.
 package sessionlog
 
 import (
@@ -29,7 +24,7 @@ import (
 // Entry is a single log event.
 type Entry struct {
 	Timestamp time.Time `json:"timestamp"`
-	Category  string    `json:"category"` // bug, info, runtime, toolcall, thinks, user, todo, changes
+	Category  string    `json:"category"` // one of the category keys defined in catName
 	Event     string    `json:"event"`    // short event name (e.g. "tool_call_start", "error_occurred")
 	Data      string    `json:"data"`     // structured or freeform content
 	Meta      Meta      `json:"meta,omitempty"`
@@ -160,7 +155,7 @@ func (l *Logger) getFile(cat string) (*os.File, error) {
 	path := filepath.Join(l.dir, cat+".md")
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open session log %q: %w", path, err)
 	}
 	// Write header only when the file is new/empty. A new Logger is created
 	// per turn (and per sub-agent), so without this check the header would

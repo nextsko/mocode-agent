@@ -129,6 +129,8 @@ func (h *Help) HandleMsg(msg tea.Msg) Action {
 			}
 			h.list.ScrollToSelected()
 			h.selectedIdx = h.list.Selected()
+		default:
+			// Other wheel buttons are not handled here.
 		}
 	case tea.MouseClickMsg:
 		if !image.Pt(msg.X, msg.Y).In(h.lastArea) {

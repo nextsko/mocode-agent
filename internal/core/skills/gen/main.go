@@ -17,94 +17,113 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/skills"
 )
 
+// Skill categories, in display order.
+const (
+	categoryMeta         = "元技能 · 发现与自省"
+	categoryPrinciples   = "规范与理念"
+	categoryPlanning     = "计划 · 协作 · 编排"
+	categoryReview       = "评审 · 质量 · 验收"
+	categoryDebug        = "调试 · 调查 · 重构"
+	categoryArchitecture = "架构 · 领域 · 设计系统"
+	categoryFrontend     = "前端 · UI 库"
+	categoryDesign       = "UI 设计方法学 · 视觉产出"
+	categoryAIChat       = "AI 对话 UI · LLM 集成"
+	categoryBackend      = "后端 · 运行时 · 构建"
+	categoryShell        = "Shell · Windows 环境"
+	categoryWriting      = "写作 · 文档 · 可视化产出"
+	categoryResearch     = "研究 · 调研 · 抓取 · 复盘"
+	categoryGit          = "Git · 交付 · 安全"
+	categoryMocode       = "Mocode 自身"
+)
+
 // categoryOrder is the display order of skill categories.
 var categoryOrder = []string{
-	"元技能 · 发现与自省",
-	"规范与理念",
-	"计划 · 协作 · 编排",
-	"评审 · 质量 · 验收",
-	"调试 · 调查 · 重构",
-	"架构 · 领域 · 设计系统",
-	"前端 · UI 库",
-	"UI 设计方法学 · 视觉产出",
-	"AI 对话 UI · LLM 集成",
-	"后端 · 运行时 · 构建",
-	"Shell · Windows 环境",
-	"写作 · 文档 · 可视化产出",
-	"研究 · 调研 · 抓取 · 复盘",
-	"Git · 交付 · 安全",
-	"Mocode 自身",
+	categoryMeta,
+	categoryPrinciples,
+	categoryPlanning,
+	categoryReview,
+	categoryDebug,
+	categoryArchitecture,
+	categoryFrontend,
+	categoryDesign,
+	categoryAIChat,
+	categoryBackend,
+	categoryShell,
+	categoryWriting,
+	categoryResearch,
+	categoryGit,
+	categoryMocode,
 }
 
 // categoryOf maps every builtin skill to a category. A skill missing here lands
 // in "其他" — keep this in sync (gen_test.go fails on drift only for the doc).
-var categoryOf = map[string]string{ //nolint:gosec // static skill catalogue, no credentials.
-	"using-agent-skills": "元技能 · 发现与自省", "find-skills": "元技能 · 发现与自省",
-	"using-superpowers": "元技能 · 发现与自省", "writing-skills": "元技能 · 发现与自省",
-	"dot-skill": "元技能 · 发现与自省", "deep-roles": "元技能 · 发现与自省",
+var categoryOf = map[string]string{
+	"using-agent-skills": categoryMeta, "find-skills": categoryMeta,
+	"using-superpowers": categoryMeta, "writing-skills": categoryMeta,
+	"dot-skill": categoryMeta, "deep-roles": categoryMeta,
 
-	"docs-rulebook": "规范与理念", "common-rulebook": "规范与理念",
-	"ooml-rulebook": "规范与理念", "karpathy-guidelines": "规范与理念",
-	"lean-build": "规范与理念",
+	"docs-rulebook": categoryPrinciples, "common-rulebook": categoryPrinciples,
+	"ooml-rulebook": categoryPrinciples, "karpathy-guidelines": categoryPrinciples,
+	"lean-build": categoryPrinciples,
 
-	"planning-with-files": "计划 · 协作 · 编排", "writing-plans": "计划 · 协作 · 编排",
-	"executing-plans": "计划 · 协作 · 编排", "spec-driven-development": "计划 · 协作 · 编排",
-	"to-spec": "计划 · 协作 · 编排", "brainstorming": "计划 · 协作 · 编排",
-	"subagent-driven-development": "计划 · 协作 · 编排", "sub-team-dev": "计划 · 协作 · 编排",
-	"dispatching-parallel-agents": "计划 · 协作 · 编排", "multi-agent-orchestration": "计划 · 协作 · 编排",
-	"handoff": "计划 · 协作 · 编排",
+	"planning-with-files": categoryPlanning, "writing-plans": categoryPlanning,
+	"executing-plans": categoryPlanning, "spec-driven-development": categoryPlanning,
+	"to-spec": categoryPlanning, "brainstorming": categoryPlanning,
+	"subagent-driven-development": categoryPlanning, "sub-team-dev": categoryPlanning,
+	"dispatching-parallel-agents": categoryPlanning, "multi-agent-orchestration": categoryPlanning,
+	"handoff": categoryPlanning,
 
-	"code-review-and-quality": "评审 · 质量 · 验收", "requesting-code-review": "评审 · 质量 · 验收",
-	"receiving-code-review": "评审 · 质量 · 验收", "multi-review": "评审 · 质量 · 验收",
-	"verification-before-completion": "评审 · 质量 · 验收", "verify-and-stop": "评审 · 质量 · 验收",
-	"triage": "评审 · 质量 · 验收", "surgical-patch": "评审 · 质量 · 验收",
-	"bug-lesson": "评审 · 质量 · 验收", "test-driven-development": "评审 · 质量 · 验收",
+	"code-review-and-quality": categoryReview, "requesting-code-review": categoryReview,
+	"receiving-code-review": categoryReview, "multi-review": categoryReview,
+	"verification-before-completion": categoryReview, "verify-and-stop": categoryReview,
+	"triage": categoryReview, "surgical-patch": categoryReview,
+	"bug-lesson": categoryReview, "test-driven-development": categoryReview,
 
-	"systematic-debugging": "调试 · 调查 · 重构", "investigate-first": "调试 · 调查 · 重构",
-	"incremental-implementation": "调试 · 调查 · 重构", "safe-refactor": "调试 · 调查 · 重构",
+	"systematic-debugging": categoryDebug, "investigate-first": categoryDebug,
+	"incremental-implementation": categoryDebug, "safe-refactor": categoryDebug,
 
-	"codebase-design": "架构 · 领域 · 设计系统", "domain-modeling": "架构 · 领域 · 设计系统",
-	"improve-codebase-architecture": "架构 · 领域 · 设计系统", "design-md": "架构 · 领域 · 设计系统",
-	"design-taste-frontend": "架构 · 领域 · 设计系统",
+	"codebase-design": categoryArchitecture, "domain-modeling": categoryArchitecture,
+	"improve-codebase-architecture": categoryArchitecture, "design-md": categoryArchitecture,
+	"design-taste-frontend": categoryArchitecture,
 
-	"vercel-react-best-practices": "前端 · UI 库", "vercel-composition-patterns": "前端 · UI 库",
-	"web-design-guidelines": "前端 · UI 库", "tailwindcss": "前端 · UI 库",
-	"shadcn": "前端 · UI 库", "zustand": "前端 · UI 库", "zod": "前端 · UI 库",
-	"ui-replication": "前端 · UI 库", "playwright-cli": "前端 · UI 库",
+	"vercel-react-best-practices": categoryFrontend, "vercel-composition-patterns": categoryFrontend,
+	"web-design-guidelines": categoryFrontend, "tailwindcss": categoryFrontend,
+	"shadcn": categoryFrontend, "zustand": categoryFrontend, "zod": categoryFrontend,
+	"ui-replication": categoryFrontend, "playwright-cli": categoryFrontend,
 
-	"screenshot-to-ui": "UI 设计方法学 · 视觉产出", "css-layout-and-box-model": "UI 设计方法学 · 视觉产出",
-	"design-tokens": "UI 设计方法学 · 视觉产出", "responsive-design": "UI 设计方法学 · 视觉产出",
-	"motion-design": "UI 设计方法学 · 视觉产出", "ecommerce-image-studio": "UI 设计方法学 · 视觉产出",
-	"interactive-h5-app": "UI 设计方法学 · 视觉产出", "red-team-animation-verification": "UI 设计方法学 · 视觉产出",
+	"screenshot-to-ui": categoryDesign, "css-layout-and-box-model": categoryDesign,
+	"design-tokens": categoryDesign, "responsive-design": categoryDesign,
+	"motion-design": categoryDesign, "ecommerce-image-studio": categoryDesign,
+	"interactive-h5-app": categoryDesign, "red-team-animation-verification": categoryDesign,
 
-	"assistant-ui": "AI 对话 UI · LLM 集成", "primitives": "AI 对话 UI · LLM 集成",
-	"runtime": "AI 对话 UI · LLM 集成", "streaming": "AI 对话 UI · LLM 集成",
-	"cloud": "AI 对话 UI · LLM 集成", "observability": "AI 对话 UI · LLM 集成",
-	"rig-core-llm-integration": "AI 对话 UI · LLM 集成",
+	"assistant-ui": categoryAIChat, "primitives": categoryAIChat,
+	"runtime": categoryAIChat, "streaming": categoryAIChat,
+	"cloud": categoryAIChat, "observability": categoryAIChat,
+	"rig-core-llm-integration": categoryAIChat,
 
-	"rust-backend": "后端 · 运行时 · 构建", "rust-android-apk": "后端 · 运行时 · 构建",
-	"tauri": "后端 · 运行时 · 构建", "bun": "后端 · 运行时 · 构建",
-	"rsbuild": "后端 · 运行时 · 构建", "go-tools-mcp-master": "后端 · 运行时 · 构建",
+	"rust-backend": categoryBackend, "rust-android-apk": categoryBackend,
+	"tauri": categoryBackend, "bun": categoryBackend,
+	"rsbuild": categoryBackend, "go-tools-mcp-master": categoryBackend,
 
-	"powershell-on-windows": "Shell · Windows 环境", "nu-shell-helper": "Shell · Windows 环境",
-	"pi-windows-setup": "Shell · Windows 环境", "windows-junction-link": "Shell · Windows 环境",
-	"jq": "Shell · Windows 环境",
+	"powershell-on-windows": categoryShell, "nu-shell-helper": categoryShell,
+	"pi-windows-setup": categoryShell, "windows-junction-link": categoryShell,
+	"jq": categoryShell,
 
-	"report-writer": "写作 · 文档 · 可视化产出", "docx": "写作 · 文档 · 可视化产出",
-	"pptx": "写作 · 文档 · 可视化产出", "kami-pdf-workflow": "写作 · 文档 · 可视化产出",
-	"stunning-html-slides": "写作 · 文档 · 可视化产出", "excalidraw-diagram": "写作 · 文档 · 可视化产出",
-	"file-organizer": "写作 · 文档 · 可视化产出",
+	"report-writer": categoryWriting, "docx": categoryWriting,
+	"pptx": categoryWriting, "kami-pdf-workflow": categoryWriting,
+	"stunning-html-slides": categoryWriting, "excalidraw-diagram": categoryWriting,
+	"file-organizer": categoryWriting,
 
-	"project-teardown": "研究 · 调研 · 抓取 · 复盘", "reverse-engineering-docs": "研究 · 调研 · 抓取 · 复盘",
-	"fromsko-research": "研究 · 调研 · 抓取 · 复盘", "fromsko-knowledge": "研究 · 调研 · 抓取 · 复盘",
-	"public-social-research": "研究 · 调研 · 抓取 · 复盘", "firecrawl": "研究 · 调研 · 抓取 · 复盘",
-	"session-viz": "研究 · 调研 · 抓取 · 复盘", "exp-recorder": "研究 · 调研 · 抓取 · 复盘",
+	"project-teardown": categoryResearch, "reverse-engineering-docs": categoryResearch,
+	"fromsko-research": categoryResearch, "fromsko-knowledge": categoryResearch,
+	"public-social-research": categoryResearch, "firecrawl": categoryResearch,
+	"session-viz": categoryResearch, "exp-recorder": categoryResearch,
 
-	"shipping-gitea-prs": "Git · 交付 · 安全", "github-issue-fix-pr": "Git · 交付 · 安全",
-	"resolving-merge-conflicts": "Git · 交付 · 安全", "finishing-a-development-branch": "Git · 交付 · 安全",
-	"using-git-worktrees": "Git · 交付 · 安全", "security-and-hardening": "Git · 交付 · 安全",
+	"shipping-gitea-prs": categoryGit, "github-issue-fix-pr": categoryGit,
+	"resolving-merge-conflicts": categoryGit, "finishing-a-development-branch": categoryGit,
+	"using-git-worktrees": categoryGit, "security-and-hardening": categoryGit,
 
-	"mocode-config": "Mocode 自身", "mocode-hooks": "Mocode 自身",
+	"mocode-config": categoryMocode, "mocode-hooks": categoryMocode,
 }
 
 const howToAdd = "## 三、新增 skill / 角色\n\n" +
@@ -129,7 +148,7 @@ func main() {
 		os.Exit(1)
 	}
 	dst := filepath.Join(root, "docs", "skills-and-roles", "README.md")
-	if err := os.WriteFile(dst, []byte(out), 0o600); err != nil {
+	if err := os.WriteFile(dst, []byte(out), 0o600); err != nil { //nolint:gosec // dst is the generated docs path derived from the repo root.
 		fmt.Fprintln(os.Stderr, "gen:", err)
 		os.Exit(1)
 	}

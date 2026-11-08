@@ -114,6 +114,8 @@ func (m *MCP) HandleMsg(msg tea.Msg) Action {
 			m.moveSelection(-1)
 		case tea.MouseWheelDown:
 			m.moveSelection(1)
+		default:
+			// Other wheel buttons are not handled here.
 		}
 	case tea.MouseClickMsg:
 		if !image.Pt(msg.X, msg.Y).In(m.lastArea) {

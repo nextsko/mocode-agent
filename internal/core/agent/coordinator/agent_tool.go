@@ -8,10 +8,9 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 
 	"charm.land/fantasy"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
 	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
@@ -206,59 +205,32 @@ func (c *Coordinator) runSubAgentBatch(ctx context.Context, params subAgentBatch
 	return c.runSubAgentParallel(ctx, params)
 }
 
+// subAgentBatchEntry accumulates the outcome of a single task in a parallel
+// sub-agent batch.
+type subAgentBatchEntry struct {
+	idx      int
+	task     AgentTaskParams
+	result   string
+	err      string
+	duration int64
+	usage    *TaskUsage
+}
+
 // runSubAgentParallel runs all tasks concurrently (no dependencies).
 func (c *Coordinator) runSubAgentParallel(ctx context.Context, params subAgentBatchParams) (fantasy.ToolResponse, error) {
-	type batchEntry struct {
-		idx      int
-		task     AgentTaskParams
-		result   string
-		err      string
-		duration int64
-		usage    *TaskUsage
-	}
-	entries := make([]batchEntry, len(params.Tasks))
+	entries := make([]subAgentBatchEntry, len(params.Tasks))
 
-	group, ctx := errgroup.WithContext(ctx)
+	var group sync.WaitGroup
 	for i, task := range params.Tasks {
-		entries[i] = batchEntry{idx: i, task: task}
+		entries[i] = subAgentBatchEntry{idx: i, task: task}
 		e := &entries[i]
-		group.Go(func() error {
-			if strings.TrimSpace(e.task.Prompt) == "" {
-				e.err = "prompt is required"
-				return nil
-			}
-			agentID := strings.TrimSpace(e.task.AgentName)
-			if agentID == "" {
-				agentID = config.AgentTask
-			}
-			agent, err := c.buildSubAgent(ctx, agentID, e.task.AllowEdit)
-			if err != nil {
-				e.err = err.Error()
-				return nil
-			}
-			resp, meta, callErr := c.runSubAgentWithMeta(ctx, subAgentParams{
-				Agent:          agent,
-				SessionID:      params.SessionID,
-				AgentMessageID: params.AgentMessageID,
-				ToolCallID:     fmt.Sprintf("%s-%d", params.ToolCallID, e.idx+1),
-				Prompt:         e.task.Prompt,
-				SessionTitle:   fmt.Sprintf("Agent %s: %s", agentID, e.task.Prompt),
-				AgentID:        fmt.Sprintf("%s-%d", params.ToolCallID, e.idx+1),
-				SubagentType:   agentID,
-			})
-			e.duration = meta.DurationMs
-			e.usage = FromFantasyUsage(meta.Usage)
-			if callErr != nil {
-				e.err = callErr.Error()
-				return nil
-			}
-			e.result = strings.TrimSpace(resp.Content)
-			return nil
-		})
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			c.runBatchEntry(ctx, params, e)
+		}()
 	}
-	if err := group.Wait(); err != nil {
-		return fantasy.ToolResponse{}, err
-	}
+	group.Wait()
 
 	// Build structured results array.
 	taskResults := make([]TaskResult, len(entries))
@@ -309,6 +281,41 @@ func (c *Coordinator) runSubAgentParallel(ctx context.Context, params subAgentBa
 	}
 
 	return fantasy.NewTextResponse(out.String()), nil
+}
+
+// runBatchEntry executes one task of a parallel batch. Failures are recorded on
+// the entry so that a single failing task does not abort the whole batch.
+func (c *Coordinator) runBatchEntry(ctx context.Context, params subAgentBatchParams, e *subAgentBatchEntry) {
+	if strings.TrimSpace(e.task.Prompt) == "" {
+		e.err = "prompt is required"
+		return
+	}
+	agentID := strings.TrimSpace(e.task.AgentName)
+	if agentID == "" {
+		agentID = config.AgentTask
+	}
+	agent, err := c.buildSubAgent(ctx, agentID, e.task.AllowEdit)
+	if err != nil {
+		e.err = err.Error()
+		return
+	}
+	resp, meta, callErr := c.runSubAgentWithMeta(ctx, subAgentParams{
+		Agent:          agent,
+		SessionID:      params.SessionID,
+		AgentMessageID: params.AgentMessageID,
+		ToolCallID:     fmt.Sprintf("%s-%d", params.ToolCallID, e.idx+1),
+		Prompt:         e.task.Prompt,
+		SessionTitle:   fmt.Sprintf("Agent %s: %s", agentID, e.task.Prompt),
+		AgentID:        fmt.Sprintf("%s-%d", params.ToolCallID, e.idx+1),
+		SubagentType:   agentID,
+	})
+	e.duration = meta.DurationMs
+	e.usage = FromFantasyUsage(meta.Usage)
+	if callErr != nil {
+		e.err = callErr.Error()
+		return
+	}
+	e.result = strings.TrimSpace(resp.Content)
 }
 
 // firstLine returns the first non-empty line of s, truncated to 200 chars.
@@ -434,51 +441,24 @@ func (c *Coordinator) runSubAgentDAG(ctx context.Context, params subAgentBatchPa
 			break
 		}
 
-		// Run ready tasks in parallel.
-		group, gctx := errgroup.WithContext(ctx)
+		// Run ready tasks in parallel, then fold the per-task outcomes back
+		// into the scheduling state.
+		failedFlags := make([]bool, n)
+		var group sync.WaitGroup
 		for _, idx := range ready {
-			i := idx
-			group.Go(func() error {
-				task := params.Tasks[i]
-				if strings.TrimSpace(task.Prompt) == "" {
-					results[i] = "error: prompt is required"
-					failed[task.ID] = true
-					return nil
-				}
-				agentID := strings.TrimSpace(task.AgentName)
-				if agentID == "" {
-					agentID = config.AgentTask
-				}
-				agent, err := c.buildSubAgent(gctx, agentID, task.AllowEdit)
-				if err != nil {
-					results[i] = "error: " + err.Error()
-					failed[task.ID] = true
-					return nil
-				}
-				resp, meta, callErr := c.runSubAgentWithMeta(gctx, subAgentParams{
-					Agent:          agent,
-					SessionID:      params.SessionID,
-					AgentMessageID: params.AgentMessageID,
-					ToolCallID:     fmt.Sprintf("%s-%s", params.ToolCallID, task.ID),
-					Prompt:         task.Prompt,
-					SessionTitle:   fmt.Sprintf("Agent %s: %s", agentID, task.Prompt),
-					AgentID:        fmt.Sprintf("%s-%s", params.ToolCallID, task.ID),
-					SubagentType:   agentID,
-				})
-				durations[i] = meta.DurationMs
-				usages[i] = FromFantasyUsage(meta.Usage)
-				if callErr != nil {
-					results[i] = "error: " + callErr.Error()
-					failed[task.ID] = true
-					return nil
-				}
-				results[i] = strings.TrimSpace(resp.Content)
-				done[task.ID] = true
-				return nil
-			})
+			group.Add(1)
+			go func(idx int) {
+				defer group.Done()
+				failedFlags[idx] = c.runDAGEntry(ctx, params, idx, results, durations, usages)
+			}(idx)
 		}
-		if err := group.Wait(); err != nil {
-			return fantasy.ToolResponse{}, err
+		group.Wait()
+		for _, idx := range ready {
+			if failedFlags[idx] {
+				failed[params.Tasks[idx].ID] = true
+				continue
+			}
+			done[params.Tasks[idx].ID] = true
 		}
 	}
 
@@ -540,6 +520,44 @@ func (c *Coordinator) runSubAgentDAG(ctx context.Context, params subAgentBatchPa
 	}
 
 	return fantasy.NewTextResponse(out.String()), nil
+}
+
+// runDAGEntry executes one ready task of a dependency-ordered batch. It reports
+// whether the task failed; failures are recorded in results so that a single
+// failing task does not abort the rest of the phase.
+func (c *Coordinator) runDAGEntry(ctx context.Context, params subAgentBatchParams, idx int, results []string, durations []int64, usages []*TaskUsage) bool {
+	task := params.Tasks[idx]
+	if strings.TrimSpace(task.Prompt) == "" {
+		results[idx] = "error: prompt is required"
+		return true
+	}
+	agentID := strings.TrimSpace(task.AgentName)
+	if agentID == "" {
+		agentID = config.AgentTask
+	}
+	agent, err := c.buildSubAgent(ctx, agentID, task.AllowEdit)
+	if err != nil {
+		results[idx] = "error: " + err.Error()
+		return true
+	}
+	resp, meta, callErr := c.runSubAgentWithMeta(ctx, subAgentParams{
+		Agent:          agent,
+		SessionID:      params.SessionID,
+		AgentMessageID: params.AgentMessageID,
+		ToolCallID:     fmt.Sprintf("%s-%s", params.ToolCallID, task.ID),
+		Prompt:         task.Prompt,
+		SessionTitle:   fmt.Sprintf("Agent %s: %s", agentID, task.Prompt),
+		AgentID:        fmt.Sprintf("%s-%s", params.ToolCallID, task.ID),
+		SubagentType:   agentID,
+	})
+	durations[idx] = meta.DurationMs
+	usages[idx] = FromFantasyUsage(meta.Usage)
+	if callErr != nil {
+		results[idx] = "error: " + callErr.Error()
+		return true
+	}
+	results[idx] = strings.TrimSpace(resp.Content)
+	return false
 }
 
 func readOnlyAgentTools(allowed []string) []string {

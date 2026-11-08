@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -42,7 +41,7 @@ func (ms *MemoryStore) loadEntries() {
 	var loaded []*memory.Entry
 	err := writer.ScanLines(func(line string) error {
 		var entry memory.Entry
-		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+		if !decodeJSONLine(line, &entry) {
 			return nil // skip corrupt lines
 		}
 		if entry.Memory != nil {

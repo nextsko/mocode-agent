@@ -287,7 +287,7 @@ func (r *Registry) Build(ctx context.Context, deps ToolDeps) []fantasy.AgentTool
 	if deps.HTTP == nil && deps.Cfg != nil {
 		deps.HTTP = NewHTTPFactory(deps.Cfg)
 	}
-	var all []fantasy.AgentTool
+	all := make([]fantasy.AgentTool, 0, len(r.plugins))
 	for _, p := range r.plugins {
 		all = append(all, p.Build(ctx, deps)...)
 	}

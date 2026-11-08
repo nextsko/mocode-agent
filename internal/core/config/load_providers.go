@@ -29,39 +29,7 @@ func (c *Config) configureProviders(store *ConfigStore, env Env, resolver Variab
 		config, configExists := c.Providers.Get(string(p.ID))
 		// if the user configured a known provider we need to allow it to override a couple of parameters
 		if configExists {
-			if config.BaseURL != "" {
-				p.APIEndpoint = config.BaseURL
-			}
-			if config.APIKey != "" {
-				p.APIKey = config.APIKey
-			}
-			if len(config.Models) > 0 {
-				models := []catwalk.Model{}
-				seen := make(map[string]bool)
-
-				for _, model := range config.Models {
-					if seen[model.ID] {
-						continue
-					}
-					seen[model.ID] = true
-					if model.Name == "" {
-						model.Name = model.ID
-					}
-					models = append(models, model)
-				}
-				for _, model := range p.Models {
-					if seen[model.ID] {
-						continue
-					}
-					seen[model.ID] = true
-					if model.Name == "" {
-						model.Name = model.ID
-					}
-					models = append(models, model)
-				}
-
-				p.Models = models
-			}
+			mergeProviderOverrides(&p, config)
 		}
 
 		headers := map[string]string{}
@@ -299,102 +267,126 @@ func (c *Config) defaultModelSelection(knownProviders []catwalk.Provider) (large
 	return largeModel, smallModel, err
 }
 
+// mergeProviderOverrides applies user-configured provider fields on top of the
+// catalog entry. Configured models take precedence; catalog models are appended
+// afterwards so that model IDs stay unique.
+func mergeProviderOverrides(p *catwalk.Provider, config ProviderConfig) {
+	if config.BaseURL != "" {
+		p.APIEndpoint = config.BaseURL
+	}
+	if config.APIKey != "" {
+		p.APIKey = config.APIKey
+	}
+	if len(config.Models) == 0 {
+		return
+	}
+
+	models := make([]catwalk.Model, 0, len(config.Models)+len(p.Models))
+	seen := make(map[string]bool)
+	for _, model := range config.Models {
+		if seen[model.ID] {
+			continue
+		}
+		seen[model.ID] = true
+		if model.Name == "" {
+			model.Name = model.ID
+		}
+		models = append(models, model)
+	}
+	for _, model := range p.Models {
+		if seen[model.ID] {
+			continue
+		}
+		seen[model.ID] = true
+		if model.Name == "" {
+			model.Name = model.ID
+		}
+		models = append(models, model)
+	}
+	p.Models = models
+}
+
 func configureSelectedModels(store *ConfigStore, knownProviders []catwalk.Provider, persist bool) error {
 	c := store.config
 	defaultLarge, defaultSmall, err := c.defaultModelSelection(knownProviders)
 	if err != nil {
 		return fmt.Errorf("failed to select default models: %w", err)
 	}
-	large, small := defaultLarge, defaultSmall
-
 	largeModelSelected, largeModelConfigured := c.Models[SelectedModelTypeLarge]
-	if largeModelConfigured {
-		if largeModelSelected.Model != "" {
-			large.Model = largeModelSelected.Model
-		}
-		if largeModelSelected.Provider != "" {
-			large.Provider = largeModelSelected.Provider
-		}
-		model := c.GetModel(large.Provider, large.Model)
-		if model == nil {
-			large = defaultLarge
-			if persist {
-				if err := store.UpdatePreferredModel(ScopeGlobal, SelectedModelTypeLarge, large); err != nil {
-					return fmt.Errorf("failed to update preferred large model: %w", err)
-				}
-			}
-		} else {
-			if largeModelSelected.MaxTokens > 0 {
-				large.MaxTokens = largeModelSelected.MaxTokens
-			} else {
-				large.MaxTokens = model.DefaultMaxTokens
-			}
-			if largeModelSelected.ReasoningEffort != "" {
-				large.ReasoningEffort = largeModelSelected.ReasoningEffort
-			}
-			large.Think = largeModelSelected.Think
-			if largeModelSelected.Temperature != nil {
-				large.Temperature = largeModelSelected.Temperature
-			}
-			if largeModelSelected.TopP != nil {
-				large.TopP = largeModelSelected.TopP
-			}
-			if largeModelSelected.TopK != nil {
-				large.TopK = largeModelSelected.TopK
-			}
-			if largeModelSelected.FrequencyPenalty != nil {
-				large.FrequencyPenalty = largeModelSelected.FrequencyPenalty
-			}
-			if largeModelSelected.PresencePenalty != nil {
-				large.PresencePenalty = largeModelSelected.PresencePenalty
-			}
-		}
+	large, err := resolveSelectedModel(c, store, SelectedModelTypeLarge, defaultLarge, largeModelSelected, largeModelConfigured, persist)
+	if err != nil {
+		return err
 	}
-	smallModelSelected, smallModelConfigured := c.Models[SelectedModelTypeSmall]
-	if smallModelConfigured {
-		if smallModelSelected.Model != "" {
-			small.Model = smallModelSelected.Model
-		}
-		if smallModelSelected.Provider != "" {
-			small.Provider = smallModelSelected.Provider
-		}
 
-		model := c.GetModel(small.Provider, small.Model)
-		if model == nil {
-			small = defaultSmall
-			if persist {
-				if err := store.UpdatePreferredModel(ScopeGlobal, SelectedModelTypeSmall, small); err != nil {
-					return fmt.Errorf("failed to update preferred small model: %w", err)
-				}
-			}
-		} else {
-			if smallModelSelected.MaxTokens > 0 {
-				small.MaxTokens = smallModelSelected.MaxTokens
-			} else {
-				small.MaxTokens = model.DefaultMaxTokens
-			}
-			if smallModelSelected.ReasoningEffort != "" {
-				small.ReasoningEffort = smallModelSelected.ReasoningEffort
-			}
-			if smallModelSelected.Temperature != nil {
-				small.Temperature = smallModelSelected.Temperature
-			}
-			if smallModelSelected.TopP != nil {
-				small.TopP = smallModelSelected.TopP
-			}
-			if smallModelSelected.TopK != nil {
-				small.TopK = smallModelSelected.TopK
-			}
-			if smallModelSelected.FrequencyPenalty != nil {
-				small.FrequencyPenalty = smallModelSelected.FrequencyPenalty
-			}
-			if smallModelSelected.PresencePenalty != nil {
-				small.PresencePenalty = smallModelSelected.PresencePenalty
-			}
-			small.Think = smallModelSelected.Think
-		}
+	smallModelSelected, smallModelConfigured := c.Models[SelectedModelTypeSmall]
+	small, err := resolveSelectedModel(c, store, SelectedModelTypeSmall, defaultSmall, smallModelSelected, smallModelConfigured, persist)
+	if err != nil {
+		return err
 	}
+
 	c.Models[SelectedModelTypeLarge] = large
 	c.Models[SelectedModelTypeSmall] = small
 	return nil
+}
+
+// resolveSelectedModel applies a user-selected model on top of the default
+// selection, repairing it to the default when it no longer resolves. The
+// repaired selection is persisted when persist is set.
+func resolveSelectedModel(
+	c *Config,
+	store *ConfigStore,
+	modelType SelectedModelType,
+	defaultModel SelectedModel,
+	selected SelectedModel,
+	configured bool,
+	persist bool,
+) (SelectedModel, error) {
+	if !configured {
+		return defaultModel, nil
+	}
+
+	model := defaultModel
+	if selected.Model != "" {
+		model.Model = selected.Model
+	}
+	if selected.Provider != "" {
+		model.Provider = selected.Provider
+	}
+
+	catwalkModel := c.GetModel(model.Provider, model.Model)
+	if catwalkModel == nil {
+		if !persist {
+			return defaultModel, nil
+		}
+		if err := store.UpdatePreferredModel(ScopeGlobal, modelType, defaultModel); err != nil {
+			return SelectedModel{}, fmt.Errorf("failed to update preferred %s model: %w", modelType, err)
+		}
+		return defaultModel, nil
+	}
+
+	if selected.MaxTokens > 0 {
+		model.MaxTokens = selected.MaxTokens
+	} else {
+		model.MaxTokens = catwalkModel.DefaultMaxTokens
+	}
+	if selected.ReasoningEffort != "" {
+		model.ReasoningEffort = selected.ReasoningEffort
+	}
+	model.Think = selected.Think
+	if selected.Temperature != nil {
+		model.Temperature = selected.Temperature
+	}
+	if selected.TopP != nil {
+		model.TopP = selected.TopP
+	}
+	if selected.TopK != nil {
+		model.TopK = selected.TopK
+	}
+	if selected.FrequencyPenalty != nil {
+		model.FrequencyPenalty = selected.FrequencyPenalty
+	}
+	if selected.PresencePenalty != nil {
+		model.PresencePenalty = selected.PresencePenalty
+	}
+	return model, nil
 }

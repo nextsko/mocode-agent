@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/ui/chat"
+	"github.com/nextsko/mocode-agent/internal/ui/list"
 	"github.com/nextsko/mocode-agent/internal/util/pubsub"
 )
 
@@ -197,27 +198,10 @@ func (m *UI) appendSessionMessage(msg message.Message) tea.Cmd {
 				// we should have an item!
 				continue
 			}
-			if toolMsgItem, ok := toolItem.(chat.ToolMessageItem); ok {
-				toolMsgItem.SetResult(&tr)
-				// When an agent tool completes, reload nested tools from child
-				// sessions as a fallback. Live pubsub events may have been
-				// missed (e.g. client/server mode, timing issues) leaving the
-				// nested tool tree empty even though the sub-agent did work.
-				if nestedContainer, ok := toolItem.(chat.NestedToolContainer); ok {
-					if len(nestedContainer.NestedTools()) == 0 {
-						m.reloadNestedToolsForItem(toolMsgItem)
-					}
-				}
-				if m.chat.Follow() {
-					if cmd := m.chat.ScrollToBottomAndAnimate(); cmd != nil {
-						cmds = append(cmds, cmd)
-					}
-				}
-				if cmd := m.maybeStartBackgroundJobPoll(tr); cmd != nil {
-					cmds = append(cmds, cmd)
-				}
-			}
+			cmds = append(cmds, m.applyToolResult(toolItem, tr)...)
 		}
+	case message.System:
+		// System messages only carry context; nothing is rendered for them.
 	}
 	return tea.Sequence(cmds...)
 }
@@ -226,6 +210,81 @@ func (m *UI) appendSessionMessage(msg message.Message) tea.Cmd {
 // the chat when an assistant message is updated it may include updated tool
 // calls as well that is why we need to handle creating/updating each tool call
 // message too.
+// applyToolResult attaches a tool result to its rendered item and refreshes
+// nested tools, scrolling and background polling as needed.
+func (m *UI) applyToolResult(toolItem list.Item, tr message.ToolResult) []tea.Cmd {
+	toolMsgItem, ok := toolItem.(chat.ToolMessageItem)
+	if !ok {
+		return nil
+	}
+	toolMsgItem.SetResult(&tr)
+
+	// When an agent tool completes, reload nested tools from child sessions as
+	// a fallback. Live pubsub events may have been missed (e.g. client/server
+	// mode, timing issues) leaving the nested tool tree empty even though the
+	// sub-agent did work.
+	if nestedContainer, ok := toolItem.(chat.NestedToolContainer); ok && len(nestedContainer.NestedTools()) == 0 {
+		m.reloadNestedToolsForItem(toolMsgItem)
+	}
+
+	var cmds []tea.Cmd
+	if m.chat.Follow() {
+		if cmd := m.chat.ScrollToBottomAndAnimate(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+	if cmd := m.maybeStartBackgroundJobPoll(tr); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	return cmds
+}
+
+// syncToolCall updates an already rendered tool call when its finished state or
+// input changed, loading nested tools once it finishes.
+func (m *UI) syncToolCall(existingToolItem list.Item, tc message.ToolCall) {
+	toolItem, ok := existingToolItem.(chat.ToolMessageItem)
+	if !ok {
+		return
+	}
+
+	existingToolCall := toolItem.ToolCall()
+	// only update if finished state changed or input changed
+	// to avoid clearing the cache
+	if (!tc.Finished || existingToolCall.Finished) && tc.Input == existingToolCall.Input {
+		return
+	}
+	toolItem.SetToolCall(tc)
+
+	// When an agent/agentic_fetch tool transitions to finished, ensure nested
+	// tools are loaded from child sessions. This is a fallback for cases where
+	// live pubsub events were missed.
+	if !tc.Finished || existingToolCall.Finished {
+		return
+	}
+	if nestedContainer, ok := toolItem.(chat.NestedToolContainer); ok && len(nestedContainer.NestedTools()) == 0 {
+		m.reloadNestedToolsForItem(toolItem)
+	}
+}
+
+// propagateChildStatusSummary pushes the sub-agent's latest status line onto
+// its agent tool item so the user can see what the sub-agent is doing.
+func propagateChildStatusSummary(agentItem chat.NestedToolContainer, payload message.Message) {
+	if agentItem == nil {
+		return
+	}
+	summaryEntry, ok := agentItem.(interface{ SetStatusSummary(string) })
+	if !ok {
+		return
+	}
+	summary := firstContentLine(payload.Content().Text)
+	if summary == "" && payload.IsThinking() {
+		summary = "thinking"
+	}
+	if summary != "" {
+		summaryEntry.SetStatusSummary(summary)
+	}
+}
+
 func (m *UI) updateSessionMessage(msg message.Message) tea.Cmd {
 	var cmds []tea.Cmd
 	existingItem := m.chat.MessageItem(msg.ID)
@@ -262,24 +321,7 @@ func (m *UI) updateSessionMessage(msg message.Message) tea.Cmd {
 	for _, tc := range msg.ToolCalls() {
 		m.registerAgentToolTopology(msg.ID, tc)
 		existingToolItem := m.chat.MessageItem(tc.ID)
-		if toolItem, ok := existingToolItem.(chat.ToolMessageItem); ok {
-			existingToolCall := toolItem.ToolCall()
-			// only update if finished state changed or input changed
-			// to avoid clearing the cache
-			if (tc.Finished && !existingToolCall.Finished) || tc.Input != existingToolCall.Input {
-				toolItem.SetToolCall(tc)
-				// When an agent/agentic_fetch tool transitions to finished,
-				// ensure nested tools are loaded from child sessions. This is
-				// a fallback for cases where live pubsub events were missed.
-				if tc.Finished && !existingToolCall.Finished {
-					if nestedContainer, ok := toolItem.(chat.NestedToolContainer); ok {
-						if len(nestedContainer.NestedTools()) == 0 {
-							m.reloadNestedToolsForItem(toolItem)
-						}
-					}
-				}
-			}
-		}
+		m.syncToolCall(existingToolItem, tc)
 		if existingToolItem == nil {
 			items = append(items, chat.NewToolMessageItem(m.com.Styles, msg.ID, tc, nil, false))
 		}
@@ -321,19 +363,7 @@ func (m *UI) handleChildSessionMessage(event pubsub.Event[message.Message]) tea.
 	if len(event.Payload.ToolCalls()) == 0 && len(event.Payload.ToolResults()) == 0 {
 		// Even though there are no tool calls/results to render as nested
 		// items, the sub-agent may have produced text (thinking/reasoning).
-		// Propagate the latest status summary to the agent tool item so the
-		// user can see what the sub-agent is doing.
-		if agentItem != nil {
-			if summaryEntry, ok := agentItem.(interface{ SetStatusSummary(string) }); ok {
-				summary := firstContentLine(event.Payload.Content().Text)
-				if summary == "" && event.Payload.IsThinking() {
-					summary = "thinking"
-				}
-				if summary != "" {
-					summaryEntry.SetStatusSummary(summary)
-				}
-			}
-		}
+		propagateChildStatusSummary(agentItem, event.Payload)
 		return nil
 	}
 	if agentItem == nil {

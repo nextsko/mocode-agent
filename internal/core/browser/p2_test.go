@@ -70,7 +70,7 @@ func TestNavigateForward_MovesToNextHistoryEntry(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.on("Page.getNavigationHistory", func(json.RawMessage) (any, error) {
 		return map[string]any{"currentIndex": 1, "entries": []map[string]any{
 			{"id": 1}, {"id": 2}, {"id": 3},
@@ -98,7 +98,7 @@ func TestNavigateForward_AtTheEndOfHistoryIsAnError(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.on("Page.getNavigationHistory", func(json.RawMessage) (any, error) {
 		return map[string]any{"currentIndex": 2, "entries": []map[string]any{
 			{"id": 1}, {"id": 2}, {"id": 3},
@@ -118,7 +118,7 @@ func TestReload_WaitsForLoad(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.on("Page.reload", func(json.RawMessage) (any, error) {
 		go func() {
 			time.Sleep(10 * time.Millisecond)
@@ -304,7 +304,7 @@ func TestCookies_ListSetAndClear(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.on("Runtime.evaluate", func(json.RawMessage) (any, error) {
 		// The SetCookie default-domain probe asks for location.href.
 		return map[string]any{"result": map[string]any{"type": "string", "value": "https://x.test/page"}}, nil
@@ -346,7 +346,7 @@ func TestSetCookie_BlankPageWithoutDomainIsRejected(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.on("Runtime.evaluate", func(json.RawMessage) (any, error) {
 		return map[string]any{"result": map[string]any{"type": "string", "value": "about:blank"}}, nil
 	})
@@ -366,7 +366,7 @@ func TestPDF_DecodesBase64(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.on("Page.printToPDF", func(json.RawMessage) (any, error) {
 		return map[string]any{"data": base64.StdEncoding.EncodeToString([]byte("%PDF-1.7 fake"))}, nil
 	})
@@ -386,7 +386,7 @@ func TestNetworkLog_RecordsRequestsResponsesAndFailures(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 
 	s, err := Attach(context.Background(), sessionEndpoint(f))
 	require.NoError(t, err)
@@ -423,7 +423,7 @@ func TestRoute_BlocksFulfillsAndPassesThrough(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 
 	s, err := Attach(context.Background(), sessionEndpoint(f))
 	require.NoError(t, err)

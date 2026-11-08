@@ -688,33 +688,11 @@ func (p *Permissions) renderDefaultContent(width int) string {
 	}
 
 	// Pretty-print JSON params if available.
-	if p.permission.Params != nil {
-		var paramStr string
-		if str, ok := p.permission.Params.(string); ok {
-			paramStr = str
-		} else {
-			paramStr = fmt.Sprintf("%v", p.permission.Params)
+	if rendered := renderPermissionParams(t, p.permission.Params); rendered != "" {
+		if content != "" {
+			content += "\n\n"
 		}
-
-		var parsed any
-		if err := json.Unmarshal([]byte(paramStr), &parsed); err == nil {
-			if b, err := json.MarshalIndent(parsed, "", "  "); err == nil {
-				jsonContent := string(b)
-				highlighted, err := common.SyntaxHighlight(t, jsonContent, "params.json", t.Dialog.Permissions.ParamsBg)
-				if err == nil {
-					jsonContent = highlighted
-				}
-				if content != "" {
-					content += "\n\n"
-				}
-				content += jsonContent
-			}
-		} else if paramStr != "" {
-			if content != "" {
-				content += "\n\n"
-			}
-			content += paramStr
-		}
+		content += rendered
 	}
 
 	if content == "" {
@@ -722,6 +700,32 @@ func (p *Permissions) renderDefaultContent(width int) string {
 	}
 
 	return p.renderContentPanel(strings.TrimSpace(content), width)
+}
+
+// renderPermissionParams renders tool-call parameters, pretty-printing and
+// highlighting them when they are JSON.
+func renderPermissionParams(t *styles.Styles, params any) string {
+	if params == nil {
+		return ""
+	}
+	paramStr := fmt.Sprintf("%v", params)
+	if str, ok := params.(string); ok {
+		paramStr = str
+	}
+
+	var parsed any
+	if err := json.Unmarshal([]byte(paramStr), &parsed); err != nil {
+		return paramStr
+	}
+	b, err := json.MarshalIndent(parsed, "", "  ")
+	if err != nil {
+		return paramStr
+	}
+	jsonContent := string(b)
+	if highlighted, err := common.SyntaxHighlight(t, jsonContent, "params.json", t.Dialog.Permissions.ParamsBg); err == nil {
+		jsonContent = highlighted
+	}
+	return jsonContent
 }
 
 // renderContentPanel renders content in a panel with the full width.

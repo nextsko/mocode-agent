@@ -123,7 +123,7 @@ func TestRecordRecentModel_TrimsToMax(t *testing.T) {
 	require.True(t, ok)
 	require.Len(t, large, 5)
 	// Build provider:model IDs and verify order
-	var ids []string
+	ids := make([]string, 0, len(large))
 	for _, v := range large {
 		m := v.(map[string]any)
 		ids = append(ids, m["provider"].(string)+":"+m["model"].(string))

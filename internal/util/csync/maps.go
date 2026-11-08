@@ -2,6 +2,7 @@ package csync
 
 import (
 	"encoding/json"
+	"fmt"
 	"iter"
 	"maps"
 	"sync"
@@ -174,5 +175,9 @@ func (m *Map[K, V]) MarshalJSON() ([]byte, error) {
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return json.Marshal(m.inner)
+	b, err := json.Marshal(m.inner)
+	if err != nil {
+		return nil, fmt.Errorf("marshal map: %w", err)
+	}
+	return b, nil
 }

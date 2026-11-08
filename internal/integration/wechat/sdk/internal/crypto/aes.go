@@ -19,7 +19,7 @@ func EncryptAESECB(plaintext, key []byte) ([]byte, error) {
 	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create AES cipher: %w", err)
 	}
 
 	padded := pkcs7Pad(plaintext, aes.BlockSize)
@@ -42,7 +42,7 @@ func DecryptAESECB(ciphertext, key []byte) ([]byte, error) {
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create AES cipher: %w", err)
 	}
 
 	plaintext := make([]byte, len(ciphertext))
@@ -55,8 +55,10 @@ func DecryptAESECB(ciphertext, key []byte) ([]byte, error) {
 // GenerateAESKey generates a random 16-byte AES key.
 func GenerateAESKey() ([]byte, error) {
 	key := make([]byte, 16)
-	_, err := rand.Read(key)
-	return key, err
+	if _, err := rand.Read(key); err != nil {
+		return nil, fmt.Errorf("generate AES key: %w", err)
+	}
+	return key, nil
 }
 
 // EncryptedSize calculates the size after AES-128-ECB with PKCS7 padding.
@@ -69,7 +71,11 @@ func EncryptedSize(rawSize int) int {
 func DecodeAESKey(encoded string) ([]byte, error) {
 	// Direct hex string (from image_item.aeskey)
 	if hexPattern.MatchString(encoded) {
-		return hex.DecodeString(encoded)
+		key, err := hex.DecodeString(encoded)
+		if err != nil {
+			return nil, fmt.Errorf("decode hex aes_key: %w", err)
+		}
+		return key, nil
 	}
 
 	decoded, err := base64.StdEncoding.DecodeString(encoded)
@@ -85,7 +91,11 @@ func DecodeAESKey(encoded string) ([]byte, error) {
 		return decoded, nil
 	}
 	if len(decoded) == 32 && hexPattern.Match(decoded) {
-		return hex.DecodeString(string(decoded))
+		key, err := hex.DecodeString(string(decoded))
+		if err != nil {
+			return nil, fmt.Errorf("decode hex aes_key: %w", err)
+		}
+		return key, nil
 	}
 
 	return nil, fmt.Errorf("decoded aes_key has unexpected length %d (want 16 or 32)", len(decoded))

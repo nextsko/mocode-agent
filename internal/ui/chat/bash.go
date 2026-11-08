@@ -143,7 +143,7 @@ func (j *JobOutputToolRenderContext) RenderTool(sty *styles.Styles, width int, o
 	if opts.IsPending() && params.ShellID != "" {
 		return renderJobPending(sty, opts, cappedWidth, "Output", params.ShellID, description)
 	} else if params.ShellID == "" {
-		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+		return toolErrorContent(sty, &message.ToolResult{Content: msgInvalidParameters}, cappedWidth)
 	}
 
 	content := ""
@@ -196,7 +196,7 @@ func (j *JobKillToolRenderContext) RenderTool(sty *styles.Styles, width int, opt
 	if opts.IsPending() && params.ShellID != "" {
 		return renderJobPending(sty, opts, cappedWidth, "Kill", params.ShellID, description)
 	} else if params.ShellID == "" {
-		return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+		return toolErrorContent(sty, &message.ToolResult{Content: msgInvalidParameters}, cappedWidth)
 	}
 
 	content := ""

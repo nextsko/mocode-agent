@@ -40,7 +40,7 @@ func (g *GlobToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *
 	var params tools.GlobParams
 	if opts.ToolCall.Input != "" {
 		if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
-			return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+			return toolErrorContent(sty, &message.ToolResult{Content: msgInvalidParameters}, cappedWidth)
 		}
 	}
 
@@ -102,7 +102,7 @@ func (g *GrepToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *
 	var params tools.GrepParams
 	if opts.ToolCall.Input != "" {
 		if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
-			return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+			return toolErrorContent(sty, &message.ToolResult{Content: msgInvalidParameters}, cappedWidth)
 		}
 	}
 
@@ -170,7 +170,7 @@ func (l *LSToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *To
 	var params tools.LSParams
 	if opts.ToolCall.Input != "" {
 		if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
-			return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+			return toolErrorContent(sty, &message.ToolResult{Content: msgInvalidParameters}, cappedWidth)
 		}
 	}
 
@@ -233,7 +233,7 @@ func (s *SourcegraphToolRenderContext) RenderTool(sty *styles.Styles, width int,
 	var params tools.SourcegraphParams
 	if opts.ToolCall.Input != "" {
 		if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
-			return toolErrorContent(sty, &message.ToolResult{Content: "Invalid parameters"}, cappedWidth)
+			return toolErrorContent(sty, &message.ToolResult{Content: msgInvalidParameters}, cappedWidth)
 		}
 	}
 

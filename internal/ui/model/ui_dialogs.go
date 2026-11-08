@@ -3,8 +3,9 @@ package model
 import (
 	"context"
 	"fmt"
-	"github.com/nextsko/mocode-agent/internal/ui/pills"
 	"strings"
+
+	"github.com/nextsko/mocode-agent/internal/ui/pills"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -50,9 +51,7 @@ func (m *UI) openDialog(id string) tea.Cmd {
 			cmds = append(cmds, cmd)
 		}
 	case dialog.HelpID:
-		if cmd := m.openHelpDialog(); cmd != nil {
-			cmds = append(cmds, cmd)
-		}
+		m.openHelpDialog()
 	case dialog.WeChatSelectID:
 		m.dialog.OpenDialog(dialog.NewWeChatSelect(m.com))
 	case dialog.WeChatManagerID:
@@ -64,9 +63,7 @@ func (m *UI) openDialog(id string) tea.Cmd {
 			cmds = append(cmds, cmd)
 		}
 	case dialog.MCPID:
-		if cmd := m.openMCPDialog(); cmd != nil {
-			cmds = append(cmds, cmd)
-		}
+		m.openMCPDialog()
 	case dialog.ContextID:
 		if cmd := m.openContextDialog(); cmd != nil {
 			cmds = append(cmds, cmd)
@@ -120,10 +117,7 @@ func (m *UI) performRollback(target message.Message) tea.Cmd {
 			return util.InfoMsg{Type: util.InfoTypeWarn, Msg: "No messages to remove and no file history found for this session"}
 		}
 
-		repoDir, err := rollbackRepoDir(sess, workingDir)
-		if err != nil {
-			return util.NewErrorMsg(err)
-		}
+		repoDir := rollbackRepoDir(sess, workingDir)
 		if err := commitRollbackState(repoDir, workingDir, currentTrackedFileState(files, workingDir), "pre-rollback to "+shortNodeID(target)); err != nil {
 			return util.NewErrorMsg(fmt.Errorf("snapshot before rollback: %w", err))
 		}

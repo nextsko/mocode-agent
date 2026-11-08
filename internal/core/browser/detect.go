@@ -106,6 +106,9 @@ func (c Candidate) String() string {
 		b.WriteString("\n    (version probe failed — the file exists but did not run)")
 	case VerNotRun:
 		b.WriteString("\n    (not probed: this platform's browser launches instead of printing a version)")
+	default:
+		// VerOK: the version probe answered, so the version string above is
+		// authoritative and needs no extra note.
 	}
 	if c.NeedsSnapProfile {
 		b.WriteString("\n    (snap confined: profile lives under ~/snap)")

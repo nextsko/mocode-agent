@@ -41,13 +41,13 @@ type pillClickTarget struct {
 }
 
 // togglePillsExpanded toggles the pills panel expansion state.
-func (m *UI) togglePillsExpanded() tea.Cmd {
+func (m *UI) togglePillsExpanded() {
 	if !m.hasSession() {
-		return nil
+		return
 	}
 	hasPills := pillspkg.HasIncompleteTodos(m.session.Todos) || m.promptQueue > 0
 	if !hasPills {
-		return nil
+		return
 	}
 	m.pillsExpanded = !m.pillsExpanded
 	if m.pillsExpanded {
@@ -63,14 +63,12 @@ func (m *UI) togglePillsExpanded() tea.Cmd {
 	if m.chat.Follow() {
 		m.chat.ScrollToBottom()
 	}
-
-	return nil
 }
 
 // switchPillSection changes focus between todo and queue sections.
-func (m *UI) switchPillSection(dir int) tea.Cmd {
+func (m *UI) switchPillSection(dir int) {
 	if !m.pillsExpanded || !m.hasSession() {
-		return nil
+		return
 	}
 	hasIncompleteTodos := pillspkg.HasIncompleteTodos(m.session.Todos)
 	hasQueue := m.promptQueue > 0
@@ -78,14 +76,12 @@ func (m *UI) switchPillSection(dir int) tea.Cmd {
 	if dir < 0 && m.focusedPillSection == pillSectionQueue && hasIncompleteTodos {
 		m.focusedPillSection = pillSectionTodos
 		m.updateLayoutAndSize()
-		return nil
+		return
 	}
 	if dir > 0 && m.focusedPillSection == pillSectionTodos && hasQueue {
 		m.focusedPillSection = pillSectionQueue
 		m.updateLayoutAndSize()
-		return nil
 	}
-	return nil
 }
 
 // pillsAreaHeight calculates the total height needed for the pills area.
@@ -152,21 +148,12 @@ func (m *UI) renderPills() {
 
 	var expandedList string
 	if m.pillsExpanded {
-		if todosFocused && hasIncomplete {
-			expandedList = pillspkg.TodoList(m.session.Todos, inProgressIcon, t, contentWidth)
-			if state := m.todoContinuations[m.session.ID]; state != nil && state.Stalled {
-				stalled := t.Pills.HelpText.Render("Todo stalled, manual intervention required")
-				if expandedList != "" {
-					expandedList = expandedList + "\n" + stalled
-				} else {
-					expandedList = stalled
-				}
-			}
-		} else if queueFocused && hasQueue {
-			if m.com.Workspace.AgentIsReady() {
-				queueItems := m.com.Workspace.AgentQueuedPromptsList(m.session.ID)
-				expandedList = pillspkg.QueueList(queueItems, t)
-			}
+		switch {
+		case todosFocused && hasIncomplete:
+			expandedList = m.expandedTodoList(t, inProgressIcon, contentWidth)
+		case queueFocused && hasQueue && m.com.Workspace.AgentIsReady():
+			queueItems := m.com.Workspace.AgentQueuedPromptsList(m.session.ID)
+			expandedList = pillspkg.QueueList(queueItems, t)
 		}
 	}
 
@@ -246,21 +233,7 @@ func (m *UI) pillClickTargetAt(x, y int) pillClickTarget {
 	todosFocused := m.pillsExpanded && m.focusedPillSection == pillSectionTodos
 	queueFocused := m.pillsExpanded && m.focusedPillSection == pillSectionQueue
 	if localY < pillHeightWithBorder {
-		offset := 0
-		if hasIncomplete {
-			w := lipgloss.Width(pillspkg.TodoPill(m.session.Todos, inProgressIcon, todosFocused, m.pillsExpanded, t))
-			if localX >= offset && localX < offset+w {
-				return pillClickTarget{kind: pillClickTodoSummary, todoIndex: -1}
-			}
-			offset += w
-		}
-		if hasQueue {
-			w := lipgloss.Width(pillspkg.QueuePill(m.promptQueue, queueFocused, m.pillsExpanded, t))
-			if localX >= offset && localX < offset+w {
-				return pillClickTarget{kind: pillClickQueue}
-			}
-		}
-		return pillClickTarget{}
+		return m.pillSummaryHit(localX, hasIncomplete, hasQueue, todosFocused, queueFocused, inProgressIcon, t)
 	}
 
 	if !m.pillsExpanded || !todosFocused {
@@ -269,6 +242,42 @@ func (m *UI) pillClickTargetAt(x, y int) pillClickTarget {
 	row := localY - pillHeightWithBorder
 	if idx, ok := m.todoIndexForExpandedRow(row); ok {
 		return pillClickTarget{kind: pillClickTodoRow, todoIndex: idx}
+	}
+	return pillClickTarget{}
+}
+
+// expandedTodoList renders the expanded To-Do list, appending the stalled
+// notice when the todo auto-continue loop stopped.
+func (m *UI) expandedTodoList(t *styles.Styles, inProgressIcon string, contentWidth int) string {
+	list := pillspkg.TodoList(m.session.Todos, inProgressIcon, t, contentWidth)
+	state := m.todoContinuations[m.session.ID]
+	if state == nil || !state.Stalled {
+		return list
+	}
+	stalled := t.Pills.HelpText.Render("Todo stalled, manual intervention required")
+	if list == "" {
+		return stalled
+	}
+	return list + "\n" + stalled
+}
+
+// pillSummaryHit resolves a click on the pill summary row to its click target.
+func (m *UI) pillSummaryHit(
+	localX int, hasIncomplete, hasQueue, todosFocused, queueFocused bool, inProgressIcon string, t *styles.Styles,
+) pillClickTarget {
+	offset := 0
+	if hasIncomplete {
+		w := lipgloss.Width(pillspkg.TodoPill(m.session.Todos, inProgressIcon, todosFocused, m.pillsExpanded, t))
+		if localX >= offset && localX < offset+w {
+			return pillClickTarget{kind: pillClickTodoSummary, todoIndex: -1}
+		}
+		offset += w
+	}
+	if hasQueue {
+		w := lipgloss.Width(pillspkg.QueuePill(m.promptQueue, queueFocused, m.pillsExpanded, t))
+		if localX >= offset && localX < offset+w {
+			return pillClickTarget{kind: pillClickQueue}
+		}
 	}
 	return pillClickTarget{}
 }

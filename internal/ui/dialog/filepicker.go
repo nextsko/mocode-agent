@@ -306,7 +306,7 @@ func loadImage(path string) (img image.Image, err error) {
 
 	img, _, err = image.Decode(file)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode image %s: %w", path, err)
 	}
 
 	return img, nil

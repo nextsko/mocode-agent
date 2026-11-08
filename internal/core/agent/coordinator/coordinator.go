@@ -388,7 +388,7 @@ func (c *Coordinator) SmallLanguageModel(ctx context.Context) fantasy.LanguageMo
 
 func (c *Coordinator) UpdateModels(ctx context.Context) error {
 	// build the models again so we make sure we get the latest config
-	large, small, err := c.buildAgentModels(ctx, false)
+	large, small, err := c.buildAgentModels(ctx)
 	if err != nil {
 		return err
 	}
@@ -424,7 +424,7 @@ func (c *Coordinator) UpdateModels(ctx context.Context) error {
 		c.activeAgentID = activeAgentID
 	}
 
-	tools, err := c.buildTools(ctx, agentCfg, false)
+	tools, err := c.buildTools(ctx, agentCfg)
 	if err != nil {
 		return err
 	}

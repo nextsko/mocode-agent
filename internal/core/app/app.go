@@ -135,9 +135,7 @@ func New(ctx context.Context, storeCfg *config.ConfigStore) (*App, error) {
 		return nil
 	})
 
-	if err := app.useStoreServices(); err != nil {
-		return nil, err
-	}
+	app.useStoreServices()
 
 	app.setupEvents()
 
@@ -153,7 +151,7 @@ func New(ctx context.Context, storeCfg *config.ConfigStore) (*App, error) {
 		func(ctx context.Context) error { return mcp.Close(ctx) },
 	)
 
-	// TODO: remove the concept of agent config, most likely.
+	// Future work: remove the concept of agent config, most likely.
 	if !cfg.IsConfigured() {
 		slog.Warn("No agent configuration found")
 		return app, nil
@@ -254,9 +252,7 @@ func (app *App) resolveSession(ctx context.Context, continueSessionID string, us
 		}
 	}
 
-	if err := app.useSessionStore(ctx, sess); err != nil {
-		return session.Session{}, err
-	}
+	app.useSessionStore(sess)
 	return sess, nil
 }
 
@@ -351,7 +347,7 @@ func (app *App) RunNonInteractive(ctx context.Context, output io.Writer, prompt,
 	}
 	done := make(chan response, 1)
 
-	go func(ctx context.Context, sessionID, prompt string) {
+	go func(ctx context.Context, prompt string) {
 		result, err := app.AgentCoordinator.Run(ctx, sess.ID, prompt)
 		if err != nil {
 			done <- response{
@@ -362,7 +358,7 @@ func (app *App) RunNonInteractive(ctx context.Context, output io.Writer, prompt,
 		done <- response{
 			result: result,
 		}
-	}(ctx, sess.ID, prompt)
+	}(ctx, prompt)
 
 	messageEvents := app.Messages.Subscribe(ctx)
 	messageReadBytes := make(map[string]int)
@@ -426,7 +422,7 @@ func (app *App) RunNonInteractive(ctx context.Context, output io.Writer, prompt,
 
 		case <-ctx.Done():
 			stopSpinner()
-			return ctx.Err()
+			return fmt.Errorf("non-interactive run cancelled: %w", ctx.Err())
 		}
 	}
 }

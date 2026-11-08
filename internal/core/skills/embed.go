@@ -34,7 +34,7 @@ func DiscoverBuiltinWithStates() ([]*Skill, []*SkillState) {
 
 	_ = fs.WalkDir(builtinFS, "builtin", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // best-effort discovery: unreadable entries are skipped, not fatal.
 		}
 		if d.IsDir() || d.Name() != SkillFileName {
 			return nil

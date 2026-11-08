@@ -99,9 +99,9 @@ func (c *Commands) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	c.lastArea = common.CenterRect(area, width, height)
 	c.lastListArea = image.Rect(
 		c.lastArea.Min.X+t.Dialog.View.GetBorderLeftSize()+t.Dialog.View.GetPaddingLeft(),
-		c.lastArea.Min.Y+t.Dialog.View.GetBorderTopSize()+t.Dialog.View.GetPaddingTop()+titleHeight(t, title, separator, inputView, innerWidth),
+		c.lastArea.Min.Y+t.Dialog.View.GetBorderTopSize()+t.Dialog.View.GetPaddingTop()+titleHeight(title, separator, inputView),
 		c.lastArea.Max.X-t.Dialog.View.GetBorderRightSize()-t.Dialog.View.GetPaddingRight(),
-		c.lastArea.Min.Y+t.Dialog.View.GetBorderTopSize()+t.Dialog.View.GetPaddingTop()+titleHeight(t, title, separator, inputView, innerWidth)+c.list.Height(),
+		c.lastArea.Min.Y+t.Dialog.View.GetBorderTopSize()+t.Dialog.View.GetPaddingTop()+titleHeight(title, separator, inputView)+c.list.Height(),
 	)
 
 	cur := c.Cursor()
@@ -109,7 +109,7 @@ func (c *Commands) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	return cur
 }
 
-func titleHeight(t *styles.Styles, title, separator, inputView string, innerWidth int) int {
+func titleHeight(title, separator, inputView string) int {
 	total := 0
 	total += lipgloss.Height(title)
 	total += lipgloss.Height(separator)

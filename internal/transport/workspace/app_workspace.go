@@ -619,7 +619,8 @@ func (w *AppWorkspace) BuildCommandRegistry() []slash.CommandDescriptor {
 		}
 	}
 
-	builtinDescs := []slash.CommandDescriptor{
+	builtinDescs := make([]slash.CommandDescriptor, 0, 32+len(customDescs))
+	builtinDescs = append(builtinDescs, []slash.CommandDescriptor{
 		{ID: "skplan", Title: "SK Plan", Description: "/plan", Category: slash.CommandCategorySystem, Risk: slash.RiskLevelRead},
 		{ID: "skplan_start", Title: "Start New Plan", Category: slash.CommandCategorySystem, Risk: slash.RiskLevelRead, ParentID: "skplan"},
 		{ID: "skplan_code", Title: "Quick Code Mode", Category: slash.CommandCategorySystem, Risk: slash.RiskLevelRead, ParentID: "skplan"},
@@ -652,7 +653,7 @@ func (w *AppWorkspace) BuildCommandRegistry() []slash.CommandDescriptor {
 		{ID: "reload", Title: "Reload Config", Shortcut: "/reload", Category: slash.CommandCategoryAdmin, Risk: slash.RiskLevelWrite},
 		{ID: "reload_mcp", Title: "Reload MCP Servers", Shortcut: "/reload-mcp", Category: slash.CommandCategoryAdmin, Risk: slash.RiskLevelWrite},
 		{ID: "quit", Title: "Quit", Shortcut: "/quit", Category: slash.CommandCategoryAdmin, Risk: slash.RiskLevelDangerous},
-	}
+	}...)
 
 	return append(append(builtinDescs, customDescs...), mcpDescs...)
 }

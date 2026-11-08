@@ -204,39 +204,44 @@ func constraintDimensions(q StructuredQuery) []constraintDimension {
 		})
 	}
 	if q.After != nil || q.Before != nil {
-		var afterTime, beforeTime time.Time
-		if q.After != nil {
-			afterTime, _ = time.Parse("2006-01-02", *q.After)
-		}
-		if q.Before != nil {
-			beforeTime, _ = time.Parse("2006-01-02", *q.Before)
-		}
-		labelParts := make([]string, 0, 2)
-		if q.After != nil {
-			labelParts = append(labelParts, "after:"+*q.After)
-		}
-		if q.Before != nil {
-			labelParts = append(labelParts, "before:"+*q.Before)
-		}
-		after, before := q.After, q.Before
-		dims = append(dims, constraintDimension{
-			label: strings.Join(labelParts, " "),
-			pred: func(src FilterableSource) bool {
-				t, ok := sourceTime(src)
-				if !ok {
-					return true // undated: cannot prove violation
-				}
-				if after != nil && t.Before(afterTime) {
-					return false
-				}
-				if before != nil && !t.Before(beforeTime) {
-					return false
-				}
-				return true
-			},
-		})
+		dims = append(dims, dateConstraintDimension(q))
 	}
 	return dims
+}
+
+// dateConstraintDimension builds the after/before publication-date filter.
+func dateConstraintDimension(q StructuredQuery) constraintDimension {
+	var afterTime, beforeTime time.Time
+	if q.After != nil {
+		afterTime, _ = time.Parse("2006-01-02", *q.After)
+	}
+	if q.Before != nil {
+		beforeTime, _ = time.Parse("2006-01-02", *q.Before)
+	}
+	labelParts := make([]string, 0, 2)
+	if q.After != nil {
+		labelParts = append(labelParts, "after:"+*q.After)
+	}
+	if q.Before != nil {
+		labelParts = append(labelParts, "before:"+*q.Before)
+	}
+	after, before := q.After, q.Before
+	return constraintDimension{
+		label: strings.Join(labelParts, " "),
+		pred: func(src FilterableSource) bool {
+			t, ok := sourceTime(src)
+			if !ok {
+				return true // undated: cannot prove violation
+			}
+			if after != nil && t.Before(afterTime) {
+				return false
+			}
+			if before != nil && !t.Before(beforeTime) {
+				return false
+			}
+			return true
+		},
+	}
 }
 
 // MatchesQueryConstraints checks every filterable dimension of q against

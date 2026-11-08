@@ -41,6 +41,8 @@ func (c *Commands) HandleMsg(msg tea.Msg) Action {
 				c.list.SelectNext()
 			}
 			c.list.ScrollToSelected()
+		default:
+			// Other wheel buttons are not handled here.
 		}
 	case tea.MouseClickMsg:
 		return c.handleMouseClick(msg)
@@ -81,37 +83,7 @@ func (c *Commands) HandleMsg(msg tea.Msg) Action {
 			}
 			c.list.ScrollToSelected()
 		case key.Matches(msg, c.keyMap.Select):
-			if selectedItem := c.list.SelectedItem(); selectedItem != nil {
-				if item, ok := selectedItem.(*CommandItem); ok && item != nil {
-					// If filtering at root level and selected a child item,
-					// navigate into its parent submenu first.
-					if c.filterActive && item.parent != nil && !c.isInSubmenu() {
-						c.navStack = append(c.navStack, item.parent)
-						c.pushSubmenu(item.parent)
-						// Find and select the child in the submenu.
-						for i, filterable := range c.list.FilteredItems() {
-							if child, ok := filterable.(*CommandItem); ok && child == item {
-								c.list.SetSelected(i)
-								break
-							}
-						}
-						c.list.ScrollToSelected()
-						c.input.SetValue("")
-						c.filterActive = false
-						// If the selected child itself has children, let the user
-						// navigate deeper; otherwise execute its action directly.
-						if item.HasChildren() {
-							return nil
-						}
-						return item.Action()
-					}
-					if item.HasChildren() {
-						c.pushSubmenu(item)
-						return nil
-					}
-					return item.Action()
-				}
-			}
+			return c.selectionAction()
 		case key.Matches(msg, c.keyMap.Tab):
 			if len(c.customCommands) > 0 || len(c.mcpPrompts) > 0 {
 				c.selected = c.nextCommandType()
@@ -163,6 +135,53 @@ func (c *Commands) HandleMsg(msg tea.Msg) Action {
 		}
 	}
 	return nil
+}
+
+// selectionAction activates the highlighted command. A filtered child selected
+// at the root level first navigates into its parent submenu; commands with
+// children open the submenu instead of executing.
+func (c *Commands) selectionAction() Action {
+	selectedItem := c.list.SelectedItem()
+	if selectedItem == nil {
+		return nil
+	}
+	item, ok := selectedItem.(*CommandItem)
+	if !ok || item == nil {
+		return nil
+	}
+
+	// If filtering at root level and selected a child item,
+	// navigate into its parent submenu first.
+	if c.filterActive && item.parent != nil && !c.isInSubmenu() {
+		c.navStack = append(c.navStack, item.parent)
+		c.pushSubmenu(item.parent)
+		c.selectFilteredChild(item)
+		c.list.ScrollToSelected()
+		c.input.SetValue("")
+		c.filterActive = false
+		// If the selected child itself has children, let the user
+		// navigate deeper; otherwise execute its action directly.
+		if item.HasChildren() {
+			return nil
+		}
+		return item.Action()
+	}
+
+	if item.HasChildren() {
+		c.pushSubmenu(item)
+		return nil
+	}
+	return item.Action()
+}
+
+// selectFilteredChild selects the filtered row that renders item.
+func (c *Commands) selectFilteredChild(item *CommandItem) {
+	for i, filterable := range c.list.FilteredItems() {
+		if child, ok := filterable.(*CommandItem); ok && child == item {
+			c.list.SetSelected(i)
+			return
+		}
+	}
 }
 
 func (c *Commands) handleMouseClick(msg tea.MouseClickMsg) Action {

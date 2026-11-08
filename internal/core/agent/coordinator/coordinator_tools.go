@@ -28,7 +28,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/shellruntime/screencap"
 	"github.com/nextsko/mocode-agent/internal/core/tools"
-	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/agent"
+	agenttools "github.com/nextsko/mocode-agent/internal/core/tools/internalx/agent"
 	"github.com/nextsko/mocode-agent/internal/domain/messenger"
 	"github.com/nextsko/mocode-agent/internal/util/infra"
 	"github.com/qjebbs/go-jsons"
@@ -172,8 +172,8 @@ func getProviderOptions(model Model, providerCfg config.ProviderConfig) fantasy.
 
 		// "reasoning effort" is a standard OpenAI field, but "thinking" is not.
 		// Setting it in the right way for each provider.
-		// TODO: Abstract this in Fantasy somehow?
-		// TODO: Allow custom providers to specify how to set this?
+		// Future work: abstract this in Fantasy and let custom providers
+		// specify how to set this.
 		switch providerCfg.ID {
 		case string(catwalk.InferenceProviderIoNet):
 			extraBody["chat_template_kwargs"] = map[string]any{
@@ -197,6 +197,9 @@ func getProviderOptions(model Model, providerCfg config.ProviderConfig) fantasy.
 		if err == nil {
 			options[openaicompat.Name] = parsed
 		}
+	default:
+		// Other provider types need no option translation here; they read
+		// their options straight from the merged config.
 	}
 
 	return options
@@ -213,7 +216,7 @@ func mergeCallOptions(model Model, cfg config.ProviderConfig) (fantasy.ProviderO
 }
 
 func (c *Coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, agent config.Agent, isSubAgent bool) (SessionAgent, error) {
-	large, small, err := c.buildAgentModels(ctx, isSubAgent)
+	large, small, err := c.buildAgentModels(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +248,7 @@ func (c *Coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, age
 	})
 
 	c.readyWg.Go(func() error {
-		tools, err := c.buildTools(ctx, agent, isSubAgent)
+		tools, err := c.buildTools(ctx, agent)
 		if err != nil {
 			return err
 		}
@@ -256,7 +259,7 @@ func (c *Coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, age
 	return result, nil
 }
 
-func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isSubAgent bool) ([]fantasy.AgentTool, error) {
+func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent) ([]fantasy.AgentTool, error) {
 	// ── coordinator-owned tools (call back into coordinator state) ───────────
 	var allTools []fantasy.AgentTool
 	if slices.Contains(agentCfg.AllowedTools, AgentToolName) {
@@ -267,11 +270,7 @@ func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 		allTools = append(allTools, agentTool)
 	}
 	if slices.Contains(agentCfg.AllowedTools, tools.AgenticFetchToolName) {
-		agenticFetchTool, err := c.agenticFetchTool(ctx, nil)
-		if err != nil {
-			return nil, err
-		}
-		allTools = append(allTools, agenticFetchTool)
+		allTools = append(allTools, c.agenticFetchTool(ctx, nil))
 	}
 
 	// ── standard tools via registry ──────────────────────────────────────────
@@ -399,8 +398,9 @@ func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 	return filteredTools, nil
 }
 
-// TODO: when we support multiple agents we need to change this so that we pass in the agent specific model config.
-func (c *Coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Model, Model, error) {
+// Future work: when we support multiple agents this needs to take the agent
+// specific model config into account.
+func (c *Coordinator) buildAgentModels(ctx context.Context) (Model, Model, error) {
 	largeModelCfg, ok := c.cfg.Config().Models[config.SelectedModelTypeLarge]
 	if !ok {
 		return Model{}, Model{}, errLargeModelNotSelected
@@ -415,7 +415,7 @@ func (c *Coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Mo
 		return Model{}, Model{}, errLargeModelProviderNotConfigured
 	}
 
-	largeProvider, err := c.buildProvider(largeProviderCfg, largeModelCfg, isSubAgent)
+	largeProvider, err := c.buildProvider(largeProviderCfg, largeModelCfg)
 	if err != nil {
 		return Model{}, Model{}, err
 	}
@@ -425,7 +425,7 @@ func (c *Coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Mo
 		return Model{}, Model{}, errSmallModelProviderNotConfigured
 	}
 
-	smallProvider, err := c.buildProvider(smallProviderCfg, smallModelCfg, true)
+	smallProvider, err := c.buildProvider(smallProviderCfg, smallModelCfg)
 	if err != nil {
 		return Model{}, Model{}, err
 	}
@@ -508,7 +508,7 @@ func (c *Coordinator) withFailover(ctx context.Context, primary fantasy.Language
 	if !ok {
 		return nil, fmt.Errorf("failover: fallback provider %q not configured", fb.Provider)
 	}
-	fbProvider, err := c.buildProvider(fbProviderCfg, fb, true)
+	fbProvider, err := c.buildProvider(fbProviderCfg, fb)
 	if err != nil {
 		return nil, fmt.Errorf("failover: build fallback provider: %w", err)
 	}

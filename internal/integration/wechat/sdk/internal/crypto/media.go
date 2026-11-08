@@ -5,6 +5,7 @@ import (
 	"crypto/md5" //nolint:gosec // MD5 is required by the WeChat file-transfer protocol.
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 )
 
 // AesEcbPaddedSize returns the size after PKCS7 padding for AES-ECB.
@@ -17,7 +18,7 @@ func AesEcbPaddedSize(rawSize int64) int64 {
 func RandomHex(n int) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
-		return "", err
+		return "", fmt.Errorf("generate random hex: %w", err)
 	}
 	return hex.EncodeToString(b), nil
 }

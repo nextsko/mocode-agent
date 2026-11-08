@@ -253,6 +253,9 @@ func ParseSearchQuery(raw string) StructuredQuery {
 					q.Filetypes = append(q.Filetypes, ext)
 				}
 			}
+		default:
+			// Date and language directives are handled before pushConstraint
+			// is called, so they never reach this switch.
 		}
 	}
 
@@ -335,7 +338,7 @@ func ParseSearchQuery(raw string) StructuredQuery {
 			continue
 		}
 
-		if match != nil && field != "" {
+		if match != nil && field != "" { //nolint:nestif // Directive parsing shares the tokenizer's mutable closure state; extracting it would require threading six variables.
 			value := strings.TrimSpace(match[3])
 			// site: example.com — lenient: adopt the next plain token as
 			// the value.

@@ -106,7 +106,10 @@ func (p *ttyBackgroundProcess) Terminate(force bool) error {
 		sig = syscall.SIGKILL
 	}
 
-	return syscall.Kill(-p.cmd.Process.Pid, sig)
+	if err := syscall.Kill(-p.cmd.Process.Pid, sig); err != nil {
+		return fmt.Errorf("signal background process: %w", err)
+	}
+	return nil
 }
 
 // WriteStdin feeds the child process through the PTY master, so interactive
@@ -115,7 +118,11 @@ func (p *ttyBackgroundProcess) WriteStdin(b []byte) (int, error) {
 	if p.ptm == nil {
 		return 0, fmt.Errorf("tty is closed")
 	}
-	return p.ptm.Write(b)
+	n, err := p.ptm.Write(b)
+	if err != nil {
+		return n, fmt.Errorf("write to tty: %w", err)
+	}
+	return n, nil
 }
 
 func openBackgroundPTY() (*os.File, *os.File, error) {

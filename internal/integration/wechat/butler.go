@@ -49,6 +49,7 @@ const (
 	butlerErrorReply    = "抱歉，处理出错了，请稍后重试。"
 	butlerInitFailReply = "抱歉，系统正在初始化，请稍后再试。"
 	butlerTimeoutReply  = "抱歉，处理超时，请稍后再试。"
+	butlerNotReadyReply = "❌ 系统未就绪"
 	busyPollInterval    = 250 * time.Millisecond
 )
 
@@ -167,7 +168,7 @@ func (h *llmButlerHandler) messageCount(ctx context.Context, sessID string) (int
 func (h *llmButlerHandler) waitForAssistantReply(ctx context.Context, sessID string, beforeCount int) (string, error) {
 	for {
 		if err := ctx.Err(); err != nil {
-			return "", err
+			return "", fmt.Errorf("wait for assistant reply: %w", err)
 		}
 
 		busy := h.ctx.Workspace.AgentIsSessionBusy(ctx, sessID)
@@ -186,6 +187,30 @@ func (h *llmButlerHandler) waitForAssistantReply(ctx context.Context, sessID str
 
 		time.Sleep(busyPollInterval)
 	}
+}
+
+// createButlerSession creates the butler's agent session for userID and adopts
+// it, deleting the fresh session when another goroutine won the race.
+func (h *llmButlerHandler) createButlerSession(ctx context.Context, userID string, st *userButlerState) error {
+	sid, err := h.ctx.Workspace.CreateSession(ctx, "Butler: "+userID)
+	if err != nil {
+		return err
+	}
+
+	h.mu.Lock()
+	if st.sessID == "" {
+		st.sessID = sid
+		slog.Info("Butler session created", "userID", userID, "sessionID", sid)
+		h.mu.Unlock()
+		return nil
+	}
+	orphan := sid
+	h.mu.Unlock()
+
+	if delErr := h.ctx.Workspace.DeleteSession(ctx, orphan); delErr != nil {
+		slog.Warn("Failed to delete orphan butler session", "sessionID", orphan, "error", delErr)
+	}
+	return nil
 }
 
 // extractAssistantAfter returns the latest non-empty assistant message after beforeCount.
@@ -214,24 +239,9 @@ func (h *llmButlerHandler) ensureSession(ctx context.Context, userID string) err
 	h.mu.Unlock()
 
 	if needsCreate {
-		sid, err := h.ctx.Workspace.CreateSession(ctx, "Butler: "+userID)
-		if err != nil {
+		if err := h.createButlerSession(ctx, userID, st); err != nil {
 			return err
 		}
-
-		h.mu.Lock()
-		if st.sessID == "" {
-			st.sessID = sid
-			slog.Info("Butler session created", "userID", userID, "sessionID", sid)
-		} else {
-			orphan := sid
-			h.mu.Unlock()
-			if delErr := h.ctx.Workspace.DeleteSession(ctx, orphan); delErr != nil {
-				slog.Warn("Failed to delete orphan butler session", "sessionID", orphan, "error", delErr)
-			}
-			h.mu.Lock()
-		}
-		h.mu.Unlock()
 	}
 
 	h.mu.Lock()
@@ -330,7 +340,7 @@ func (h *llmButlerHandler) handleButlerSlash(ctx context.Context, userID, text s
 // inject). When idle the text is simply stored as the next context.
 func (h *llmButlerHandler) handleGuide(ctx context.Context, userID, text string) string {
 	if h.ctx.Workspace == nil {
-		return "❌ 系统未就绪"
+		return butlerNotReadyReply
 	}
 	if err := h.ensureSession(ctx, userID); err != nil {
 		return butlerInitFailReply
@@ -353,7 +363,7 @@ func (h *llmButlerHandler) handleGuide(ctx context.Context, userID, text string)
 // waits for the forced turn's reply like a normal run.
 func (h *llmButlerHandler) handleForce(ctx context.Context, userID, text string) string {
 	if h.ctx.Workspace == nil {
-		return "❌ 系统未就绪"
+		return butlerNotReadyReply
 	}
 	if err := h.ensureSession(ctx, userID); err != nil {
 		return butlerInitFailReply
@@ -392,7 +402,7 @@ func (h *llmButlerHandler) handleForce(ctx context.Context, userID, text string)
 
 func (h *llmButlerHandler) switchSession(ctx context.Context, userID, sessionID string) string {
 	if h.ctx.Workspace == nil {
-		return "❌ 系统未就绪"
+		return butlerNotReadyReply
 	}
 	sessions, err := h.ctx.Workspace.ListSessions(ctx)
 	if err != nil {
@@ -414,7 +424,7 @@ func (h *llmButlerHandler) switchSession(ctx context.Context, userID, sessionID 
 
 func (h *llmButlerHandler) createSession(ctx context.Context, userID, name string) string {
 	if h.ctx.Workspace == nil {
-		return "❌ 系统未就绪"
+		return butlerNotReadyReply
 	}
 	title := name
 	if title == "" {
@@ -430,7 +440,7 @@ func (h *llmButlerHandler) createSession(ctx context.Context, userID, name strin
 
 func (h *llmButlerHandler) deleteSession(ctx context.Context, sessionID string) string {
 	if h.ctx.Workspace == nil {
-		return "❌ 系统未就绪"
+		return butlerNotReadyReply
 	}
 	if err := h.ctx.Workspace.DeleteSession(ctx, sessionID); err != nil {
 		return fmt.Sprintf("❌ 删除失败: %v", err)

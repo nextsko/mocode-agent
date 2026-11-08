@@ -52,7 +52,7 @@ func handleSleep(ctx context.Context, args []string, stderr io.Writer) error {
 	case <-time.After(total):
 		return nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("sleep interrupted: %w", ctx.Err())
 	}
 }
 
@@ -82,7 +82,7 @@ func parseSleepDuration(s string) (time.Duration, error) {
 
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("parse duration %q: %w", s, err)
 	}
 	if v < 0 {
 		return 0, fmt.Errorf("negative duration")

@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"fmt"
 	"os"
 )
 
@@ -19,4 +20,10 @@ func readFileIfExists(path string) ([]byte, error) {
 }
 
 // statFile is os.Stat, named so the memory package reads uniformly.
-func statFile(path string) (os.FileInfo, error) { return os.Stat(path) }
+func statFile(path string) (os.FileInfo, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("stating %s: %w", path, err)
+	}
+	return info, nil
+}

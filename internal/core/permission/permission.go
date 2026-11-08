@@ -2,6 +2,7 @@ package permission
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -248,7 +249,7 @@ func (s *permissionService) Request(ctx context.Context, opts CreatePermissionRe
 
 	select {
 	case <-ctx.Done():
-		return false, ctx.Err()
+		return false, fmt.Errorf("waiting for permission decision: %w", ctx.Err())
 	case granted := <-respCh:
 		return granted, nil
 	}

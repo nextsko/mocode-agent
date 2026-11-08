@@ -157,7 +157,7 @@ func (c *Client) Close(ctx context.Context) error {
 		return err
 	case <-closeCtx.Done():
 		c.client.Kill()
-		return closeCtx.Err()
+		return fmt.Errorf("close LSP client: %w", closeCtx.Err())
 	}
 }
 

@@ -119,7 +119,7 @@ func (ms *MessageStore) Get(ctx context.Context, id string) (message.Message, er
 		var found *jsonlMessage
 		_ = writer.ScanLines(func(line string) error {
 			var jm jsonlMessage
-			if err := json.Unmarshal([]byte(line), &jm); err != nil {
+			if !decodeJSONLine(line, &jm) {
 				return nil // skip corrupt lines
 			}
 			if jm.ID == id {
@@ -144,14 +144,12 @@ func (ms *MessageStore) List(ctx context.Context, sessionID string) ([]message.M
 	}
 	err := writer.ScanLines(func(line string) error {
 		var jm jsonlMessage
-		if err := json.Unmarshal([]byte(line), &jm); err != nil {
+		if !decodeJSONLine(line, &jm) {
 			return nil // skip corrupt
 		}
-		msg, err := jsonlToMessage(jm)
-		if err != nil {
-			return nil
+		if msg, err := jsonlToMessage(jm); err == nil {
+			msgs = append(msgs, msg)
 		}
-		msgs = append(msgs, msg)
 		return nil
 	})
 	return msgs, err
@@ -177,7 +175,8 @@ func (ms *MessageStore) ListAllUserMessages(ctx context.Context) ([]message.Mess
 	dir := filepath.Join(ms.store.ProjectDir, "sessions")
 	entries, err := readDir(dir)
 	if err != nil {
-		return nil, nil
+		// A missing or unreadable sessions directory simply has no messages.
+		return nil, nil //nolint:nilerr // Soft-fail by design: absence of sessions is an empty list.
 	}
 	var all []message.Message
 	for _, entry := range entries {

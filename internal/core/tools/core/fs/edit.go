@@ -183,7 +183,7 @@ func createNewFile(edit editContext, filePath, content string, callID string) (c
 			Path:        fsext.PathOrPrefix(filePath, edit.workingDir),
 			ToolCallID:  callID,
 			ToolName:    EditToolName,
-			Action:      "write",
+			Action:      WriteToolName,
 			Description: fmt.Sprintf("Create file %s", filePath),
 			Params: EditPermissionsParams{
 				FilePath:   filePath,
@@ -299,7 +299,7 @@ func deleteContent(edit editContext, filePath, oldString string, replaceAll bool
 			Path:        fsext.PathOrPrefix(filePath, edit.workingDir),
 			ToolCallID:  callID,
 			ToolName:    EditToolName,
-			Action:      "write",
+			Action:      WriteToolName,
 			Description: fmt.Sprintf("Delete content from file %s", filePath),
 			Params: EditPermissionsParams{
 				FilePath:   filePath,
@@ -319,7 +319,7 @@ func deleteContent(edit editContext, filePath, oldString string, replaceAll bool
 		newContent, _ = fsext.ToWindowsLineEndings(newContent)
 	}
 
-	err = os.WriteFile(filePath, []byte(newContent), 0o600)
+	err = os.WriteFile(filePath, []byte(newContent), 0o600) //nolint:gosec // The path is the user-authorized target of this editing tool.
 	if err != nil {
 		return contract.ToolResult{}, fmt.Errorf("failed to write file: %w", err)
 	}
@@ -427,7 +427,7 @@ func replaceContent(edit editContext, filePath, oldString, newString string, rep
 			Path:        fsext.PathOrPrefix(filePath, edit.workingDir),
 			ToolCallID:  callID,
 			ToolName:    EditToolName,
-			Action:      "write",
+			Action:      WriteToolName,
 			Description: fmt.Sprintf("Replace content in file %s", filePath),
 			Params: EditPermissionsParams{
 				FilePath:   filePath,
@@ -447,7 +447,7 @@ func replaceContent(edit editContext, filePath, oldString, newString string, rep
 		newContent, _ = fsext.ToWindowsLineEndings(newContent)
 	}
 
-	err = os.WriteFile(filePath, []byte(newContent), 0o600)
+	err = os.WriteFile(filePath, []byte(newContent), 0o600) //nolint:gosec // The path is the user-authorized target of this editing tool.
 	if err != nil {
 		return contract.ToolResult{}, fmt.Errorf("failed to write file: %w", err)
 	}

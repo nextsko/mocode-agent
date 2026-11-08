@@ -132,9 +132,9 @@ func (l *List) Len() int {
 	return len(l.items)
 }
 
-// lastOffsetItem returns the index and line offsets of the last item that can
+// lastOffsetItem returns the index and line offset of the last item that can
 // be partially visible in the viewport.
-func (l *List) lastOffsetItem() (int, int, int) {
+func (l *List) lastOffsetItem() (int, int) {
 	var totalHeight int
 	var idx int
 	for idx = len(l.items) - 1; idx >= 0; idx-- {
@@ -153,7 +153,7 @@ func (l *List) lastOffsetItem() (int, int, int) {
 	lineOffset := max(totalHeight-l.height, 0)
 	idx = max(idx, 0)
 
-	return idx, lineOffset, totalHeight
+	return idx, lineOffset
 }
 
 // getItem renders (if needed) and returns the item at the given index.
@@ -205,36 +205,7 @@ func (l *List) ScrollBy(lines int) {
 	}
 
 	if lines > 0 {
-		if l.AtBottom() {
-			// Already at bottom
-			return
-		}
-
-		// Scroll down
-		l.offsetLine += lines
-		currentItem := l.getItem(l.offsetIdx)
-		for l.offsetLine >= currentItem.height {
-			l.offsetLine -= currentItem.height
-			if l.gap > 0 {
-				l.offsetLine = max(0, l.offsetLine-l.gap)
-			}
-
-			// Move to next item
-			l.offsetIdx++
-			if l.offsetIdx > len(l.items)-1 {
-				// Reached bottom
-				l.ScrollToBottom()
-				return
-			}
-			currentItem = l.getItem(l.offsetIdx)
-		}
-
-		lastOffsetIdx, lastOffsetLine, _ := l.lastOffsetItem()
-		if l.offsetIdx > lastOffsetIdx || (l.offsetIdx == lastOffsetIdx && l.offsetLine > lastOffsetLine) {
-			// Clamp to bottom
-			l.offsetIdx = lastOffsetIdx
-			l.offsetLine = lastOffsetLine
-		}
+		l.scrollDown(lines)
 	} else if lines < 0 {
 		// Scroll up
 		l.offsetLine += lines // lines is negative
@@ -253,6 +224,39 @@ func (l *List) ScrollBy(lines int) {
 			}
 			l.offsetLine += totalHeight
 		}
+	}
+}
+
+// scrollDown advances the viewport by lines lines, stopping at the bottom.
+func (l *List) scrollDown(lines int) {
+	if l.AtBottom() {
+		// Already at bottom
+		return
+	}
+
+	l.offsetLine += lines
+	currentItem := l.getItem(l.offsetIdx)
+	for l.offsetLine >= currentItem.height {
+		l.offsetLine -= currentItem.height
+		if l.gap > 0 {
+			l.offsetLine = max(0, l.offsetLine-l.gap)
+		}
+
+		// Move to next item
+		l.offsetIdx++
+		if l.offsetIdx > len(l.items)-1 {
+			// Reached bottom
+			l.ScrollToBottom()
+			return
+		}
+		currentItem = l.getItem(l.offsetIdx)
+	}
+
+	lastOffsetIdx, lastOffsetLine := l.lastOffsetItem()
+	if l.offsetIdx > lastOffsetIdx || (l.offsetIdx == lastOffsetIdx && l.offsetLine > lastOffsetLine) {
+		// Clamp to bottom
+		l.offsetIdx = lastOffsetIdx
+		l.offsetLine = lastOffsetLine
 	}
 }
 
@@ -411,12 +415,11 @@ func (l *List) PrependItems(items ...Item) {
 
 // SetItems sets the items in the list.
 func (l *List) SetItems(items ...Item) {
-	l.setItems(true, items...)
+	l.setItems(items...)
 }
 
-// setItems sets the items in the list. If evict is true, it clears the
-// rendered item cache.
-func (l *List) setItems(evict bool, items ...Item) {
+// setItems replaces the items in the list.
+func (l *List) setItems(items ...Item) {
 	l.items = items
 	l.selectedIdx = min(l.selectedIdx, len(l.items)-1)
 	l.offsetIdx = min(l.offsetIdx, len(l.items)-1)
@@ -480,7 +483,7 @@ func (l *List) ScrollToBottom() {
 		return
 	}
 
-	lastOffsetIdx, lastOffsetLine, _ := l.lastOffsetItem()
+	lastOffsetIdx, lastOffsetLine := l.lastOffsetItem()
 	l.offsetIdx = lastOffsetIdx
 	l.offsetLine = lastOffsetLine
 }

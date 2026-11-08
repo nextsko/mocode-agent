@@ -262,7 +262,7 @@ type UI struct {
 	todoContinuations map[string]*todoAutoContinueState
 	backgroundJobs    map[string]string
 
-	// Todo spinner
+	// To-do spinner
 	todoSpinner    spinner.Model
 	todoIsSpinning bool
 
@@ -560,7 +560,7 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case sessionFilesUpdatesMsg:
 		m.sessionFiles = msg.sessionFiles
-		var paths []string
+		paths := make([]string, 0, len(msg.sessionFiles))
 		for _, f := range msg.sessionFiles {
 			paths = append(paths, f.LatestVersion.Path)
 		}
@@ -718,6 +718,8 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.com.Workspace.PermissionSkipRequests() {
 			m.textarea.Placeholder = "Yolo mode!"
 		}
+	default:
+		// No focus-specific placeholder logic without a focused pane.
 	}
 
 	// at this point this can only handle [message.Attachment] message, and we

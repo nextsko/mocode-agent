@@ -44,10 +44,10 @@ func NewSessionSummaryPortTool(sessions session.Service, messages message.Servic
 	return contract.NewFunc(SessionSummaryToolName, "Inspect or schedule summarization for the current session.", map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"action": map[string]any{
+			schemaActionKey: map[string]any{
 				"type":        "string",
 				"description": "Action: latest, status, or schedule. Defaults to latest",
-				"enum":        []string{"latest", "status", "schedule"},
+				schemaEnumKey: []string{"latest", "status", "schedule"},
 			},
 		},
 	}, func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
@@ -59,9 +59,9 @@ func NewSessionSummaryPortTool(sessions session.Service, messages message.Servic
 		}
 		text, metadata, err := runSessionSummary(ctx, sessions, messages, workingDir, schedule, params)
 		if err != nil {
-			return contract.ToolResult{Error: err}, nil
+			return contract.ToolResult{Error: err}, nil //nolint:nilerr // Tool-level failures are reported in the result, not as a Go error.
 		}
-		return contract.ToolResult{Content: text, Metadata: map[string]any{"result": metadata}}, nil
+		return contract.ToolResult{Content: text, Metadata: map[string]any{metaResultKey: metadata}}, nil
 	})
 }
 

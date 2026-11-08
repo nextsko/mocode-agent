@@ -60,7 +60,11 @@ type configLoader interface {
 type defaultConfigLoader struct{}
 
 func (defaultConfigLoader) Get(host, key string) (string, error) {
-	return ssh_config.GetStrict(host, key)
+	value, err := ssh_config.GetStrict(host, key)
+	if err != nil {
+		return "", fmt.Errorf("read ssh config %s %s: %w", host, key, err)
+	}
+	return value, nil
 }
 
 // Resolver turns a user-supplied "host" string into a HostSpec.
@@ -187,23 +191,11 @@ func parseExplicit(input string) HostSpec {
 
 	// IPv6 literal: [::1]:22 or [::1]
 	if strings.HasPrefix(rest, "[") {
-		end := strings.Index(rest, "]")
-		if end < 0 {
+		spec, ok := parseBracketedIPv6(rest, user, input)
+		if !ok {
 			return HostSpec{} // malformed
 		}
-		host := rest[1:end]
-		port := 0
-		if rest[end+1:] != "" {
-			if !strings.HasPrefix(rest[end+1:], ":") {
-				return HostSpec{}
-			}
-			p, err := strconv.Atoi(rest[end+2:])
-			if err != nil {
-				return HostSpec{}
-			}
-			port = p
-		}
-		return HostSpec{Host: host, Port: port, User: user, Alias: input}
+		return spec
 	}
 
 	// host:port form
@@ -223,6 +215,27 @@ func parseExplicit(input string) HostSpec {
 	return HostSpec{}
 }
 
+// parseBracketedIPv6 parses an IPv6 literal of the form [host] or [host]:port.
+func parseBracketedIPv6(rest, user, input string) (HostSpec, bool) {
+	end := strings.Index(rest, "]")
+	if end < 0 {
+		return HostSpec{}, false
+	}
+	host := rest[1:end]
+	port := 0
+	if rest[end+1:] != "" {
+		if !strings.HasPrefix(rest[end+1:], ":") {
+			return HostSpec{}, false
+		}
+		p, err := strconv.Atoi(rest[end+2:])
+		if err != nil {
+			return HostSpec{}, false
+		}
+		port = p
+	}
+	return HostSpec{Host: host, Port: port, User: user, Alias: input}, true
+}
+
 func parsePort(s string) (int, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -230,7 +243,7 @@ func parsePort(s string) (int, error) {
 	}
 	p, err := strconv.Atoi(s)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("parse port %q: %w", s, err)
 	}
 	if p < 1 || p > 65535 {
 		return 0, fmt.Errorf("port out of range: %d", p)

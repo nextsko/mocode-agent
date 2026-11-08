@@ -185,7 +185,17 @@ func (w *JSONLWriter) ScanLines(fn func(line string) error) error {
 			return err
 		}
 	}
-	return scanner.Err()
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("scan %s: %w", w.path, err)
+	}
+	return nil
+}
+
+// decodeJSONLine unmarshals one JSONL line into v. It reports false for lines
+// that are not valid JSON; callers skip those so a single corrupt record
+// cannot hide the rest of the file.
+func decodeJSONLine(line string, v any) bool {
+	return json.Unmarshal([]byte(line), v) == nil
 }
 
 // WriteAll atomically replaces the entire file content.
@@ -254,7 +264,10 @@ func (w *JSONLWriter) Remove() error {
 	if os.IsNotExist(err) {
 		return nil
 	}
-	return err
+	if err != nil {
+		return fmt.Errorf("remove %s: %w", w.path, err)
+	}
+	return nil
 }
 
 // WriteJSON atomic writes a JSON value to a file.
@@ -297,5 +310,8 @@ func ReadJSON(path string, v any) error {
 		return fmt.Errorf("open %s: %w", path, err)
 	}
 	defer f.Close()
-	return json.NewDecoder(f).Decode(v)
+	if err := json.NewDecoder(f).Decode(v); err != nil {
+		return fmt.Errorf("decode %s: %w", path, err)
+	}
+	return nil
 }

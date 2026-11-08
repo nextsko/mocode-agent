@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"charm.land/lipgloss/v2"
@@ -38,7 +39,7 @@ Mocode projects --json
 
 			data, err := json.Marshal(output)
 			if err != nil {
-				return err
+				return fmt.Errorf("marshal projects: %w", err)
 			}
 			cmd.Println(string(data))
 			return nil

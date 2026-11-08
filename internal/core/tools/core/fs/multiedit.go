@@ -247,7 +247,7 @@ func processMultiEditWithCreation(edit multiEditContext, params MultiEditParams,
 		Path:        fsext.PathOrPrefix(params.FilePath, edit.workingDir),
 		ToolCallID:  callID,
 		ToolName:    MultiEditToolName,
-		Action:      "write",
+		Action:      WriteToolName,
 		Description: description,
 		Params: MultiEditPermissionsParams{
 			FilePath:   params.FilePath,
@@ -386,7 +386,7 @@ func processMultiEditExistingFile(edit multiEditContext, params MultiEditParams,
 		Path:        fsext.PathOrPrefix(params.FilePath, edit.workingDir),
 		ToolCallID:  callID,
 		ToolName:    MultiEditToolName,
-		Action:      "write",
+		Action:      WriteToolName,
 		Description: description,
 		Params: MultiEditPermissionsParams{
 			FilePath:   params.FilePath,
@@ -406,7 +406,7 @@ func processMultiEditExistingFile(edit multiEditContext, params MultiEditParams,
 	}
 
 	// Write the updated content
-	err = os.WriteFile(params.FilePath, []byte(currentContent), 0o600)
+	err = os.WriteFile(params.FilePath, []byte(currentContent), 0o600) //nolint:gosec // The path is the user-authorized target of this editing tool.
 	if err != nil {
 		return contract.ToolResult{}, fmt.Errorf("failed to write file: %w", err)
 	}

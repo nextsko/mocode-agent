@@ -302,13 +302,17 @@ func (s *Shell) builtinHandler() func(next interp.ExecHandlerFunc) interp.ExecHa
 
 // newInterp creates a new interpreter with the current shell state.
 func (s *Shell) newInterp(stdin io.Reader, stdout, stderr io.Writer) (*interp.Runner, error) {
-	return interp.New(
+	runner, err := interp.New(
 		interp.StdIO(stdin, stdout, stderr),
 		interp.Interactive(false),
 		interp.Env(expand.ListEnviron(s.env...)),
 		interp.Dir(s.cwd),
 		interp.ExecHandlers(s.execHandlers()...),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("create interpreter: %w", err)
+	}
+	return runner, nil
 }
 
 // updateShellFromRunner updates the shell from the interpreter after execution.
@@ -356,7 +360,10 @@ func (s *Shell) execCommon(ctx context.Context, command string, stdin io.Reader,
 	}
 
 	err = runner.Run(ctx, line)
-	return err
+	if err != nil {
+		return fmt.Errorf("run command: %w", err)
+	}
+	return nil
 }
 
 // exec executes commands using a cross-platform shell interpreter.

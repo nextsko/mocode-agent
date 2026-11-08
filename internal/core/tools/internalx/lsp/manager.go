@@ -166,6 +166,8 @@ func (s *Manager) startServer(ctx context.Context, name, filepath string, server
 			s.callback(name, client)
 			// already done, return
 			return
+		default:
+			// Unstarted, stopped, and failed servers fall through to start.
 		}
 	}
 
@@ -197,6 +199,8 @@ func (s *Manager) startServer(ctx context.Context, name, filepath string, server
 		case StateReady, StateStarting, StateDisabled:
 			s.callback(name, client)
 			return
+		default:
+			// Needs a start; continue below.
 		}
 	}
 
@@ -220,6 +224,8 @@ func (s *Manager) startServer(ctx context.Context, name, filepath string, server
 			_ = client.Close(ctx)
 			s.callback(name, existing)
 			return
+		default:
+			// The stored client is not usable; replace it below.
 		}
 	}
 	s.clients.Set(name, client)
@@ -231,6 +237,8 @@ func (s *Manager) startServer(ctx context.Context, name, filepath string, server
 	case StateReady, StateStarting, StateDisabled:
 		// already done, return
 		return
+	default:
+		// Transition to starting below.
 	}
 
 	client.serverState.Store(StateStarting)

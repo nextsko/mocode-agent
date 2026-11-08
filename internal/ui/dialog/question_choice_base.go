@@ -157,14 +157,13 @@ func (c *choiceList) adoptHover() {
 	c.mouseActive = false
 }
 
-// handleFillInKey processes keys when the fill-in textarea is
-// focused. Returns (cmd, handled). When handled is true the
-// caller should not process the key further.
-func (c *choiceList) handleFillInKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
+// handleFillInKey processes keys when the fill-in textarea is focused. The
+// key is always handled, so the caller never processes it further.
+func (c *choiceList) handleFillInKey(msg tea.KeyPressMsg) tea.Cmd {
 	switch {
 	case key.Matches(msg, c.keyClose):
 		c.fillIn.Blur()
-		return nil, true
+		return nil
 	case key.Matches(msg, c.navUp):
 		// Arrows move relative to the fill-in the user is editing,
 		// not a choice the mouse happens to hover, so drop hover mode
@@ -173,17 +172,17 @@ func (c *choiceList) handleFillInKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 		c.moveUp()
 		if c.isFillIn() {
 			c.fillIn.Focus()
-			return c.fillIn.Focus(), true
+			return c.fillIn.Focus()
 		}
-		return nil, true
+		return nil
 	case key.Matches(msg, c.navDown):
 		c.mouseActive = false
 		c.moveDown()
 		if c.isFillIn() {
 			c.fillIn.Focus()
-			return c.fillIn.Focus(), true
+			return c.fillIn.Focus()
 		}
-		return nil, true
+		return nil
 	default:
 		// Typing is keyboard input, so leave hover mode: the fill-in
 		// regains its gutter bar and any hovered choice releases it.
@@ -191,7 +190,7 @@ func (c *choiceList) handleFillInKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 		c.mouseActive = false
 		var cmd tea.Cmd
 		c.fillIn, cmd = c.fillIn.Update(msg)
-		return cmd, true
+		return cmd
 	}
 }
 
@@ -287,14 +286,8 @@ func (c *choiceList) buildLines(innerWidth int, fillInPrefix string, itemFn choi
 	const barInactive = "  "
 
 	var lines []contentLine
-	push := func(text string, flags ...bool) {
+	push := func(text string) {
 		cl := newContentLine(text)
-		if len(flags) > 0 {
-			cl.fillInRow = flags[0]
-		}
-		if len(flags) > 1 {
-			cl.cursorItem = flags[1]
-		}
 		// Split multi-line strings into one row each.
 		for ln := range strings.SplitSeq(text, "\n") {
 			row := cl
@@ -578,7 +571,7 @@ func (c *choiceList) buildChoiceCompositor(lines []contentLine, area uv.Rectangl
 		}
 	}
 
-	var layers []*lipgloss.Layer
+	layers := make([]*lipgloss.Layer, 0, len(ranges))
 	for choiceIdx, r := range ranges {
 		height := r.max - r.min + 1
 		hitStr := strings.Repeat(strings.Repeat(" ", contentWidth)+"\n", height-1) + strings.Repeat(" ", contentWidth)
@@ -725,6 +718,5 @@ func (c *choiceList) handleFillInFocused(
 		done, cmd := onDone()
 		return done, cmd, true
 	}
-	cmd, handled := c.handleFillInKey(msg)
-	return false, cmd, handled
+	return false, c.handleFillInKey(msg), true
 }

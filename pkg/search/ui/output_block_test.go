@@ -48,8 +48,8 @@ func dashes(n int) string { return strings.Repeat("─", n) }
 
 // bar builds a mock-theme bar row: corner glyph + dash cap + embedded
 // label (or plain fill) + closing glyph, all border-colored per token.
-func bar(token, left, label, right string, lineWidth int) string {
-	esc := func(s string) string { return "<" + token + ":" + s + ">" }
+func bar(left, label, right string, lineWidth int) string {
+	esc := func(s string) string { return "<borderMuted:" + s + ">" }
 	leftWidth := 1 + barCapLen // corner glyph plus the dash cap
 	leftGlyphs := left + dashes(barCapLen)
 	if label == "" {
@@ -99,7 +99,7 @@ func TestOutputBlockHeaderEmbeddedInTopBorder(t *testing.T) {
 	t.Parallel()
 	block := NewOutputBlock(mockTheme{})
 	lines := block.Render(OutputBlockOptions{Header: "H", Width: 20})
-	require.Equal(t, bar("borderMuted", "┌", "H", "┐", 20), lines[0])
+	require.Equal(t, bar("┌", "H", "┐", 20), lines[0])
 }
 
 func TestOutputBlockHeaderMetaJoinedWithDot(t *testing.T) {
@@ -120,10 +120,10 @@ func TestOutputBlockSectionBarsAndContentRows(t *testing.T) {
 		Width: 24,
 	})
 	require.Len(t, lines, 5)
-	require.Equal(t, bar("borderMuted", "├", "A", "┤", 24), lines[1])
+	require.Equal(t, bar("├", "A", "┤", 24), lines[1])
 	require.Equal(t, testContentRow("borderMuted", "hi", 24), lines[2])
-	require.Equal(t, bar("borderMuted", "├", "B", "┤", 24), lines[3])
-	require.Equal(t, bar("borderMuted", "└", "", "┘", 24), lines[4])
+	require.Equal(t, bar("├", "B", "┤", 24), lines[3])
+	require.Equal(t, bar("└", "", "┘", 24), lines[4])
 }
 
 func TestOutputBlockSeparatorOnlyBetweenSections(t *testing.T) {
@@ -138,7 +138,7 @@ func TestOutputBlockSeparatorOnlyBetweenSections(t *testing.T) {
 	})
 	// Rows: top, "a", plain divider, "b", bottom.
 	require.Len(t, lines, 5)
-	require.Equal(t, bar("borderMuted", "├", "", "┤", 20), lines[2])
+	require.Equal(t, bar("├", "", "┤", 20), lines[2])
 }
 
 func TestOutputBlockWrapsWideContent(t *testing.T) {

@@ -21,6 +21,10 @@ const responseContextHeight = 10
 // toolBodyLeftPaddingTotal represents the padding that should be applied to each tool body.
 const toolBodyLeftPaddingTotal = 2
 
+// msgInvalidParameters is the user-visible message shown when a tool call's
+// JSON parameters cannot be decoded.
+const msgInvalidParameters = "Invalid parameters"
+
 // ToolStatus represents the current state of a tool call.
 type ToolStatus int
 

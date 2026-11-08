@@ -103,65 +103,7 @@ func MigrateFromSQLite(ctx context.Context, dbPath string, projectPath string) (
 	// Legacy migration path: reads from the pre-DataDirectory era, where
 	// sessions lived under "<homedir>/.mocode/sessions/<id>/mocode.db".
 	// Keep this literal until the next major migration removes it.
-	sessionRoot := filepath.Join(infra.Dir(), ".mocode", "sessions")
-	if entries, err := os.ReadDir(sessionRoot); err == nil {
-		fmt.Fprintf(os.Stderr, "Migrating per-session databases from %s...\n", sessionRoot)
-		sessionMsgs := 0
-		sessionFiles := 0
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				continue
-			}
-			dbFile := filepath.Join(sessionRoot, entry.Name(), "mocode.db")
-			if _, err := os.Stat(dbFile); os.IsNotExist(err) {
-				continue
-			}
-
-			// Extract session ID from directory name: <uuid>_<date>
-			parts := strings.SplitN(entry.Name(), "_", 2)
-			if len(parts) < 1 {
-				continue
-			}
-			sid := parts[0]
-
-			// Find matching session in our index
-			if _, ok := st.Sessions().index.Sessions[sid]; !ok {
-				continue
-			}
-
-			perDB, err := sql.Open("sqlite", dbFile)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "  Warning: cannot open %s: %v\n", dbFile, err)
-				continue
-			}
-
-			// Read messages from per-session DB
-			msgs, err := readMessages(ctx, perDB, sid)
-			_ = perDB.Close()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "  Warning: failed to read messages from %s: %v\n", dbFile, err)
-				continue
-			}
-			if len(msgs) == 0 {
-				continue
-			}
-
-			sessMeta := st.Sessions().index.Sessions[sid]
-			sessDir := st.sessionDir(sessionMetaToSession(*sessMeta))
-			_ = os.MkdirAll(sessDir, 0o700)
-
-			writer := NewJSONLWriter(filepath.Join(sessDir, "messages.jsonl"))
-			for _, jm := range msgs {
-				if err := writer.Append(jm); err != nil {
-					fmt.Fprintf(os.Stderr, "  Warning: write message: %v\n", err)
-				} else {
-					sessionMsgs++
-				}
-			}
-			sessionFiles += len(msgs) // count message count for stats
-		}
-		fmt.Fprintf(os.Stderr, "  Migrated %d messages from per-session databases\n", sessionMsgs)
-	}
+	migrateSessionDatabases(ctx, st)
 
 	// Backup the old database
 	backupPath := dbPath + ".bak"
@@ -179,6 +121,79 @@ func MigrateFromSQLite(ctx context.Context, dbPath string, projectPath string) (
 	fmt.Fprintf(os.Stderr, "  Data directory: %s\n", st.ProjectDir)
 
 	return st, nil
+}
+
+// migrateSessionDatabases imports messages from the legacy per-session SQLite
+// databases stored under "<homedir>/.mocode/sessions/<id>/mocode.db".
+// A missing directory simply means there is nothing to migrate.
+func migrateSessionDatabases(ctx context.Context, st *Store) {
+	sessionRoot := filepath.Join(infra.Dir(), ".mocode", "sessions")
+	entries, err := os.ReadDir(sessionRoot)
+	if err != nil {
+		return
+	}
+
+	fmt.Fprintf(os.Stderr, "Migrating per-session databases from %s...\n", sessionRoot)
+	sessionMsgs := 0
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		dbFile := filepath.Join(sessionRoot, entry.Name(), "mocode.db")
+		if _, statErr := os.Stat(dbFile); os.IsNotExist(statErr) {
+			continue
+		}
+
+		// Extract session ID from directory name: <uuid>_<date>.
+		parts := strings.SplitN(entry.Name(), "_", 2)
+		if len(parts) < 1 {
+			continue
+		}
+		sid := parts[0]
+
+		// Only import databases that match a session in the new index.
+		meta, ok := st.Sessions().index.Sessions[sid]
+		if !ok {
+			continue
+		}
+
+		sessionMsgs += importLegacySessionDB(ctx, st, dbFile, sid, *meta)
+	}
+	fmt.Fprintf(os.Stderr, "  Migrated %d messages from per-session databases\n", sessionMsgs)
+}
+
+// importLegacySessionDB copies the messages of one legacy per-session database
+// into the JSONL layout and returns the number of messages written.
+func importLegacySessionDB(ctx context.Context, st *Store, dbFile, sid string, meta sessionMeta) int {
+	perDB, err := sql.Open("sqlite", dbFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  Warning: cannot open %s: %v\n", dbFile, err)
+		return 0
+	}
+	defer func() { _ = perDB.Close() }()
+
+	msgs, err := readMessages(ctx, perDB, sid)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  Warning: failed to read messages from %s: %v\n", dbFile, err)
+		return 0
+	}
+	if len(msgs) == 0 {
+		return 0
+	}
+
+	sessDir := st.sessionDir(sessionMetaToSession(meta))
+	_ = os.MkdirAll(sessDir, 0o700)
+
+	written := 0
+	writer := NewJSONLWriter(filepath.Join(sessDir, "messages.jsonl"))
+	for _, jm := range msgs {
+		if err := writer.Append(jm); err != nil {
+			fmt.Fprintf(os.Stderr, "  Warning: write message: %v\n", err)
+			continue
+		}
+		written++
+	}
+	return written
 }
 
 // --- SQLite row types (minimal — mirrors old db.Models) ---
@@ -279,7 +294,7 @@ func readSessions(ctx context.Context, db *sql.DB) ([]migrationSession, error) {
 		        COALESCE(todos,''), created_at, updated_at
 		 FROM sessions ORDER BY created_at`)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query sessions: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -289,11 +304,14 @@ func readSessions(ctx context.Context, db *sql.DB) ([]migrationSession, error) {
 		if err := rows.Scan(&s.ID, &s.ParentSessionID, &s.Title, &s.MessageCount,
 			&s.PromptTokens, &s.CompletionTokens, &s.SummaryMessageID, &s.Cost,
 			&s.Todos, &s.CreatedAt, &s.UpdatedAt); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan session: %w", err)
 		}
 		result = append(result, s)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return result, fmt.Errorf("iterate sessions: %w", err)
+	}
+	return result, nil
 }
 
 func readMessages(ctx context.Context, db *sql.DB, sessionID string) ([]jsonlMessage, error) {
@@ -304,7 +322,7 @@ func readMessages(ctx context.Context, db *sql.DB, sessionID string) ([]jsonlMes
 		        COALESCE(finished_at,0), COALESCE(is_summary_message,0)
 		 FROM messages WHERE session_id = ? ORDER BY created_at`, sessionID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query messages: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -314,11 +332,14 @@ func readMessages(ctx context.Context, db *sql.DB, sessionID string) ([]jsonlMes
 		if err := rows.Scan(&m.ID, &m.SessionID, &m.Role, &m.Parts,
 			&m.Model, &m.Provider, &m.CreatedAt, &m.UpdatedAt,
 			&m.FinishedAt, &m.IsSummaryMessage); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan message: %w", err)
 		}
 		result = append(result, m.toJSONL())
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return result, fmt.Errorf("iterate messages: %w", err)
+	}
+	return result, nil
 }
 
 func readFiles(ctx context.Context, db *sql.DB, sessionID string) ([]jsonlFile, error) {
@@ -326,7 +347,7 @@ func readFiles(ctx context.Context, db *sql.DB, sessionID string) ([]jsonlFile, 
 		`SELECT id, session_id, path, content, version, created_at, updated_at
 		 FROM files WHERE session_id = ? ORDER BY created_at`, sessionID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query files: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -335,11 +356,14 @@ func readFiles(ctx context.Context, db *sql.DB, sessionID string) ([]jsonlFile, 
 		var f migrationFile
 		if err := rows.Scan(&f.ID, &f.SessionID, &f.Path, &f.Content,
 			&f.Version, &f.CreatedAt, &f.UpdatedAt); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan file: %w", err)
 		}
 		result = append(result, f.toJSONL())
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return result, fmt.Errorf("iterate files: %w", err)
+	}
+	return result, nil
 }
 
 // migrate_message ensures message import is used.

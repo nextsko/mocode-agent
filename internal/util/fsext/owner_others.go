@@ -3,6 +3,7 @@
 package fsext
 
 import (
+	"fmt"
 	"os"
 	"syscall"
 )
@@ -12,7 +13,7 @@ import (
 func Owner(path string) (int, error) {
 	info, err := os.Stat(path)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("stat %q: %w", path, err)
 	}
 	var uid int
 	if stat, ok := info.Sys().(*syscall.Stat_t); ok {

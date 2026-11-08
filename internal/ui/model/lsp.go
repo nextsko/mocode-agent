@@ -30,7 +30,7 @@ func (m *UI) lspInfo(width, maxItems int, isSection bool) string {
 		return strings.Compare(a.Name, b.Name)
 	})
 
-	var lsps []LSPInfo
+	lsps := make([]LSPInfo, 0, len(states))
 	for _, state := range states {
 		lspErrs := map[protocol.DiagnosticSeverity]int{}
 		counts := m.com.Workspace.LSPGetDiagnosticCounts(state.Name)

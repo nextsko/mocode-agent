@@ -97,7 +97,7 @@ func (e *StartpageEngine) Fetch(ctx context.Context, client *http.Client, queryS
 	}
 
 	if isStartpageChallenge(page) {
-		e.cooldown.trigger(cooldownDuration)
+		e.cooldown.trigger()
 		return nil, challengeError(StartpageID, startpageChallengeMessage)
 	}
 	if page.status < 200 || page.status >= 300 {
@@ -119,7 +119,7 @@ func (e *StartpageEngine) fetchFormInputs(ctx context.Context, client *http.Clie
 		return nil
 	}
 	setNavigationHeaders(req.Header, e.homeURL)
-	page, err := fetchPage(ctx, client, StartpageID, req)
+	page, err := fetchPage(client, StartpageID, req)
 	if err != nil {
 		return nil
 	}
@@ -168,7 +168,7 @@ func (e *StartpageEngine) postSearch(ctx context.Context, client *http.Client, f
 	}
 	setNavigationHeaders(req.Header, e.homeURL)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	return fetchPage(ctx, client, StartpageID, req)
+	return fetchPage(client, StartpageID, req)
 }
 
 // getSearch issues the tokenless GET fallback.
@@ -184,7 +184,7 @@ func (e *StartpageEngine) getSearch(ctx context.Context, client *http.Client, en
 	values := req.URL.Query()
 	values.Set("query", engineQuery)
 	req.URL.RawQuery = values.Encode()
-	return fetchPage(ctx, client, StartpageID, req)
+	return fetchPage(client, StartpageID, req)
 }
 
 // isStartpageChallenge reports whether Startpage answered with its

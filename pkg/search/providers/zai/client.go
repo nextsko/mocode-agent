@@ -64,7 +64,7 @@ func (t zaiTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	resp, err := next.RoundTrip(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Z.AI round trip: %w", err)
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, mcpErrorBodyLimit))
@@ -200,7 +200,7 @@ func zaiRPCError(rpcErr *jsonrpc.Error) *search.SearchProviderError {
 		text = fmt.Sprintf("Z.AI MCP error (%d): %s", rpcErr.Code, message)
 	}
 	return &search.SearchProviderError{
-		Provider:   "zai",
+		Provider:   zaiProviderID,
 		Message:    text,
 		HTTPStatus: int(rpcErr.Code),
 	}
@@ -223,7 +223,7 @@ func zaiToolError(result *mcp.CallToolResult) *search.SearchProviderError {
 		errorText = "Z.AI MCP tool call failed"
 	}
 	return &search.SearchProviderError{
-		Provider:   "zai",
+		Provider:   zaiProviderID,
 		Message:    errorText,
 		HTTPStatus: status,
 	}
@@ -244,29 +244,29 @@ func absInt(n int) int {
 func classifyZAIHTTP(status int, body string) *search.SearchProviderError {
 	if creditBodyPattern.MatchString(body) {
 		return &search.SearchProviderError{
-			Provider: "zai", Code: search.ErrorCodeBilling,
+			Provider: zaiProviderID, Code: search.ErrorCodeBilling,
 			Message: "credits exhausted", HTTPStatus: status,
 		}
 	}
 	switch status {
 	case 402:
 		return &search.SearchProviderError{
-			Provider: "zai", Code: search.ErrorCodeBilling,
+			Provider: zaiProviderID, Code: search.ErrorCodeBilling,
 			Message: "402 credits exhausted", HTTPStatus: status,
 		}
 	case 401:
 		return &search.SearchProviderError{
-			Provider: "zai", Code: search.ErrorCodeUnauthorized,
+			Provider: zaiProviderID, Code: search.ErrorCodeUnauthorized,
 			Message: "401 unauthorized", HTTPStatus: status,
 		}
 	case 403:
 		return &search.SearchProviderError{
-			Provider: "zai", Code: search.ErrorCodeForbidden,
+			Provider: zaiProviderID, Code: search.ErrorCodeForbidden,
 			Message: "403 forbidden", HTTPStatus: status,
 		}
 	}
 	return &search.SearchProviderError{
-		Provider:   "zai",
+		Provider:   zaiProviderID,
 		Message:    fmt.Sprintf("Z.AI MCP error (%d): %s", status, body),
 		HTTPStatus: status,
 	}

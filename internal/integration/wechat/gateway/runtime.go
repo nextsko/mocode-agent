@@ -239,6 +239,7 @@ func (w *gatewayButlerWorkspace) UpdateModel(provider, model string) error {
 func lastAssistantReply(ctx context.Context, ws workspace.Workspace, sessionID string) (string, error) {
 	msgs, err := ws.ListMessages(ctx, sessionID)
 	if err != nil || len(msgs) == 0 {
+		//nolint:nilerr // Best effort: report a generic completion instead of failing the reply.
 		return "处理完成。", nil
 	}
 	for i := len(msgs) - 1; i >= 0; i-- {

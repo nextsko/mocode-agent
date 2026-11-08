@@ -173,8 +173,16 @@ func (f *fakeChromium) find(method string) (cdpMessage, bool) {
 	return cdpMessage{}, false
 }
 
+// fakeSessionID and fakeTargetID are the CDP ids every fake browser hands out.
+const (
+	fakeSessionID = "S1"
+	fakeTargetID  = "T1"
+)
+
 // withDefaultHandlers wires up the minimum a session needs to come up.
-func (f *fakeChromium) withDefaultHandlers(sessionID, targetID string) {
+func (f *fakeChromium) withDefaultHandlers() {
+	sessionID := fakeSessionID
+	targetID := fakeTargetID
 	f.on("Target.getTargets", func(json.RawMessage) (any, error) {
 		return map[string]any{"targetInfos": []map[string]any{
 			{"targetId": targetID, "type": "page", "url": "about:blank", "attached": false},
@@ -236,7 +244,7 @@ func TestAttach_EnablesTheDomainsWeRelyOn(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 
 	s, err := Attach(context.Background(), sessionEndpoint(f))
 	require.NoError(t, err)
@@ -289,7 +297,7 @@ func TestConsole_EventsAreCaptured(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 
 	s, err := Attach(context.Background(), sessionEndpoint(f))
 	require.NoError(t, err)
@@ -345,7 +353,7 @@ func TestConsole_BufferIsBoundedAndReportsDrops(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 
 	s, err := Attach(context.Background(), sessionEndpoint(f))
 	require.NoError(t, err)
@@ -375,7 +383,7 @@ func TestDrainConsole_ReturnsOnlyNewMessages(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 
 	s, err := Attach(context.Background(), sessionEndpoint(f))
 	require.NoError(t, err)
@@ -399,7 +407,7 @@ func TestNavigate_WaitsForLoadEventAndSurvivesTimeout(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 
 	s, err := Attach(context.Background(), sessionEndpoint(f))
 	require.NoError(t, err)
@@ -447,7 +455,7 @@ func TestEvaluate_SurfacesPageExceptions(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.on("Runtime.evaluate", func(json.RawMessage) (any, error) {
 		return map[string]any{
 			"result": map[string]any{"type": "undefined"},
@@ -473,7 +481,7 @@ func TestEvaluate_DecodesValuesIntoOut(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.on("Runtime.evaluate", func(json.RawMessage) (any, error) {
 		return map[string]any{
 			"result": map[string]any{"type": "object", "value": map[string]any{"n": 7}},
@@ -496,7 +504,7 @@ func TestCall_ProtocolErrorIsSurfaced(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.on("Runtime.evaluate", func(json.RawMessage) (any, error) {
 		return nil, fmt.Errorf("Cannot find context with specified id")
 	})
@@ -516,7 +524,7 @@ func TestCall_ConnectionDropFailsPendingCalls(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.dropOn = "Runtime.evaluate"
 
 	s, err := Attach(context.Background(), sessionEndpoint(f))
@@ -543,7 +551,7 @@ func TestClick_DispatchesMouseEventsAtElementCentre(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.on("Runtime.evaluate", func(params json.RawMessage) (any, error) {
 		var p struct {
 			Expression string `json:"expression"`
@@ -646,7 +654,7 @@ func TestFill_UsesNativeSetterAndDispatchesInputEvents(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 
 	var seen string
 	f.on("Runtime.evaluate", func(params json.RawMessage) (any, error) {
@@ -679,7 +687,7 @@ func TestFill_SubmitPressesEnter(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.on("Runtime.evaluate", func(params json.RawMessage) (any, error) {
 		return map[string]any{"result": map[string]any{"type": "string", "value": "ok"}}, nil
 	})
@@ -696,7 +704,7 @@ func TestFill_ReportsMissingElement(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.on("Runtime.evaluate", func(json.RawMessage) (any, error) {
 		return map[string]any{"result": map[string]any{"type": "string", "value": "not found"}}, nil
 	})
@@ -730,7 +738,7 @@ func TestScreenshot_DecodesBase64(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.on("Page.captureScreenshot", func(json.RawMessage) (any, error) {
 		return map[string]any{"data": "aGVsbG8="}, nil // "hello"
 	})
@@ -752,7 +760,7 @@ func TestScreenshot_FullPageSetsCaptureBeyondViewport(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.on("Page.captureScreenshot", func(json.RawMessage) (any, error) {
 		return map[string]any{"data": "aGVsbG8="}, nil
 	})
@@ -774,7 +782,7 @@ func TestSnapshot_DecodesAndRenders(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 
 	var script string
 	f.on("Runtime.evaluate", func(params json.RawMessage) (any, error) {
@@ -847,7 +855,7 @@ func TestClose_OnAttachedSessionLeavesBrowserAlive(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 	f.on("Target.closeTarget", func(json.RawMessage) (any, error) {
 		return map[string]any{"success": true}, nil
 	})
@@ -865,7 +873,7 @@ func TestClose_IsIdempotent(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 
 	s, err := Attach(context.Background(), sessionEndpoint(f))
 	require.NoError(t, err)
@@ -878,7 +886,7 @@ func TestAlive_ReportsConnectionState(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeChromium(t)
-	f.withDefaultHandlers("S1", "T1")
+	f.withDefaultHandlers()
 
 	s, err := Attach(context.Background(), sessionEndpoint(f))
 	require.NoError(t, err)

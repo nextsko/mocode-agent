@@ -3,6 +3,7 @@ package fsext
 import (
 	"cmp"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -192,14 +193,15 @@ func (dl *directoryLister) getDirPatterns(dir string) []gitignore.Pattern {
 // Results are cached per directory, and we reuse parent directory matchers.
 func (dl *directoryLister) getCombinedMatcher(dir string) gitignore.Matcher {
 	return dl.combinedMatchers.GetOrSet(dir, func() gitignore.Matcher {
-		var allPatterns []gitignore.Pattern
-
-		// Add common patterns first (lowest priority).
-		allPatterns = append(allPatterns, commonIgnorePatterns()...)
-
-		// Add global ignore patterns (git core.excludesFile + Mocode global ignore).
-		allPatterns = append(allPatterns, gitGlobalIgnorePatterns()...)
-		allPatterns = append(allPatterns, MocodeGlobalIgnorePatterns()...)
+		// Add common patterns first (lowest priority), then the global ignore
+		// patterns (git core.excludesFile + Mocode global ignore).
+		common := commonIgnorePatterns()
+		globalGit := gitGlobalIgnorePatterns()
+		globalMocode := MocodeGlobalIgnorePatterns()
+		allPatterns := make([]gitignore.Pattern, 0, len(common)+len(globalGit)+len(globalMocode))
+		allPatterns = append(allPatterns, common...)
+		allPatterns = append(allPatterns, globalGit...)
+		allPatterns = append(allPatterns, globalMocode...)
 
 		// Collect patterns from root to this directory.
 		relDir, _ := filepath.Rel(dl.rootPath, dir)
@@ -283,7 +285,7 @@ func ListDirectory(initialPath string, ignorePatterns []string, depth, limit int
 
 	err := fastwalk.Walk(&conf, initialPath, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil // Skip files we don't have permission to access
+			return nil //nolint:nilerr // Walk errors skip unreadable entries by design.
 		}
 
 		isDir := d.IsDir()
@@ -308,7 +310,7 @@ func ListDirectory(initialPath string, ignorePatterns []string, depth, limit int
 		return nil
 	})
 	if err != nil && !errors.Is(err, filepath.SkipAll) {
-		return nil, false, err
+		return nil, false, fmt.Errorf("fastwalk %s: %w", initialPath, err)
 	}
 
 	matches, truncated := truncate(slices.Collect(found.Seq()), limit)

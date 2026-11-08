@@ -228,37 +228,49 @@ func (b *Bot) sendContent(ctx context.Context, userID, contextToken string, cont
 
 	// File (auto-route by extension)
 	if content.File != nil {
-		fileName := content.FileName
-		if fileName == "" {
-			fileName = "file.bin"
-		}
-		cat := categorizeByExtension(fileName)
-		if cat == "image" {
-			return b.sendContent(ctx, userID, contextToken, SendContent{Image: content.File, Caption: content.Caption})
-		}
-		if cat == "video" {
-			return b.sendContent(ctx, userID, contextToken, SendContent{Video: content.File, Caption: content.Caption})
-		}
-		// Generic file
-		if content.Caption != "" {
-			_ = b.sendText(ctx, userID, content.Caption, contextToken)
-		}
-		result, err := b.cdnUpload(ctx, creds, content.File, userID, int(MediaFile))
-		if err != nil {
-			return err
-		}
-		items := []map[string]interface{}{
-			{"type": 4, "file_item": map[string]interface{}{
-				"media":     cdnMediaMap(&result.Media),
-				"file_name": fileName,
-				"len":       strconv.Itoa(len(content.File)),
-			}},
-		}
-		msg := protocol.BuildMediaMessage(userID, contextToken, items)
-		return b.client.SendMessage(ctx, creds.BaseURL, creds.Token, msg)
+		return b.sendFileContent(ctx, userID, contextToken, content)
 	}
 
 	return fmt.Errorf("empty SendContent")
+}
+
+// sendFileContent sends a file payload, routing images and videos through
+// their dedicated media types and everything else as a generic file.
+func (b *Bot) sendFileContent(ctx context.Context, userID, contextToken string, content SendContent) error {
+	creds := b.getCreds()
+	if creds == nil {
+		return fmt.Errorf("not logged in; call Login() first")
+	}
+
+	fileName := content.FileName
+	if fileName == "" {
+		fileName = "file.bin"
+	}
+	switch categorizeByExtension(fileName) {
+	case "image":
+		return b.sendContent(ctx, userID, contextToken, SendContent{Image: content.File, Caption: content.Caption})
+	case "video":
+		return b.sendContent(ctx, userID, contextToken, SendContent{Video: content.File, Caption: content.Caption})
+	default:
+		// Generic file.
+	}
+
+	if content.Caption != "" {
+		_ = b.sendText(ctx, userID, content.Caption, contextToken)
+	}
+	result, err := b.cdnUpload(ctx, creds, content.File, userID, int(MediaFile))
+	if err != nil {
+		return err
+	}
+	items := []map[string]interface{}{
+		{"type": 4, "file_item": map[string]interface{}{
+			"media":     cdnMediaMap(&result.Media),
+			"file_name": fileName,
+			"len":       strconv.Itoa(len(content.File)),
+		}},
+	}
+	msg := protocol.BuildMediaMessage(userID, contextToken, items)
+	return b.client.SendMessage(ctx, creds.BaseURL, creds.Token, msg)
 }
 
 func (b *Bot) cdnDownload(ctx context.Context, media *CDNMedia, aeskeyOverride string) ([]byte, error) {

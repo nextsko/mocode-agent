@@ -67,6 +67,10 @@ type packageRule struct {
 	forbidden []string // import prefixes banned inside that subtree
 }
 
+// charmLandPrefix matches every charm.land module (fantasy, bubbletea,
+// lipgloss, ...) so a rule can ban the whole framework family at once.
+const charmLandPrefix = "charm.land/"
+
 // packageRules mirrors the constraints published in
 // internal/core/tools/doc.go ("Enforced package constraints"). Keep the two
 // lists in sync.
@@ -93,7 +97,7 @@ var packageRules = []packageRule{
 		// provider SDK types belong to the adapters in core/agent/llmconv.
 		pkg: "github.com/nextsko/mocode-agent/internal/domain",
 		forbidden: []string{
-			"charm.land/",
+			charmLandPrefix,
 		},
 	},
 	{
@@ -101,7 +105,7 @@ var packageRules = []packageRule{
 		// message helpers live in core/agent/llmconv.
 		pkg: "github.com/nextsko/mocode-agent/internal/core/agent/messages",
 		forbidden: []string{
-			"charm.land/",
+			charmLandPrefix,
 		},
 	},
 	{
@@ -109,7 +113,7 @@ var packageRules = []packageRule{
 		// it may not depend on the framework or on other internal packages.
 		pkg: "github.com/nextsko/mocode-agent/internal/core/tools/contract",
 		forbidden: []string{
-			"charm.land/",
+			charmLandPrefix,
 			"github.com/nextsko/mocode-agent/internal/",
 		},
 	},
@@ -118,14 +122,14 @@ var packageRules = []packageRule{
 		// the fantasy boundary, so the package must stay framework-free.
 		pkg: "github.com/nextsko/mocode-agent/internal/core/tools/internalx/agent",
 		forbidden: []string{
-			"charm.land/",
+			charmLandPrefix,
 		},
 	},
 	{
 		// The question tool is ported; keep it framework-free.
 		pkg: "github.com/nextsko/mocode-agent/internal/core/tools/core/question",
 		forbidden: []string{
-			"charm.land/",
+			charmLandPrefix,
 		},
 	},
 	{
@@ -133,14 +137,14 @@ var packageRules = []packageRule{
 		// external/systems/ssh and are ported separately.
 		pkg: "github.com/nextsko/mocode-agent/internal/core/tools/external/common/ssh",
 		forbidden: []string{
-			"charm.land/",
+			charmLandPrefix,
 		},
 	},
 	{
 		// The screenshot tool is ported; the adapter owns the framework edge.
 		pkg: "github.com/nextsko/mocode-agent/internal/core/shellruntime/screencap",
 		forbidden: []string{
-			"charm.land/",
+			charmLandPrefix,
 		},
 	},
 
@@ -149,51 +153,51 @@ var packageRules = []packageRule{
 	// still returns structured image/media responses the port cannot express.
 	{
 		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/core/fs",
-		forbidden: []string{"charm.land/"},
+		forbidden: []string{charmLandPrefix},
 	},
 	{
 		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/core/web",
-		forbidden: []string{"charm.land/"},
+		forbidden: []string{charmLandPrefix},
 	},
 	{
 		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/core/shell",
-		forbidden: []string{"charm.land/"},
+		forbidden: []string{charmLandPrefix},
 	},
 	{
 		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/core/sandbox",
-		forbidden: []string{"charm.land/"},
+		forbidden: []string{charmLandPrefix},
 	},
 	{
 		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp",
-		forbidden: []string{"charm.land/"},
+		forbidden: []string{charmLandPrefix},
 	},
 	{
 		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/internalx/filter",
-		forbidden: []string{"charm.land/"},
+		forbidden: []string{charmLandPrefix},
 	},
 	{
 		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/ssh",
-		forbidden: []string{"charm.land/"},
+		forbidden: []string{charmLandPrefix},
 	},
 	{
 		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitea",
-		forbidden: []string{"charm.land/"},
+		forbidden: []string{charmLandPrefix},
 	},
 	{
 		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitops",
-		forbidden: []string{"charm.land/"},
+		forbidden: []string{charmLandPrefix},
 	},
 	{
 		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/browser",
-		forbidden: []string{"charm.land/"},
+		forbidden: []string{charmLandPrefix},
 	},
 	{
 		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/wechat",
-		forbidden: []string{"charm.land/"},
+		forbidden: []string{charmLandPrefix},
 	},
 	{
 		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/external/mcp",
-		forbidden: []string{"charm.land/"},
+		forbidden: []string{charmLandPrefix},
 	},
 }
 

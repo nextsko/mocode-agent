@@ -25,6 +25,9 @@ const (
 	appName             = "mocode"
 	defaultAppName      = "oMo code"
 	defaultInitializeAs = "AGENTS.md"
+
+	// goosWindows is the runtime.GOOS value for Windows.
+	goosWindows = "windows"
 )
 
 // AppName returns the executable name derived from os.Args[0].
@@ -187,7 +190,7 @@ type MCPConfig struct {
 	DisabledTools []string          `json:"disabled_tools,omitempty" jsonschema:"description=List of tools from this MCP server to disable,example=get-library-doc"`
 	Timeout       int               `json:"timeout,omitempty" jsonschema:"description=Timeout in seconds for MCP server connections,default=15,example=30,example=60,example=120"`
 
-	// TODO: maybe make it possible to get the value from the env
+	// Future work: make it possible to get the value from the env.
 	Headers map[string]string `json:"headers,omitempty" jsonschema:"description=HTTP headers for HTTP/SSE MCP servers"`
 }
 
@@ -791,6 +794,8 @@ func (c *ProviderConfig) TestConnection(resolver VariableResolver, clients ...*h
 	case catwalk.InferenceProviderMiniMax, catwalk.InferenceProviderMiniMaxChina:
 		// NOTE: MiniMax has no good endpoint we can use to validate the API key.
 		return nil
+	default:
+		// Every other provider is validated through the HTTP probe below.
 	}
 
 	switch c.Type {
@@ -840,6 +845,10 @@ func (c *ProviderConfig) TestConnection(resolver VariableResolver, clients ...*h
 			return nil
 		}
 		return errors.New("not a valid vercel api key")
+	default:
+		// Azure and Vertex AI need provider-specific credential checks that
+		// the generic HTTP probe below cannot perform.
+		return fmt.Errorf("connection test is not supported for provider type %q", c.Type)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

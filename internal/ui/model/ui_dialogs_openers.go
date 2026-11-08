@@ -60,13 +60,12 @@ func (m *UI) openModelsDialog() tea.Cmd {
 	return nil
 }
 
-func (m *UI) openMCPDialog() tea.Cmd {
+func (m *UI) openMCPDialog() {
 	if m.dialog.ContainsDialog(dialog.MCPID) {
 		m.dialog.BringToFront(dialog.MCPID)
-		return nil
+		return
 	}
 	m.dialog.OpenDialog(dialog.NewMCP(m.com, m.mcpStates))
-	return nil
 }
 
 func (m *UI) openReasoningDialog() tea.Cmd {
@@ -171,15 +170,14 @@ func (m *UI) openModesDialog() tea.Cmd {
 	return nil
 }
 
-func (m *UI) openHelpDialog() tea.Cmd {
+func (m *UI) openHelpDialog() {
 	if m.dialog.ContainsDialog(dialog.HelpID) {
 		m.dialog.BringToFront(dialog.HelpID)
-		return nil
+		return
 	}
 
 	helpDialog := dialog.NewHelp(m.com)
 	m.dialog.OpenDialog(helpDialog)
-	return nil
 }
 
 func (m *UI) openContextDialog() tea.Cmd {
@@ -232,7 +230,7 @@ func (m *UI) openTodoDialog(selected int) tea.Cmd {
 	return nil
 }
 
-func (m *UI) openPermissionsDialog(perm permission.PermissionRequest) tea.Cmd {
+func (m *UI) openPermissionsDialog(perm permission.PermissionRequest) {
 	// Close any existing permissions dialog first.
 	m.dialog.CloseDialog(dialog.PermissionsID)
 
@@ -244,5 +242,4 @@ func (m *UI) openPermissionsDialog(perm permission.PermissionRequest) tea.Cmd {
 
 	permDialog := dialog.NewPermissions(m.com, perm, opts...)
 	m.dialog.OpenDialog(permDialog)
-	return nil
 }

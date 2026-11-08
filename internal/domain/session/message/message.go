@@ -76,7 +76,11 @@ func marshalParts(parts []ContentPart) ([]byte, error) {
 			Data: part,
 		}
 	}
-	return json.Marshal(wrappedParts)
+	b, err := json.Marshal(wrappedParts)
+	if err != nil {
+		return nil, fmt.Errorf("marshal message parts: %w", err)
+	}
+	return b, nil
 }
 
 func unmarshalParts(data []byte) ([]ContentPart, error) {

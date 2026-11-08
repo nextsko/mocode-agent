@@ -42,7 +42,10 @@ func ensureDir(path string) error {
 
 // removeAll removes a path and all its contents.
 func removeAll(path string) error {
-	return os.RemoveAll(path)
+	if err := os.RemoveAll(path); err != nil {
+		return fmt.Errorf("remove all %q: %w", path, err)
+	}
+	return nil
 }
 
 // rename atomically renames a file.
@@ -81,7 +84,11 @@ func lockPath(path string) string {
 
 // openLock opens or creates a lock file.
 func openLock(path string) (*os.File, error) {
-	return os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("open lock file %q: %w", path, err)
+	}
+	return f, nil
 }
 
 // closeQuietly closes a file, ignoring errors.

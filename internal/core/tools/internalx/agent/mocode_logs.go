@@ -27,6 +27,9 @@ const (
 	maxLogLines     = 100
 )
 
+// logLevelInfo is the normalized fallback log level.
+const logLevelInfo = "INFO"
+
 // Reserved fields that should not appear as extra key=value pairs.
 // Case-insensitive matching is used.
 var reservedFields = map[string]bool{
@@ -102,7 +105,7 @@ func readLastLines(filePath string, n int) ([]map[string]any, error) {
 
 	stat, err := file.Stat()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("stat log file: %w", err)
 	}
 
 	if stat.Size() == 0 {
@@ -126,13 +129,13 @@ func readLastLines(filePath string, n int) ([]map[string]any, error) {
 
 		_, err := file.Seek(chunkStart, 0)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("seek log file: %w", err)
 		}
 
-		chunk := make([]byte, chunkLen)
+		chunk := make([]byte, chunkLen, chunkLen+len(remainder))
 		_, err = io.ReadFull(file, chunk)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("read log chunk: %w", err)
 		}
 
 		// Combine with remainder from previous (earlier) chunk.
@@ -208,7 +211,7 @@ func splitLines(data []byte) [][]byte {
 
 // formatLogEntries formats log entries into compact text format.
 func formatLogEntries(entries []map[string]any) []string {
-	var result []string
+	result := make([]string, 0, len(entries))
 	for _, entry := range entries {
 		result = append(result, formatLogEntry(entry))
 	}
@@ -218,7 +221,7 @@ func formatLogEntries(entries []map[string]any) []string {
 // formatLogEntry formats a single log entry into compact text format:
 // TIMESTAMP LEVEL SOURCE:LINE MESSAGE key=value...
 func formatLogEntry(entry map[string]any) string {
-	var parts []string
+	parts := make([]string, 0, 3)
 
 	// Extract and format timestamp (time-only, no date).
 	timeStr := extractTime(entry)
@@ -298,25 +301,25 @@ func extractTime(entry map[string]any) string {
 func extractLevel(entry map[string]any) string {
 	levelVal, ok := entry["level"]
 	if !ok {
-		return "INFO"
+		return logLevelInfo
 	}
 
 	levelStr, ok := levelVal.(string)
 	if !ok {
-		return "INFO"
+		return logLevelInfo
 	}
 
 	switch strings.ToUpper(levelStr) {
 	case "DEBUG":
 		return "DEBUG"
-	case "INFO":
-		return "INFO"
+	case logLevelInfo:
+		return logLevelInfo
 	case "WARN", "WARNING":
 		return "WARN"
 	case "ERROR":
 		return "ERROR"
 	default:
-		return "INFO"
+		return logLevelInfo
 	}
 }
 

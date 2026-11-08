@@ -372,6 +372,9 @@ func ExtractMessageItems(sty *styles.Styles, msg *message.Message, toolResults m
 			))
 		}
 		return items
+	case message.System, message.Tool:
+		// System and tool-result messages are rendered through their own items.
+		return []MessageItem{}
 	}
 	return []MessageItem{}
 }

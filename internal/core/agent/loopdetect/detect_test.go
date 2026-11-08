@@ -9,7 +9,7 @@ import (
 
 // makeStep creates a StepResult with the given tool calls and results in its Content.
 func makeStep(calls []fantasy.ToolCallContent, results []fantasy.ToolResultContent) fantasy.StepResult {
-	var content fantasy.ResponseContent
+	content := make(fantasy.ResponseContent, 0, len(calls)+len(results))
 	for _, c := range calls {
 		content = append(content, c)
 	}

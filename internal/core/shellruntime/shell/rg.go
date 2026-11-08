@@ -158,6 +158,8 @@ func runRg(env pipeEnv, args []string) error {
 
 	if !matched {
 		// rg exits 1 when there are no matches; other options do not change it.
+		//
+		//nolint:wrapcheck // interp.ExitStatus is a shell control-flow sentinel; wrapping it would change the shell's error text.
 		return interp.ExitStatus(1)
 	}
 	return nil

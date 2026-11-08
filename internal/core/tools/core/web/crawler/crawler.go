@@ -123,14 +123,14 @@ func (rc *RecursiveCrawler) Crawl(ctx context.Context, startURL string) (*CrawlR
 func (rc *RecursiveCrawler) crawlPage(ctx context.Context, pageURL string) ([]string, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 
 	resp, err := rc.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetch page: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -145,7 +145,7 @@ func (rc *RecursiveCrawler) crawlPage(ctx context.Context, pageURL string) ([]st
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(body)))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse HTML: %w", err)
 	}
 
 	title := strings.TrimSpace(doc.Find("title").Text())

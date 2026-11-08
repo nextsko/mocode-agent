@@ -147,6 +147,7 @@ func (m *SessionManager) executeTask(ctx context.Context, mocodeSessionID, promp
 	// After agent finishes, get the last assistant message.
 	msgs, err := m.butler.Workspace.ListMessages(ctx, mocodeSessionID)
 	if err != nil {
+		//nolint:nilerr // The agent turn already succeeded; fall back to a generic notice.
 		return "任务已完成", nil
 	}
 

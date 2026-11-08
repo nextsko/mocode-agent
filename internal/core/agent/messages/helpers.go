@@ -27,6 +27,9 @@ func BuildSummaryPrompt(todos []session.Todo) string {
 				pending++
 			case "in_progress":
 				inProgress++
+			default:
+				// Completed todos are not counted; the detail list below
+				// still reports their final status.
 			}
 		}
 		fmt.Fprintf(&sb, "\n\n## 当前 Todo 状态\n\n- pending: %d\n- in_progress: %d\n", pending, inProgress)

@@ -78,9 +78,9 @@ func SearchDuckDuckGo(ctx context.Context, client *http.Client, query string, ma
 }
 
 func setRandomizedHeaders(req *http.Request) {
-	req.Header.Set("User-Agent", userAgents[rand.IntN(len(userAgents))])
+	req.Header.Set("User-Agent", userAgents[rand.IntN(len(userAgents))]) //nolint:gosec // Header jitter only; not security-sensitive randomness.
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-	req.Header.Set("Accept-Language", acceptLanguages[rand.IntN(len(acceptLanguages))])
+	req.Header.Set("Accept-Language", acceptLanguages[rand.IntN(len(acceptLanguages))]) //nolint:gosec // Header jitter only; not security-sensitive randomness.
 	req.Header.Set("Accept-Encoding", "identity")
 	req.Header.Set("Connection", "keep-alive")
 	req.Header.Set("Upgrade-Insecure-Requests", "1")
@@ -89,7 +89,7 @@ func setRandomizedHeaders(req *http.Request) {
 	req.Header.Set("Sec-Fetch-Site", "none")
 	req.Header.Set("Sec-Fetch-User", "?1")
 	req.Header.Set("Cache-Control", "max-age=0")
-	if rand.IntN(2) == 0 {
+	if rand.IntN(2) == 0 { //nolint:gosec // Header jitter only; not security-sensitive randomness.
 		req.Header.Set("DNT", "1")
 	}
 }
@@ -103,26 +103,34 @@ func parseLiteSearchResults(htmlContent string, maxResults int) ([]SearchResult,
 	var results []SearchResult
 	var currentResult *SearchResult
 
+	// flush appends the pending result when it carries a link.
+	flush := func() {
+		if currentResult == nil || currentResult.Link == "" {
+			return
+		}
+		currentResult.Position = len(results) + 1
+		results = append(results, *currentResult)
+		currentResult = nil
+	}
+
 	var traverse func(*html.Node)
 	traverse = func(n *html.Node) {
 		if n.Type == html.ElementNode {
-			if n.Data == "a" && hasClass(n, "result-link") {
-				if currentResult != nil && currentResult.Link != "" {
-					currentResult.Position = len(results) + 1
-					results = append(results, *currentResult)
-					if len(results) >= maxResults {
-						return
-					}
+			switch {
+			case n.Data == "a" && hasClass(n, "result-link"):
+				flush()
+				if len(results) >= maxResults {
+					return
 				}
-				currentResult = &SearchResult{Title: getTextContent(n)}
+				link := SearchResult{Title: getTextContent(n)}
 				for _, attr := range n.Attr {
 					if attr.Key == "href" {
-						currentResult.Link = cleanDuckDuckGoURL(attr.Val)
+						link.Link = cleanDuckDuckGoURL(attr.Val)
 						break
 					}
 				}
-			}
-			if n.Data == "td" && hasClass(n, "result-snippet") && currentResult != nil {
+				currentResult = &link
+			case n.Data == "td" && hasClass(n, "result-snippet") && currentResult != nil:
 				currentResult.Snippet = getTextContent(n)
 			}
 		}
@@ -136,9 +144,8 @@ func parseLiteSearchResults(htmlContent string, maxResults int) ([]SearchResult,
 
 	traverse(doc)
 
-	if currentResult != nil && currentResult.Link != "" && len(results) < maxResults {
-		currentResult.Position = len(results) + 1
-		results = append(results, *currentResult)
+	if len(results) < maxResults {
+		flush()
 	}
 
 	return results, nil
@@ -171,16 +178,20 @@ func getTextContent(n *html.Node) string {
 }
 
 func cleanDuckDuckGoURL(rawURL string) string {
-	if strings.HasPrefix(rawURL, "//duckduckgo.com/l/?uddg=") {
-		if _, after, ok := strings.Cut(rawURL, "uddg="); ok {
-			encoded := after
-			if ampIdx := strings.Index(encoded, "&"); ampIdx != -1 {
-				encoded = encoded[:ampIdx]
-			}
-			if decoded, err := url.QueryUnescape(encoded); err == nil {
-				return decoded
-			}
-		}
+	const prefix = "//duckduckgo.com/l/?uddg="
+	if !strings.HasPrefix(rawURL, prefix) {
+		return rawURL
+	}
+	_, after, ok := strings.Cut(rawURL, "uddg=")
+	if !ok {
+		return rawURL
+	}
+	encoded := after
+	if ampIdx := strings.Index(encoded, "&"); ampIdx != -1 {
+		encoded = encoded[:ampIdx]
+	}
+	if decoded, err := url.QueryUnescape(encoded); err == nil {
+		return decoded
 	}
 	return rawURL
 }
@@ -210,7 +221,7 @@ func MaybeDelaySearch() {
 	lastSearchMu.Lock()
 	defer lastSearchMu.Unlock()
 
-	minGap := time.Duration(500+rand.IntN(1500)) * time.Millisecond
+	minGap := time.Duration(500+rand.IntN(1500)) * time.Millisecond //nolint:gosec // Throttle jitter only; not security-sensitive randomness.
 	elapsed := time.Since(lastSearchTime)
 	if elapsed < minGap {
 		time.Sleep(minGap - elapsed)

@@ -453,6 +453,8 @@ func (s *Session) FullHelp() [][]key.Binding {
 			s.keyMap.ConfirmRename,
 			s.keyMap.CancelRename,
 		}
+	case sessionsModeNormal:
+		// The default bindings assembled above already cover this mode.
 	}
 	for i := 0; i < len(slice); i += 4 {
 		end := min(i+4, len(slice))

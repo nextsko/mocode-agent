@@ -113,6 +113,8 @@ func quitMessageStats(messages []message.Message) (users, assistants, tools int)
 			assistants++
 		case message.Tool:
 			tools++
+		case message.System:
+			// System messages are not counted in the quit summary.
 		}
 	}
 	return users, assistants, tools
@@ -152,7 +154,7 @@ func renderQuitSummary(summary quitSummary, qs styles.QuitSummary) string {
 	}
 
 	// Build all rows
-	var rows []string
+	rows := make([]string, 0, 19)
 
 	// ── Title ──
 	rows = append(rows, qs.Title.Render(fmt.Sprintf(" %s session summary ", strings.ToLower(summary.AppName))), "")

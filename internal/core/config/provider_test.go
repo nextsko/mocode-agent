@@ -114,7 +114,7 @@ func TestCachePathFor(t *testing.T) {
 				t.Setenv("XDG_DATA_HOME", "")
 			}
 
-			result := cachePathFor("providers")
+			result := cachePathFor()
 			if tt.expected != "" {
 				require.Equal(t, tt.expected, filepath.ToSlash(result))
 			} else {

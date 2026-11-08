@@ -160,6 +160,8 @@ func (a *AssistantMessageItem) renderMessageContent(width int) string {
 			messageParts = append(messageParts, a.sty.Messages.AssistantCanceled.Render("Canceled"))
 		case message.FinishReasonError:
 			messageParts = append(messageParts, a.renderError(width))
+		default:
+			// EndTurn, MaxTokens, ToolUse and Unknown need no extra footer.
 		}
 	}
 

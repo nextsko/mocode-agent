@@ -111,7 +111,7 @@ func (t mcpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	resp, err := next.RoundTrip(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("exa MCP round trip: %w", err)
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, mcpErrorBodyLimit))

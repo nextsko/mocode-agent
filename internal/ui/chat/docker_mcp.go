@@ -102,13 +102,14 @@ func (d *DockerMCPToolRenderContext) RenderTool(sty *styles.Styles, width int, o
 		}
 	}
 
-	var toolParams []string
-	toolParams = append(toolParams, mainParam)
 	keys := make([]string, 0, len(extraArgs))
 	for k := range extraArgs {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
+
+	toolParams := make([]string, 0, 1+2*len(keys))
+	toolParams = append(toolParams, mainParam)
 	for _, k := range keys {
 		toolParams = append(toolParams, k, extraArgs[k])
 	}

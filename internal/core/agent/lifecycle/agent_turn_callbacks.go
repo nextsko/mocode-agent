@@ -93,7 +93,7 @@ func (a *sessionAgent) prepareStep(ts *turnState) func(callContext context.Conte
 			prepared.Messages = append([]fantasy.Message{gm}, prepared.Messages...)
 		}
 
-		// Todo nudge: surface open todos at each model step so the agent is
+		// Reminder nudge: surface open todos at each model step so the agent is
 		// reminded to finish pending/in-progress items before declaring done.
 		// Re-fetch the session for fresh todo state (the todos tool may have
 		// updated it mid-run). Best-effort: a fetch failure just skips the nudge.
@@ -270,6 +270,9 @@ func (a *sessionAgent) onStepFinish(ts *turnState) func(stepResult fantasy.StepR
 			finishReason = message.FinishReasonEndTurn
 		case fantasy.FinishReasonToolCalls:
 			finishReason = message.FinishReasonToolUse
+		default:
+			// Content filters, provider errors, "other" and unknown reasons
+			// all keep the unknown finish reason set above.
 		}
 		// If a tool result halted the turn (e.g. a hook halt or a
 		// permission denial), the step ends on FinishReasonToolCalls but

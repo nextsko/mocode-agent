@@ -111,11 +111,7 @@ func (p *Prompt) Build(ctx context.Context, provider, model string, store *confi
 		return "", fmt.Errorf("parsing template: %w", err)
 	}
 	var sb strings.Builder
-	d, err := p.promptData(ctx, provider, model, store)
-	if err != nil {
-		return "", err
-	}
-	if err := t.Execute(&sb, d); err != nil {
+	if err := t.Execute(&sb, p.promptData(ctx, provider, model, store)); err != nil {
 		return "", fmt.Errorf("executing template: %w", err)
 	}
 
@@ -133,35 +129,41 @@ func processFile(filePath string) *ContextFile {
 	}
 }
 
-func processContextPath(p string, store *config.ConfigStore) []ContextFile {
+// collectContextFiles walks dir and returns every readable context file.
+func collectContextFiles(dir string) []ContextFile {
 	var contexts []ContextFile
+	_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if result := processFile(path); result != nil {
+			contexts = append(contexts, *result)
+		}
+		return nil
+	})
+	return contexts
+}
+
+func processContextPath(p string, store *config.ConfigStore) []ContextFile {
 	fullPath := p
 	if !filepath.IsAbs(p) {
 		fullPath = filepath.Join(store.WorkingDir(), p)
 	}
 	info, err := os.Stat(fullPath)
 	if err != nil {
-		return contexts
+		return nil
 	}
 	if info.IsDir() {
-		_ = filepath.WalkDir(fullPath, func(path string, d os.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if !d.IsDir() {
-				if result := processFile(path); result != nil {
-					contexts = append(contexts, *result)
-				}
-			}
-			return nil
-		})
-	} else {
-		result := processFile(fullPath)
-		if result != nil {
-			contexts = append(contexts, *result)
-		}
+		return collectContextFiles(fullPath)
 	}
-	return contexts
+	result := processFile(fullPath)
+	if result == nil {
+		return nil
+	}
+	return []ContextFile{*result}
 }
 
 // expandPath expands ~ and environment variables in file paths.
@@ -177,7 +179,7 @@ func expandPath(path string, store *config.ConfigStore) string {
 	return path
 }
 
-func (p *Prompt) promptData(ctx context.Context, provider, model string, store *config.ConfigStore) (PromptDat, error) {
+func (p *Prompt) promptData(ctx context.Context, provider, model string, store *config.ConfigStore) PromptDat {
 	workingDir := cmp.Or(p.workingDir, store.WorkingDir())
 	platform := cmp.Or(p.platform, runtime.GOOS)
 
@@ -247,17 +249,13 @@ func (p *Prompt) promptData(ctx context.Context, provider, model string, store *
 		AppName:        config.GetAppName(cfg),
 	}
 	if isGit {
-		var err error
-		data.GitStatus, err = getGitStatus(ctx, store.WorkingDir())
-		if err != nil {
-			return PromptDat{}, err
-		}
+		data.GitStatus = getGitStatus(ctx, store.WorkingDir())
 	}
 
 	for _, contextFiles := range files {
 		data.ContextFiles = append(data.ContextFiles, contextFiles...)
 	}
-	return data, nil
+	return data
 }
 
 func isGitRepo(dir string) bool {
@@ -265,56 +263,46 @@ func isGitRepo(dir string) bool {
 	return err == nil
 }
 
-func getGitStatus(ctx context.Context, dir string) (string, error) {
+func getGitStatus(ctx context.Context, dir string) string {
 	sh := shell.NewShell(&shell.Options{
 		WorkingDir: dir,
 	})
-	branch, err := getGitBranch(ctx, sh)
-	if err != nil {
-		return "", err
-	}
-	status, err := getGitStatusSummary(ctx, sh)
-	if err != nil {
-		return "", err
-	}
-	commits, err := getGitRecentCommits(ctx, sh)
-	if err != nil {
-		return "", err
-	}
-	return branch + status + commits, nil
+	// Git output is prompt context only; query failures degrade to an empty
+	// section instead of failing prompt construction.
+	return getGitBranch(ctx, sh) + getGitStatusSummary(ctx, sh) + getGitRecentCommits(ctx, sh)
 }
 
-func getGitBranch(ctx context.Context, sh *shell.Shell) (string, error) {
+func getGitBranch(ctx context.Context, sh *shell.Shell) string {
 	out, _, err := sh.Exec(ctx, "git branch --show-current 2>/dev/null")
 	if err != nil {
-		return "", nil
+		return ""
 	}
 	out = strings.TrimSpace(out)
 	if out == "" {
-		return "", nil
+		return ""
 	}
-	return fmt.Sprintf("Current branch: %s\n", out), nil
+	return fmt.Sprintf("Current branch: %s\n", out)
 }
 
-func getGitStatusSummary(ctx context.Context, sh *shell.Shell) (string, error) {
+func getGitStatusSummary(ctx context.Context, sh *shell.Shell) string {
 	out, _, err := sh.Exec(ctx, "git status --short 2>/dev/null | head -20")
 	if err != nil {
-		return "", nil
+		return ""
 	}
 	out = strings.TrimSpace(out)
 	if out == "" {
-		return "Status: clean\n", nil
+		return "Status: clean\n"
 	}
-	return fmt.Sprintf("Status:\n%s\n", out), nil
+	return fmt.Sprintf("Status:\n%s\n", out)
 }
 
-func getGitRecentCommits(ctx context.Context, sh *shell.Shell) (string, error) {
+func getGitRecentCommits(ctx context.Context, sh *shell.Shell) string {
 	out, _, err := sh.Exec(ctx, "git log --oneline -n 3 2>/dev/null")
 	if err != nil || out == "" {
-		return "", nil
+		return ""
 	}
 	out = strings.TrimSpace(out)
-	return fmt.Sprintf("Recent commits:\n%s\n", out), nil
+	return fmt.Sprintf("Recent commits:\n%s\n", out)
 }
 
 func (p *Prompt) Name() string {

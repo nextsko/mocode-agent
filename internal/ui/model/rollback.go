@@ -57,10 +57,7 @@ func (m *UI) rollbackSession(node string) tea.Cmd {
 			return util.InfoMsg{Type: util.InfoTypeWarn, Msg: "No file history found for this session"}
 		}
 
-		repoDir, err := rollbackRepoDir(sess, workingDir)
-		if err != nil {
-			return util.NewErrorMsg(err)
-		}
+		repoDir := rollbackRepoDir(sess, workingDir)
 		if err := commitRollbackState(repoDir, workingDir, currentTrackedFileState(files, workingDir), "pre-rollback to "+shortNode(target)); err != nil {
 			return util.NewErrorMsg(fmt.Errorf("snapshot before rollback: %w", err))
 		}
@@ -172,14 +169,14 @@ func currentTrackedFileState(files []history.File, workingDir string) map[string
 	return state
 }
 
-func rollbackRepoDir(sess sessionpkg.Session, workingDir string) (string, error) {
+func rollbackRepoDir(sess sessionpkg.Session, workingDir string) string {
 	project := filepath.Base(workingDir)
 	if project == "." || project == string(filepath.Separator) || project == "" {
 		project = "project"
 	}
 	root := infra.ScreenshotsDir()
 	sessionDir := filepath.Base(sessionpkg.StoreDir(root, sess))
-	return filepath.Join(root, sessionDir, safePathName(project)), nil
+	return filepath.Join(root, sessionDir, safePathName(project))
 }
 
 func commitRollbackState(repoDir, workingDir string, state map[string]string, msg string) error {
@@ -191,11 +188,11 @@ func commitRollbackState(repoDir, workingDir string, state map[string]string, ms
 		repo, err = git.PlainInit(repoDir, false)
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("open rollback repository: %w", err)
 	}
 	wt, err := repo.Worktree()
 	if err != nil {
-		return err
+		return fmt.Errorf("open rollback worktree: %w", err)
 	}
 	if err := clearRollbackRepoWorktree(repoDir); err != nil {
 		return err
@@ -214,7 +211,7 @@ func commitRollbackState(repoDir, workingDir string, state map[string]string, ms
 			return err
 		}
 		if _, err := wt.Add(rel); err != nil {
-			return err
+			return fmt.Errorf("stage %s: %w", rel, err)
 		}
 	}
 
@@ -223,7 +220,7 @@ func commitRollbackState(repoDir, workingDir string, state map[string]string, ms
 		All:    true,
 	})
 	if err != nil && !strings.Contains(strings.ToLower(err.Error()), "clean") {
-		return err
+		return fmt.Errorf("commit rollback state: %w", err)
 	}
 	return nil
 }
@@ -238,7 +235,7 @@ func clearRollbackRepoWorktree(repoDir string) error {
 			continue
 		}
 		if err := os.RemoveAll(filepath.Join(repoDir, entry.Name())); err != nil {
-			return err
+			return fmt.Errorf("remove %s: %w", entry.Name(), err)
 		}
 	}
 	return nil

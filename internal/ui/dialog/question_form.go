@@ -395,40 +395,58 @@ func (f *QuestionForm) HandlePaste(msg tea.PasteMsg) tea.Cmd {
 
 func (f *QuestionForm) HandleMouseClick(x, y int) (bool, bool) {
 	// Check tabs first.
-	if f.showTabs && f.compositor != nil {
-		hit := f.compositor.Hit(x, y)
-		if !hit.Empty() {
-			var idx int
-			if _, err := fmt.Sscanf(hit.ID(), "tab_%d", &idx); err == nil {
-				if idx >= 0 && idx < len(f.labels) && idx != f.activeIdx {
-					f.switchTab(idx)
-				}
-				return false, true
-			}
-		}
+	if f.handleTabClick(x, y) {
+		return false, true
 	}
 
 	// Delegate to active component.
 	if f.isConfirmTab() && f.confirmComp != nil {
 		return f.confirmComp.HandleMouseClick(x, y)
 	}
-	if f.activeIdx < len(f.questions) {
-		done, handled := f.questions[f.activeIdx].HandleMouseClick(x, y)
-		if handled {
-			resp := f.questions[f.activeIdx].Response()
-			f.answers[f.activeIdx] = &resp
-			f.syncConfirmAnswers()
-			if done {
-				if f.activeIdx < len(f.labels)-1 {
-					f.switchTab(f.activeIdx + 1)
-					return false, true
-				} else if !f.hasConfirm {
-					f.submit()
-					return true, true
-				}
-			}
-			return false, true
-		}
+	return f.handleActiveQuestionClick(x, y)
+}
+
+// handleTabClick reports whether the click landed on a tab, switching to it
+// when it is a different tab than the active one.
+func (f *QuestionForm) handleTabClick(x, y int) bool {
+	if !f.showTabs || f.compositor == nil {
+		return false
 	}
-	return false, false
+	hit := f.compositor.Hit(x, y)
+	if hit.Empty() {
+		return false
+	}
+	var idx int
+	if _, err := fmt.Sscanf(hit.ID(), "tab_%d", &idx); err != nil {
+		return false
+	}
+	if idx >= 0 && idx < len(f.labels) && idx != f.activeIdx {
+		f.switchTab(idx)
+	}
+	return true
+}
+
+// handleActiveQuestionClick forwards a click to the active question component
+// and records its answer. It reports (done, handled) like the components do.
+func (f *QuestionForm) handleActiveQuestionClick(x, y int) (bool, bool) {
+	if f.activeIdx >= len(f.questions) {
+		return false, false
+	}
+	done, handled := f.questions[f.activeIdx].HandleMouseClick(x, y)
+	if !handled {
+		return false, false
+	}
+
+	resp := f.questions[f.activeIdx].Response()
+	f.answers[f.activeIdx] = &resp
+	f.syncConfirmAnswers()
+	if done && f.activeIdx < len(f.labels)-1 {
+		f.switchTab(f.activeIdx + 1)
+		return false, true
+	}
+	if done && !f.hasConfirm {
+		f.submit()
+		return true, true
+	}
+	return false, true
 }

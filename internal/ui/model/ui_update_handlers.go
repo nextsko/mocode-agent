@@ -100,9 +100,7 @@ func (m *UI) handleServiceEventMsg(msg tea.Msg) (cmds []tea.Cmd) {
 		if msg.Payload.SessionID != "" {
 			m.ensureTodoContinuationState(msg.Payload.SessionID).PendingPermission = true
 		}
-		if cmd := m.openPermissionsDialog(msg.Payload); cmd != nil {
-			cmds = append(cmds, cmd)
-		}
+		m.openPermissionsDialog(msg.Payload)
 		if cmd := m.sendNotification(notification.Notification{
 			Title:   fmt.Sprintf("%s is waiting...", config.GetAppName(m.com.Config())),
 			Message: fmt.Sprintf("Permission required to execute \"%s\"", msg.Payload.ToolName),
@@ -112,9 +110,7 @@ func (m *UI) handleServiceEventMsg(msg tea.Msg) (cmds []tea.Cmd) {
 	case pubsub.Event[permission.PermissionNotification]:
 		m.handlePermissionNotification(msg.Payload)
 	case pubsub.Event[question.Request]:
-		if cmd := m.openQuestionDialog(msg.Payload); cmd != nil {
-			cmds = append(cmds, cmd)
-		}
+		m.openQuestionDialog(msg.Payload)
 		m.chat.ScrollToBottom()
 		if cmd := m.sendNotification(notification.Notification{
 			Title:   "mocode is waiting...",
@@ -128,7 +124,56 @@ func (m *UI) handleServiceEventMsg(msg tea.Msg) (cmds []tea.Cmd) {
 	return cmds
 }
 
+// scrollChatUpOne scrolls the chat up one line, keeping the selection visible.
+func (m *UI) scrollChatUpOne() []tea.Cmd {
+	var cmds []tea.Cmd
+	if cmd := m.chat.ScrollByAndAnimate(-1); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	if !m.chat.SelectedItemInView() {
+		m.chat.SelectPrev()
+		if cmd := m.chat.ScrollToSelectedAndAnimate(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+	return cmds
+}
+
+// scrollChatDownOne scrolls the chat down one line, keeping the selection
+// visible.
+func (m *UI) scrollChatDownOne() []tea.Cmd {
+	var cmds []tea.Cmd
+	if cmd := m.chat.ScrollByAndAnimate(1); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	if !m.chat.SelectedItemInView() {
+		m.chat.SelectNext()
+		if cmd := m.chat.ScrollToSelectedAndAnimate(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+	return cmds
+}
+
 // handleMouseMsg routes mouse events — extracted from Update.
+// handleChatMouseMotion scrolls when the pointer rests on the chat edges and
+// forwards drag coordinates to the chat for selection handling.
+func (m *UI) handleChatMouseMotion(msg tea.MouseMotionMsg) []tea.Cmd {
+	var cmds []tea.Cmd
+	if msg.Y <= 0 {
+		cmds = append(cmds, m.scrollChatUpOne()...)
+	} else if msg.Y >= m.chat.Height()-1 {
+		cmds = append(cmds, m.scrollChatDownOne()...)
+	}
+
+	x, y := msg.X, msg.Y
+	// Adjust for chat area position
+	x -= m.layout.main.Min.X
+	y -= m.layout.main.Min.Y
+	m.chat.HandleMouseDrag(x, y)
+	return cmds
+}
+
 func (m *UI) handleMouseMsg(msg tea.Msg) (cmds []tea.Cmd) {
 	switch msg := msg.(type) {
 	case DelayedClickMsg:
@@ -167,6 +212,8 @@ func (m *UI) handleMouseMsg(msg tea.Msg) (cmds []tea.Cmd) {
 					}
 				}
 			}
+		default:
+			// Other states do not handle chat mouse clicks.
 		}
 
 	case tea.MouseMotionMsg:
@@ -178,33 +225,9 @@ func (m *UI) handleMouseMsg(msg tea.Msg) (cmds []tea.Cmd) {
 
 		switch m.state {
 		case uiChat:
-			if msg.Y <= 0 {
-				if cmd := m.chat.ScrollByAndAnimate(-1); cmd != nil {
-					cmds = append(cmds, cmd)
-				}
-				if !m.chat.SelectedItemInView() {
-					m.chat.SelectPrev()
-					if cmd := m.chat.ScrollToSelectedAndAnimate(); cmd != nil {
-						cmds = append(cmds, cmd)
-					}
-				}
-			} else if msg.Y >= m.chat.Height()-1 {
-				if cmd := m.chat.ScrollByAndAnimate(1); cmd != nil {
-					cmds = append(cmds, cmd)
-				}
-				if !m.chat.SelectedItemInView() {
-					m.chat.SelectNext()
-					if cmd := m.chat.ScrollToSelectedAndAnimate(); cmd != nil {
-						cmds = append(cmds, cmd)
-					}
-				}
-			}
-
-			x, y := msg.X, msg.Y
-			// Adjust for chat area position
-			x -= m.layout.main.Min.X
-			y -= m.layout.main.Min.Y
-			m.chat.HandleMouseDrag(x, y)
+			cmds = append(cmds, m.handleChatMouseMotion(msg)...)
+		default:
+			// Other states do not handle chat mouse motion.
 		}
 
 	case tea.MouseReleaseMsg:
@@ -228,6 +251,8 @@ func (m *UI) handleMouseMsg(msg tea.Msg) (cmds []tea.Cmd) {
 					return nil
 				}))
 			}
+		default:
+			// Other states do not handle chat mouse releases.
 		}
 	case tea.MouseWheelMsg:
 		// Pass mouse events to dialogs first if any are open.
@@ -264,7 +289,11 @@ func (m *UI) handleMouseMsg(msg tea.Msg) (cmds []tea.Cmd) {
 						cmds = append(cmds, cmd)
 					}
 				}
+			default:
+				// Other wheel buttons are not handled here.
 			}
+		default:
+			// Other states do not handle chat mouse wheel events.
 		}
 	}
 	return cmds

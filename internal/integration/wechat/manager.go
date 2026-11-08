@@ -306,7 +306,7 @@ func (m *AccountManager) IsRunning(id string) bool {
 func (m *AccountManager) List() []AccountInfo {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	var result []AccountInfo
+	result := make([]AccountInfo, 0, len(m.accounts))
 	for id, ch := range m.accounts {
 		status := AccountStatusOnline
 		if !ch.IsLoggedIn() {
@@ -385,7 +385,7 @@ func (m *AccountManager) loadRegistry() error {
 
 func (m *AccountManager) saveRegistry() error {
 	path := filepath.Join(m.storeDir, "registry.json")
-	var ids []string
+	ids := make([]string, 0, len(m.accounts))
 	for id := range m.accounts {
 		ids = append(ids, id)
 	}

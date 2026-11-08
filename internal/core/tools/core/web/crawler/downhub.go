@@ -114,7 +114,7 @@ func (d *Downhub) Fetch() (*DocsResult, error) {
 		if d.shouldInclude(f.Name) {
 			content, err := f.Contents()
 			if err != nil {
-				return nil
+				return nil //nolint:nilerr // Unreadable blobs are skipped; one bad file must not abort the crawl.
 			}
 			result.Files = append(result.Files, DocFile{
 				Path:    f.Name,

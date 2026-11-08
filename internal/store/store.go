@@ -180,7 +180,7 @@ func (s *Store) EnsureDir(path string) error {
 // EnsureDirContext creates a directory, respecting context cancellation.
 func (s *Store) EnsureDirContext(ctx context.Context, path string) error {
 	if err := ctx.Err(); err != nil {
-		return err
+		return fmt.Errorf("ensure dir context: %w", err)
 	}
 	return os.MkdirAll(path, 0o700)
 }

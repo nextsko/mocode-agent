@@ -290,13 +290,16 @@ func gzipFile(path string) (string, error) {
 	outPath := path + ".gz"
 	out, err := os.Create(outPath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("create %s: %w", outPath, err)
 	}
 	defer out.Close()
 	w := gzip.NewWriter(out)
 	if _, err := io.Copy(w, in); err != nil {
 		_ = w.Close()
-		return "", err
+		return "", fmt.Errorf("compress %s: %w", path, err)
 	}
-	return outPath, w.Close()
+	if err := w.Close(); err != nil {
+		return outPath, fmt.Errorf("close gzip writer: %w", err)
+	}
+	return outPath, nil
 }

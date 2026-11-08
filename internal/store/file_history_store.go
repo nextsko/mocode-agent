@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -146,7 +145,7 @@ func (fhs *FileHistoryStore) ListLatestSessionFiles(ctx context.Context, session
 			latest[jf.Path] = jf
 		}
 	})
-	var files []history.File
+	files := make([]history.File, 0, len(latest))
 	for _, jf := range latest {
 		files = append(files, jsonlToFile(jf))
 	}
@@ -203,7 +202,7 @@ func (fhs *FileHistoryStore) scanFiles(sessionID string, fn func(jsonlFile)) {
 	}
 	_ = writer.ScanLines(func(line string) error {
 		var jf jsonlFile
-		if err := json.Unmarshal([]byte(line), &jf); err != nil {
+		if !decodeJSONLine(line, &jf) {
 			return nil
 		}
 		fn(jf)

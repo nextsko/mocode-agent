@@ -156,7 +156,10 @@ func runSessionList(cmd *cobra.Command, _ []string) error {
 		}
 		enc := json.NewEncoder(out)
 		enc.SetEscapeHTML(false)
-		return enc.Encode(output)
+		if err := enc.Encode(output); err != nil {
+			return fmt.Errorf("encode session list: %w", err)
+		}
+		return nil
 	}
 
 	w, cleanup, usingPager := sessionWriter(ctx, len(list))
@@ -186,7 +189,10 @@ func runSessionList(cmd *cobra.Command, _ []string) error {
 	if writeErr != nil && usingPager && isBrokenPipe(writeErr) {
 		return nil
 	}
-	return writeErr
+	if writeErr != nil {
+		return fmt.Errorf("write session list: %w", writeErr)
+	}
+	return nil
 }
 
 type sessionJSON struct {
@@ -294,12 +300,15 @@ func runSessionDelete(cmd *cobra.Command, args []string) error {
 	if sessionDeleteJSON {
 		enc := json.NewEncoder(out)
 		enc.SetEscapeHTML(false)
-		return enc.Encode(sessionMutationResult{
+		if err := enc.Encode(sessionMutationResult{
 			ID:      session.HashID(sess.ID),
 			UUID:    sess.ID,
 			Title:   sess.Title,
 			Deleted: true,
-		})
+		}); err != nil {
+			return fmt.Errorf("encode delete result: %w", err)
+		}
+		return nil
 	}
 
 	fmt.Fprintf(out, "Deleted session %s\n", session.HashID(sess.ID)[:12])
@@ -327,12 +336,15 @@ func runSessionRename(cmd *cobra.Command, args []string) error {
 	if sessionRenameJSON {
 		enc := json.NewEncoder(out)
 		enc.SetEscapeHTML(false)
-		return enc.Encode(sessionMutationResult{
+		if err := enc.Encode(sessionMutationResult{
 			ID:      session.HashID(sess.ID),
 			UUID:    sess.ID,
 			Title:   newTitle,
 			Renamed: true,
-		})
+		}); err != nil {
+			return fmt.Errorf("encode rename result: %w", err)
+		}
+		return nil
 	}
 
 	fmt.Fprintf(out, "Renamed session %s to %q\n", session.HashID(sess.ID)[:12], newTitle)
@@ -413,7 +425,10 @@ func outputSessionJSON(w io.Writer, sess session.Session, msgs []*message.Messag
 
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
-	return enc.Encode(output)
+	if err := enc.Encode(output); err != nil {
+		return fmt.Errorf("encode session output: %w", err)
+	}
+	return nil
 }
 
 func outputSessionHuman(ctx context.Context, cfg *config.ConfigStore, sess session.Session, msgs []*message.Message) error {
@@ -484,7 +499,10 @@ func outputSessionHuman(ctx context.Context, cfg *config.ConfigStore, sess sessi
 	if err != nil && usingPager && isBrokenPipe(err) {
 		return nil
 	}
-	return err
+	if err != nil {
+		return fmt.Errorf("write session output: %w", err)
+	}
+	return nil
 }
 
 func isBrokenPipe(err error) bool {
@@ -612,21 +630,23 @@ func extractSkillsFromMessages(msgs []*message.Message) []sessionShowSkill {
 
 	for _, msg := range msgs {
 		for _, part := range msg.Parts {
-			if tr, ok := part.(message.ToolResult); ok && tr.Metadata != "" {
-				var meta tools.ViewResponseMetadata
-				if err := json.Unmarshal([]byte(tr.Metadata), &meta); err == nil {
-					if meta.ResourceType == tools.ViewResourceSkill && meta.ResourceName != "" {
-						if !seen[meta.ResourceName] {
-							seen[meta.ResourceName] = true
-							skills = append(skills, sessionShowSkill{
-								Name:        meta.ResourceName,
-								Description: meta.ResourceDescription,
-								LoadedAt:    time.Unix(msg.CreatedAt, 0).Format(time.RFC3339),
-							})
-						}
-					}
-				}
+			tr, ok := part.(message.ToolResult)
+			if !ok || tr.Metadata == "" {
+				continue
 			}
+			var meta tools.ViewResponseMetadata
+			if err := json.Unmarshal([]byte(tr.Metadata), &meta); err != nil {
+				continue
+			}
+			if meta.ResourceType != tools.ViewResourceSkill || meta.ResourceName == "" || seen[meta.ResourceName] {
+				continue
+			}
+			seen[meta.ResourceName] = true
+			skills = append(skills, sessionShowSkill{
+				Name:        meta.ResourceName,
+				Description: meta.ResourceDescription,
+				LoadedAt:    time.Unix(msg.CreatedAt, 0).Format(time.RFC3339),
+			})
 		}
 	}
 

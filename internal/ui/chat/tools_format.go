@@ -27,26 +27,32 @@ func (t *baseToolMessageItem) formatToolForCopy() string {
 		}
 	}
 
-	if t.result != nil && t.result.ToolCallID != "" {
-		if t.result.IsError {
-			parts = append(parts, "### Error:")
-			parts = append(parts, t.result.Content)
-		} else {
-			parts = append(parts, "### Result:")
-			content := t.formatResultForCopy()
-			if content != "" {
-				parts = append(parts, content)
-			}
-		}
-	} else if t.status == ToolStatusCanceled {
-		parts = append(parts, "### Status:")
-		parts = append(parts, "Cancelled")
-	} else {
-		parts = append(parts, "### Status:")
-		parts = append(parts, "Pending...")
-	}
+	parts = append(parts, t.resultSectionForCopy()...)
 
 	return strings.Join(parts, "\n\n")
+}
+
+// resultSectionForCopy renders the result/status section of the copy payload.
+func (t *baseToolMessageItem) resultSectionForCopy() []string {
+	if t.result == nil || t.result.ToolCallID == "" {
+		return statusSectionForCopy(t.status)
+	}
+	if t.result.IsError {
+		return []string{"### Error:", t.result.Content}
+	}
+	section := []string{"### Result:"}
+	if content := t.formatResultForCopy(); content != "" {
+		section = append(section, content)
+	}
+	return section
+}
+
+// statusSectionForCopy renders the status section for a call without a result.
+func statusSectionForCopy(status ToolStatus) []string {
+	if status == ToolStatusCanceled {
+		return []string{"### Status:", "Cancelled"}
+	}
+	return []string{"### Status:", "Pending..."}
 }
 
 func (t *baseToolMessageItem) formatParametersForCopy() string {
@@ -79,7 +85,7 @@ func (t *baseToolMessageItem) formatParametersForCopy() string {
 	case tools.MultiEditToolName:
 		var params tools.MultiEditParams
 		if json.Unmarshal([]byte(t.toolCall.Input), &params) == nil {
-			var parts []string
+			parts := make([]string, 0, 2)
 			parts = append(parts, fmt.Sprintf("**File:** %s", fsext.PrettyPath(params.FilePath)))
 			parts = append(parts, fmt.Sprintf("**Edits:** %d", len(params.Edits)))
 			return strings.Join(parts, "\n")

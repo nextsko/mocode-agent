@@ -813,9 +813,9 @@ func TestDateToAgeSecondsAndTruncate(t *testing.T) {
 	require.Zero(t, dateToAgeSeconds(""))
 
 	require.Equal(t, strings.Repeat("a", 500),
-		truncateRunes(strings.Repeat("a", 600), 500))
+		truncateRunes(strings.Repeat("a", 600)))
 	multibyte := strings.Repeat("é", 600)
-	truncated := truncateRunes(multibyte, 500)
+	truncated := truncateRunes(multibyte)
 	require.Equal(t, 500, len([]rune(truncated)))
 	require.True(t, utf8.ValidString(truncated))
 }

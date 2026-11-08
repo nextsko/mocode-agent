@@ -163,7 +163,7 @@ func writeDiagnostics(output *strings.Builder, tag string, in []string) {
 	output.WriteString("\n</" + tag + ">\n")
 }
 
-func sortDiagnostics(in []string) []string {
+func sortDiagnostics(in []string) {
 	sort.Slice(in, func(i, j int) bool {
 		iIsError := strings.HasPrefix(in[i], "Error")
 		jIsError := strings.HasPrefix(in[j], "Error")
@@ -172,7 +172,6 @@ func sortDiagnostics(in []string) []string {
 		}
 		return in[i] < in[j]
 	})
-	return in
 }
 
 func formatDiagnostic(pth string, diagnostic protocol.Diagnostic, source string) string {
@@ -182,6 +181,8 @@ func formatDiagnostic(pth string, diagnostic protocol.Diagnostic, source string)
 		severity = "Error"
 	case protocol.SeverityWarning:
 		severity = "Warn"
+	case protocol.SeverityInformation:
+		severity = "Info"
 	case protocol.SeverityHint:
 		severity = "Hint"
 	}

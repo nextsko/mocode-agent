@@ -76,6 +76,8 @@ func TodoPill(todos []session.Todo, spinnerView string, focused, panelFocused bo
 			if currentTodo == nil {
 				currentTodo = &todos[i]
 			}
+		case session.TodoStatusPending:
+			// Pending todos only contribute to the total count.
 		}
 	}
 

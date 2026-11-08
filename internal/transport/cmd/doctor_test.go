@@ -74,7 +74,7 @@ func TestDoctorJSON(t *testing.T) {
 	require.Equal(t, tmpDir, report.CWD)
 	require.NotEmpty(t, report.Checks)
 
-	var names []string
+	names := make([]string, 0, len(report.Checks))
 	for _, check := range report.Checks {
 		names = append(names, check.Name)
 	}

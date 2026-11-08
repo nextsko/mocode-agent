@@ -41,9 +41,9 @@ func goldenResp() *search.SearchResponse {
 // pad pads text with n trailing spaces.
 func pad(n int) string { return strings.Repeat(" ", n) }
 
-// row wraps inner into a no-color content row of the given outer width.
-func row(inner string, width int) string {
-	return "│ " + inner + pad(width-4-theme.VisibleWidth(inner)) + " │"
+// row wraps inner into a no-color content row at the golden 80-column width.
+func row(inner string) string {
+	return "│ " + inner + pad(80-4-theme.VisibleWidth(inner)) + " │"
 }
 
 func TestRenderResultGoldenEightyColumns(t *testing.T) {
@@ -62,7 +62,7 @@ func TestRenderResultGoldenEightyColumns(t *testing.T) {
 	require.Equal(t, 80, theme.VisibleWidth(lines[0]))
 
 	require.Equal(t,
-		row("Query: golang generics", 80),
+		row("Query: golang generics"),
 		lines[1],
 	)
 
@@ -71,7 +71,7 @@ func TestRenderResultGoldenEightyColumns(t *testing.T) {
 		lines[2],
 	)
 	require.Equal(t,
-		row("No answer text returned", 80),
+		row("No answer text returned"),
 		lines[3],
 	)
 
@@ -83,14 +83,14 @@ func TestRenderResultGoldenEightyColumns(t *testing.T) {
 		"Go Generics Guide" +
 		"\x1b]8;;\x1b\\"
 	require.Equal(t,
-		row("├─ "+link1+" (example.com) · 2d ago", 80),
+		row("├─ "+link1+" (example.com) · 2d ago"),
 		lines[5],
 	)
 	link2 := "\x1b]8;;https://www.news.org/generics\x1b\\" +
 		"Generics in Go" +
 		"\x1b]8;;\x1b\\"
 	require.Equal(t,
-		row("└─ "+link2+" (news.org) · 2026-09-01", 80),
+		row("└─ "+link2+" (news.org) · 2026-09-01"),
 		lines[6],
 	)
 
@@ -99,11 +99,11 @@ func TestRenderResultGoldenEightyColumns(t *testing.T) {
 		lines[7],
 	)
 	require.Equal(t,
-		row("Provider: sonar-pro @ Perplexity (API)", 80),
+		row("Provider: sonar-pro @ Perplexity (API)"),
 		lines[8],
 	)
 	require.Equal(t,
-		row("Usage: in 1240 · out 87 · total 1327 · search 3", 80),
+		row("Usage: in 1240 · out 87 · total 1327 · search 3"),
 		lines[9],
 	)
 

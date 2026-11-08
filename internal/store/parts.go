@@ -24,7 +24,11 @@ func marshalParts(parts []message.ContentPart) ([]byte, error) {
 		}
 		wrapped[i] = partWrapper{Type: typ, Data: part}
 	}
-	return json.Marshal(wrapped)
+	b, err := json.Marshal(wrapped)
+	if err != nil {
+		return nil, fmt.Errorf("marshal parts: %w", err)
+	}
+	return b, nil
 }
 
 // unmarshalParts deserializes a JSON blob back to a slice of ContentParts.

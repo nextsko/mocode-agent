@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"iter"
 	"log/slog"
 
@@ -51,7 +52,7 @@ func ReadResource(ctx context.Context, cfg *config.ConfigStore, name, uri string
 	}
 	result, err := session.ReadResource(ctx, &mcp.ReadResourceParams{URI: uri})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read resource %s: %w", uri, err)
 	}
 	return result.Contents, nil
 }
@@ -89,7 +90,7 @@ func getResources(ctx context.Context, c *ClientSession) ([]*Resource, error) {
 			slog.Warn("MCP server does not support resources/list", "error", err)
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("list resources: %w", err)
 	}
 	return result.Resources, nil
 }

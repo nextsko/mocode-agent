@@ -157,6 +157,8 @@ func (m *UI) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 			cur.Y += m.layout.editor.Min.Y + 2 // Offset for divider and attachments row
 			return cur
 		}
+	default:
+		// Only the editor exposes a cursor.
 	}
 	return nil
 }

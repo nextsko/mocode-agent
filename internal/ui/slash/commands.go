@@ -4,6 +4,7 @@ package slash
 
 import (
 	"context"
+	"fmt"
 	"hash/fnv"
 	"io/fs"
 	"os"
@@ -59,7 +60,7 @@ type commandSource struct {
 // LoadCustomCommands loads custom commands from multiple sources including
 // XDG config directory, home directory, and project directory.
 func LoadCustomCommands(cfg *config.Config) ([]CustomCommand, error) {
-	return loadAll(buildCommandSources(cfg))
+	return loadAll(buildCommandSources())
 }
 
 // LoadMCPPrompts loads custom commands from available MCP servers.
@@ -94,7 +95,7 @@ func LoadMCPPrompts() ([]MCPPrompt, error) {
 	return commands, nil
 }
 
-func buildCommandSources(cfg *config.Config) []commandSource {
+func buildCommandSources() []commandSource {
 	return []commandSource{
 		{
 			path:   filepath.Join(infra.Config(), "Mocode", "commands"),
@@ -137,14 +138,17 @@ func loadFromSource(source commandSource) ([]CustomCommand, error) {
 
 		cmd, err := loadCommand(path, source.path, source.prefix)
 		if err != nil {
-			return nil // Skip invalid files
+			//nolint:nilerr // Invalid command files are skipped so one bad file cannot hide the rest.
+			return nil
 		}
 
 		commands = append(commands, cmd)
 		return nil
 	})
-
-	return commands, err
+	if err != nil {
+		return commands, fmt.Errorf("walk command sources: %w", err)
+	}
+	return commands, nil
 }
 
 func loadCommand(path, baseDir, prefix string) (CustomCommand, error) {

@@ -248,48 +248,43 @@ func formatSourcegraphResults(result map[string]any, contextWindow int) (string,
 			fmt.Fprintf(&buffer, "URL: %s\n\n", fileURL)
 		}
 
-		if len(lineMatches) > 0 {
-			for _, lm := range lineMatches {
-				lineMatch, ok := lm.(map[string]any)
-				if !ok {
-					continue
-				}
-
-				lineNumber, _ := lineMatch["lineNumber"].(float64)
-				preview, _ := lineMatch["preview"].(string)
-
-				if fileContent != "" {
-					lines := strings.Split(fileContent, "\n")
-
-					buffer.WriteString("```\n")
-
-					startLine := max(1, int(lineNumber)-contextWindow)
-
-					for j := startLine - 1; j < int(lineNumber)-1 && j < len(lines); j++ {
-						if j >= 0 {
-							fmt.Fprintf(&buffer, "%d| %s\n", j+1, lines[j])
-						}
-					}
-
-					fmt.Fprintf(&buffer, "%d|  %s\n", int(lineNumber), preview)
-
-					endLine := int(lineNumber) + contextWindow
-
-					for j := int(lineNumber); j < endLine && j < len(lines); j++ {
-						if j < len(lines) {
-							fmt.Fprintf(&buffer, "%d| %s\n", j+1, lines[j])
-						}
-					}
-
-					buffer.WriteString("```\n\n")
-				} else {
-					buffer.WriteString("```\n")
-					fmt.Fprintf(&buffer, "%d| %s\n", int(lineNumber), preview)
-					buffer.WriteString("```\n\n")
-				}
+		for _, lm := range lineMatches {
+			lineMatch, ok := lm.(map[string]any)
+			if !ok {
+				continue
 			}
+			renderLineMatch(&buffer, fileContent, lineMatch, contextWindow)
 		}
 	}
 
 	return buffer.String(), nil
+}
+
+// renderLineMatch writes one source line match with its context lines.
+func renderLineMatch(buffer *strings.Builder, fileContent string, lineMatch map[string]any, contextWindow int) {
+	lineNumber, _ := lineMatch["lineNumber"].(float64)
+	preview, _ := lineMatch["preview"].(string)
+
+	buffer.WriteString("```\n")
+	if fileContent == "" {
+		fmt.Fprintf(buffer, "%d| %s\n", int(lineNumber), preview)
+		buffer.WriteString("```\n\n")
+		return
+	}
+
+	lines := strings.Split(fileContent, "\n")
+	startLine := max(1, int(lineNumber)-contextWindow)
+	for j := startLine - 1; j < int(lineNumber)-1 && j < len(lines); j++ {
+		if j >= 0 {
+			fmt.Fprintf(buffer, "%d| %s\n", j+1, lines[j])
+		}
+	}
+	fmt.Fprintf(buffer, "%d|  %s\n", int(lineNumber), preview)
+	endLine := int(lineNumber) + contextWindow
+	for j := int(lineNumber); j < endLine && j < len(lines); j++ {
+		if j < len(lines) {
+			fmt.Fprintf(buffer, "%d| %s\n", j+1, lines[j])
+		}
+	}
+	buffer.WriteString("```\n\n")
 }

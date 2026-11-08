@@ -434,7 +434,7 @@ func AgentAuth() AuthMethod {
 		if sock == "" {
 			return nil, errors.New("SSH_AUTH_SOCK not set")
 		}
-		conn, err := net.Dial("unix", sock) //nolint:gosec // unix socket path comes from the SSH agent configuration.
+		conn, err := (&net.Dialer{}).DialContext(context.Background(), "unix", sock)
 		if err != nil {
 			return nil, fmt.Errorf("dial agent: %w", err)
 		}

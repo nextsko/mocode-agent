@@ -6,7 +6,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 )
 
-func (app *App) useStoreServices() error {
+func (app *App) useStoreServices() {
 	app.Sessions = newStoreSessionService(app.store)
 	app.Messages = newStoreMessageService(app.store)
 	app.History = newStoreHistoryService(app.store)
@@ -14,12 +14,10 @@ func (app *App) useStoreServices() error {
 	if app.eventsCtx != nil {
 		app.subscribeSessionServices(app.eventsCtx)
 	}
-	return nil
 }
 
-func (app *App) useSessionStore(_ context.Context, sess session.Session) error {
+func (app *App) useSessionStore(sess session.Session) {
 	app.sessionStoreID = sess.ID
-	return nil
 }
 
 func (app *App) CreateSession(ctx context.Context, title string) (session.Session, error) {
@@ -27,9 +25,7 @@ func (app *App) CreateSession(ctx context.Context, title string) (session.Sessio
 	if err != nil {
 		return session.Session{}, err
 	}
-	if err := app.useSessionStore(ctx, sess); err != nil {
-		return session.Session{}, err
-	}
+	app.useSessionStore(sess)
 	return sess, nil
 }
 
@@ -38,9 +34,7 @@ func (app *App) GetSession(ctx context.Context, id string) (session.Session, err
 	if err != nil {
 		return session.Session{}, err
 	}
-	if err := app.useSessionStore(ctx, sess); err != nil {
-		return session.Session{}, err
-	}
+	app.useSessionStore(sess)
 	return sess, nil
 }
 

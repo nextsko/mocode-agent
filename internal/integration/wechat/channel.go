@@ -461,7 +461,7 @@ func (c *Channel) Run(ctx context.Context) error {
 				c.mu.Lock()
 				c.running = false
 				c.mu.Unlock()
-				return ctx.Err()
+				return fmt.Errorf("channel stopped: %w", ctx.Err())
 			}
 			consecutiveFailures = 0
 			continue
@@ -476,7 +476,7 @@ func (c *Channel) Run(ctx context.Context) error {
 			c.mu.Lock()
 			c.running = false
 			c.mu.Unlock()
-			return ctx.Err()
+			return fmt.Errorf("channel stopped: %w", ctx.Err())
 		}
 	}
 }

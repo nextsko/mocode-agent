@@ -262,7 +262,7 @@ func (s *questionService) Ask(ctx context.Context, req Request) ([]Answer, error
 
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return nil, fmt.Errorf("waiting for answer: %w", ctx.Err())
 	case <-s.cancelled:
 		return nil, ErrCancelled
 	case answers := <-s.pending:

@@ -364,8 +364,8 @@ type Styles struct {
 		// Agentic fetch styles
 		AgenticFetchPromptTag lipgloss.Style // Agentic fetch prompt tag (green background, bold)
 
-		// Todo styles
-		TodoRatio          lipgloss.Style // Todo ratio (e.g., "2/5")
+		// To-do list styles
+		TodoRatio          lipgloss.Style // To-do ratio (e.g., "2/5")
 		TodoCompletedIcon  lipgloss.Style // Completed todo icon
 		TodoInProgressIcon lipgloss.Style // In-progress todo icon
 		TodoPendingIcon    lipgloss.Style // Pending todo icon
@@ -584,9 +584,9 @@ type Styles struct {
 		QueueGradFromColor color.Color    // Start color for queue indicator gradient
 		QueueGradToColor   color.Color    // End color for queue indicator gradient
 		TodoLabel          lipgloss.Style // "To-Do" label
-		TodoProgress       lipgloss.Style // Todo ratio (e.g. "2/5")
+		TodoProgress       lipgloss.Style // To-do ratio (e.g. "2/5")
 		TodoCurrentTask    lipgloss.Style // Current in-progress task name
-		TodoSpinner        lipgloss.Style // Todo spinner style
+		TodoSpinner        lipgloss.Style // To-do spinner style
 		HelpKey            lipgloss.Style // Keystroke hint style
 		HelpText           lipgloss.Style // Help action text style
 		Area               lipgloss.Style // Pills area container

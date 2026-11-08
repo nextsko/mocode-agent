@@ -3,7 +3,6 @@ package model
 import (
 	"cmp"
 	"context"
-	"github.com/nextsko/mocode-agent/internal/ui/pills"
 	"image"
 	"log/slog"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/nextsko/mocode-agent/internal/ui/pills"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -190,6 +191,38 @@ func (m *UI) closeCompletions() {
 	m.completions.Close()
 }
 
+// thinkingSettingItems returns the reasoning-related slash entries for the
+// coder agent, or nothing when its model cannot reason.
+func thinkingSettingItems(cfg *config.Config) []completions.SlashCompletionValue {
+	if cfg == nil {
+		return nil
+	}
+	agentCfg, ok := cfg.Agents[config.AgentCoder]
+	if !ok {
+		return nil
+	}
+	model := cfg.GetModelByType(agentCfg.Model)
+	if model == nil || !model.CanReason {
+		return nil
+	}
+	if len(model.ReasoningLevels) > 0 {
+		return []completions.SlashCompletionValue{{
+			Command: "/reasoning",
+			Desc:    "Select reasoning effort",
+			Msg:     dialog.ActionOpenDialog{DialogID: dialog.ReasoningID},
+		}}
+	}
+	status := "Enable"
+	if cfg.Models[agentCfg.Model].Think {
+		status = "Disable"
+	}
+	return []completions.SlashCompletionValue{{
+		Command: "/think",
+		Desc:    status + " thinking mode",
+		Msg:     dialog.ActionToggleThinking{},
+	}}
+}
+
 func (m *UI) slashCompletionGroups() []completions.SlashGroup {
 	hasSession := m.hasSession()
 	hasTodos := hasSession && pills.HasIncompleteTodos(m.session.Todos)
@@ -265,30 +298,13 @@ func (m *UI) slashCompletionGroups() []completions.SlashGroup {
 	}
 
 	// ── Settings ──────────────────────────────────────────────────────────
-	settingsItems := []completions.SlashCompletionValue{
+	settingsItems := make([]completions.SlashCompletionValue, 0, 5)
+	settingsItems = append(settingsItems, []completions.SlashCompletionValue{
 		v("/approve", "Toggle auto-approve (Yolo)", dialog.ActionToggleYoloMode{}),
 		v("/notifications", "Toggle notifications", dialog.ActionToggleNotifications{}),
 		v("/theme", "Toggle transparent background", dialog.ActionToggleTransparentBackground{}),
-	}
-	if cfg != nil {
-		if agentCfg, ok := cfg.Agents[config.AgentCoder]; ok {
-			if model := cfg.GetModelByType(agentCfg.Model); model != nil && model.CanReason {
-				sel := cfg.Models[agentCfg.Model]
-				if len(model.ReasoningLevels) == 0 {
-					status := "Enable"
-					if sel.Think {
-						status = "Disable"
-					}
-					settingsItems = append(settingsItems,
-						v("/think", status+" thinking mode", dialog.ActionToggleThinking{}))
-				} else {
-					settingsItems = append(settingsItems,
-						v("/reasoning", "Select reasoning effort",
-							dialog.ActionOpenDialog{DialogID: dialog.ReasoningID}))
-				}
-			}
-		}
-	}
+	}...)
+	settingsItems = append(settingsItems, thinkingSettingItems(cfg)...)
 
 	// ── Help ──────────────────────────────────────────────────────────────
 	helpItems := []completions.SlashCompletionValue{

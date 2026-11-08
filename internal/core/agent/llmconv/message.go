@@ -106,7 +106,7 @@ func ToAIMessage(m message.Message) []fantasy.Message {
 			Content: parts,
 		})
 	case message.Tool:
-		var parts []fantasy.MessagePart
+		parts := make([]fantasy.MessagePart, 0, len(m.ToolResults()))
 		for _, result := range m.ToolResults() {
 			var content fantasy.ToolResultOutputContent
 			if result.IsError {
@@ -141,6 +141,9 @@ func ToAIMessage(m message.Message) []fantasy.Message {
 			Role:    fantasy.MessageRoleTool,
 			Content: parts,
 		})
+	default:
+		// System messages are provided by the caller, not derived from the
+		// session history, so they produce no fantasy message here.
 	}
 	return messages
 }

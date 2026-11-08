@@ -27,13 +27,14 @@ func (m *UI) openAtCompletions(depth, limit int) tea.Cmd {
 }
 
 func (m *UI) atCompletionItems(depth, limit int) []completions.AtCompletionValue {
-	items := []completions.AtCompletionValue{
+	items := make([]completions.AtCompletionValue, 0, 5)
+	items = append(items,
 		atCategory("@mcp:", "MCP servers, prompts, and resources", "mcp"),
 		atCategory("@skill:", "Agent Skills loaded from builtin and configured paths", "skill"),
 		atCategory("@file:", "Files from the current project", "file"),
 		atCategory("@dir:", "Directories from the current project", "dir"),
 		atCategory("@workflow:", "Windsurf workflows and custom command markdown", "workflow"),
-	}
+	)
 
 	items = append(items, m.atMCPItems()...)
 	items = append(items, m.atSkillItems()...)
@@ -195,7 +196,11 @@ func windsurfWorkflowItems() []completions.AtCompletionValue {
 	for _, dir := range dirs {
 		base := dir
 		_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
-			if err != nil || d.IsDir() || !isWorkflowFile(d.Name()) {
+			if err != nil {
+				//nolint:nilerr // Unreadable entries are skipped; the walk continues.
+				return nil
+			}
+			if d.IsDir() || !isWorkflowFile(d.Name()) {
 				return nil
 			}
 			rel, _ := filepath.Rel(base, path)
@@ -208,6 +213,7 @@ func windsurfWorkflowItems() []completions.AtCompletionValue {
 			seenTokens[token] = true
 			content, err := os.ReadFile(path) //nolint:gosec // walk root is the user data directory.
 			if err != nil {
+				//nolint:nilerr // A single unreadable workflow file must not abort the walk.
 				return nil
 			}
 			items = append(items, completions.AtCompletionValue{
@@ -299,6 +305,10 @@ func (m *UI) atAttachmentCmd(item completions.AtCompletionValue) tea.Cmd {
 				return nil
 			}
 			return textAttachment(firstNonEmpty(item.Path, item.Token), item.Token, item.Content)
+
+		case completions.AtCompletionCategory:
+			// Categories only group entries; they never carry an attachment.
+			return nil
 		}
 		return nil
 	}

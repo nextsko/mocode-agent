@@ -270,7 +270,8 @@ func (p *Pipeline) extractViewKeyInfo(content string) string {
 	if len(lines) <= 20 {
 		return content
 	}
-	result := []string{lines[0], lines[1], lines[2]}
+	result := make([]string, 0, 3+1+3)
+	result = append(result, lines[0], lines[1], lines[2])
 	result = append(result, fmt.Sprintf("  ... [%d lines omitted] ...", len(lines)-6))
 	result = append(result, lines[len(lines)-3:]...)
 	return strings.Join(result, "\n")

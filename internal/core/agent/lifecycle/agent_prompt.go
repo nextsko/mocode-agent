@@ -15,8 +15,9 @@ import (
 )
 
 func (a *sessionAgent) createUserMessage(ctx context.Context, call SessionAgentCall) (message.Message, error) {
-	parts := []message.ContentPart{message.TextContent{Text: call.Prompt}}
-	var attachmentParts []message.ContentPart
+	parts := make([]message.ContentPart, 0, 1+len(call.Attachments))
+	parts = append(parts, message.TextContent{Text: call.Prompt})
+	attachmentParts := make([]message.ContentPart, 0, len(call.Attachments))
 	for _, attachment := range call.Attachments {
 		attachmentParts = append(attachmentParts, message.BinaryContent{Path: attachment.FilePath, MIMEType: attachment.MimeType, Data: attachment.Content})
 	}
@@ -58,6 +59,8 @@ If not, please feel free to ignore. Again do not mention this message to the use
 			for _, tr := range m.ToolResults() {
 				knownToolResultIDs[tr.ToolCallID] = struct{}{}
 			}
+		default:
+			// User and system messages never carry tool call or result IDs.
 		}
 	}
 
@@ -189,30 +192,24 @@ func (a *sessionAgent) generateTitle(ctx context.Context, sessionID string, user
 
 	// Use the small model to generate the title.
 	model := smallModel
-	agent := newAgent(model.Model, titlePrompt, maxOutputTokens)
-	resp, err := agent.Stream(ctx, streamCall)
-	if err == nil {
-		// We successfully generated a title with the small model.
-		slog.Debug("Generated title with small model")
-	} else {
+	resp, err := newAgent(model.Model, titlePrompt, maxOutputTokens).Stream(ctx, streamCall)
+	if err != nil {
 		// It didn't work. Let's try with the big model.
 		slog.Error("Error generating title with small model; trying big model", "err", err)
 		model = largeModel
-		agent = newAgent(model.Model, titlePrompt, maxOutputTokens)
-		resp, err = agent.Stream(ctx, streamCall)
-		if err == nil {
-			slog.Debug("Generated title with large model")
-		} else {
-			// Welp, the large model didn't work either. Use the default
-			// session name and return.
-			slog.Error("Error generating title with large model", "err", err)
-			saveErr := a.sessions.Rename(ctx, sessionID, DefaultSessionName)
-			if saveErr != nil {
-				slog.Error("Failed to save session title", "error", saveErr)
-			}
-			return
-		}
+		resp, err = newAgent(model.Model, titlePrompt, maxOutputTokens).Stream(ctx, streamCall)
 	}
+	if err != nil {
+		// Welp, the large model didn't work either. Use the default session
+		// name and return.
+		slog.Error("Error generating title with large model", "err", err)
+		saveErr := a.sessions.Rename(ctx, sessionID, DefaultSessionName)
+		if saveErr != nil {
+			slog.Error("Failed to save session title", "error", saveErr)
+		}
+		return
+	}
+	slog.Debug("Generated session title")
 
 	if resp == nil {
 		// Actually, we didn't get a response so we can't. Use the default

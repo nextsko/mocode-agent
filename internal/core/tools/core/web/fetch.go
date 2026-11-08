@@ -246,7 +246,7 @@ func runFetch(ctx context.Context, permissions permission.Service, workingDir st
 func extractTextFromHTML(html string) (string, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("parse HTML: %w", err)
 	}
 
 	text := doc.Find("body").Text()
@@ -260,7 +260,7 @@ func convertHTMLToMarkdown(html string) (string, error) {
 
 	markdown, err := converter.ConvertString(html)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("convert HTML to markdown: %w", err)
 	}
 
 	return markdown, nil

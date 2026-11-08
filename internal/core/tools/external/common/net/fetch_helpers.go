@@ -151,7 +151,7 @@ func ConvertHTMLToMarkdown(htmlContent string) (string, error) {
 
 	markdown, err := converter.ConvertString(htmlContent)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("convert HTML to markdown: %w", err)
 	}
 
 	return markdown, nil
@@ -168,7 +168,7 @@ func FormatJSON(content string) (string, error) {
 	encoder := json.NewEncoder(&buf)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(data); err != nil {
-		return "", err
+		return "", fmt.Errorf("encode JSON: %w", err)
 	}
 
 	return buf.String(), nil

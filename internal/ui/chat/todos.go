@@ -59,82 +59,9 @@ type TodosToolRenderContext struct{}
 func (t *TodosToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
 
-	var params tools.TodosParams
-	var meta tools.TodosResponseMetadata
-	var headerText string
-	var body string
-
-	// Parse params for pending state (before result is available).
-	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err == nil {
-		completedCount := 0
-		inProgressTask := ""
-		for _, todo := range params.Todos {
-			if todo.Status == "completed" {
-				completedCount++
-			}
-			if todo.Status == "in_progress" {
-				if todo.ActiveForm != "" {
-					inProgressTask = todo.ActiveForm
-				} else {
-					inProgressTask = todo.Content
-				}
-			}
-		}
-
-		// Default display from params (used when pending or no metadata).
-		ratio := sty.Tool.TodoRatio.Render(fmt.Sprintf("%d/%d", completedCount, len(params.Todos)))
-		headerText = ratio
-		if inProgressTask != "" {
-			headerText = fmt.Sprintf("%s · %s", ratio, inProgressTask)
-		}
-
-		if opts.IsPending() {
-			return pendingTool(sty, "To-Do", opts.Anim, opts.Compact, cappedWidth, ansi.Strip(headerText))
-		}
-
-		// If we have metadata, use it for richer display.
-		if opts.HasResult() && opts.Result.Metadata != "" {
-			if err := json.Unmarshal([]byte(opts.Result.Metadata), &meta); err == nil {
-				if meta.IsNew {
-					if meta.JustStarted != "" {
-						headerText = fmt.Sprintf("created %d todos, starting first", meta.Total)
-					} else {
-						headerText = fmt.Sprintf("created %d todos", meta.Total)
-					}
-					body = FormatTodosList(sty, meta.Todos, styles.ArrowRightIcon, cappedWidth)
-				} else {
-					// Build header based on what changed.
-					hasCompleted := len(meta.JustCompleted) > 0
-					hasStarted := meta.JustStarted != ""
-					allCompleted := meta.Completed == meta.Total
-
-					ratio := sty.Tool.TodoRatio.Render(fmt.Sprintf("%d/%d", meta.Completed, meta.Total))
-					if hasCompleted && hasStarted {
-						text := sty.Tool.TodoStatusNote.Render(fmt.Sprintf(" · completed %d, starting next", len(meta.JustCompleted)))
-						headerText = fmt.Sprintf("%s%s", ratio, text)
-					} else if hasCompleted {
-						text := sty.Tool.TodoStatusNote.Render(fmt.Sprintf(" · completed %d", len(meta.JustCompleted)))
-						if allCompleted {
-							text = sty.Tool.TodoStatusNote.Render(" · completed all")
-						}
-						headerText = fmt.Sprintf("%s%s", ratio, text)
-					} else if hasStarted {
-						headerText = fmt.Sprintf("%s%s", ratio, sty.Tool.TodoStatusNote.Render(" · starting task"))
-					} else {
-						headerText = ratio
-					}
-
-					// Build body with details.
-					if allCompleted {
-						// Show all todos when all are completed, like when created.
-						body = FormatTodosList(sty, meta.Todos, styles.ArrowRightIcon, cappedWidth)
-					} else if meta.JustStarted != "" {
-						body = sty.Tool.TodoInProgressIcon.Render(styles.ArrowRightIcon+" ") +
-							sty.Tool.TodoJustStarted.Render(meta.JustStarted)
-					}
-				}
-			}
-		}
+	headerText, body, pending := todosHeaderAndBody(sty, opts, cappedWidth)
+	if pending {
+		return pendingTool(sty, "To-Do", opts.Anim, opts.Compact, cappedWidth, ansi.Strip(headerText))
 	}
 
 	toolParams := []string{headerText}
@@ -152,6 +79,100 @@ func (t *TodosToolRenderContext) RenderTool(sty *styles.Styles, width int, opts 
 	}
 
 	return joinToolParts(header, sty.Tool.Body.Render(body))
+}
+
+// todosHeaderAndBody derives the header line and optional body for a To-Do
+// tool call from its JSON input and, when present, its result metadata. The
+// pending flag reports that the call has no result yet, in which case only the
+// header is meaningful.
+func todosHeaderAndBody(sty *styles.Styles, opts *ToolRenderOpts, cappedWidth int) (headerText, body string, pending bool) {
+	var params tools.TodosParams
+	if err := json.Unmarshal([]byte(opts.ToolCall.Input), &params); err != nil {
+		return "", "", false
+	}
+	headerText = todosParamsHeader(sty, params)
+	if opts.IsPending() {
+		return headerText, "", true
+	}
+	var meta tools.TodosResponseMetadata
+	if opts.HasResult() && opts.Result.Metadata != "" && json.Unmarshal([]byte(opts.Result.Metadata), &meta) == nil {
+		headerText, body = todosMetadataView(sty, &meta, cappedWidth)
+	}
+	return headerText, body, false
+}
+
+// todosParamsHeader renders the "<done>/<total> · <task>" header from the
+// tool-call parameters alone.
+func todosParamsHeader(sty *styles.Styles, params tools.TodosParams) string {
+	completedCount := 0
+	inProgressTask := ""
+	for _, todo := range params.Todos {
+		switch todo.Status {
+		case "completed":
+			completedCount++
+		case "in_progress":
+			inProgressTask = todo.ActiveForm
+			if inProgressTask == "" {
+				inProgressTask = todo.Content
+			}
+		}
+	}
+
+	ratio := sty.Tool.TodoRatio.Render(fmt.Sprintf("%d/%d", completedCount, len(params.Todos)))
+	if inProgressTask == "" {
+		return ratio
+	}
+	return fmt.Sprintf("%s · %s", ratio, inProgressTask)
+}
+
+// todosMetadataView renders the richer header and body derived from a result
+// metadata payload.
+func todosMetadataView(sty *styles.Styles, meta *tools.TodosResponseMetadata, cappedWidth int) (headerText, body string) {
+	if !meta.IsNew {
+		return todosUpdatedView(sty, meta, cappedWidth)
+	}
+
+	if meta.JustStarted != "" {
+		headerText = fmt.Sprintf("created %d todos, starting first", meta.Total)
+	} else {
+		headerText = fmt.Sprintf("created %d todos", meta.Total)
+	}
+	body = FormatTodosList(sty, meta.Todos, styles.ArrowRightIcon, cappedWidth)
+	return headerText, body
+}
+
+// todosUpdatedView renders the header and body for an update to an existing
+// To-Do list.
+func todosUpdatedView(sty *styles.Styles, meta *tools.TodosResponseMetadata, cappedWidth int) (headerText, body string) {
+	hasCompleted := len(meta.JustCompleted) > 0
+	hasStarted := meta.JustStarted != ""
+	allCompleted := meta.Completed == meta.Total
+
+	ratio := sty.Tool.TodoRatio.Render(fmt.Sprintf("%d/%d", meta.Completed, meta.Total))
+	switch {
+	case hasCompleted && hasStarted:
+		text := sty.Tool.TodoStatusNote.Render(fmt.Sprintf(" · completed %d, starting next", len(meta.JustCompleted)))
+		headerText = fmt.Sprintf("%s%s", ratio, text)
+	case hasCompleted:
+		text := sty.Tool.TodoStatusNote.Render(fmt.Sprintf(" · completed %d", len(meta.JustCompleted)))
+		if allCompleted {
+			text = sty.Tool.TodoStatusNote.Render(" · completed all")
+		}
+		headerText = fmt.Sprintf("%s%s", ratio, text)
+	case hasStarted:
+		headerText = fmt.Sprintf("%s%s", ratio, sty.Tool.TodoStatusNote.Render(" · starting task"))
+	default:
+		headerText = ratio
+	}
+
+	if allCompleted {
+		// Show all todos when all are completed, like when created.
+		body = FormatTodosList(sty, meta.Todos, styles.ArrowRightIcon, cappedWidth)
+	} else if meta.JustStarted != "" {
+		body = sty.Tool.TodoInProgressIcon.Render(styles.ArrowRightIcon+" ") +
+			sty.Tool.TodoJustStarted.Render(meta.JustStarted)
+	}
+	return headerText, body
 }
 
 // FormatTodosList formats a list of todos for display.

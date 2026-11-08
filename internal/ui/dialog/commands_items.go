@@ -8,6 +8,7 @@ import (
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/ui/list"
 	"github.com/nextsko/mocode-agent/internal/ui/slash"
+	"github.com/nextsko/mocode-agent/internal/ui/styles"
 )
 
 func (c *Commands) nextCommandType() CommandType {
@@ -259,10 +260,36 @@ func descriptorsFromCommandItems(items []*CommandItem, category slash.CommandCat
 	return descriptors
 }
 
+// thinkingCommandItems returns the reasoning-related settings entries for the
+// coder agent, or nothing when the agent's model cannot reason.
+func thinkingCommandItems(t *styles.Styles, cfg *config.Config) []*CommandItem {
+	agentCfg, ok := cfg.Agents[config.AgentCoder]
+	if !ok {
+		return nil
+	}
+	providerCfg := cfg.GetProviderForModel(agentCfg.Model)
+	model := cfg.GetModelByType(agentCfg.Model)
+	if providerCfg == nil || model == nil || !model.CanReason {
+		return nil
+	}
+	if len(model.ReasoningLevels) > 0 {
+		return []*CommandItem{
+			NewCommandItem(t, "select_reasoning_effort", "Select Reasoning Effort...", "", ActionOpenDialog{ReasoningID}),
+		}
+	}
+	status := "Enable"
+	if cfg.Models[agentCfg.Model].Think {
+		status = "Disable"
+	}
+	return []*CommandItem{
+		NewCommandItem(t, "toggle_thinking", status+" Thinking Mode", "", ActionToggleThinking{}),
+	}
+}
+
 func (c *Commands) defaultCommands() []*CommandItem {
 	cfg := c.com.Config()
 	t := c.com.Styles
-	var commands []*CommandItem
+	commands := make([]*CommandItem, 0, 6)
 
 	// ── Agent ──
 	agentCommands := []*CommandItem{
@@ -333,10 +360,11 @@ func (c *Commands) defaultCommands() []*CommandItem {
 	commands = append(commands, NewParentCommandItem(t, "group_tools", "Tools", "", toolsCommands...))
 
 	// ── Settings ──
-	settingsCommands := []*CommandItem{
+	settingsCommands := make([]*CommandItem, 0, 8)
+	settingsCommands = append(settingsCommands, []*CommandItem{
 		NewCommandItem(t, "toggle_yolo", "Toggle Yolo Mode", "", ActionToggleYoloMode{}),
 		NewCommandItem(t, "toggle_help", "Show Help", "", ActionOpenDialog{HelpID}),
-	}
+	}...)
 	notificationsDisabled := cfg != nil && cfg.Options != nil && cfg.Options.DisableNotifications
 	notificationLabel := "Disable Notifications"
 	if notificationsDisabled {
@@ -355,23 +383,7 @@ func (c *Commands) defaultCommands() []*CommandItem {
 		NewCommandItem(t, "proxy_disable", "Disable Proxy", "", ActionSetProxyURL{Enabled: false}),
 	)
 
-	if agentCfg, cfgOk := cfg.Agents[config.AgentCoder]; cfgOk {
-		providerCfg := cfg.GetProviderForModel(agentCfg.Model)
-		model := cfg.GetModelByType(agentCfg.Model)
-		if providerCfg != nil && model != nil && model.CanReason {
-			selectedModel := cfg.Models[agentCfg.Model]
-			if model.CanReason && len(model.ReasoningLevels) == 0 {
-				status := "Enable"
-				if selectedModel.Think {
-					status = "Disable"
-				}
-				settingsCommands = append(settingsCommands, NewCommandItem(t, "toggle_thinking", status+" Thinking Mode", "", ActionToggleThinking{}))
-			}
-			if len(model.ReasoningLevels) > 0 {
-				settingsCommands = append(settingsCommands, NewCommandItem(t, "select_reasoning_effort", "Select Reasoning Effort...", "", ActionOpenDialog{ReasoningID}))
-			}
-		}
-	}
+	settingsCommands = append(settingsCommands, thinkingCommandItems(t, cfg)...)
 	commands = append(commands, NewParentCommandItem(t, "group_settings", "Settings", "", settingsCommands...))
 
 	// ── Admin ──

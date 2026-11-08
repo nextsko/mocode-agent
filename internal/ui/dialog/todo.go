@@ -265,12 +265,13 @@ func (d *Todo) renderTodoDetail(t *styles.Styles, width, height int) string {
 	if todo == nil {
 		return t.Dialog.PrimaryText.Width(width).Render("No todo selected")
 	}
-	lines := []string{
+	lines := make([]string, 0, 8)
+	lines = append(lines,
 		t.Dialog.TitleText.Render("Details"),
 		fmt.Sprintf("Status: %s", todo.Status),
 		"",
 		t.Dialog.TitleText.Render("Content"),
-	}
+	)
 	lines = append(lines, todoClampLines(todo.Content, width, todoMax(3, height/3))...)
 	lines = append(lines, "", t.Dialog.TitleText.Render("Active Form"))
 	active := todo.ActiveForm

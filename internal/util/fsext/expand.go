@@ -1,6 +1,7 @@
 package fsext
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -18,12 +19,16 @@ func Expand(s string) (string, error) {
 	p := syntax.NewParser()
 	word, err := p.Document(strings.NewReader(s))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("parse shell expression %q: %w", s, err)
 	}
 	cfg := &expand.Config{
 		Env:      expand.FuncEnviron(os.Getenv),
 		ReadDir2: os.ReadDir,
 		GlobStar: true,
 	}
-	return expand.Literal(cfg, word)
+	lit, err := expand.Literal(cfg, word)
+	if err != nil {
+		return "", fmt.Errorf("expand shell expression %q: %w", s, err)
+	}
+	return lit, nil
 }

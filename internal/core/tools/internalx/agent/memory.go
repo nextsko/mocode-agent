@@ -293,23 +293,12 @@ func memoryExtract(ctx context.Context, deps MemoryDeps, p MemoryParams) (toolOu
 	// flow unusable. The response names the source session so the choice is never
 	// silent.
 	if target == "" {
-		entries, err := deps.Store.List(ctx, memory.ListOptions{Scope: memory.ScopeSession, Session: session, Limit: 1})
+		resolved, from, err := latestSessionTarget(ctx, deps, session)
 		if err != nil {
-			return memError(fmt.Sprintf("finding the latest session memory: %v", err)), nil
+			return memError(err.Error()), nil
 		}
-		if len(entries) == 0 {
-			anyEntries, aerr := deps.Store.List(ctx, memory.ListOptions{Scope: memory.ScopeSession, Limit: 1})
-			if aerr != nil {
-				return memError(fmt.Sprintf("finding session memory: %v", aerr)), nil
-			}
-			if len(anyEntries) == 0 {
-				return memError("no session memory to extract. Write one first with action=write, " +
-					"or pass path to promote a specific entry (action=list shows the available paths)."), nil
-			}
-			entries = anyEntries
-			fromOtherSession = memory.SessionShort(entries[0].Session)
-		}
-		target = entries[0].RelPath
+		target = resolved
+		fromOtherSession = from
 	}
 
 	res, err := memory.Extract(ctx, deps.Store, target, memory.ExtractOptions{
@@ -344,6 +333,32 @@ func memoryExtract(ctx context.Context, deps MemoryDeps, p MemoryParams) (toolOu
 		Path: res.RelPath, PromotedTo: res.RelPath, Created: res.Created,
 	}
 	return withMeta(okOutcome(b.String()), meta), nil
+}
+
+// errNoSessionMemory reports that no session memory is available to promote.
+var errNoSessionMemory = fmt.Errorf("no session memory to extract. Write one first with action=write, " +
+	"or pass path to promote a specific entry (action=list shows the available paths)")
+
+// latestSessionTarget returns the most recent session memory to promote. When
+// the current session has none, it falls back to the most recent entry of any
+// session and reports that session's short ID.
+func latestSessionTarget(ctx context.Context, deps MemoryDeps, session string) (string, string, error) {
+	entries, err := deps.Store.List(ctx, memory.ListOptions{Scope: memory.ScopeSession, Session: session, Limit: 1})
+	if err != nil {
+		return "", "", fmt.Errorf("finding the latest session memory: %w", err)
+	}
+	if len(entries) > 0 {
+		return entries[0].RelPath, "", nil
+	}
+
+	anyEntries, err := deps.Store.List(ctx, memory.ListOptions{Scope: memory.ScopeSession, Limit: 1})
+	if err != nil {
+		return "", "", fmt.Errorf("finding session memory: %w", err)
+	}
+	if len(anyEntries) == 0 {
+		return "", "", errNoSessionMemory
+	}
+	return anyEntries[0].RelPath, memory.SessionShort(anyEntries[0].Session), nil
 }
 
 // memoryForget archives an entry.

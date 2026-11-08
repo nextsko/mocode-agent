@@ -127,7 +127,7 @@ func searchWithRipgrep(ctx context.Context, pattern, path, include string) ([]Ma
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
 			return []Match{}, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("run %s: %w", cmd.Path, err)
 	}
 
 	var matches []Match
@@ -200,7 +200,7 @@ func searchFilesWithRegex(pattern, rootPath, include string) ([]Match, error) {
 
 	err = filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil // Skip errors
+			return nil //nolint:nilerr // Best-effort walk: unreadable paths are skipped.
 		}
 
 		if info.IsDir() {
@@ -228,7 +228,7 @@ func searchFilesWithRegex(pattern, rootPath, include string) ([]Match, error) {
 
 		match, lineNum, charNum, lineText, err := fileContainsPattern(path, regex)
 		if err != nil {
-			return nil // Skip files we can't read
+			return nil //nolint:nilerr // Best-effort walk: unreadable files are skipped.
 		}
 
 		if match {
@@ -248,7 +248,7 @@ func searchFilesWithRegex(pattern, rootPath, include string) ([]Match, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("walk %s: %w", rootPath, err)
 	}
 
 	return matches, nil
@@ -277,7 +277,10 @@ func fileContainsPattern(filePath string, pattern *regexp.Regexp) (bool, int, in
 		}
 	}
 
-	return false, 0, 0, "", scanner.Err()
+	if err := scanner.Err(); err != nil {
+		return false, 0, 0, "", fmt.Errorf("scan %s: %w", filePath, err)
+	}
+	return false, 0, 0, "", nil
 }
 
 // isTextFile checks if a file is a text file by examining its MIME type.

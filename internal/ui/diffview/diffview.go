@@ -381,15 +381,7 @@ outer:
 			isLastLine := j+1 == len(h.Lines)
 			if hasReachedHeight && (!isLastHunk || !isLastLine) {
 				if shouldWrite() {
-					ls := dv.lineStyleForType(l.Kind)
-					if dv.lineNumbers {
-						b.WriteString(ls.LineNumber.Render(pad("…", dv.beforeNumDigits)))
-						b.WriteString(ls.LineNumber.Render(pad("…", dv.afterNumDigits)))
-					}
-					b.WriteString(fullContentStyle.Render(
-						ls.Code.Width(dv.fullCodeWidth).Render("  …"),
-					))
-					b.WriteRune('\n')
+					dv.writeUnifiedMissingLine(&b, l, fullContentStyle)
 				}
 				break outer
 			}
@@ -449,6 +441,65 @@ outer:
 	return b.String()
 }
 
+// writeUnifiedFileHeader writes the file-name row shown above the first hunk.
+func (dv *DiffView) writeUnifiedFileHeader(b *strings.Builder) {
+	ls := dv.style.Filename
+	if dv.lineNumbers {
+		b.WriteString(ls.LineNumber.Render(pad("…", dv.beforeNumDigits)))
+	}
+	content := ansi.Truncate("  "+dv.fileName, dv.fullCodeWidth, "…")
+	b.WriteString(ls.Code.Width(dv.fullCodeWidth).Render(content))
+	if dv.lineNumbers {
+		b.WriteString(ls.LineNumber.Render(pad("…", dv.afterNumDigits)))
+	}
+	b.WriteString(ls.Code.Width(dv.fullCodeWidth + btoi(dv.extraColOnAfter)).Render(" "))
+	b.WriteRune('\n')
+}
+
+// writeUnifiedMissingLine writes the ellipsis row that stands in for the diff
+// lines cut off by the view height in the unified renderer.
+func (dv *DiffView) writeUnifiedMissingLine(b *strings.Builder, l udiff.Line, contentStyle lipgloss.Style) {
+	ls := dv.lineStyleForType(l.Kind)
+	if dv.lineNumbers {
+		b.WriteString(ls.LineNumber.Render(pad("…", dv.beforeNumDigits)))
+		b.WriteString(ls.LineNumber.Render(pad("…", dv.afterNumDigits)))
+	}
+	b.WriteString(contentStyle.Render(
+		ls.Code.Width(dv.fullCodeWidth).Render("  …"),
+	))
+	b.WriteRune('\n')
+}
+
+// writeUnifiedMissingLines writes the ellipsis row that stands in for the diff
+// lines cut off by the view height.
+func (dv *DiffView) writeUnifiedMissingLines(b *strings.Builder, l *splitLine) {
+	beforeStyle := lipgloss.NewStyle().MaxWidth(dv.fullCodeWidth)
+	afterStyle := lipgloss.NewStyle().MaxWidth(dv.fullCodeWidth + btoi(dv.extraColOnAfter))
+
+	ls := dv.style.MissingLine
+	if l.before != nil {
+		ls = dv.lineStyleForType(l.before.Kind)
+	}
+	if dv.lineNumbers {
+		b.WriteString(ls.LineNumber.Render(pad("…", dv.beforeNumDigits)))
+	}
+	b.WriteString(beforeStyle.Render(
+		ls.Code.Width(dv.fullCodeWidth).Render("  …"),
+	))
+
+	ls = dv.style.MissingLine
+	if l.after != nil {
+		ls = dv.lineStyleForType(l.after.Kind)
+	}
+	if dv.lineNumbers {
+		b.WriteString(ls.LineNumber.Render(pad("…", dv.afterNumDigits)))
+	}
+	b.WriteString(afterStyle.Render(
+		ls.Code.Width(dv.fullCodeWidth).Render("  …"),
+	))
+	b.WriteRune('\n')
+}
+
 // renderSplit renders the split (side-by-side) diff view as a string.
 
 func (dv *DiffView) renderSplit() string {
@@ -473,17 +524,7 @@ outer:
 		// Render file name header before the first hunk.
 		if i == 0 && dv.fileName != "" {
 			if shouldWrite() {
-				ls := dv.style.Filename
-				if dv.lineNumbers {
-					b.WriteString(ls.LineNumber.Render(pad("…", dv.beforeNumDigits)))
-				}
-				content := ansi.Truncate("  "+dv.fileName, dv.fullCodeWidth, "…")
-				b.WriteString(ls.Code.Width(dv.fullCodeWidth).Render(content))
-				if dv.lineNumbers {
-					b.WriteString(ls.LineNumber.Render(pad("…", dv.afterNumDigits)))
-				}
-				b.WriteString(ls.Code.Width(dv.fullCodeWidth + btoi(dv.extraColOnAfter)).Render(" "))
-				b.WriteRune('\n')
+				dv.writeUnifiedFileHeader(&b)
 			}
 			printedLines++
 		}
@@ -512,27 +553,7 @@ outer:
 			isLastLine := j+1 == len(h.lines)
 			if hasReachedHeight && (!isLastHunk || !isLastLine) {
 				if shouldWrite() {
-					ls := dv.style.MissingLine
-					if l.before != nil {
-						ls = dv.lineStyleForType(l.before.Kind)
-					}
-					if dv.lineNumbers {
-						b.WriteString(ls.LineNumber.Render(pad("…", dv.beforeNumDigits)))
-					}
-					b.WriteString(beforeFullContentStyle.Render(
-						ls.Code.Width(dv.fullCodeWidth).Render("  …"),
-					))
-					ls = dv.style.MissingLine
-					if l.after != nil {
-						ls = dv.lineStyleForType(l.after.Kind)
-					}
-					if dv.lineNumbers {
-						b.WriteString(ls.LineNumber.Render(pad("…", dv.afterNumDigits)))
-					}
-					b.WriteString(afterFullContentStyle.Render(
-						ls.Code.Width(dv.fullCodeWidth).Render("  …"),
-					))
-					b.WriteRune('\n')
+					dv.writeUnifiedMissingLines(&b, l)
 				}
 				break outer
 			}

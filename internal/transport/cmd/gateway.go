@@ -23,7 +23,7 @@ var gatewayCmd = &cobra.Command{
 		cmd.SetContext(ctx)
 
 		if err := cmd.Flags().Set("yolo", "true"); err != nil {
-			return err
+			return fmt.Errorf("enable yolo mode: %w", err)
 		}
 
 		ws, cleanup, err := setupLocalWorkspace(cmd)

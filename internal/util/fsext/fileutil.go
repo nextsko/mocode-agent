@@ -108,7 +108,7 @@ func globWithDoubleStar(pattern, searchPath string, limit int, gitignore bool) (
 	}
 	err := fastwalk.Walk(&conf, searchPath, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil // Skip files we can't access
+			return nil //nolint:nilerr // Walk errors skip unreadable entries by design.
 		}
 
 		isDir := d.IsDir()
@@ -133,15 +133,13 @@ func globWithDoubleStar(pattern, searchPath string, limit int, gitignore bool) (
 		// Check if path matches the pattern
 		matched, err := doublestar.Match(pattern, relPath)
 		if err != nil || !matched {
-			return nil
+			// An invalid pattern matches nothing; unreadable entries are skipped.
+			return nil //nolint:nilerr // Deliberate skip: nothing to report per entry.
 		}
 
-		info, err := d.Info()
-		if err != nil {
-			return nil
+		if info, err := d.Info(); err == nil {
+			found.Append(FileInfo{Path: path, ModTime: info.ModTime()})
 		}
-
-		found.Append(FileInfo{Path: path, ModTime: info.ModTime()})
 		if limit > 0 && found.Len() >= limit*2 { // NOTE: why x2?
 			return filepath.SkipAll
 		}

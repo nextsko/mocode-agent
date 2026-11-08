@@ -45,7 +45,7 @@ func globalModesConfigPath() string {
 	if xdgConfigHome := os.Getenv("XDG_CONFIG_HOME"); xdgConfigHome != "" {
 		return filepath.Join(xdgConfigHome, appName, modesConfigName)
 	}
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		localAppData := os.Getenv("LOCALAPPDATA")
 		if localAppData == "" {
 			localAppData = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local")

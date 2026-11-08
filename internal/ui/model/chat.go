@@ -380,43 +380,44 @@ func (m *Chat) ClearMouse() {
 // applyHighlightRange applies the current highlight range to the chat items.
 
 func (m *Chat) applyHighlightRange(idx, selectedIdx int, item list.Item) list.Item {
-	if hi, ok := item.(list.Highlightable); ok {
-		// Apply highlight
-		startItemIdx, startLine, startCol, endItemIdx, endLine, endCol := m.getHighlightRange()
-		sLine, sCol, eLine, eCol := -1, -1, -1, -1
-		if idx >= startItemIdx && idx <= endItemIdx {
-			if idx == startItemIdx && idx == endItemIdx {
-				// Single item selection
-				sLine = startLine
-				sCol = startCol
-				eLine = endLine
-				eCol = endCol
-			} else if idx == startItemIdx {
-				// First item - from start position to end of item
-				sLine = startLine
-				sCol = startCol
-				eLine = -1
-				eCol = -1
-			} else if idx == endItemIdx {
-				// Last item - from start of item to end position
-				sLine = 0
-				sCol = 0
-				eLine = endLine
-				eCol = endCol
-			} else {
-				// Middle item - fully highlighted
-				sLine = 0
-				sCol = 0
-				eLine = -1
-				eCol = -1
-			}
-		}
-
-		hi.SetHighlight(sLine, sCol, eLine, eCol)
-		return hi.(list.Item)
+	hi, ok := item.(list.Highlightable)
+	if !ok {
+		return item
 	}
 
-	return item
+	startItemIdx, startLine, startCol, endItemIdx, endLine, endCol := m.getHighlightRange()
+	sLine, sCol, eLine, eCol := -1, -1, -1, -1
+	switch {
+	case idx < startItemIdx || idx > endItemIdx:
+		// Outside the selection: no highlight.
+	case idx == startItemIdx && idx == endItemIdx:
+		// Single item selection
+		sLine = startLine
+		sCol = startCol
+		eLine = endLine
+		eCol = endCol
+	case idx == startItemIdx:
+		// First item - from start position to end of item
+		sLine = startLine
+		sCol = startCol
+		eLine = -1
+		eCol = -1
+	case idx == endItemIdx:
+		// Last item - from start of item to end position
+		sLine = 0
+		sCol = 0
+		eLine = endLine
+		eCol = endCol
+	default:
+		// Middle item - fully highlighted
+		sLine = 0
+		sCol = 0
+		eLine = -1
+		eCol = -1
+	}
+
+	hi.SetHighlight(sLine, sCol, eLine, eCol)
+	return hi.(list.Item)
 }
 
 // getHighlightRange returns the current highlight range.

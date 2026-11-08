@@ -30,7 +30,7 @@ type fakeGitHub struct {
 	authHeaders []string
 }
 
-func (f *fakeGitHub) start(t *testing.T) (*Provider, *fakeGitHub) {
+func (f *fakeGitHub) start(t *testing.T) *Provider {
 	t.Helper()
 
 	raw := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -69,13 +69,13 @@ func (f *fakeGitHub) start(t *testing.T) (*Provider, *fakeGitHub) {
 	t.Cleanup(raw.Close)
 	t.Cleanup(api.Close)
 
-	return New(raw.Client(), WithBaseURLs(raw.URL, api.URL), WithToken("")), f
+	return New(raw.Client(), WithBaseURLs(raw.URL, api.URL), WithToken(""))
 }
 
 func TestProvider_AuthorityAndSummary(t *testing.T) {
 	t.Parallel()
 
-	p, _ := (&fakeGitHub{}).start(t)
+	p := (&fakeGitHub{}).start(t)
 	assert.Equal(t, uri.AuthorityGitHub, p.Authority())
 	assert.Contains(t, p.Summary(), "mocode://github/")
 }
@@ -85,7 +85,7 @@ func TestProvider_AuthorityAndSummary(t *testing.T) {
 func TestProvider_RequiresOwnerAndRepo(t *testing.T) {
 	t.Parallel()
 
-	p, _ := (&fakeGitHub{}).start(t)
+	p := (&fakeGitHub{}).start(t)
 	for _, raw := range []string{"mocode://github", "mocode://github/only-owner"} {
 		_, err := p.Resolve(context.Background(), mustParse(t, raw))
 		require.Error(t, err)
@@ -99,7 +99,7 @@ func TestProvider_ReadsFileOverRaw(t *testing.T) {
 	f := &fakeGitHub{raw: map[string]string{
 		"/cli/cli/HEAD/README.md": "# cli\n",
 	}}
-	p, _ := f.start(t)
+	p := f.start(t)
 
 	content, err := p.Resolve(context.Background(), mustParse(t, "mocode://github/cli/cli/README.md"))
 	require.NoError(t, err)
@@ -119,7 +119,7 @@ func TestProvider_NestedPathKeepsSeparators(t *testing.T) {
 	f := &fakeGitHub{raw: map[string]string{
 		"/o/r/main/docs/plans/01-x.md": "nested\n",
 	}}
-	p, _ := f.start(t)
+	p := f.start(t)
 
 	content, err := p.Resolve(context.Background(), mustParse(t, "mocode://github/o/r/docs/plans/01-x.md?ref=main"))
 	require.NoError(t, err)
@@ -133,7 +133,7 @@ func TestProvider_EscapesSegmentsIndividually(t *testing.T) {
 	t.Parallel()
 
 	f := &fakeGitHub{}
-	p, _ := f.start(t)
+	p := f.start(t)
 
 	// The upstream will 404, which sends us to the listing; the assertion is on
 	// the request the raw fetch actually made.
@@ -156,7 +156,7 @@ func TestProvider_FallsThroughToDirectoryListing(t *testing.T) {
 			{"name":"src","path":"src","type":"dir","size":0}
 		]`,
 	}}
-	p, _ := f.start(t)
+	p := f.start(t)
 
 	content, err := p.Resolve(context.Background(), mustParse(t, "mocode://github/o/r"))
 	require.NoError(t, err)
@@ -181,7 +181,7 @@ func TestProvider_ListsSubdirectory(t *testing.T) {
 	f := &fakeGitHub{api: map[string]string{
 		"/repos/o/r/contents/docs?ref=HEAD": `[{"name":"a.md","path":"docs/a.md","type":"file","size":3}]`,
 	}}
-	p, _ := f.start(t)
+	p := f.start(t)
 
 	content, err := p.Resolve(context.Background(), mustParse(t, "mocode://github/o/r/docs"))
 	require.NoError(t, err)
@@ -197,7 +197,7 @@ func TestProvider_FileObjectFromAPIExplainsItself(t *testing.T) {
 	f := &fakeGitHub{api: map[string]string{
 		"/repos/o/r/contents/big.bin?ref=HEAD": `{"type":"file","path":"big.bin"}`,
 	}}
-	p, _ := f.start(t)
+	p := f.start(t)
 
 	_, err := p.Resolve(context.Background(), mustParse(t, "mocode://github/o/r/big.bin"))
 	require.Error(t, err)
@@ -210,7 +210,7 @@ func TestProvider_RateLimitIsExplained(t *testing.T) {
 	t.Parallel()
 
 	f := &fakeGitHub{apiStatus: http.StatusForbidden}
-	p, _ := f.start(t)
+	p := f.start(t)
 
 	_, err := p.Resolve(context.Background(), mustParse(t, "mocode://github/o/r"))
 	require.Error(t, err)
@@ -222,7 +222,7 @@ func TestProvider_NotFoundHintsAtTheRef(t *testing.T) {
 	t.Parallel()
 
 	f := &fakeGitHub{apiStatus: http.StatusNotFound}
-	p, _ := f.start(t)
+	p := f.start(t)
 
 	_, err := p.Resolve(context.Background(), mustParse(t, "mocode://github/o/r/nope.md"))
 	require.Error(t, err)
@@ -235,7 +235,7 @@ func TestProvider_ImageExtensionReturnsImage(t *testing.T) {
 
 	png := "\x89PNG\r\n\x1a\n-fake"
 	f := &fakeGitHub{raw: map[string]string{"/o/r/HEAD/docs/a.png": png}}
-	p, _ := f.start(t)
+	p := f.start(t)
 
 	content, err := p.Resolve(context.Background(), mustParse(t, "mocode://github/o/r/docs/a.png"))
 	require.NoError(t, err)
@@ -251,7 +251,7 @@ func TestProvider_BinaryIsRefused(t *testing.T) {
 	t.Parallel()
 
 	f := &fakeGitHub{raw: map[string]string{"/o/r/HEAD/x.bin": "\xff\xfe\x00"}}
-	p, _ := f.start(t)
+	p := f.start(t)
 
 	_, err := p.Resolve(context.Background(), mustParse(t, "mocode://github/o/r/x.bin"))
 	require.Error(t, err)
@@ -262,7 +262,7 @@ func TestProvider_RejectsOversizedFile(t *testing.T) {
 	t.Parallel()
 
 	f := &fakeGitHub{raw: map[string]string{"/o/r/HEAD/big.txt": strings.Repeat("x", 5000)}}
-	p, _ := f.start(t)
+	p := f.start(t)
 	p.maxFileSize = 1000
 
 	_, err := p.Resolve(context.Background(), mustParse(t, "mocode://github/o/r/big.txt"))
@@ -312,7 +312,7 @@ func TestProvider_DefaultRefIsHEAD(t *testing.T) {
 	t.Parallel()
 
 	f := &fakeGitHub{raw: map[string]string{"/o/r/HEAD/a.md": "x"}}
-	p, _ := f.start(t)
+	p := f.start(t)
 
 	_, err := p.Resolve(context.Background(), mustParse(t, "mocode://github/o/r/a.md"))
 	require.NoError(t, err)
@@ -367,7 +367,7 @@ func TestProvider_MalformedAPIPayloadIsAnError(t *testing.T) {
 	f := &fakeGitHub{api: map[string]string{
 		"/repos/o/r/contents/?ref=HEAD": `not json at all`,
 	}}
-	p, _ := f.start(t)
+	p := f.start(t)
 
 	_, err := p.Resolve(context.Background(), mustParse(t, "mocode://github/o/r"))
 	require.Error(t, err)

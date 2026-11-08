@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"iter"
 	"log/slog"
 
@@ -31,7 +32,7 @@ func GetPromptMessages(ctx context.Context, cfg *config.ConfigStore, clientName,
 		Arguments: args,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get prompt %s: %w", promptName, err)
 	}
 
 	var messages []string
@@ -74,7 +75,7 @@ func getPrompts(ctx context.Context, c *ClientSession) ([]*Prompt, error) {
 	}
 	result, err := c.ListPrompts(ctx, &mcp.ListPromptsParams{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list prompts: %w", err)
 	}
 	return result.Prompts, nil
 }

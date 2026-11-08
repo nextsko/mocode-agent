@@ -113,6 +113,8 @@ func (m *APIKeyInput) HandleMsg(msg tea.Msg) Action {
 		case APIKeyInputStateVerifying:
 			cmd := tea.Batch(m.spinner.Tick, m.verifyAPIKey)
 			return ActionCmd{cmd}
+		default:
+			// Other states need no action on a state change.
 		}
 	case spinner.TickMsg:
 		switch m.state {
@@ -122,6 +124,8 @@ func (m *APIKeyInput) HandleMsg(msg tea.Msg) Action {
 			if cmd != nil {
 				return ActionCmd{cmd}
 			}
+		default:
+			// The spinner only runs while a verification is in flight.
 		}
 	case tea.KeyPressMsg:
 		switch {
@@ -140,6 +144,8 @@ func (m *APIKeyInput) HandleMsg(msg tea.Msg) Action {
 				return ActionChangeAPIKeyState{State: APIKeyInputStateVerifying}
 			case APIKeyInputStateVerified:
 				return m.saveKeyAndContinue()
+			case APIKeyInputStateVerifying:
+				// Already verifying; ignore repeated submits.
 			}
 		default:
 			var cmd tea.Cmd

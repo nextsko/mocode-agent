@@ -191,7 +191,9 @@ func Launch(ctx context.Context, c Candidate, opts LaunchOptions) (*Session, err
 
 	args := launchArgs(c, opts, profileDir, runningAsRoot())
 
-	cmd := exec.Command(c.Path, args...) //nolint:gosec // browser binary path comes from detection, not untrusted input.
+	// The browser must outlive the tool call that launched it, so it is not
+	// bound to ctx here; the session tears the process down on close.
+	cmd := exec.Command(c.Path, args...) //nolint:gosec,noctx // browser path comes from detection; lifetime is owned by the session, not the call.
 	// Chrome writes "DevTools listening on ws://..." to stderr, which is how we
 	// learn the port it picked. Capturing stderr is therefore load-bearing, not
 	// just diagnostics.
@@ -289,7 +291,7 @@ func readDevToolsURL(ctx context.Context, stderr anyReader, timeout time.Duratio
 	case <-timer.C:
 		return "", fmt.Errorf("browser did not announce its debug endpoint within %s", timeout)
 	case <-ctx.Done():
-		return "", ctx.Err()
+		return "", fmt.Errorf("waiting for browser debug endpoint: %w", ctx.Err())
 	}
 }
 
@@ -448,7 +450,7 @@ func (s *Session) waitLoad(ctx context.Context) error {
 	case <-loaded:
 	case <-time.After(15 * time.Second):
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("waiting for page load: %w", ctx.Err())
 	}
 	return nil
 }

@@ -146,118 +146,125 @@ func New(opts Settings) *Anim {
 	a.cyclingCharWidth = opts.Size
 	a.labelColor = opts.LabelColor
 
-	// Check cache first
+	// Check cache first.
 	cacheKey := settingsHash(opts)
 	cached, exists := animCacheMap.Get(cacheKey)
-
 	if exists {
-		// Use cached values
-		a.width = cached.width
-		a.labelWidth = cached.labelWidth
-		a.label = csync.NewSliceFrom(cached.label)
-		a.ellipsisFrames = csync.NewSliceFrom(cached.ellipsisFrames)
-		a.initialFrames = cached.initialFrames
-		a.cyclingFrames = cached.cyclingFrames
+		a.useCached(cached)
 	} else {
-		// Generate new values and cache them
-		a.labelWidth = lipgloss.Width(opts.Label)
-
-		// Total width of anim, in cells.
-		a.width = opts.Size
-		if opts.Label != "" {
-			a.width += labelGapWidth + lipgloss.Width(opts.Label)
-		}
-
-		// Render the label
-		a.renderLabel(opts.Label)
-
-		// Pre-generate gradient.
-		var ramp []color.Color
-		numFrames := prerenderedFrames
-		if opts.CycleColors {
-			ramp = makeGradientRamp(a.width*3, opts.GradColorA, opts.GradColorB, opts.GradColorA, opts.GradColorB)
-			numFrames = a.width * 2
-		} else {
-			ramp = makeGradientRamp(a.width, opts.GradColorA, opts.GradColorB)
-		}
-
-		// Pre-render initial characters.
-		a.initialFrames = make([][]string, numFrames)
-		offset := 0
-		for i := range a.initialFrames {
-			a.initialFrames[i] = make([]string, a.width+labelGapWidth+a.labelWidth)
-			for j := range a.initialFrames[i] {
-				if j+offset >= len(ramp) {
-					continue // skip if we run out of colors
-				}
-
-				var c color.Color
-				if j <= a.cyclingCharWidth {
-					c = ramp[j+offset]
-				} else {
-					c = opts.LabelColor
-				}
-
-				// Also prerender the initial character with Lip Gloss to avoid
-				// processing in the render loop.
-				a.initialFrames[i][j] = lipgloss.NewStyle().
-					Foreground(c).
-					Render(string(initialChar))
-			}
-			if opts.CycleColors {
-				offset++
-			}
-		}
-
-		// Prerender scrambled rune frames for the animation.
-		a.cyclingFrames = make([][]string, numFrames)
-		offset = 0
-		for i := range a.cyclingFrames {
-			a.cyclingFrames[i] = make([]string, a.width)
-			for j := range a.cyclingFrames[i] {
-				if j+offset >= len(ramp) {
-					continue // skip if we run out of colors
-				}
-
-				// Also prerender the color with Lip Gloss here to avoid processing
-				// in the render loop.
-				r := availableRunes[rand.IntN(len(availableRunes))]
-				a.cyclingFrames[i][j] = lipgloss.NewStyle().
-					Foreground(ramp[j+offset]).
-					Render(string(r))
-			}
-			if opts.CycleColors {
-				offset++
-			}
-		}
-
-		// Cache the results
-		labelSlice := make([]string, a.label.Len())
-		for i, v := range a.label.Seq2() {
-			labelSlice[i] = v
-		}
-		ellipsisSlice := make([]string, a.ellipsisFrames.Len())
-		for i, v := range a.ellipsisFrames.Seq2() {
-			ellipsisSlice[i] = v
-		}
-		cached = &animCache{
-			initialFrames:  a.initialFrames,
-			cyclingFrames:  a.cyclingFrames,
-			width:          a.width,
-			labelWidth:     a.labelWidth,
-			label:          labelSlice,
-			ellipsisFrames: ellipsisSlice,
-		}
-		animCacheMap.Set(cacheKey, cached)
+		animCacheMap.Set(cacheKey, a.buildFrames(opts))
 	}
 
 	// Random assign a birth to each character for a stagged entrance effect.
 	a.birthOffsets = make([]time.Duration, a.width)
 	for i := range a.birthOffsets {
-		a.birthOffsets[i] = time.Duration(rand.N(int64(maxBirthOffset))) * time.Nanosecond
+		a.birthOffsets[i] = time.Duration(rand.N(int64(maxBirthOffset))) * time.Nanosecond //nolint:gosec // Visual jitter only, not security-sensitive.
 	}
 
 	return a
+}
+
+// useCached restores the precomputed animation fields from a cache entry.
+func (a *Anim) useCached(cached *animCache) {
+	a.width = cached.width
+	a.labelWidth = cached.labelWidth
+	a.label = csync.NewSliceFrom(cached.label)
+	a.ellipsisFrames = csync.NewSliceFrom(cached.ellipsisFrames)
+	a.initialFrames = cached.initialFrames
+	a.cyclingFrames = cached.cyclingFrames
+}
+
+// buildFrames computes the animation frames for opts, assigns them to a, and
+// returns the cache entry to store.
+func (a *Anim) buildFrames(opts Settings) *animCache {
+	a.labelWidth = lipgloss.Width(opts.Label)
+
+	// Total width of anim, in cells.
+	a.width = opts.Size
+	if opts.Label != "" {
+		a.width += labelGapWidth + lipgloss.Width(opts.Label)
+	}
+
+	// Render the label
+	a.renderLabel(opts.Label)
+
+	// Pre-generate gradient.
+	var ramp []color.Color
+	numFrames := prerenderedFrames
+	if opts.CycleColors {
+		ramp = makeGradientRamp(a.width*3, opts.GradColorA, opts.GradColorB, opts.GradColorA, opts.GradColorB)
+		numFrames = a.width * 2
+	} else {
+		ramp = makeGradientRamp(a.width, opts.GradColorA, opts.GradColorB)
+	}
+
+	// Pre-render initial characters.
+	a.initialFrames = make([][]string, numFrames)
+	offset := 0
+	for i := range a.initialFrames {
+		a.initialFrames[i] = make([]string, a.width+labelGapWidth+a.labelWidth)
+		for j := range a.initialFrames[i] {
+			if j+offset >= len(ramp) {
+				continue // skip if we run out of colors
+			}
+
+			var c color.Color
+			if j <= a.cyclingCharWidth {
+				c = ramp[j+offset]
+			} else {
+				c = opts.LabelColor
+			}
+
+			// Also prerender the initial character with Lip Gloss to avoid
+			// processing in the render loop.
+			a.initialFrames[i][j] = lipgloss.NewStyle().
+				Foreground(c).
+				Render(string(initialChar))
+		}
+		if opts.CycleColors {
+			offset++
+		}
+	}
+
+	// Prerender scrambled rune frames for the animation.
+	a.cyclingFrames = make([][]string, numFrames)
+	offset = 0
+	for i := range a.cyclingFrames {
+		a.cyclingFrames[i] = make([]string, a.width)
+		for j := range a.cyclingFrames[i] {
+			if j+offset >= len(ramp) {
+				continue // skip if we run out of colors
+			}
+
+			// Also prerender the color with Lip Gloss here to avoid processing
+			// in the render loop.
+			r := availableRunes[rand.IntN(len(availableRunes))] //nolint:gosec // Visual jitter only, not security-sensitive.
+			a.cyclingFrames[i][j] = lipgloss.NewStyle().
+				Foreground(ramp[j+offset]).
+				Render(string(r))
+		}
+		if opts.CycleColors {
+			offset++
+		}
+	}
+
+	// Cache the results.
+	labelSlice := make([]string, a.label.Len())
+	for i, v := range a.label.Seq2() {
+		labelSlice[i] = v
+	}
+	ellipsisSlice := make([]string, a.ellipsisFrames.Len())
+	for i, v := range a.ellipsisFrames.Seq2() {
+		ellipsisSlice[i] = v
+	}
+	return &animCache{
+		initialFrames:  a.initialFrames,
+		cyclingFrames:  a.cyclingFrames,
+		width:          a.width,
+		labelWidth:     a.labelWidth,
+		label:          labelSlice,
+		ellipsisFrames: ellipsisSlice,
+	}
 }
 
 // SetLabel updates the label text and re-renders it.

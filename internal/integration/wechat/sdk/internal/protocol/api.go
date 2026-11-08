@@ -24,6 +24,8 @@ const (
 	iLinkAppID = "bot"
 	// iLink-App-ClientVersion header value (0x00MMNNPP for 0.1.0 = 256).
 	iLinkClientVer = "256"
+	// fieldBaseInfo names the base_info object required by every bot request.
+	fieldBaseInfo = "base_info"
 )
 
 // APIError is returned when the iLink API returns a non-zero ret or HTTP error.
@@ -143,7 +145,7 @@ func (c *Client) PollQRStatus(ctx context.Context, baseURL, qrcode string) (*QRS
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("poll QR status: %w", err)
 	}
 	defer resp.Body.Close()
 	var result QRStatusResponse
@@ -200,7 +202,7 @@ func (c *Client) apiPost(ctx context.Context, baseURL, endpoint, token string, b
 func (c *Client) GetUpdates(ctx context.Context, baseURL, token, cursor string) (*GetUpdatesResponse, error) {
 	body := map[string]interface{}{
 		"get_updates_buf": cursor,
-		"base_info":       baseInfo(),
+		fieldBaseInfo:     baseInfo(),
 	}
 	raw, err := c.apiPost(ctx, baseURL, "/ilink/bot/getupdates", token, body, 45*time.Second)
 	if err != nil {
@@ -214,8 +216,8 @@ func (c *Client) GetUpdates(ctx context.Context, baseURL, token, cursor string) 
 // SendMessage sends a message through the iLink API.
 func (c *Client) SendMessage(ctx context.Context, baseURL, token string, msg interface{}) error {
 	body := map[string]interface{}{
-		"msg":       msg,
-		"base_info": baseInfo(),
+		"msg":         msg,
+		fieldBaseInfo: baseInfo(),
 	}
 	_, err := c.apiPost(ctx, baseURL, "/ilink/bot/sendmessage", token, body, 15*time.Second)
 	return err
@@ -226,7 +228,7 @@ func (c *Client) GetConfig(ctx context.Context, baseURL, token, userID, contextT
 	body := map[string]interface{}{
 		"ilink_user_id": userID,
 		"context_token": contextToken,
-		"base_info":     baseInfo(),
+		fieldBaseInfo:   baseInfo(),
 	}
 	raw, err := c.apiPost(ctx, baseURL, "/ilink/bot/getconfig", token, body, 15*time.Second)
 	if err != nil {
@@ -243,7 +245,7 @@ func (c *Client) SendTyping(ctx context.Context, baseURL, token, userID, ticket 
 		"ilink_user_id": userID,
 		"typing_ticket": ticket,
 		"status":        status,
-		"base_info":     baseInfo(),
+		fieldBaseInfo:   baseInfo(),
 	}
 	_, err := c.apiPost(ctx, baseURL, "/ilink/bot/sendtyping", token, body, 15*time.Second)
 	return err
@@ -283,7 +285,7 @@ func (c *Client) GetUploadURL(ctx context.Context, baseURL, token string, req Ge
 		"filesize":      req.FileSize,
 		"no_need_thumb": req.NoNeedThumb,
 		"aeskey":        req.AESKey,
-		"base_info":     baseInfo(),
+		fieldBaseInfo:   baseInfo(),
 	}
 	raw, err := c.apiPost(ctx, baseURL, "/ilink/bot/getuploadurl", token, body, 15*time.Second)
 	if err != nil {

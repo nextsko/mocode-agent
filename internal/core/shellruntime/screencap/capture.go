@@ -51,13 +51,13 @@ func CapturePNG(outputDir string) (string, error) {
 
 	file, err := os.Create(path)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("create screenshot file: %w", err)
 	}
 	defer file.Close()
 
 	if err := png.Encode(file, canvas); err != nil {
 		_ = os.Remove(path)
-		return "", err
+		return "", fmt.Errorf("encode screenshot: %w", err)
 	}
 	return path, nil
 }

@@ -62,6 +62,8 @@ func hunkToSplit(h *udiff.Hunk) (sh splitHunk) {
 					break inner
 				case udiff.Equal:
 					break inner
+				case udiff.Delete:
+					// A deleted line has no after-side equivalent; keep scanning.
 				}
 			}
 		}

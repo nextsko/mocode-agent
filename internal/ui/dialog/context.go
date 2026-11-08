@@ -379,7 +379,7 @@ func formatMessageForCopy(msg message.Message) string {
 }
 
 func renderToolLines(msg message.Message, width, maxLines int) []string {
-	var lines []string
+	lines := make([]string, 0, 2*(len(msg.ToolCalls())+len(msg.ToolResults())))
 	for _, tc := range msg.ToolCalls() {
 		lines = append(lines, ansi.Truncate(fmt.Sprintf("call  %s %s", tc.Name, tc.ID), width, "…"))
 		lines = append(lines, clampLines(tc.Input, width, 2)...)

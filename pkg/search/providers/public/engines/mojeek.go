@@ -112,7 +112,7 @@ func (e *MojeekEngine) Fetch(ctx context.Context, client *http.Client, queryStri
 		}
 	}
 	setNavigationHeaders(req.Header, e.homeURL)
-	page, err := fetchPage(ctx, client, MojeekID, req)
+	page, err := fetchPage(client, MojeekID, req)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (e *MojeekEngine) Fetch(ctx context.Context, client *http.Client, queryStri
 	// actionable than their raw statuses, so they are checked before
 	// the generic status handling.
 	if isMojeekRobotPage(page) {
-		e.cooldown.trigger(cooldownDuration)
+		e.cooldown.trigger()
 		return nil, challengeError(MojeekID, mojeekBlockedMessage)
 	}
 	if page.status < 200 || page.status >= 300 {

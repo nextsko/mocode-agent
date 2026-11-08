@@ -116,18 +116,20 @@ func (e *GoogleEngine) Fetch(ctx context.Context, client *http.Client, queryStri
 		}
 	}
 	setNavigationHeaders(req.Header, e.homeURL)
-	page, err := fetchPage(ctx, client, GoogleID, req)
+	page, err := fetchPage(client, GoogleID, req)
 	if err != nil {
 		return nil, err
 	}
 
 	switch googleBlockReason(page) {
 	case googleBlockTraffic:
-		e.cooldown.trigger(cooldownDuration)
+		e.cooldown.trigger()
 		return nil, challengeError(GoogleID, googleTrafficMessage)
 	case googleBlockJavaScript:
-		e.cooldown.trigger(cooldownDuration)
+		e.cooldown.trigger()
 		return nil, challengeError(GoogleID, googleJSMessage)
+	case googleBlockNone:
+		// Not blocked; continue with status handling below.
 	}
 	if page.status < 200 || page.status >= 300 {
 		if classified := classifyStatus(GoogleID, page.status, page.body); classified != nil {

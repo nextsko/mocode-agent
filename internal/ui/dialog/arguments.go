@@ -268,7 +268,7 @@ func (a *Arguments) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	// Build fields with label and input.
 	caser := cases.Title(language.English)
 
-	var fields []string
+	fields := make([]string, 0, len(a.arguments))
 	for i, arg := range a.arguments {
 		isFocused := i == a.focused
 

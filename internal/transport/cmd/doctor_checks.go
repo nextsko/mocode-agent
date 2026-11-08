@@ -34,7 +34,7 @@ func doctorBinaryCheck() doctorCheck {
 	}
 }
 
-func doctorRuntimeCheck(cwd string, facts doctorWorkspaceFacts) doctorCheck {
+func doctorRuntimeCheck(facts doctorWorkspaceFacts) doctorCheck {
 	details := []string{
 		"OS/Arch: " + runtime.GOOS + "/" + runtime.GOARCH,
 		"Go runtime: " + runtime.Version(),

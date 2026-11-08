@@ -86,9 +86,7 @@ func NewModes(com *common.Common) (*Modes, error) {
 	m.input.SetStyles(com.Styles.TextInput)
 	m.input.Focus()
 
-	if err := m.setModeItems(); err != nil {
-		return nil, err
-	}
+	m.setModeItems()
 
 	return m, nil
 }
@@ -145,6 +143,8 @@ func (m *Modes) HandleMsg(msg tea.Msg) Action {
 			m.moveSelection(-1)
 		case tea.MouseWheelDown:
 			m.moveSelection(1)
+		default:
+			// Other wheel buttons are not handled here.
 		}
 	case tea.MouseClickMsg:
 		return m.handleMouseClick(msg)
@@ -233,20 +233,31 @@ func (m *Modes) FullHelp() [][]key.Binding {
 
 func (m *Modes) moveSelection(delta int) {
 	if delta < 0 {
-		if m.list.IsSelectedFirst() {
-			m.list.SelectLast()
-		} else {
-			m.list.SelectPrev()
-		}
-	} else if delta > 0 {
-		if m.list.IsSelectedLast() {
-			m.list.SelectFirst()
-		} else {
-			m.list.SelectNext()
-		}
+		m.moveSelectionUp()
+	}
+	if delta > 0 {
+		m.moveSelectionDown()
 	}
 	m.list.Focus()
 	m.list.ScrollToSelected()
+}
+
+// moveSelectionUp selects the previous mode, wrapping to the last one.
+func (m *Modes) moveSelectionUp() {
+	if m.list.IsSelectedFirst() {
+		m.list.SelectLast()
+		return
+	}
+	m.list.SelectPrev()
+}
+
+// moveSelectionDown selects the next mode, wrapping to the first one.
+func (m *Modes) moveSelectionDown() {
+	if m.list.IsSelectedLast() {
+		m.list.SelectFirst()
+		return
+	}
+	m.list.SelectNext()
 }
 
 func (m *Modes) handleMouseClick(msg tea.MouseClickMsg) Action {
@@ -279,7 +290,7 @@ func (m *Modes) listArea(dialogArea image.Rectangle, leftWidth, listHeight int) 
 	return image.Rect(x, y, x+leftWidth, y+listHeight)
 }
 
-func (m *Modes) setModeItems() error {
+func (m *Modes) setModeItems() {
 	cfg := m.com.Config()
 	activeMode := config.AgentDefault
 	if cfg.Options != nil && cfg.Options.ActiveMode != "" {
@@ -311,7 +322,6 @@ func (m *Modes) setModeItems() error {
 	m.list.Focus()
 	m.list.SetSelected(selectedIndex)
 	m.list.ScrollToSelected()
-	return nil
 }
 
 func (m *Modes) selectedModeItem() *ModeItem {

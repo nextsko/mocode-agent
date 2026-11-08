@@ -17,8 +17,7 @@ func TestConfigStore_ConfigPath_GlobalAlwaysWorks(t *testing.T) {
 		globalDataPath: "/some/global/mocode.json",
 	}
 
-	path, err := store.configPath(ScopeGlobal)
-	require.NoError(t, err)
+	path := store.configPath()
 	require.Equal(t, "/some/global/mocode.json", path)
 }
 
@@ -31,8 +30,7 @@ func TestConfigStore_ConfigPath_WorkspaceReturnsPath(t *testing.T) {
 		globalDataPath: "/some/workspace/.mocode/mocode.json",
 	}
 
-	path, err := store.configPath(ScopeGlobal)
-	require.NoError(t, err)
+	path := store.configPath()
 	require.Equal(t, "/some/workspace/.mocode/mocode.json", path)
 }
 
@@ -45,8 +43,7 @@ func TestConfigStore_ConfigPath_WorkspaceErrorsWhenEmpty(t *testing.T) {
 		globalDataPath: "/some/global/mocode.json",
 	}
 
-	path, err := store.configPath(ScopeGlobal)
-	require.NoError(t, err)
+	path := store.configPath()
 	require.Equal(t, "/some/global/mocode.json", path)
 }
 

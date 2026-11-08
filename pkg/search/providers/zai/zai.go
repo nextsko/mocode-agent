@@ -16,6 +16,10 @@ import (
 	"github.com/nextsko/mocode-agent/pkg/search/query"
 )
 
+// zaiProviderID is the canonical provider identifier used in metadata,
+// credentials, and error payloads.
+const zaiProviderID = "zai"
+
 // zaiMCPURL is the remote MCP endpoint of the webSearchPrime server.
 const zaiMCPURL = "https://api.z.ai/api/mcp/web_search_prime/mcp"
 
@@ -73,7 +77,7 @@ func newProvider(httpClient *http.Client, mcpURL string) *Provider {
 // is done by the integration layer, not by this package's init.
 func Meta() search.ProviderMeta {
 	return search.ProviderMeta{
-		ID:       "zai",
+		ID:       zaiProviderID,
 		Label:    "Z.AI",
 		Priority: 15,
 		NewFunc:  func() search.ProviderV2 { return New(nil) },
@@ -81,7 +85,7 @@ func Meta() search.ProviderMeta {
 }
 
 // ID implements search.ProviderV2.
-func (p *Provider) ID() string { return "zai" }
+func (p *Provider) ID() string { return zaiProviderID }
 
 // Label implements search.ProviderV2.
 func (p *Provider) Label() string { return "Z.AI" }
@@ -90,7 +94,7 @@ func (p *Provider) Label() string { return "Z.AI" }
 func resolveOpts(sessionID string) search.ResolveOpts {
 	return search.ResolveOpts{
 		EnvKey:    "ZAI_API_KEY",
-		AuthID:    "zai",
+		AuthID:    zaiProviderID,
 		SessionID: sessionID,
 	}
 }
@@ -105,8 +109,8 @@ func (p *Provider) IsAvailable(
 	if broker == nil {
 		return false, nil
 	}
-	if _, err := broker.Resolve(ctx, "zai", resolveOpts("")); err != nil {
-		return false, nil
+	if _, err := broker.Resolve(ctx, zaiProviderID, resolveOpts("")); err != nil {
+		return false, nil //nolint:nilerr // Availability probing: a missing credential simply means "not available".
 	}
 	return true, nil
 }
@@ -125,7 +129,7 @@ func (p *Provider) IsExplicitlyAvailable(
 // TypeScript port surfaces through withAuth.
 func zaiCredentialError() *search.SearchProviderError {
 	return &search.SearchProviderError{
-		Provider: "zai",
+		Provider: zaiProviderID,
 		Code:     search.ErrorCodeUnauthorized,
 		Message:  missingKeyMessage,
 	}
@@ -168,7 +172,7 @@ func (p *Provider) Search(
 	apiKey := ""
 	if params.AuthStorage != nil {
 		if key, err := params.AuthStorage.Resolve(
-			ctx, "zai", resolveOpts(params.SessionID)); err == nil {
+			ctx, zaiProviderID, resolveOpts(params.SessionID)); err == nil {
 			apiKey = key
 		}
 	}
@@ -195,7 +199,7 @@ func buildSearchResponse(
 	in searchInput,
 ) *search.SearchResponse {
 	out := &search.SearchResponse{
-		Provider:  "zai",
+		Provider:  zaiProviderID,
 		Answer:    payload.Answer,
 		RequestID: payload.RequestID,
 		AuthMode:  "api_key",

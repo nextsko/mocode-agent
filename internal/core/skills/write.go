@@ -232,7 +232,7 @@ func backupExisting(root, name, target string, now time.Time) (string, error) {
 		dst = filepath.Join(dir, stamp+"-"+strconv.Itoa(i)+".md")
 	}
 
-	if err := os.WriteFile(dst, data, 0o600); err != nil {
+	if err := os.WriteFile(dst, data, 0o600); err != nil { //nolint:gosec // dst is built from a validated kebab-case skill name under the skills root.
 		return "", fmt.Errorf("writing backup %s: %w", dst, err)
 	}
 	return dst, nil
