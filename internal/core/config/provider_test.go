@@ -3,18 +3,15 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 
 	"charm.land/catwalk/pkg/catwalk"
 	"github.com/stretchr/testify/require"
 )
 
-func resetProviderState() {
-	providerOnce = sync.Once{}
-	providerList = nil
-	providerErr = nil
-}
+// resetProviderState is kept for test call sites; the provider list is no
+// longer memoized in package state, so there is nothing to reset.
+func resetProviderState() {}
 
 func TestProviders_Integration_AutoUpdateDisabled(t *testing.T) {
 	tmpDir := t.TempDir()

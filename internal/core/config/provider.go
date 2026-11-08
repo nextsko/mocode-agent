@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"sync"
 
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/catwalk/pkg/embedded"
@@ -25,12 +24,6 @@ import (
 type syncer[T any] interface {
 	Get(context.Context) (T, error)
 }
-
-var (
-	providerOnce sync.Once
-	providerList []catwalk.Provider
-	providerErr  error
-)
 
 // providersCacheFile is the cache file name for the provider list.
 const providersCacheFile = "providers"
@@ -96,27 +89,23 @@ func UpdateProviders(pathOrURL string) error {
 // without any network requests. This is the default behavior to avoid
 // blocking startup on network operations.
 func ProvidersWithCache(cfg *Config) ([]catwalk.Provider, error) {
-	providerOnce.Do(func() {
-		var errs []error
-		providers := csync.NewSlice[catwalk.Provider]()
-		customProvidersOnly := cfg.Options.DisableDefaultProviders
+	var errs []error
+	providers := csync.NewSlice[catwalk.Provider]()
+	customProvidersOnly := cfg.Options.DisableDefaultProviders
 
-		if !customProvidersOnly {
-			// Load catwalk providers from cache
-			catwalkCache := newCache[[]catwalk.Provider](cachePathFor())
-			catwalkProviders, _, err := catwalkCache.Get()
-			if err == nil {
-				providers.Append(catwalkProviders...)
-			} else {
-				slog.Debug("Failed to load catwalk providers from cache, using embedded", "error", err)
-				providers.Append(embedded.GetAll()...)
-			}
+	if !customProvidersOnly {
+		// Load catwalk providers from cache
+		catwalkCache := newCache[[]catwalk.Provider](cachePathFor())
+		catwalkProviders, _, err := catwalkCache.Get()
+		if err == nil {
+			providers.Append(catwalkProviders...)
+		} else {
+			slog.Debug("Failed to load catwalk providers from cache, using embedded", "error", err)
+			providers.Append(embedded.GetAll()...)
 		}
+	}
 
-		providerList = slices.Collect(providers.Seq())
-		providerErr = errors.Join(errs...)
-	})
-	return providerList, providerErr
+	return slices.Collect(providers.Seq()), errors.Join(errs...)
 }
 
 // Providers returns the list of providers. This is an alias for ProvidersWithCache
