@@ -188,18 +188,44 @@ func (s *Server) loadSession(ctx context.Context, params json.RawMessage) (any, 
 	// ACP requires replaying the conversation before answering session/load.
 	if history, err := s.runner.History(ctx, info.SessionID); err == nil {
 		for _, msg := range history {
-			kind := "agent_message_chunk"
-			if msg.Role == "user" {
-				kind = "user_message_chunk"
+			switch msg.Kind {
+			case "tool_call":
+				_ = s.peer.Notify("session/update", SessionNotification{
+					SessionID: info.SessionID,
+					Update: SessionUpdate{
+						SessionUpdate: "tool_call",
+						ToolCallID:    msg.ToolCallID,
+						Title:         msg.ToolName,
+						Name:          msg.ToolName,
+						Status:        "pending",
+						RawInput:      json.RawMessage(fmt.Sprintf("%q", msg.Input)),
+					},
+				})
+			case "tool_result":
+				_ = s.peer.Notify("session/update", SessionNotification{
+					SessionID: info.SessionID,
+					Update: SessionUpdate{
+						SessionUpdate: "tool_call_update",
+						ToolCallID:    msg.ToolCallID,
+						Name:          msg.ToolName,
+						Status:        msg.Status,
+						RawOutput:     json.RawMessage(fmt.Sprintf("%q", msg.Output)),
+					},
+				})
+			default:
+				kind := "agent_message_chunk"
+				if msg.Role == "user" {
+					kind = "user_message_chunk"
+				}
+				_ = s.peer.Notify("session/update", SessionNotification{
+					SessionID: info.SessionID,
+					Update: SessionUpdate{
+						SessionUpdate: kind,
+						MessageID:     msg.MessageID,
+						Content:       &ContentBlock{Type: "text", Text: msg.Text},
+					},
+				})
 			}
-			_ = s.peer.Notify("session/update", SessionNotification{
-				SessionID: info.SessionID,
-				Update: SessionUpdate{
-					SessionUpdate: kind,
-					MessageID:     msg.MessageID,
-					Content:       &ContentBlock{Type: "text", Text: msg.Text},
-				},
-			})
 		}
 	}
 	s.emitCommands(info.SessionID)

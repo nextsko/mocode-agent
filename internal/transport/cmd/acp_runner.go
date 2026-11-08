@@ -9,6 +9,7 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/app"
 	"github.com/nextsko/mocode-agent/internal/core/config"
+	coreplan "github.com/nextsko/mocode-agent/internal/core/plan"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/transport/acp"
 	"github.com/nextsko/mocode-agent/internal/transport/workspace"
@@ -80,8 +81,23 @@ func (r *acpAppRunner) History(ctx context.Context, sessionID string) ([]acp.Rep
 		}
 		var b strings.Builder
 		for _, part := range m.Parts {
-			if t, ok := part.(message.TextContent); ok {
-				b.WriteString(t.Text)
+			switch p := part.(type) {
+			case message.TextContent:
+				b.WriteString(p.Text)
+			case message.ToolCall:
+				out = append(out, acp.ReplayMessage{
+					Role: string(m.Role), MessageID: m.ID, Kind: "tool_call",
+					ToolCallID: p.ID, ToolName: p.Name, Input: p.Input, Status: "pending",
+				})
+			case message.ToolResult:
+				status := "completed"
+				if p.IsError {
+					status = "failed"
+				}
+				out = append(out, acp.ReplayMessage{
+					Role: string(m.Role), MessageID: m.ID, Kind: "tool_result",
+					ToolCallID: p.ToolCallID, ToolName: p.Name, Output: p.Content, Status: status,
+				})
 			}
 		}
 		if strings.TrimSpace(b.String()) == "" {
@@ -180,6 +196,8 @@ func (r *acpAppRunner) Prompt(ctx context.Context, sessionID, text string, emit 
 	}
 
 	msgs := r.app.Messages.Subscribe(ctx)
+	planCh, cancelPlan := coreplan.Default().Subscribe(sessionID)
+	defer cancelPlan()
 	done := make(chan error, 1)
 	go func() {
 		_, err := r.app.AgentCoordinator.Run(ctx, sessionID, text)
@@ -202,6 +220,10 @@ func (r *acpAppRunner) Prompt(ctx context.Context, sessionID, text string, emit 
 				return "", err
 			}
 			return acp.StopEndTurn, nil
+		case items := <-planCh:
+			if entries := planEntries(items); entries != nil {
+				emit(acp.SessionUpdate{SessionUpdate: "plan", Entries: entries})
+			}
 		case ev := <-msgs:
 			msg := ev.Payload
 			if msg.SessionID != sessionID {
@@ -400,6 +422,22 @@ func (r *acpAppRunner) markDenied(sessionID, tool string) {
 		r.denied[sessionID] = map[string]bool{}
 	}
 	r.denied[sessionID][tool] = true
+}
+
+func planEntries(items []coreplan.Item) []acp.PlanEntry {
+	if len(items) == 0 {
+		return nil
+	}
+	out := make([]acp.PlanEntry, 0, len(items))
+	for _, it := range items {
+		status := string(it.Status)
+		priority := it.Priority
+		if priority == "" {
+			priority = "medium"
+		}
+		out = append(out, acp.PlanEntry{Content: it.Content, Priority: priority, Status: status})
+	}
+	return out
 }
 
 func toolKind(name string) string {

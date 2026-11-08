@@ -37,7 +37,9 @@ func (f *fakeRunner) ResumeSession(ctx context.Context, req ResumeSessionRequest
 func (f *fakeRunner) History(_ context.Context, _ string) ([]ReplayMessage, error) {
 	return []ReplayMessage{
 		{Role: "user", MessageID: "m1", Text: "hello"},
-		{Role: "assistant", MessageID: "m2", Text: "hi there"},
+		{Role: "assistant", MessageID: "m2", Kind: "tool_call", ToolCallID: "t1", ToolName: "bash", Status: "pending", Input: "printf hi"},
+		{Role: "tool", MessageID: "m3", Kind: "tool_result", ToolCallID: "t1", ToolName: "bash", Status: "completed", Output: "hi"},
+		{Role: "assistant", MessageID: "m4", Text: "hi there"},
 	}, nil
 }
 
@@ -216,4 +218,6 @@ func TestLoadSessionReplaysHistory(t *testing.T) {
 	assert.Contains(t, frames, "agent_message_chunk")
 	assert.Contains(t, frames, `"text":"hello"`)
 	assert.Contains(t, frames, "hi there")
+	assert.Contains(t, frames, "tool_call")
+	assert.Contains(t, frames, "tool_call_update")
 }

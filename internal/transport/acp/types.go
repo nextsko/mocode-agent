@@ -421,7 +421,13 @@ type LogoutResponse struct{}
 
 // ReplayMessage is one conversation entry replayed on session/load.
 type ReplayMessage struct {
-	Role      string `json:"role"` // user | assistant
-	MessageID string `json:"messageId,omitempty"`
-	Text      string `json:"text"`
+	Role       string `json:"role"` // user | assistant | tool
+	MessageID  string `json:"messageId,omitempty"`
+	Text       string `json:"text,omitempty"`
+	Kind       string `json:"kind,omitempty"` // text | tool_call | tool_result
+	ToolCallID string `json:"toolCallId,omitempty"`
+	ToolName   string `json:"toolName,omitempty"`
+	Status     string `json:"status,omitempty"`
+	Input      string `json:"input,omitempty"`
+	Output     string `json:"output,omitempty"`
 }

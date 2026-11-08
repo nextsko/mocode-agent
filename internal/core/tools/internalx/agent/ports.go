@@ -9,6 +9,7 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/config"
+	coreplan "github.com/nextsko/mocode-agent/internal/core/plan"
 	"github.com/nextsko/mocode-agent/internal/core/skills"
 	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp"
@@ -156,6 +157,19 @@ func runTodos(ctx context.Context, sessions session.Service, params TodosParams)
 	if _, err := sessions.Save(ctx, currentSession); err != nil {
 		return "", TodosResponseMetadata{}, fmt.Errorf("failed to save todos: %w", err)
 	}
+
+	// Mirror the todo list into the observable plan store so transports
+	// (ACP, future UIs) render the same plan the agent maintains.
+	planItems := make([]coreplan.Item, 0, len(todos))
+	for i, todo := range todos {
+		planItems = append(planItems, coreplan.Item{
+			ID:       fmt.Sprintf("todo-%d", i+1),
+			Content:  todo.Content,
+			Status:   coreplan.Status(todo.Status),
+			Priority: "medium",
+		})
+	}
+	coreplan.Default().Set(sessionID, planItems)
 
 	response := "Todo list updated successfully.\n\n"
 

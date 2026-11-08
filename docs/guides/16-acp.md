@@ -25,9 +25,10 @@ mocode acp --yolo     # 自动批准所有权限（仅限可信环境）
 | MCP | `session/new` 的 MCP servers 按会话挂载：stdio / HTTP / SSE（env、headers 支持；关闭时移除） |
 | 回合 | `session/prompt`、`session/cancel` |
 | 设置 | `session/set_mode`（mocode 的 agent 模式）、`session/set_config_option`（模型选择） |
-| 流式更新 | `agent_message_chunk`、`agent_thought_chunk`、`tool_call`、`tool_call_update`（pending → completed/failed）、`available_commands_update`、`current_mode_update`、`config_option_update` |
+| 流式更新 | `agent_message_chunk`、`agent_thought_chunk`、`tool_call`、`tool_call_update`（pending → completed/failed）、`plan`、`available_commands_update`、`current_mode_update`、`config_option_update` |
 | 权限 | 工具需要授权时向客户端发 `session/request_permission`，四种 kind：allow_once / allow_always / reject_once / reject_always |
 | 命令 | 启动会话后推送 `available_commands_update`，来自 mocode 的 slash 命令注册表 |
+| 计划 | agent 调用 `todos` 工具维护计划时，实时映射为 `plan` 更新（同一份 session.Todos，不另造数据源） |
 
 权限回调与工具调用流都接在真实执行路径上：客户端批准后 mocode 的工具照常执行，
 结果通过 `tool_call_update` 回传。
@@ -53,9 +54,8 @@ mocode acp --yolo     # 自动批准所有权限（仅限可信环境）
 
 ## 当前边界（诚实说明）
 
-- 回放只覆盖文本消息，不重放 tool_call 历史；
 - 客户端 fs / terminal / elicitation 方法尚未被本地工具调用（工具在进程内执行）；
 - `reject_always` 在**会话内**记住拒绝（同一工具后续不再询问），但不跨会话持久化；
-- 未发送 `plan` 更新：mocode 目前没有独立的 plan/todo 数据源，不伪造。
+- `session/load` 现在会回放文本 + tool_call / tool_result，但不重放 reasoning。
 
 这些是下一步的明确缺口，而非“已支持”的模糊表述。
