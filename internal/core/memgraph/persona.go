@@ -67,30 +67,7 @@ func (s *Store) BuildCard() PersonaCard {
 // ConflictsLocked is the same as Conflicts but assumes the caller holds mu.
 // It exists only for BuildCard; external callers use Conflicts.
 func (s *Store) ConflictsLocked() []Conflict {
-	byKey := map[string][]Edge{}
-	for _, e := range s.g.Edges {
-		if e.Kind == EdgeSupersedes || e.Kind == EdgeEvidencedBy {
-			continue
-		}
-		byKey[e.From+"|"+e.Kind] = append(byKey[e.From+"|"+e.Kind], e)
-	}
-	var out []Conflict
-	for _, edges := range byKey {
-		for i := 0; i < len(edges); i++ {
-			for j := i + 1; j < len(edges); j++ {
-				if edges[i].To == edges[j].To {
-					continue
-				}
-				a, b := s.g.Nodes[edges[i].To], s.g.Nodes[edges[j].To]
-				out = append(out, Conflict{
-					A: a.Name, B: b.Name, Subject: s.g.Nodes[edges[i].From].Name, Kind: edges[i].Kind,
-					Detail: fmt.Sprintf("%s %s both %q and %q", s.g.Nodes[edges[i].From].Name, edges[i].Kind, a.Name, b.Name),
-				})
-			}
-		}
-	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Subject < out[j].Subject })
-	return out
+	return s.conflictsLocked()
 }
 
 // RenderCard renders the card as prompt-ready markdown.

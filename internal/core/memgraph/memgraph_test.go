@@ -3,6 +3,7 @@ package memgraph
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,9 +39,8 @@ func TestUpsertMergeSupersedeAndNeighbors(t *testing.T) {
 	assert.Equal(t, p1.ID, old.SupersededBy)
 	assert.NotNil(t, old.ValidTo)
 
-	conflicts := s.Conflicts()
-	require.Len(t, conflicts, 1)
-	assert.Equal(t, "owner", conflicts[0].Subject)
+	// prefers is multi-valued: two preferences are not a contradiction.
+	assert.Empty(t, s.Conflicts())
 }
 
 func TestExplainTracesEvidence(t *testing.T) {
@@ -173,4 +173,36 @@ func TestCJKNamesGetDistinctIDs(t *testing.T) {
 	assert.Contains(t, a.ID, "preference-")
 	assert.NotEqual(t, "preference", a.ID)
 	assert.Contains(t, RenderMermaid(s.Graph()), "id="+a.ID)
+}
+
+func TestConflictsOnlyForFunctionalRelationsAndFacts(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	s, err := Open(dir)
+	require.NoError(t, err)
+	u, err := s.UpsertNode(Node{Kind: KindUser, Name: "owner"})
+	require.NoError(t, err)
+	beijing, err := s.UpsertNode(Node{Kind: KindFact, Name: "Beijing"})
+	require.NoError(t, err)
+	utc, err := s.UpsertNode(Node{Kind: KindFact, Name: "UTC"})
+	require.NoError(t, err)
+	_, err = s.UpsertEdge(Edge{From: u.ID, To: beijing.ID, Kind: "timezone"})
+	require.NoError(t, err)
+	_, err = s.UpsertEdge(Edge{From: u.ID, To: utc.ID, Kind: "timezone"})
+	require.NoError(t, err)
+	assert.Len(t, s.Conflicts(), 1)
+
+	_, err = s.UpsertNode(Node{ID: "fact-editor-vim", Kind: KindFact, Name: "editor", Props: map[string]any{"key": "editor", "value": "vim"}})
+	require.NoError(t, err)
+	_, err = s.UpsertNode(Node{ID: "fact-editor-emacs", Kind: KindFact, Name: "editor", Props: map[string]any{"key": "editor", "value": "emacs"}})
+	require.NoError(t, err)
+	conflicts := s.Conflicts()
+	require.Len(t, conflicts, 2)
+	found := false
+	for _, c := range conflicts {
+		if strings.Contains(c.Detail, "editor") {
+			found = true
+		}
+	}
+	assert.True(t, found, "fact conflict should be reported")
 }

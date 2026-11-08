@@ -5,6 +5,15 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
+## [0.19.2] - 2026-11-09
+
+### Fixed
+
+- **冲突判定语义**: 只有功能性关系（timezone/language/name/role/…）才视为单值冲突，
+  `prefers`、`relates_to` 等多值关系不再被误报为“待澄清”；
+  事实（kind=fact）同 key 不同 value 仍会报冲突。
+- 由子代理真实跑图谱自测时发现：用户同时偏好两件事被误判为矛盾。
+
 ## [0.19.1] - 2026-11-09
 
 ### Fixed

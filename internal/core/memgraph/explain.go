@@ -122,40 +122,76 @@ type Conflict struct {
 	Detail  string `json:"detail"`
 }
 
-// Conflicts finds same-subject relationships that point at different objects
-// (excluding supersession, which is an intentional evolution).
+// functionalKinds are relationships that can hold only one value per subject.
+// Multi-valued relations such as prefers/relates_to are deliberately absent:
+// a user may prefer many things without that being a contradiction.
+var functionalKinds = map[string]bool{
+	"timezone": true, "language": true, "name": true, "role": true,
+	"location": true, "status": true, "current": true, "canonical": true,
+}
+
+// Conflicts finds genuinely inconsistent beliefs: functional relationships
+// that point at two different values, and facts with the same key but
+// different values. Supersession is intentional evolution, not conflict.
 func (s *Store) Conflicts() []Conflict {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.conflictsLocked()
+}
+
+func (s *Store) conflictsLocked() []Conflict {
 	byKey := map[string][]Edge{}
 	for _, e := range s.g.Edges {
-		if e.Kind == EdgeSupersedes || e.Kind == EdgeEvidencedBy {
+		if e.Kind == EdgeSupersedes || e.Kind == EdgeEvidencedBy || !functionalKinds[e.Kind] {
 			continue
 		}
-		key := e.From + "|" + e.Kind
-		byKey[key] = append(byKey[key], e)
+		byKey[e.From+"|"+e.Kind] = append(byKey[e.From+"|"+e.Kind], e)
 	}
 	var out []Conflict
 	for _, edges := range byKey {
-		if len(edges) < 2 {
-			continue
-		}
-		seen := map[string]bool{}
-		for i := range edges {
+		for i := 0; i < len(edges); i++ {
 			for j := i + 1; j < len(edges); j++ {
 				if edges[i].To == edges[j].To {
 					continue
 				}
-				key := edges[i].To + "|" + edges[j].To
-				if seen[key] {
-					continue
-				}
-				seen[key] = true
 				a, b := s.g.Nodes[edges[i].To], s.g.Nodes[edges[j].To]
 				out = append(out, Conflict{
-					A: a.Name, B: b.Name, Subject: s.g.Nodes[edges[i].From].Name,
-					Kind:   edges[i].Kind,
+					A: a.Name, B: b.Name, Subject: s.g.Nodes[edges[i].From].Name, Kind: edges[i].Kind,
 					Detail: fmt.Sprintf("%s %s both %q and %q", s.g.Nodes[edges[i].From].Name, edges[i].Kind, a.Name, b.Name),
+				})
+			}
+		}
+	}
+	// Facts with the same key but different values are contradictions too.
+	facts := map[string][]Node{}
+	for _, n := range s.g.Nodes {
+		if n.Kind != KindFact || n.SupersededBy != "" {
+			continue
+		}
+		key := strings.ToLower(n.Name)
+		if n.Props != nil {
+			if k, ok := n.Props["key"].(string); ok && k != "" {
+				key = strings.ToLower(k)
+			}
+		}
+		facts[key] = append(facts[key], n)
+	}
+	for key, group := range facts {
+		if len(group) < 2 {
+			continue
+		}
+		seen := map[string]bool{}
+		for i := 0; i < len(group); i++ {
+			for j := i + 1; j < len(group); j++ {
+				va := fmt.Sprint(group[i].Props["value"])
+				vb := fmt.Sprint(group[j].Props["value"])
+				if va == vb || seen[va+"|"+vb] {
+					continue
+				}
+				seen[va+"|"+vb] = true
+				out = append(out, Conflict{
+					A: group[i].Name, B: group[j].Name, Subject: key, Kind: "fact",
+					Detail: fmt.Sprintf("fact %q is both %q and %q", key, va, vb),
 				})
 			}
 		}
