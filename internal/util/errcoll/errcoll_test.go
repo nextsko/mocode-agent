@@ -61,14 +61,18 @@ func TestDailyRotation(t *testing.T) {
 	c.Record(ErrorRecord{Timestamp: day1, ToolName: "fetch", Error: "err1", Category: CategoryToolExecution})
 	c.Record(ErrorRecord{Timestamp: day2, ToolName: "bash", Error: "err2", Category: CategoryCrossPlatform})
 
-	// Give the goroutine time to process both records.
-	time.Sleep(100 * time.Millisecond)
+	// The writer is asynchronous; wait for it deterministically instead of
+	// sleeping a fixed amount, which is flaky under -race on slow CI hosts.
+	day1Path := filepath.Join(dir, "errors-20250101.jsonl")
+	day2Path := filepath.Join(dir, "errors-20250102.jsonl")
+	require.Eventually(t, func() bool {
+		_, err1 := os.Stat(day1Path)
+		_, err2 := os.Stat(day2Path)
+		return err1 == nil && err2 == nil
+	}, 5*time.Second, 10*time.Millisecond)
 
-	require.FileExists(t, filepath.Join(dir, "errors-20250101.jsonl"))
-	require.FileExists(t, filepath.Join(dir, "errors-20250102.jsonl"))
-
-	day1Records := readRecordsFromFile(t, filepath.Join(dir, "errors-20250101.jsonl"))
-	day2Records := readRecordsFromFile(t, filepath.Join(dir, "errors-20250102.jsonl"))
+	day1Records := readRecordsFromFile(t, day1Path)
+	day2Records := readRecordsFromFile(t, day2Path)
 
 	require.Len(t, day1Records, 1)
 	require.Len(t, day2Records, 1)
