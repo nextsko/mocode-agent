@@ -12,7 +12,17 @@ import (
 	"os/exec"
 	"sync"
 	"time"
+
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 )
+
+// permissionDeniedResult is the port-level form of toolutil.NewPermissionDeniedResponse:
+// a tool-level error that also ends the turn.
+func permissionDeniedResult() contract.ToolResult {
+	res := contract.Error("User denied permission")
+	res.StopTurn = true
+	return res
+}
 
 const (
 	// DefaultTimeout bounds a sandboxed run unless the model asks for more.

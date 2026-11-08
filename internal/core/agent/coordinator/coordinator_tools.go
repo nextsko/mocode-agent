@@ -341,9 +341,9 @@ func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 	}
 	allTools = append(
 		allTools,
-		tools.NewWeChatSendImageTool(messengerPort),
-		tools.NewWeChatSendFileTool(messengerPort),
-		tools.NewWeChatScreenshotTool(messengerPort, screenshotDir),
+		agenttooladapter.NewWithContext(tools.NewWeChatSendImagePortTool(messengerPort), c.portToolContextFactory()),
+		agenttooladapter.NewWithContext(tools.NewWeChatSendFilePortTool(messengerPort), c.portToolContextFactory()),
+		agenttooladapter.NewWithContext(tools.NewWeChatScreenshotPortTool(messengerPort, screenshotDir), c.portToolContextFactory()),
 	)
 
 	// ── filter by AllowedTools ────────────────────────────────────────────────

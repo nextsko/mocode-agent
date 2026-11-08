@@ -11,6 +11,7 @@ import (
 
 	"charm.land/fantasy"
 
+	"github.com/nextsko/mocode-agent/internal/core/agent/agenttooladapter"
 	"github.com/nextsko/mocode-agent/internal/core/agent/lifecycle"
 	"github.com/nextsko/mocode-agent/internal/core/agent/prompt"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
@@ -154,17 +155,17 @@ func (c *Coordinator) agenticFetchTool(_ context.Context, client *http.Client) (
 				return fantasy.ToolResponse{}, errors.New("small model provider not configured")
 			}
 
-			webFetchTool := tools.NewWebFetchTool(tmpDir, client)
-			webSearchTool := tools.NewWebSearchTool(client)
+			webFetchTool := agenttooladapter.New(tools.NewWebFetchPortTool(tmpDir, client), nil)
+			webSearchTool := agenttooladapter.New(tools.NewWebSearchPortTool(client), nil)
 			fetchTools := []fantasy.AgentTool{
 				webFetchTool,
 				webSearchTool,
-				tools.NewGlobTool(tmpDir),
-				tools.NewGrepTool(tmpDir, c.cfg.Config().Tools.Grep),
-				tools.NewSourcegraphTool(client),
+				agenttooladapter.New(tools.NewGlobPortTool(tmpDir), nil),
+				agenttooladapter.New(tools.NewGrepPortTool(tmpDir, c.cfg.Config().Tools.Grep), nil),
+				agenttooladapter.New(tools.NewSourcegraphPortTool(client), nil),
 				// The sub-agent reads fetched pages from a temp directory, so it
 				// has no use for the internal resource namespaces.
-				tools.NewViewTool(c.lspManager, c.permissions, c.filetracker, nil, nil, tmpDir),
+				agenttooladapter.New(tools.NewViewPortTool(c.lspManager, c.permissions, c.filetracker, nil, nil, tmpDir), nil),
 			}
 
 			// Sub-agent tools run without hook interception. The top-level

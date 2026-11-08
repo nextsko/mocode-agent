@@ -36,11 +36,11 @@ const (
 )
 
 var (
-	BashNoOutput     = shell.BashNoOutput
-	NewBashTool      = shell.NewBashTool
-	NewJobOutputTool = shell.NewJobOutputTool
-	NewJobInputTool  = shell.NewJobInputTool
-	NewJobKillTool   = shell.NewJobKillTool
+	BashNoOutput         = shell.BashNoOutput
+	NewBashPortTool      = shell.NewBashPortTool
+	NewJobOutputPortTool = shell.NewJobOutputPortTool
+	NewJobInputPortTool  = shell.NewJobInputPortTool
+	NewJobKillPortTool   = shell.NewJobKillPortTool
 )
 
 type (
@@ -68,14 +68,14 @@ const (
 )
 
 var (
-	NewEditTool      = fs.NewEditTool
-	NewMultiEditTool = fs.NewMultiEditTool
-	NewWriteTool     = fs.NewWriteTool
-	NewViewTool      = fs.NewViewTool
-	NewReadFilesTool = fs.NewReadFilesTool
-	NewLsTool        = fs.NewLsTool
-	NewGlobTool      = fs.NewGlobTool
-	NewGrepTool      = fs.NewGrepTool
+	NewEditPortTool      = fs.NewEditPortTool
+	NewMultiEditPortTool = fs.NewMultiEditPortTool
+	NewWritePortTool     = fs.NewWritePortTool
+	NewViewPortTool      = fs.NewViewPortTool
+	NewReadFilesPortTool = fs.NewReadFilesPortTool
+	NewLsPortTool        = fs.NewLsPortTool
+	NewGlobPortTool      = fs.NewGlobPortTool
+	NewGrepPortTool      = fs.NewGrepPortTool
 )
 
 type (
@@ -106,10 +106,10 @@ const (
 )
 
 var (
-	NewFetchTool        = web.NewFetchTool
-	NewCrawlTool        = web.NewCrawlTool
-	NewDownloadTool     = web.NewDownloadTool
-	NewDownloadDocsTool = web.NewDownloadDocsTool
+	NewFetchPortTool        = web.NewFetchPortTool
+	NewCrawlPortTool        = web.NewCrawlPortTool
+	NewDownloadPortTool     = web.NewDownloadPortTool
+	NewDownloadDocsPortTool = web.NewDownloadDocsPortTool
 )
 
 type (
@@ -159,8 +159,8 @@ const (
 )
 
 var (
-	NewReferencesTool = lsp.NewReferencesTool
-	NewLSPRestartTool = lsp.NewLSPRestartTool
+	NewReferencesPortTool = lsp.NewReferencesPortTool
+	NewLSPRestartPortTool = lsp.NewLSPRestartPortTool
 )
 
 type (
@@ -177,9 +177,9 @@ const (
 )
 
 var (
-	NewListMCPResourcesTool = mcp.NewListMCPResourcesTool
-	NewReadMCPResourceTool  = mcp.NewReadMCPResourceTool
-	GetMCPTools             = mcp.GetMCPTools
+	NewListMCPResourcesPortTool = mcp.NewListMCPResourcesPortTool
+	NewReadMCPResourcePortTool  = mcp.NewReadMCPResourcePortTool
+	GetMCPTools                 = mcp.GetMCPTools
 )
 
 // MCPToolStruct is re-exported because the coordinator iterates MCP tools and
@@ -202,12 +202,12 @@ const (
 )
 
 var (
-	NewPlanCommitsTool    = gitops.NewPlanCommitsTool
-	NewExecuteCommitsTool = gitops.NewExecuteCommitsTool
+	NewPlanCommitsPortTool    = gitops.NewPlanCommitsPortTool
+	NewExecuteCommitsPortTool = gitops.NewExecuteCommitsPortTool
 
-	NewWeChatSendImageTool  = wechat.NewWeChatSendImageTool
-	NewWeChatSendFileTool   = wechat.NewWeChatSendFileTool
-	NewWeChatScreenshotTool = wechat.NewWeChatScreenshotTool
+	NewWeChatSendImagePortTool  = wechat.NewWeChatSendImagePortTool
+	NewWeChatSendFilePortTool   = wechat.NewWeChatSendFilePortTool
+	NewWeChatScreenshotPortTool = wechat.NewWeChatScreenshotPortTool
 )
 
 type (
@@ -226,9 +226,9 @@ const (
 )
 
 var (
-	NewWebFetchTool    = web.NewWebFetchTool
-	NewWebSearchTool   = web.NewWebSearchTool
-	FetchURLAndConvert = netcommon.FetchURLAndConvert
+	NewWebFetchPortTool  = web.NewWebFetchPortTool
+	NewWebSearchPortTool = web.NewWebSearchPortTool
+	FetchURLAndConvert   = netcommon.FetchURLAndConvert
 )
 
 type (
@@ -245,7 +245,7 @@ const (
 	ModelNameContextKey = toolutil.ModelNameContextKeyVal
 )
 
-var NewSourcegraphTool = web.NewSourcegraphTool
+var NewSourcegraphPortTool = web.NewSourcegraphPortTool
 
 // ViewResourceSkill re-export (view tool resource-kind constant).
 const ViewResourceSkill = fs.ViewResourceSkill

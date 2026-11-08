@@ -3,13 +3,13 @@ package web
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/nethttp"
-
-	"charm.land/fantasy"
 
 	"github.com/nextsko/mocode-agent/internal/core/tools/core/web/crawler"
 )
@@ -28,60 +28,88 @@ type DownloadDocsParams struct {
 	MaxFiles int    `json:"max_files,omitempty" description:"Maximum number of files to return (default: 50, max: 100)"`
 }
 
-// NewDownloadDocsTool builds the download_docs tool. The factory is the
+// NewDownloadDocsPortTool builds the download_docs port tool. The factory is the
 // single proxy source of truth: go-git clones through transport.ProxyOptions
 // (not http.Client), so the tool reads the factory's resolved ProxyURL.
-func NewDownloadDocsTool(factory *nethttp.Factory) fantasy.AgentTool {
+func NewDownloadDocsPortTool(factory *nethttp.Factory) contract.Tool {
 	if factory == nil {
 		factory = nethttp.NewFactory(nil, "")
 	}
-	return fantasy.NewParallelAgentTool(
+	return asParallel(contract.NewFunc(
 		DownloadDocsToolName,
 		toolutil.FirstLineDescription(downloadDocsDescription),
-		func(ctx context.Context, params DownloadDocsParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			if params.RepoURL == "" {
-				return fantasy.NewTextErrorResponse("repo_url parameter is required"), nil
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"repo_url": map[string]any{
+					"type":        "string",
+					"description": "The GitHub repository URL to download docs from",
+				},
+				"docs_path": map[string]any{
+					"type":        "string",
+					"description": "Optional path prefix to filter files (e.g. 'docs', 'README.md')",
+				},
+				"max_files": map[string]any{
+					"type":        "integer",
+					"description": "Maximum number of files to return (default: 50, max: 100)",
+				},
+			},
+			"required": []string{"repo_url"},
+		},
+		func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+			var params DownloadDocsParams
+			if err := json.Unmarshal(args, &params); err != nil {
+				return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
 			}
+			return runDownloadDocs(factory, params)
+		},
+	))
+}
 
-			if !strings.Contains(params.RepoURL, "github.com") {
-				return fantasy.NewTextErrorResponse("Only GitHub repositories are supported"), nil
-			}
+// runDownloadDocs clones a GitHub repo's docs and renders them as Markdown.
+func runDownloadDocs(factory *nethttp.Factory, params DownloadDocsParams) (contract.ToolResult, error) {
+	if params.RepoURL == "" {
+		return contract.Error("repo_url parameter is required"), nil
+	}
 
-			// Clamp max_files
-			if params.MaxFiles <= 0 {
-				params.MaxFiles = 50
-			} else if params.MaxFiles > MaxDownloadFiles {
-				params.MaxFiles = MaxDownloadFiles
-			}
+	if !strings.Contains(params.RepoURL, "github.com") {
+		return contract.Error("Only GitHub repositories are supported"), nil
+	}
 
-			downhub := crawler.NewDownhub().
-				URL(params.RepoURL).
-				MaxFiles(params.MaxFiles)
-			if proxy := factory.ProxyURL(); proxy != "" {
-				downhub = downhub.Proxy(proxy)
-			}
+	// Clamp max_files
+	if params.MaxFiles <= 0 {
+		params.MaxFiles = 50
+	} else if params.MaxFiles > MaxDownloadFiles {
+		params.MaxFiles = MaxDownloadFiles
+	}
 
-			if params.DocsPath != "" {
-				downhub = downhub.Path(params.DocsPath)
-			}
+	downhub := crawler.NewDownhub().
+		URL(params.RepoURL).
+		MaxFiles(params.MaxFiles)
+	if proxy := factory.ProxyURL(); proxy != "" {
+		downhub = downhub.Proxy(proxy)
+	}
 
-			result, err := downhub.Fetch()
-			if err != nil {
-				return fantasy.NewTextErrorResponse(fmt.Sprintf("Download failed: %v", err)), nil
-			}
+	if params.DocsPath != "" {
+		downhub = downhub.Path(params.DocsPath)
+	}
 
-			if result.Count == 0 {
-				return fantasy.NewTextResponse("No documentation files found in the repository."), nil
-			}
+	result, err := downhub.Fetch()
+	if err != nil {
+		return contract.Error(fmt.Sprintf("Download failed: %v", err)), nil
+	}
 
-			output := result.ToMarkdown()
+	if result.Count == 0 {
+		return contract.Text("No documentation files found in the repository."), nil
+	}
 
-			// Truncate if too large
-			const maxOutput = 200000 // 200KB
-			if len(output) > maxOutput {
-				output = output[:maxOutput] + "\n\n[Content truncated - exceeded 200KB]"
-			}
+	output := result.ToMarkdown()
 
-			return fantasy.NewTextResponse(output), nil
-		})
+	// Truncate if too large
+	const maxOutput = 200000 // 200KB
+	if len(output) > maxOutput {
+		output = output[:maxOutput] + "\n\n[Content truncated - exceeded 200KB]"
+	}
+
+	return contract.Text(output), nil
 }

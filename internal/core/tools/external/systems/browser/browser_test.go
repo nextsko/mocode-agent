@@ -33,7 +33,7 @@ func (f *fakeGate) Request(_ context.Context, opts permission.CreatePermissionRe
 
 func runTool(t *testing.T, deps Deps, input string) fantasy.ToolResponse {
 	t.Helper()
-	resp, err := NewBrowserTool(deps).Run(context.Background(), fantasy.ToolCall{
+	resp, err := asAgentTool(NewBrowserPortTool(deps)).Run(context.Background(), fantasy.ToolCall{
 		ID: "call-1", Name: BrowserToolName, Input: input,
 	})
 	require.NoError(t, err)
@@ -194,7 +194,10 @@ func TestBrowser_RefIsPreferredOverSelector(t *testing.T) {
 
 	_, errResp = targetOf(BrowserParams{})
 	require.NotNil(t, errResp)
-	assert.Contains(t, errResp.Content, "ref is required")
+	// The port carries failures on Error; the adapter turns that into the
+	// text error response the model sees.
+	require.Error(t, errResp.Error)
+	assert.Contains(t, errResp.Error.Error(), "ref is required")
 }
 
 // ─── value rendering ─────────────────────────────────────────────────────────
@@ -217,7 +220,7 @@ func TestRenderValue(t *testing.T) {
 func TestBrowser_SchemaExposesActionEnum(t *testing.T) {
 	t.Parallel()
 
-	info := NewBrowserTool(Deps{}).Info()
+	info := asAgentTool(NewBrowserPortTool(Deps{})).Info()
 	assert.Equal(t, BrowserToolName, info.Name)
 
 	action, ok := info.Parameters["action"].(map[string]any)
@@ -239,7 +242,7 @@ func TestBrowser_SchemaExposesActionEnum(t *testing.T) {
 func TestBrowser_DescriptionIsUsable(t *testing.T) {
 	t.Parallel()
 
-	desc := NewBrowserTool(Deps{}).Info().Description
+	desc := asAgentTool(NewBrowserPortTool(Deps{})).Info().Description
 	assert.NotEmpty(t, desc)
 	assert.Greater(t, len(desc), 40)
 	assert.False(t, strings.HasPrefix(desc, "//"), "the //go:embed directive must not leak")

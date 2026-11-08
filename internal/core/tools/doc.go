@@ -75,11 +75,12 @@
 //	tools/plugins/netcommon may not import fantasy, catwalk, core/agent
 //	domain/...             may not import charm.land/* (LLM framework/SDK types)
 //	core/agent/messages    may not import charm.land/* (helpers live in llmconv)
-//	tools/contract         leaf: no internal or charm.land imports
-//	tools/internalx/agent  fully ported: no charm.land imports
-//	tools/core/question    ported: no charm.land imports
-//	tools/external/common/ssh  helpers ported: no charm.land imports
-//	shellruntime/screencap     ported: no charm.land imports
+//	tool packages          ported and framework-free. Enforced by layercheck:
+//	  tools/internalx/agent, tools/internalx/{lsp,filter}, tools/core/{fs,
+//	  web,shell,sandbox,question}, tools/external/systems/{ssh,gitea,gitops,
+//	  browser,wechat}, tools/external/common/ssh, shellruntime/screencap.
+//	  tools/external/mcp stays framework-backed: mcp-tools.go returns
+//	  structured image/media responses the port cannot express yet.
 //
 // nethttp stays pure (net/http + time only) so any future runtime can sit
 // behind it; netcommon may not grow LLM-runtime coupling.

@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"charm.land/fantasy"
+
+	"github.com/nextsko/mocode-agent/internal/core/agent/agenttooladapter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +51,7 @@ func TestByCategory_KnownDescriptor(t *testing.T) {
 
 	for _, d := range descs {
 		stub := stubNamedTool(d.Name)
-		result := f(ctx, stub)
+		result := f(ctx, agenttooladapter.WrapFantasy(stub))
 		wantPass := d.Category == CategoryExec
 		assert.Equal(t, wantPass, result,
 			"ByCategory(exec) on tool %q: got %v, want %v", d.Name, result, wantPass)
@@ -62,7 +64,7 @@ func TestByCategory_UnknownTool(t *testing.T) {
 	t.Parallel()
 	f := ByCategory(CategoryExec)
 	unknown := stubNamedTool("__dynamic_injected_tool__")
-	assert.True(t, f(context.Background(), unknown),
+	assert.True(t, f(context.Background(), agenttooladapter.WrapFantasy(unknown)),
 		"unknown tools should pass through ByCategory")
 }
 
@@ -74,7 +76,7 @@ func TestByKind_Builtin(t *testing.T) {
 
 	for _, d := range AllToolDescriptors() {
 		stub := stubNamedTool(d.Name)
-		got := f(ctx, stub)
+		got := f(ctx, agenttooladapter.WrapFantasy(stub))
 		want := d.Kind == ToolKindBuiltin
 		assert.Equal(t, want, got,
 			"ByKind(builtin) on tool %q: got %v, want %v", d.Name, got, want)
@@ -90,7 +92,7 @@ func TestExcludeCategories_BlocksNetworkTools(t *testing.T) {
 
 	for _, d := range AllToolDescriptors() {
 		stub := stubNamedTool(d.Name)
-		got := f(ctx, stub)
+		got := f(ctx, agenttooladapter.WrapFantasy(stub))
 		wantPass := d.Category != CategoryNetwork
 		assert.Equal(t, wantPass, got,
 			"ExcludeCategories(network) on tool %q", d.Name)

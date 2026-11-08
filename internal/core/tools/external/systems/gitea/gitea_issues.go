@@ -5,12 +5,12 @@ package gitea
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 
-	"charm.land/fantasy"
-
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 	giteacommon "github.com/nextsko/mocode-agent/internal/core/tools/external/common/gitea"
 )
 
@@ -29,53 +29,88 @@ type IssuesParams struct {
 	Limit   int    `json:"limit,omitempty"   description:"Maximum number of issues to return. Defaults to 20."`
 }
 
-// NewIssuesTool creates an AgentTool that lists Gitea issues via tea CLI.
-func NewIssuesTool() fantasy.AgentTool {
-	return fantasy.NewAgentTool(
+// NewIssuesPortTool is the framework-agnostic form of the gitea_issues tool:
+// it lists Gitea issues via the tea CLI.
+func NewIssuesPortTool() contract.Tool {
+	return contract.NewFunc(
 		IssuesToolName,
 		toolutil.FirstLineDescription(issuesDescription),
-		func(ctx context.Context, params IssuesParams, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			if giteacommon.GetTea() == "" {
-				return fantasy.NewTextErrorResponse(giteacommon.ErrTeaNotFound), nil
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"repo": map[string]any{
+					"type":        "string",
+					"description": "Repository in owner/name format. Defaults to the repo in $PWD.",
+				},
+				"state": map[string]any{
+					"type":        "string",
+					"description": "Filter by state: open, closed, or all. Defaults to open.",
+				},
+				"keyword": map[string]any{
+					"type":        "string",
+					"description": "Search keyword to filter issues by title or body.",
+				},
+				"labels": map[string]any{
+					"type":        "string",
+					"description": "Comma-separated list of labels to filter by.",
+				},
+				"limit": map[string]any{
+					"type":        "integer",
+					"description": "Maximum number of issues to return. Defaults to 20.",
+				},
+			},
+		},
+		func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+			var params IssuesParams
+			if err := json.Unmarshal(args, &params); err != nil {
+				return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
 			}
-
-			args := []string{"issues", "list", "--output", "json"}
-
-			if params.Repo != "" {
-				args = append(args, "--repo", params.Repo)
-			}
-			state := params.State
-			if state == "" {
-				state = "open"
-			}
-			args = append(args, "--state", state)
-
-			if params.Keyword != "" {
-				args = append(args, "--keyword", params.Keyword)
-			}
-			if params.Labels != "" {
-				args = append(args, "--labels", params.Labels)
-			}
-			limit := params.Limit
-			if limit <= 0 {
-				limit = 20
-			}
-			args = append(args, "--limit", fmt.Sprintf("%d", limit))
-
-			cmd := giteacommon.TeaCmd(ctx, args...)
-			out, err := cmd.Output()
-			if err != nil {
-				if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 1 {
-					return fantasy.NewTextResponse("No issues found."), nil
-				}
-				return fantasy.NewTextErrorResponse(fmt.Sprintf("tea issues failed: %v", err)), nil
-			}
-
-			text := string(out)
-			if text == "" || text == "null\n" || text == "[]" || text == "[]\n" {
-				return fantasy.NewTextResponse("No issues found."), nil
-			}
-			return fantasy.NewTextResponse(text), nil
+			return runIssues(ctx, params), nil
 		},
 	)
+}
+
+// runIssues lists issues through the tea CLI and returns its JSON output.
+func runIssues(ctx context.Context, params IssuesParams) contract.ToolResult {
+	if giteacommon.GetTea() == "" {
+		return contract.Error(giteacommon.ErrTeaNotFound)
+	}
+
+	args := []string{"issues", "list", "--output", "json"}
+
+	if params.Repo != "" {
+		args = append(args, "--repo", params.Repo)
+	}
+	state := params.State
+	if state == "" {
+		state = "open"
+	}
+	args = append(args, "--state", state)
+
+	if params.Keyword != "" {
+		args = append(args, "--keyword", params.Keyword)
+	}
+	if params.Labels != "" {
+		args = append(args, "--labels", params.Labels)
+	}
+	limit := params.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	args = append(args, "--limit", fmt.Sprintf("%d", limit))
+
+	cmd := giteacommon.TeaCmd(ctx, args...)
+	out, err := cmd.Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 1 {
+			return contract.Text("No issues found.")
+		}
+		return contract.Error(fmt.Sprintf("tea issues failed: %v", err))
+	}
+
+	text := string(out)
+	if text == "" || text == "null\n" || text == "[]" || text == "[]\n" {
+		return contract.Text("No issues found.")
+	}
+	return contract.Text(text)
 }

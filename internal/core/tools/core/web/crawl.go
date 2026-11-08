@@ -9,8 +9,7 @@ import (
 	"strings"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-
-	"charm.land/fantasy"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 
 	"github.com/nextsko/mocode-agent/internal/core/tools/core/web/crawler"
 )
@@ -30,72 +29,105 @@ type CrawlParams struct {
 	MaxPages int    `json:"max_pages,omitempty" description:"Maximum number of pages to crawl (default: 20, max: 50)"`
 }
 
-func NewCrawlTool(client ...*http.Client) fantasy.AgentTool {
-	return fantasy.NewParallelAgentTool(
+// NewCrawlPortTool is the framework-agnostic form of the crawl tool.
+func NewCrawlPortTool(client ...*http.Client) contract.Tool {
+	return asParallel(contract.NewFunc(
 		CrawlToolName,
 		toolutil.FirstLineDescription(crawlDescription),
-		func(ctx context.Context, params CrawlParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			if params.URL == "" {
-				return fantasy.NewTextErrorResponse("URL parameter is required"), nil
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"url": map[string]any{
+					"type":        "string",
+					"description": "The starting URL to begin crawling",
+				},
+				"max_depth": map[string]any{
+					"type":        "integer",
+					"description": "Maximum crawl depth (default: 2, max: 5)",
+				},
+				"max_pages": map[string]any{
+					"type":        "integer",
+					"description": "Maximum number of pages to crawl (default: 20, max: 50)",
+				},
+			},
+			"required": []string{"url"},
+		},
+		func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+			var params CrawlParams
+			if err := json.Unmarshal(args, &params); err != nil {
+				return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
 			}
-
-			if !strings.HasPrefix(params.URL, "http://") && !strings.HasPrefix(params.URL, "https://") {
-				return fantasy.NewTextErrorResponse("URL must start with http:// or https://"), nil
+			var httpClient *http.Client
+			if len(client) > 0 {
+				httpClient = client[0]
 			}
+			return runCrawl(ctx, httpClient, params)
+		},
+	))
+}
 
-			// Clamp parameters
-			if params.MaxDepth <= 0 {
-				params.MaxDepth = 2
-			} else if params.MaxDepth > MaxCrawlDepth {
-				params.MaxDepth = MaxCrawlDepth
-			}
+// runCrawl clamps the crawl budget and renders the crawled pages as Markdown.
+func runCrawl(ctx context.Context, client *http.Client, params CrawlParams) (contract.ToolResult, error) {
+	if params.URL == "" {
+		return contract.Error("URL parameter is required"), nil
+	}
 
-			if params.MaxPages <= 0 {
-				params.MaxPages = 20
-			} else if params.MaxPages > MaxCrawlPages {
-				params.MaxPages = MaxCrawlPages
-			}
+	if !strings.HasPrefix(params.URL, "http://") && !strings.HasPrefix(params.URL, "https://") {
+		return contract.Error("URL must start with http:// or https://"), nil
+	}
 
-			opts := &crawler.CrawlOptions{
-				MaxDepth:   params.MaxDepth,
-				MaxPages:   params.MaxPages,
-				SameDomain: true,
-			}
+	// Clamp parameters
+	if params.MaxDepth <= 0 {
+		params.MaxDepth = 2
+	} else if params.MaxDepth > MaxCrawlDepth {
+		params.MaxDepth = MaxCrawlDepth
+	}
 
-			rc := crawler.NewRecursiveCrawler(opts)
-			if len(client) > 0 && client[0] != nil {
-				rc.SetClient(client[0])
-			}
-			result, err := rc.Crawl(ctx, params.URL)
-			if err != nil {
-				return fantasy.NewTextErrorResponse(fmt.Sprintf("Crawl failed: %v", err)), nil
-			}
+	if params.MaxPages <= 0 {
+		params.MaxPages = 20
+	} else if params.MaxPages > MaxCrawlPages {
+		params.MaxPages = MaxCrawlPages
+	}
 
-			if result.Total == 0 {
-				return fantasy.NewTextResponse("No pages were successfully crawled."), nil
-			}
+	opts := &crawler.CrawlOptions{
+		MaxDepth:   params.MaxDepth,
+		MaxPages:   params.MaxPages,
+		SameDomain: true,
+	}
 
-			// Format output
-			var sb strings.Builder
-			fmt.Fprintf(&sb, "# Crawl Results\n\nCrawled %d pages from %s (max_depth: %d)\n\n", result.Total, params.URL, params.MaxDepth)
+	rc := crawler.NewRecursiveCrawler(opts)
+	if client != nil {
+		rc.SetClient(client)
+	}
+	result, err := rc.Crawl(ctx, params.URL)
+	if err != nil {
+		return contract.Error(fmt.Sprintf("Crawl failed: %v", err)), nil
+	}
 
-			for i, page := range result.Pages {
-				fmt.Fprintf(&sb, "---\n\n## Page %d: %s\n\n", i+1, page.Title)
-				fmt.Fprintf(&sb, "**URL:** %s\n\n", page.URL)
-				sb.WriteString(page.Markdown)
-				sb.WriteString("\n\n")
-			}
+	if result.Total == 0 {
+		return contract.Text("No pages were successfully crawled."), nil
+	}
 
-			output := sb.String()
+	// Format output
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "# Crawl Results\n\nCrawled %d pages from %s (max_depth: %d)\n\n", result.Total, params.URL, params.MaxDepth)
 
-			// Truncate if too large
-			const maxOutput = 200000 // 200KB
-			if len(output) > maxOutput {
-				output = output[:maxOutput] + "\n\n[Content truncated - exceeded 200KB]"
-			}
+	for i, page := range result.Pages {
+		fmt.Fprintf(&sb, "---\n\n## Page %d: %s\n\n", i+1, page.Title)
+		fmt.Fprintf(&sb, "**URL:** %s\n\n", page.URL)
+		sb.WriteString(page.Markdown)
+		sb.WriteString("\n\n")
+	}
 
-			return fantasy.NewTextResponse(output), nil
-		})
+	output := sb.String()
+
+	// Truncate if too large
+	const maxOutput = 200000 // 200KB
+	if len(output) > maxOutput {
+		output = output[:maxOutput] + "\n\n[Content truncated - exceeded 200KB]"
+	}
+
+	return contract.Text(output), nil
 }
 
 // CrawlPermissionsParams returns the permission parameters for the crawl tool.

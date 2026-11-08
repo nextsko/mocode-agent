@@ -3,6 +3,7 @@ package fs
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -12,8 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-
-	"charm.land/fantasy"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/domain/filetracker"
@@ -69,100 +69,133 @@ const (
 	DefaultReadLinesPerFile = 2000
 )
 
-// NewReadFilesTool creates a new tool for reading multiple files concurrently.
-func NewReadFilesTool(
+// NewReadFilesPortTool is the framework-agnostic form of the read_files tool.
+// The tool is marked parallel-safe, matching the historical
+// fantasy.NewParallelAgentTool registration.
+func NewReadFilesPortTool(
 	permissions permission.Service,
 	filetracker filetracker.Service,
 	workingDir string,
-) fantasy.AgentTool {
-	return fantasy.NewParallelAgentTool(
+) contract.Tool {
+	return parallelPort{contract.NewFunc(
 		ReadFilesToolName,
 		string(readFilesDescription),
-		func(ctx context.Context, params ReadFilesParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			if len(params.Paths) == 0 {
-				return fantasy.NewTextErrorResponse("paths parameter is required and must not be empty"), nil
-			}
-
-			if len(params.Paths) > MaxFilesPerRequest {
-				return fantasy.NewTextErrorResponse(
-					fmt.Sprintf("too many paths: %d (maximum is %d). Please split into multiple requests.",
-						len(params.Paths), MaxFilesPerRequest)), nil
-			}
-
-			// Set default max file size if not provided
-			maxFileSize := params.MaxFileSize
-			if maxFileSize <= 0 {
-				maxFileSize = DefaultMaxFileSize
-			}
-
-			// Expand glob patterns in paths
-			allPaths, expansionErrors := expandGlobPaths(ctx, params.Paths, workingDir)
-
-			// Read all files concurrently
-			results := readFilesConcurrently(ctx, allPaths, maxFileSize, call.ID, workingDir, permissions, filetracker)
-
-			// Add expansion errors to results
-			for path, err := range expansionErrors {
-				results = append(results, FileResult{
-					Path:  path,
-					Error: err,
-					Size:  0,
-				})
-			}
-
-			// Build response
-			successCount := 0
-			failureCount := 0
-			totalSize := 0
-
-			var output strings.Builder
-			output.WriteString("<files>\n")
-
-			for _, result := range results {
-				if result.Error != "" {
-					failureCount++
-					fmt.Fprintf(&output, "<file_error>\n")
-					fmt.Fprintf(&output, "  <path>%s</path>\n", result.Path)
-					fmt.Fprintf(&output, "  <error>%s</error>\n", result.Error)
-					fmt.Fprintf(&output, "</file_error>\n")
-				} else {
-					successCount++
-					totalSize += int(result.Size)
-					fmt.Fprintf(&output, "<file>\n")
-					fmt.Fprintf(&output, "  <path>%s</path>\n", result.Path)
-					fmt.Fprintf(&output, "  <size>%d</size>\n", result.Size)
-					if result.Truncated {
-						fmt.Fprintf(&output, "  <truncated>true</truncated>\n")
-					}
-					fmt.Fprintf(&output, "  <content>\n%s\n  </content>\n", result.Content)
-					fmt.Fprintf(&output, "</file>\n")
-				}
-			}
-
-			output.WriteString("</files>\n")
-
-			// Add summary
-			fmt.Fprintf(&output, "\n<summary>\n")
-			fmt.Fprintf(&output, "  Total: %d files\n", len(results))
-			fmt.Fprintf(&output, "  Success: %d files\n", successCount)
-			fmt.Fprintf(&output, "  Failed: %d files\n", failureCount)
-			fmt.Fprintf(&output, "  Total size: %d bytes\n", totalSize)
-			fmt.Fprintf(&output, "</summary>\n")
-
-			if failureCount > 0 {
-				output.WriteString("\nNote: Some files failed to read. Check individual file_error entries for details.\n")
-			}
-
-			return fantasy.WithResponseMetadata(
-				fantasy.NewTextResponse(output.String()),
-				ReadFilesResponseMetadata{
-					TotalFiles:   len(results),
-					SuccessCount: successCount,
-					FailureCount: failureCount,
-					TotalSize:    totalSize,
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"paths": map[string]any{
+					"type":        "array",
+					"items":       map[string]any{"type": "string"},
+					"description": "List of file paths to read (supports glob patterns)",
 				},
-			), nil
+				"max_file_size": map[string]any{
+					"type":        "integer",
+					"description": "Maximum size per file in bytes (default 5MB)",
+				},
+			},
+			"required": []string{"paths"},
+		},
+		func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+			var params ReadFilesParams
+			if err := json.Unmarshal(args, &params); err != nil {
+				return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
+			}
+			callID, _ := toolutil.ToolCallIDFromCtx(ctx)
+			return runReadFiles(ctx, permissions, filetracker, workingDir, params, callID)
+		},
+	)}
+}
+
+// runReadFiles expands glob patterns, reads every file concurrently, and
+// renders the batched result.
+func runReadFiles(
+	ctx context.Context,
+	permissions permission.Service,
+	filetracker filetracker.Service,
+	workingDir string,
+	params ReadFilesParams,
+	callID string,
+) (contract.ToolResult, error) {
+	if len(params.Paths) == 0 {
+		return contract.Error("paths parameter is required and must not be empty"), nil
+	}
+
+	if len(params.Paths) > MaxFilesPerRequest {
+		return contract.Error(
+			fmt.Sprintf("too many paths: %d (maximum is %d). Please split into multiple requests.",
+				len(params.Paths), MaxFilesPerRequest)), nil
+	}
+
+	// Set default max file size if not provided
+	maxFileSize := params.MaxFileSize
+	if maxFileSize <= 0 {
+		maxFileSize = DefaultMaxFileSize
+	}
+
+	// Expand glob patterns in paths
+	allPaths, expansionErrors := expandGlobPaths(ctx, params.Paths, workingDir)
+
+	// Read all files concurrently
+	results := readFilesConcurrently(ctx, allPaths, maxFileSize, callID, workingDir, permissions, filetracker)
+
+	// Add expansion errors to results
+	for path, err := range expansionErrors {
+		results = append(results, FileResult{
+			Path:  path,
+			Error: err,
+			Size:  0,
 		})
+	}
+
+	// Build response
+	successCount := 0
+	failureCount := 0
+	totalSize := 0
+
+	var output strings.Builder
+	output.WriteString("<files>\n")
+
+	for _, result := range results {
+		if result.Error != "" {
+			failureCount++
+			fmt.Fprintf(&output, "<file_error>\n")
+			fmt.Fprintf(&output, "  <path>%s</path>\n", result.Path)
+			fmt.Fprintf(&output, "  <error>%s</error>\n", result.Error)
+			fmt.Fprintf(&output, "</file_error>\n")
+		} else {
+			successCount++
+			totalSize += int(result.Size)
+			fmt.Fprintf(&output, "<file>\n")
+			fmt.Fprintf(&output, "  <path>%s</path>\n", result.Path)
+			fmt.Fprintf(&output, "  <size>%d</size>\n", result.Size)
+			if result.Truncated {
+				fmt.Fprintf(&output, "  <truncated>true</truncated>\n")
+			}
+			fmt.Fprintf(&output, "  <content>\n%s\n  </content>\n", result.Content)
+			fmt.Fprintf(&output, "</file>\n")
+		}
+	}
+
+	output.WriteString("</files>\n")
+
+	// Add summary
+	fmt.Fprintf(&output, "\n<summary>\n")
+	fmt.Fprintf(&output, "  Total: %d files\n", len(results))
+	fmt.Fprintf(&output, "  Success: %d files\n", successCount)
+	fmt.Fprintf(&output, "  Failed: %d files\n", failureCount)
+	fmt.Fprintf(&output, "  Total size: %d bytes\n", totalSize)
+	fmt.Fprintf(&output, "</summary>\n")
+
+	if failureCount > 0 {
+		output.WriteString("\nNote: Some files failed to read. Check individual file_error entries for details.\n")
+	}
+
+	return contract.WithMetadata(contract.Text(output.String()), ReadFilesResponseMetadata{
+		TotalFiles:   len(results),
+		SuccessCount: successCount,
+		FailureCount: failureCount,
+		TotalSize:    totalSize,
+	}), nil
 }
 
 // expandGlobPaths expands glob patterns in the given paths.

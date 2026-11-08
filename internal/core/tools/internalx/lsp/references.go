@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,9 +16,9 @@ import (
 	"strings"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 	searchcommon "github.com/nextsko/mocode-agent/internal/core/tools/external/common/search"
 
-	"charm.land/fantasy"
 	"github.com/charmbracelet/x/powernap/pkg/lsp/protocol"
 )
 
@@ -35,61 +36,90 @@ const ReferencesToolName = "lsp_references"
 //go:embed references.md
 var referencesDescription []byte
 
-func NewReferencesTool(lspManager *Manager) fantasy.AgentTool {
-	return fantasy.NewAgentTool(
+// NewReferencesPortTool is the framework-agnostic form of the lsp_references
+// tool.
+func NewReferencesPortTool(lspManager *Manager) contract.Tool {
+	return contract.NewFunc(
 		ReferencesToolName,
 		toolutil.FirstLineDescription(referencesDescription),
-		func(ctx context.Context, params ReferencesParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			if params.Symbol == "" {
-				return fantasy.NewTextErrorResponse("symbol is required"), nil
-			}
-
-			if lspManager.Clients().Len() == 0 {
-				return fantasy.NewTextErrorResponse("no LSP clients available"), nil
-			}
-
-			workingDir := cmp.Or(params.Path, ".")
-
-			matches, _, err := searchcommon.SearchFiles(ctx, regexp.QuoteMeta(params.Symbol), workingDir, "", 100)
-			if err != nil {
-				return fantasy.NewTextErrorResponse(fmt.Sprintf("failed to search for symbol: %s", err)), nil
-			}
-
-			if len(matches) == 0 {
-				return fantasy.NewTextResponse(fmt.Sprintf("Symbol '%s' not found", params.Symbol)), nil
-			}
-
-			var allLocations []protocol.Location
-			var allErrs error
-			for _, match := range matches {
-				locations, err := find(ctx, lspManager, params.Symbol, match)
-				if err != nil {
-					if strings.Contains(err.Error(), "no identifier found") {
-						// grep probably matched a comment, string value, or something else that's irrelevant
-						continue
-					}
-					slog.Error("Failed to find references", "error", err, "symbol", params.Symbol, "path", match.Path, "line", match.LineNum, "char", match.CharNum)
-					allErrs = errors.Join(allErrs, err)
-					continue
-				}
-				allLocations = append(allLocations, locations...)
-				// Once we have results, we're done - LSP returns all references
-				// for the symbol, not just from this file.
-				if len(locations) > 0 {
-					break
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"symbol": map[string]any{
+					"type":        "string",
+					"description": "The symbol name to search for (e.g., function name, variable name, type name)",
+				},
+				"path": map[string]any{
+					"type":        "string",
+					"description": "The directory to search in. Use a directory/file to narrow down the symbol search. Defaults to the current working directory.",
+				},
+			},
+			"required": []string{"symbol"},
+		},
+		func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+			var params ReferencesParams
+			if len(args) > 0 {
+				if err := json.Unmarshal(args, &params); err != nil {
+					return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
 				}
 			}
+			return runReferences(ctx, lspManager, params)
+		},
+	)
+}
 
-			if len(allLocations) > 0 {
-				output := formatReferences(cleanupLocations(allLocations))
-				return fantasy.NewTextResponse(output), nil
-			}
+// runReferences greps for the symbol and asks the owning LSP client for its
+// references.
+func runReferences(ctx context.Context, lspManager *Manager, params ReferencesParams) (contract.ToolResult, error) {
+	if params.Symbol == "" {
+		return contract.Error("symbol is required"), nil
+	}
 
-			if allErrs != nil {
-				return fantasy.NewTextErrorResponse(allErrs.Error()), nil
+	if lspManager.Clients().Len() == 0 {
+		return contract.Error("no LSP clients available"), nil
+	}
+
+	workingDir := cmp.Or(params.Path, ".")
+
+	matches, _, err := searchcommon.SearchFiles(ctx, regexp.QuoteMeta(params.Symbol), workingDir, "", 100)
+	if err != nil {
+		return contract.Error(fmt.Sprintf("failed to search for symbol: %s", err)), nil
+	}
+
+	if len(matches) == 0 {
+		return contract.Text(fmt.Sprintf("Symbol '%s' not found", params.Symbol)), nil
+	}
+
+	var allLocations []protocol.Location
+	var allErrs error
+	for _, match := range matches {
+		locations, err := find(ctx, lspManager, params.Symbol, match)
+		if err != nil {
+			if strings.Contains(err.Error(), "no identifier found") {
+				// grep probably matched a comment, string value, or something else that's irrelevant
+				continue
 			}
-			return fantasy.NewTextResponse(fmt.Sprintf("No references found for symbol '%s'", params.Symbol)), nil
-		})
+			slog.Error("Failed to find references", "error", err, "symbol", params.Symbol, "path", match.Path, "line", match.LineNum, "char", match.CharNum)
+			allErrs = errors.Join(allErrs, err)
+			continue
+		}
+		allLocations = append(allLocations, locations...)
+		// Once we have results, we're done - LSP returns all references
+		// for the symbol, not just from this file.
+		if len(locations) > 0 {
+			break
+		}
+	}
+
+	if len(allLocations) > 0 {
+		output := formatReferences(cleanupLocations(allLocations))
+		return contract.Text(output), nil
+	}
+
+	if allErrs != nil {
+		return contract.Error(allErrs.Error()), nil
+	}
+	return contract.Text(fmt.Sprintf("No references found for symbol '%s'", params.Symbol)), nil
 }
 
 func (r *referencesTool) Name() string {

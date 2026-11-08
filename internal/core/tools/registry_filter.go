@@ -4,15 +4,43 @@ import (
 	"context"
 
 	"charm.land/fantasy"
+
+	"github.com/nextsko/mocode-agent/internal/core/agent/agenttooladapter"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/filter"
 )
 
 // BuildFiltered is like Build but applies zero or more FilterFuncs to the
-// combined tool list before returning.  Descriptor-aware predicates (ByCategory,
-// ByKind) require the descriptor map produced by AllToolDescriptors(), which is
-// why they live here rather than in the filter sub-package.
+// combined tool list before returning. Filters operate on contract.Tool, so
+// the framework-backed tools are adapted at this boundary and mapped back to
+// the originals afterwards. Descriptor-aware predicates (ByCategory, ByKind)
+// require the descriptor map produced by AllToolDescriptors(), which is why
+// they live here rather than in the filter sub-package.
 func (r *Registry) BuildFiltered(ctx context.Context, deps ToolDeps, fns ...filter.FilterFunc) []fantasy.AgentTool {
-	return filter.Apply(ctx, r.Build(ctx, deps), fns...)
+	built := r.Build(ctx, deps)
+	if len(fns) == 0 {
+		return built
+	}
+	ports := make([]contract.Tool, len(built))
+	byName := make(map[string]fantasy.AgentTool, len(built))
+	for i, tool := range built {
+		ports[i] = agenttooladapter.WrapFantasy(tool)
+		byName[tool.Info().Name] = tool
+	}
+	allowed := filter.Apply(ctx, ports, fns...)
+	out := make([]fantasy.AgentTool, 0, len(allowed))
+	seen := make(map[string]struct{}, len(allowed))
+	for _, port := range allowed {
+		name := port.Name()
+		if _, dup := seen[name]; dup {
+			continue
+		}
+		seen[name] = struct{}{}
+		if tool, ok := byName[name]; ok {
+			out = append(out, tool)
+		}
+	}
+	return out
 }
 
 // ByCategory returns a FilterFunc that passes only tools in the given category.
@@ -20,8 +48,8 @@ func (r *Registry) BuildFiltered(ctx context.Context, deps ToolDeps, fns ...filt
 // through so that they are never accidentally dropped.
 func ByCategory(cat ToolCategory) filter.FilterFunc {
 	descs := descriptorMap()
-	return func(_ context.Context, tool fantasy.AgentTool) bool {
-		d, ok := descs[tool.Info().Name]
+	return func(_ context.Context, tool contract.Tool) bool {
+		d, ok := descs[tool.Name()]
 		if !ok {
 			return true // unknown → pass through
 		}
@@ -37,8 +65,8 @@ func ExcludeCategories(cats ...ToolCategory) filter.FilterFunc {
 		block[c] = struct{}{}
 	}
 	descs := descriptorMap()
-	return func(_ context.Context, tool fantasy.AgentTool) bool {
-		d, ok := descs[tool.Info().Name]
+	return func(_ context.Context, tool contract.Tool) bool {
+		d, ok := descs[tool.Name()]
 		if !ok {
 			return true // unknown → pass through
 		}
@@ -51,8 +79,8 @@ func ExcludeCategories(cats ...ToolCategory) filter.FilterFunc {
 // Unknown tools are passed through.
 func ByKind(kind ToolKind) filter.FilterFunc {
 	descs := descriptorMap()
-	return func(_ context.Context, tool fantasy.AgentTool) bool {
-		d, ok := descs[tool.Info().Name]
+	return func(_ context.Context, tool contract.Tool) bool {
+		d, ok := descs[tool.Name()]
 		if !ok {
 			return true // unknown → pass through
 		}

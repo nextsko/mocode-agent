@@ -332,8 +332,8 @@ func (sandboxPlugin) Descriptors() []ToolDescriptor {
 
 func (sandboxPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{
-		sandbox.NewTsRunTool(deps.Permissions, deps.Cfg.WorkingDir()),
-		sandbox.NewPyRunTool(deps.Permissions, deps.Cfg.WorkingDir()),
+		deps.wrapPort(sandbox.NewTsRunPortTool(deps.Permissions, deps.Cfg.WorkingDir())),
+		deps.wrapPort(sandbox.NewPyRunPortTool(deps.Permissions, deps.Cfg.WorkingDir())),
 	}
 }
 
@@ -352,10 +352,10 @@ func (execPlugin) Descriptors() []ToolDescriptor {
 
 func (execPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{
-		shell.NewBashTool(deps.Permissions, deps.Cfg.WorkingDir(), deps.Cfg.Config().Options.Attribution, deps.ModelName),
-		shell.NewJobOutputTool(),
-		shell.NewJobInputTool(),
-		shell.NewJobKillTool(),
+		deps.wrapPort(shell.NewBashPortTool(deps.Permissions, deps.Cfg.WorkingDir(), deps.Cfg.Config().Options.Attribution, deps.ModelName)),
+		deps.wrapPort(shell.NewJobOutputPortTool()),
+		deps.wrapPort(shell.NewJobInputPortTool()),
+		deps.wrapPort(shell.NewJobKillPortTool()),
 	}
 }
 
@@ -397,12 +397,12 @@ func (filePlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	wd := deps.Cfg.WorkingDir()
 	cfg := deps.Cfg.Config()
 	return []fantasy.AgentTool{
-		fs.NewEditTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
-		fs.NewMultiEditTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
-		fs.NewViewTool(deps.LSPManager, deps.Permissions, deps.FileTracker, deps.SkillTracker, buildURIRegistry(deps), wd, expandPaths(deps, cfg.Options.SkillsPaths)...),
-		fs.NewReadFilesTool(deps.Permissions, deps.FileTracker, wd),
-		fs.NewWriteTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd),
-		fs.NewLsTool(deps.Permissions, wd, cfg.Tools.Ls),
+		deps.wrapPort(fs.NewEditPortTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd)),
+		deps.wrapPort(fs.NewMultiEditPortTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd)),
+		deps.wrapPort(fs.NewViewPortTool(deps.LSPManager, deps.Permissions, deps.FileTracker, deps.SkillTracker, buildURIRegistry(deps), wd, expandPaths(deps, cfg.Options.SkillsPaths)...)),
+		deps.wrapPort(fs.NewReadFilesPortTool(deps.Permissions, deps.FileTracker, wd)),
+		deps.wrapPort(fs.NewWritePortTool(deps.LSPManager, deps.Permissions, deps.History, deps.FileTracker, wd)),
+		deps.wrapPort(fs.NewLsPortTool(deps.Permissions, wd, cfg.Tools.Ls)),
 	}
 }
 
@@ -422,9 +422,9 @@ func (searchPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool 
 	wd := deps.Cfg.WorkingDir()
 	webClient := deps.HTTP.Client(nethttp.DefaultTimeout)
 	return []fantasy.AgentTool{
-		fs.NewGlobTool(wd),
-		fs.NewGrepTool(wd, deps.Cfg.Config().Tools.Grep),
-		web.NewSourcegraphTool(webClient),
+		deps.wrapPort(fs.NewGlobPortTool(wd)),
+		deps.wrapPort(fs.NewGrepPortTool(wd, deps.Cfg.Config().Tools.Grep)),
+		deps.wrapPort(web.NewSourcegraphPortTool(webClient)),
 	}
 }
 
@@ -451,10 +451,10 @@ func (networkPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool
 	downloadClient := deps.HTTP.Client(nethttp.DownloadTimeout)
 	retryPolicy := toolutil.DefaultRetryPolicy()
 	return []fantasy.AgentTool{
-		toolutil.WithRetry(web.NewFetchTool(deps.Permissions, wd, webClient), retryPolicy),
-		toolutil.WithRetry(web.NewCrawlTool(webClient), retryPolicy),
-		toolutil.WithRetry(web.NewDownloadTool(deps.Permissions, wd, downloadClient), retryPolicy),
-		web.NewDownloadDocsTool(deps.HTTP),
+		toolutil.WithRetry(deps.wrapPort(web.NewFetchPortTool(deps.Permissions, wd, webClient)), retryPolicy),
+		toolutil.WithRetry(deps.wrapPort(web.NewCrawlPortTool(webClient)), retryPolicy),
+		toolutil.WithRetry(deps.wrapPort(web.NewDownloadPortTool(deps.Permissions, wd, downloadClient)), retryPolicy),
+		deps.wrapPort(web.NewDownloadDocsPortTool(deps.HTTP)),
 	}
 }
 
@@ -524,8 +524,8 @@ func (lspPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	}
 	return []fantasy.AgentTool{
 		deps.wrapPort(agenttools.NewDiagnosticsPortTool(deps.LSPManager)),
-		lsp.NewReferencesTool(deps.LSPManager),
-		lsp.NewLSPRestartTool(deps.LSPManager),
+		deps.wrapPort(lsp.NewReferencesPortTool(deps.LSPManager)),
+		deps.wrapPort(lsp.NewLSPRestartPortTool(deps.LSPManager)),
 	}
 }
 
@@ -545,8 +545,8 @@ func (mcpMetaPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool
 		return nil
 	}
 	return []fantasy.AgentTool{
-		mcp.NewListMCPResourcesTool(deps.Cfg, deps.Permissions),
-		mcp.NewReadMCPResourceTool(deps.Cfg, deps.Permissions),
+		deps.wrapPort(mcp.NewListMCPResourcesPortTool(deps.Cfg, deps.Permissions)),
+		deps.wrapPort(mcp.NewReadMCPResourcePortTool(deps.Cfg, deps.Permissions)),
 	}
 }
 
@@ -562,11 +562,11 @@ func (giteaPlugin) Descriptors() []ToolDescriptor {
 	}
 }
 
-func (giteaPlugin) Build(_ context.Context, _ ToolDeps) []fantasy.AgentTool {
+func (giteaPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{
-		gitea.NewIssuesTool(),
-		gitea.NewPullsTool(),
-		gitea.NewNotificationsTool(),
+		deps.wrapPort(gitea.NewIssuesPortTool()),
+		deps.wrapPort(gitea.NewPullsPortTool()),
+		deps.wrapPort(gitea.NewNotificationsPortTool()),
 	}
 }
 
@@ -657,10 +657,10 @@ func (browserPlugin) Descriptors() []ToolDescriptor {
 }
 
 func (browserPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
-	return []fantasy.AgentTool{browser.NewBrowserTool(browser.Deps{
+	return []fantasy.AgentTool{deps.wrapPort(browser.NewBrowserPortTool(browser.Deps{
 		Permissions: deps.Permissions,
 		Manager:     browserManager(),
-	})}
+	}))}
 }
 
 func (browserPlugin) Start(context.Context) error { return nil }
@@ -760,8 +760,8 @@ func (gitOpsPlugin) Descriptors() []ToolDescriptor {
 func (gitOpsPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	wd := deps.Cfg.WorkingDir()
 	return []fantasy.AgentTool{
-		gitops.NewPlanCommitsTool(wd),
-		gitops.NewExecuteCommitsTool(wd),
+		deps.wrapPort(gitops.NewPlanCommitsPortTool(wd)),
+		deps.wrapPort(gitops.NewExecuteCommitsPortTool(wd)),
 	}
 }
 
@@ -792,10 +792,10 @@ func (p *sshPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool 
 		p.svc = sshcommon.NewService()
 	})
 	return []fantasy.AgentTool{
-		ssh.NewSshExecTool(p.svc, deps.Permissions),
-		ssh.NewSshUploadTool(p.svc, deps.Permissions),
-		ssh.NewSshDownloadTool(p.svc, deps.Permissions),
-		ssh.NewSshListHostsTool(p.svc),
+		deps.wrapPort(ssh.NewSshExecPortTool(p.svc, deps.Permissions)),
+		deps.wrapPort(ssh.NewSshUploadPortTool(p.svc, deps.Permissions)),
+		deps.wrapPort(ssh.NewSshDownloadPortTool(p.svc, deps.Permissions)),
+		deps.wrapPort(ssh.NewSshListHostsPortTool(p.svc)),
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,11 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/fantasy"
-
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	corebrowser "github.com/nextsko/mocode-agent/internal/core/browser"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 )
 
 //go:embed browser.md
@@ -147,26 +147,37 @@ type BrowserResponseMetadata struct {
 	Count   int    `json:"count,omitempty"`
 }
 
-// NewBrowserTool creates the browser tool.
-func NewBrowserTool(deps Deps) fantasy.AgentTool {
+// NewBrowserPortTool is the framework-agnostic form of the browser tool. It
+// exposes the native browser runtime as one tool; the agent adapter owns the
+// framework boundary.
+func NewBrowserPortTool(deps Deps) contract.Tool {
 	if deps.Manager == nil {
 		deps.Manager = corebrowser.NewManager()
 	}
-	return fantasy.NewAgentTool(
+	return contract.NewFunc(
 		BrowserToolName,
 		toolutil.FirstLineDescription(browserDescription),
-		func(ctx context.Context, params BrowserParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			return run(ctx, deps, params, call)
+		browserParamsSchema(),
+		func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+			var params BrowserParams
+			if len(args) > 0 {
+				if err := json.Unmarshal(args, &params); err != nil {
+					return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
+				}
+			}
+			callID, _ := toolutil.ToolCallIDFromCtx(ctx)
+			return runBrowser(ctx, deps, params, callID)
 		},
 	)
 }
 
-func run(ctx context.Context, deps Deps, p BrowserParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
+// runBrowser dispatches one browser call by action.
+func runBrowser(ctx context.Context, deps Deps, p BrowserParams, callID string) (contract.ToolResult, error) {
 	switch action := strings.ToLower(strings.TrimSpace(p.Action)); action {
 	case actionStatus:
 		return status(ctx, deps)
 	case actionLaunch:
-		return launch(ctx, deps, p, call)
+		return launch(ctx, deps, p, callID)
 	case actionClose:
 		return closeSession(ctx, deps)
 	case "":
@@ -178,22 +189,22 @@ func run(ctx context.Context, deps Deps, p BrowserParams, call fantasy.ToolCall)
 
 // status reports the detection result plus the current session, so a failure to
 // launch can be diagnosed without guessing.
-func status(ctx context.Context, deps Deps) (fantasy.ToolResponse, error) {
+func status(ctx context.Context, deps Deps) (contract.ToolResult, error) {
 	var b strings.Builder
 	b.WriteString(corebrowser.Report(ctx, corebrowser.DetectOptions{}))
 	b.WriteString("\n")
 	b.WriteString(deps.Manager.State())
 	b.WriteString("\n")
 
-	return fantasy.WithResponseMetadata(
-		fantasy.NewTextResponse(b.String()),
+	return contract.WithMetadata(
+		contract.Text(b.String()),
 		BrowserResponseMetadata{Action: actionStatus},
 	), nil
 }
 
 // launch starts or attaches to a session. It is the one action that runs a
 // program on the user's machine, and so the one action that is gated.
-func launch(ctx context.Context, deps Deps, p BrowserParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
+func launch(ctx context.Context, deps Deps, p BrowserParams, callID string) (contract.ToolResult, error) {
 	headless := true
 	if p.Headless != nil {
 		headless = *p.Headless
@@ -202,9 +213,9 @@ func launch(ctx context.Context, deps Deps, p BrowserParams, call fantasy.ToolCa
 	endpoint := strings.TrimSpace(p.Endpoint)
 	browserKind := corebrowser.Kind(strings.ToLower(strings.TrimSpace(p.Browser)))
 
-	granted, resp, err := requestLaunch(ctx, deps, call, p, endpoint, headless)
+	granted, resp, err := requestLaunch(ctx, deps, callID, p, endpoint, headless)
 	if err != nil {
-		return fantasy.ToolResponse{}, err
+		return contract.ToolResult{}, err
 	}
 	if !granted {
 		return resp, nil
@@ -228,8 +239,8 @@ func launch(ctx context.Context, deps Deps, p BrowserParams, call fantasy.ToolCa
 	}
 	b.WriteString("\n\nNext: call action=snapshot to see the page, then act on the refs it returns.")
 
-	return fantasy.WithResponseMetadata(
-		fantasy.NewTextResponse(b.String()),
+	return contract.WithMetadata(
+		contract.Text(b.String()),
 		BrowserResponseMetadata{Action: actionLaunch, URL: session.Endpoint()},
 	), nil
 }
@@ -238,13 +249,13 @@ func launch(ctx context.Context, deps Deps, p BrowserParams, call fantasy.ToolCa
 func requestLaunch(
 	ctx context.Context,
 	deps Deps,
-	call fantasy.ToolCall,
+	callID string,
 	p BrowserParams,
 	endpoint string,
 	headless bool,
-) (granted bool, resp fantasy.ToolResponse, err error) {
+) (granted bool, resp contract.ToolResult, err error) {
 	if deps.Permissions == nil {
-		return true, fantasy.ToolResponse{}, nil
+		return true, contract.ToolResult{}, nil
 	}
 
 	// Attaching to a browser the user already started is a different act from
@@ -263,7 +274,7 @@ func requestLaunch(
 	ok, err := deps.Permissions.Request(ctx, permission.CreatePermissionRequest{
 		SessionID:   toolutil.GetSessionFromContext(ctx),
 		Path:        target,
-		ToolCallID:  call.ID,
+		ToolCallID:  callID,
 		ToolName:    BrowserToolName,
 		Action:      actionLaunch,
 		Description: fmt.Sprintf("%s %s (headless=%v)", verb, target, headless),
@@ -276,32 +287,32 @@ func requestLaunch(
 		},
 	})
 	if err != nil {
-		return false, fantasy.ToolResponse{}, err
+		return false, contract.ToolResult{}, err
 	}
 	if !ok {
-		return false, toolutil.NewPermissionDeniedResponse(), nil
+		return false, permissionDenied(), nil
 	}
-	return true, fantasy.ToolResponse{}, nil
+	return true, contract.ToolResult{}, nil
 }
 
-func closeSession(ctx context.Context, deps Deps) (fantasy.ToolResponse, error) {
+func closeSession(ctx context.Context, deps Deps) (contract.ToolResult, error) {
 	if deps.Manager.Session() == nil {
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse("No browser session is running."),
+		return contract.WithMetadata(
+			contract.Text("No browser session is running."),
 			BrowserResponseMetadata{Action: actionClose},
 		), nil
 	}
 	if err := deps.Manager.Close(ctx); err != nil {
 		return softError(fmt.Sprintf("closing the browser session: %v", err)), nil
 	}
-	return fantasy.WithResponseMetadata(
-		fantasy.NewTextResponse("Browser session closed."),
+	return contract.WithMetadata(
+		contract.Text("Browser session closed."),
 		BrowserResponseMetadata{Action: actionClose},
 	), nil
 }
 
 // sessionAction dispatches everything that needs a live session.
-func sessionAction(ctx context.Context, deps Deps, action string, p BrowserParams) (fantasy.ToolResponse, error) {
+func sessionAction(ctx context.Context, deps Deps, action string, p BrowserParams) (contract.ToolResult, error) {
 	session, err := deps.Manager.Require()
 	if err != nil {
 		return softError(err.Error()), nil
@@ -409,8 +420,8 @@ func sessionAction(ctx context.Context, deps Deps, action string, p BrowserParam
 			return softError(fmt.Sprintf("evaluating: %v", err)), nil
 		}
 		text := "Result:\n" + renderValue(out)
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse(text),
+		return contract.WithMetadata(
+			contract.Text(text),
 			BrowserResponseMetadata{Action: actionEval},
 		), nil
 
@@ -423,8 +434,8 @@ func sessionAction(ctx context.Context, deps Deps, action string, p BrowserParam
 		if werr != nil {
 			return softError(werr.Error()), nil
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse(fmt.Sprintf("Screenshot written to %s (%d bytes).", path, len(data))),
+		return contract.WithMetadata(
+			contract.Text(fmt.Sprintf("Screenshot written to %s (%d bytes).", path, len(data))),
 			BrowserResponseMetadata{Action: actionScreenshot, Path: path, Bytes: len(data)},
 		), nil
 
@@ -437,8 +448,8 @@ func sessionAction(ctx context.Context, deps Deps, action string, p BrowserParam
 		if werr != nil {
 			return softError(werr.Error()), nil
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse(fmt.Sprintf("PDF written to %s (%d bytes).", path, len(data))),
+		return contract.WithMetadata(
+			contract.Text(fmt.Sprintf("PDF written to %s (%d bytes).", path, len(data))),
 			BrowserResponseMetadata{Action: actionPDF, Path: path, Bytes: len(data)},
 		), nil
 
@@ -454,8 +465,8 @@ func sessionAction(ctx context.Context, deps Deps, action string, p BrowserParam
 	case actionNetwork:
 		entries := p.networkEntries(session)
 		if len(entries) == 0 {
-			return fantasy.WithResponseMetadata(
-				fantasy.NewTextResponse("No requests recorded yet."),
+			return contract.WithMetadata(
+				contract.Text("No requests recorded yet."),
 				BrowserResponseMetadata{Action: actionNetwork},
 			), nil
 		}
@@ -471,8 +482,8 @@ func sessionAction(ctx context.Context, deps Deps, action string, p BrowserParam
 			}
 			fmt.Fprintf(&b, "  [%s] %s %s\n", status, e.Method, e.URL)
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse(b.String()),
+		return contract.WithMetadata(
+			contract.Text(b.String()),
 			BrowserResponseMetadata{Action: actionNetwork, Count: len(entries)},
 		), nil
 
@@ -486,8 +497,8 @@ func sessionAction(ctx context.Context, deps Deps, action string, p BrowserParam
 			if p.Clear {
 				note = " since the last read"
 			}
-			return fantasy.WithResponseMetadata(
-				fantasy.NewTextResponse("No console messages"+note+"."),
+			return contract.WithMetadata(
+				contract.Text("No console messages"+note+"."),
 				BrowserResponseMetadata{Action: actionConsole},
 			), nil
 		}
@@ -496,8 +507,8 @@ func sessionAction(ctx context.Context, deps Deps, action string, p BrowserParam
 		for _, e := range entries {
 			fmt.Fprintf(&b, "  %s\n", e)
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse(b.String()),
+		return contract.WithMetadata(
+			contract.Text(b.String()),
 			BrowserResponseMetadata{Action: actionConsole, Console: len(entries)},
 		), nil
 
@@ -534,15 +545,15 @@ func opOf(p BrowserParams, def string) string {
 }
 
 // tabsAction handles action=tabs: list, new, select, close.
-func tabsAction(ctx context.Context, session *corebrowser.Session, p BrowserParams) (fantasy.ToolResponse, error) {
+func tabsAction(ctx context.Context, session *corebrowser.Session, p BrowserParams) (contract.ToolResult, error) {
 	switch op := opOf(p, "list"); op {
 	case "list":
 		tabs, err := session.Tabs(ctx)
 		if err != nil {
 			return softError(fmt.Sprintf("listing tabs: %v", err)), nil
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse(renderTabs(tabs)),
+		return contract.WithMetadata(
+			contract.Text(renderTabs(tabs)),
 			BrowserResponseMetadata{Action: actionTabs, Count: len(tabs)},
 		), nil
 
@@ -566,8 +577,8 @@ func tabsAction(ctx context.Context, session *corebrowser.Session, p BrowserPara
 		if err != nil {
 			return softError(fmt.Sprintf("the tab closed, but listing the rest failed: %v", err)), nil
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse("Tab closed.\n\n"+renderTabs(tabs)),
+		return contract.WithMetadata(
+			contract.Text("Tab closed.\n\n"+renderTabs(tabs)),
 			BrowserResponseMetadata{Action: actionTabs, Count: len(tabs)},
 		), nil
 
@@ -598,7 +609,7 @@ func renderTabs(tabs []corebrowser.TabInfo) string {
 }
 
 // storageAction handles action=storage over cookies and web storage.
-func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserParams) (fantasy.ToolResponse, error) {
+func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserParams) (contract.ToolResult, error) {
 	op := opOf(p, "list")
 
 	if strings.EqualFold(strings.TrimSpace(p.Kind), "cookies") {
@@ -609,8 +620,8 @@ func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserP
 				return softError(fmt.Sprintf("reading cookies: %v", err)), nil
 			}
 			if len(cookies) == 0 {
-				return fantasy.WithResponseMetadata(
-					fantasy.NewTextResponse("No cookies set."),
+				return contract.WithMetadata(
+					contract.Text("No cookies set."),
 					BrowserResponseMetadata{Action: actionStorage, Count: 0},
 				), nil
 			}
@@ -619,8 +630,8 @@ func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserP
 			for _, c := range cookies {
 				fmt.Fprintf(&b, "  %s\n", c)
 			}
-			return fantasy.WithResponseMetadata(
-				fantasy.NewTextResponse(b.String()),
+			return contract.WithMetadata(
+				contract.Text(b.String()),
 				BrowserResponseMetadata{Action: actionStorage, Count: len(cookies)},
 			), nil
 
@@ -633,8 +644,8 @@ func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserP
 			}); err != nil {
 				return softError(fmt.Sprintf("setting the cookie: %v", err)), nil
 			}
-			return fantasy.WithResponseMetadata(
-				fantasy.NewTextResponse(fmt.Sprintf("Cookie %s set.", p.Name)),
+			return contract.WithMetadata(
+				contract.Text(fmt.Sprintf("Cookie %s set.", p.Name)),
 				BrowserResponseMetadata{Action: actionStorage, Count: 1},
 			), nil
 
@@ -642,8 +653,8 @@ func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserP
 			if err := session.DeleteCookies(ctx, p.Name, p.Domain); err != nil {
 				return softError(fmt.Sprintf("removing the cookie: %v", err)), nil
 			}
-			return fantasy.WithResponseMetadata(
-				fantasy.NewTextResponse(fmt.Sprintf("Cookie %s removed.", p.Name)),
+			return contract.WithMetadata(
+				contract.Text(fmt.Sprintf("Cookie %s removed.", p.Name)),
 				BrowserResponseMetadata{Action: actionStorage},
 			), nil
 
@@ -651,8 +662,8 @@ func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserP
 			if err := session.ClearCookies(ctx); err != nil {
 				return softError(fmt.Sprintf("clearing cookies: %v", err)), nil
 			}
-			return fantasy.WithResponseMetadata(
-				fantasy.NewTextResponse("All cookies cleared."),
+			return contract.WithMetadata(
+				contract.Text("All cookies cleared."),
 				BrowserResponseMetadata{Action: actionStorage},
 			), nil
 
@@ -673,8 +684,8 @@ func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserP
 			return softError(fmt.Sprintf("listing storage: %v", err)), nil
 		}
 		if len(items) == 0 {
-			return fantasy.WithResponseMetadata(
-				fantasy.NewTextResponse(fmt.Sprintf("%s is empty.", strings.Title(p.Kind))), //nolint:staticcheck // Title on a fixed string is fine
+			return contract.WithMetadata(
+				contract.Text(fmt.Sprintf("%s is empty.", strings.Title(p.Kind))), //nolint:staticcheck // Title on a fixed string is fine
 				BrowserResponseMetadata{Action: actionStorage, Count: 0},
 			), nil
 		}
@@ -688,8 +699,8 @@ func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserP
 		for _, k := range keys {
 			fmt.Fprintf(&b, "  %s = %s\n", k, items[k])
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse(b.String()),
+		return contract.WithMetadata(
+			contract.Text(b.String()),
 			BrowserResponseMetadata{Action: actionStorage, Count: len(items)},
 		), nil
 
@@ -701,8 +712,8 @@ func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserP
 		if err != nil {
 			return softError(err.Error()), nil
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse(fmt.Sprintf("%s = %s", p.Name, value)),
+		return contract.WithMetadata(
+			contract.Text(fmt.Sprintf("%s = %s", p.Name, value)),
 			BrowserResponseMetadata{Action: actionStorage, Count: 1},
 		), nil
 
@@ -713,8 +724,8 @@ func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserP
 		if err := session.StorageSet(ctx, p.Kind, p.Name, p.Value); err != nil {
 			return softError(fmt.Sprintf("writing the entry: %v", err)), nil
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse(fmt.Sprintf("%s set to %q.", p.Name, p.Value)),
+		return contract.WithMetadata(
+			contract.Text(fmt.Sprintf("%s set to %q.", p.Name, p.Value)),
 			BrowserResponseMetadata{Action: actionStorage, Count: 1},
 		), nil
 
@@ -725,8 +736,8 @@ func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserP
 		if err := session.StorageRemove(ctx, p.Kind, p.Name); err != nil {
 			return softError(fmt.Sprintf("removing the entry: %v", err)), nil
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse(fmt.Sprintf("%s removed.", p.Name)),
+		return contract.WithMetadata(
+			contract.Text(fmt.Sprintf("%s removed.", p.Name)),
 			BrowserResponseMetadata{Action: actionStorage},
 		), nil
 
@@ -734,8 +745,8 @@ func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserP
 		if err := session.StorageClear(ctx, p.Kind); err != nil {
 			return softError(fmt.Sprintf("clearing storage: %v", err)), nil
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse("Storage cleared."),
+		return contract.WithMetadata(
+			contract.Text("Storage cleared."),
 			BrowserResponseMetadata{Action: actionStorage},
 		), nil
 
@@ -746,7 +757,7 @@ func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserP
 
 // stateAction handles action=state: save the session's cookies and storage to a
 // file, or restore them.
-func stateAction(ctx context.Context, session *corebrowser.Session, p BrowserParams) (fantasy.ToolResponse, error) {
+func stateAction(ctx context.Context, session *corebrowser.Session, p BrowserParams) (contract.ToolResult, error) {
 	switch op := opOf(p, "save"); op {
 	case "save":
 		st, err := session.SaveState(ctx)
@@ -760,8 +771,8 @@ func stateAction(ctx context.Context, session *corebrowser.Session, p BrowserPar
 		if err := corebrowser.WriteStateFile(path, st); err != nil {
 			return softError(fmt.Sprintf("writing the state file: %v", err)), nil
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse(fmt.Sprintf("State written to %s (%d cookie(s), %d origin(s)).", path, len(st.Cookies), len(st.Origins))),
+		return contract.WithMetadata(
+			contract.Text(fmt.Sprintf("State written to %s (%d cookie(s), %d origin(s)).", path, len(st.Cookies), len(st.Origins))),
 			BrowserResponseMetadata{Action: actionState, Path: path},
 		), nil
 
@@ -787,8 +798,8 @@ func stateAction(ctx context.Context, session *corebrowser.Session, p BrowserPar
 		for _, o := range report.SkippedOrigins {
 			fmt.Fprintf(&b, "\nSkipped storage for %s (the page is on a different origin; navigate there and load again).", o)
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse(b.String()),
+		return contract.WithMetadata(
+			contract.Text(b.String()),
 			BrowserResponseMetadata{Action: actionState, Path: path, Count: report.CookiesApplied},
 		), nil
 
@@ -798,13 +809,13 @@ func stateAction(ctx context.Context, session *corebrowser.Session, p BrowserPar
 }
 
 // routeAction handles action=route: block or mock requests by URL pattern.
-func routeAction(ctx context.Context, session *corebrowser.Session, p BrowserParams) (fantasy.ToolResponse, error) {
+func routeAction(ctx context.Context, session *corebrowser.Session, p BrowserParams) (contract.ToolResult, error) {
 	switch op := opOf(p, "list"); op {
 	case "list":
 		routes := session.Routes()
 		if len(routes) == 0 {
-			return fantasy.WithResponseMetadata(
-				fantasy.NewTextResponse("No routes installed. op=add with a pattern blocks matching requests; adding a body answers them with it."),
+			return contract.WithMetadata(
+				contract.Text("No routes installed. op=add with a pattern blocks matching requests; adding a body answers them with it."),
 				BrowserResponseMetadata{Action: actionRoute, Count: 0},
 			), nil
 		}
@@ -813,8 +824,8 @@ func routeAction(ctx context.Context, session *corebrowser.Session, p BrowserPar
 		for _, r := range routes {
 			fmt.Fprintf(&b, "  %s\n", r)
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse(b.String()),
+		return contract.WithMetadata(
+			contract.Text(b.String()),
 			BrowserResponseMetadata{Action: actionRoute, Count: len(routes)},
 		), nil
 
@@ -838,8 +849,8 @@ func routeAction(ctx context.Context, session *corebrowser.Session, p BrowserPar
 		if mock != nil {
 			what = "answered with the given body"
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse(fmt.Sprintf("Requests matching %s are now %s. Reload the page to see the effect.", pattern, what)),
+		return contract.WithMetadata(
+			contract.Text(fmt.Sprintf("Requests matching %s are now %s. Reload the page to see the effect.", pattern, what)),
 			BrowserResponseMetadata{Action: actionRoute, Count: 1},
 		), nil
 
@@ -852,8 +863,8 @@ func routeAction(ctx context.Context, session *corebrowser.Session, p BrowserPar
 				return softError(fmt.Sprintf("removing route %s: %v", line, err)), nil
 			}
 		}
-		return fantasy.WithResponseMetadata(
-			fantasy.NewTextResponse("All routes removed."),
+		return contract.WithMetadata(
+			contract.Text("All routes removed."),
 			BrowserResponseMetadata{Action: actionRoute, Count: 0},
 		), nil
 
@@ -879,19 +890,19 @@ func extractPatterns(lines []string) []string {
 // Every action that changes the page re-snapshots, because the state *after* the
 // action is what the next decision depends on. Returning it here saves the
 // model a round trip it would otherwise always have to make.
-func withSnapshot(ctx context.Context, session *corebrowser.Session, action string) (fantasy.ToolResponse, error) {
+func withSnapshot(ctx context.Context, session *corebrowser.Session, action string) (contract.ToolResult, error) {
 	snap, err := session.Snapshot(ctx)
 	if err != nil {
 		return softError(fmt.Sprintf("the action succeeded but taking a snapshot failed: %v", err)), nil
 	}
-	return fantasy.WithResponseMetadata(
-		fantasy.NewTextResponse(snap.Render()),
+	return contract.WithMetadata(
+		contract.Text(snap.Render()),
 		BrowserResponseMetadata{Action: action, URL: snap.URL, Title: snap.Title, Refs: len(snap.Elements)},
 	), nil
 }
 
 // targetOf extracts the element reference, preferring ref over selector.
-func targetOf(p BrowserParams) (string, *fantasy.ToolResponse) {
+func targetOf(p BrowserParams) (string, *contract.ToolResult) {
 	if ref := strings.TrimSpace(p.Ref); ref != "" {
 		return ref, nil
 	}
@@ -960,6 +971,123 @@ func renderValue(v any) string {
 	}
 }
 
-func softError(msg string) fantasy.ToolResponse {
-	return fantasy.NewTextErrorResponse(msg)
+func softError(msg string) contract.ToolResult {
+	return contract.Error(msg)
+}
+
+// permissionDenied is the port form of the old permission-denied response: a
+// tool-level error that also ends the turn.
+func permissionDenied() contract.ToolResult {
+	res := contract.ToolResult{Error: errors.New("User denied permission")} //nolint:staticcheck // user-facing denial text matches the legacy prompt.
+	res.StopTurn = true
+	return res
+}
+
+// browserParamsSchema is the JSON schema for BrowserParams, kept property by
+// property equivalent to the one the framework used to generate from the
+// struct tags (names, descriptions, types, enum and required list).
+func browserParamsSchema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"action": map[string]any{
+				"type":        "string",
+				"enum":        []string{"status", "launch", "goto", "back", "forward", "reload", "snapshot", "click", "dblclick", "fill", "press", "hover", "check", "uncheck", "select", "eval", "screenshot", "pdf", "console", "tabs", "storage", "state", "network", "route", "close"},
+				"description": "status reports which browsers are installed; launch starts or attaches to a session; the rest act on the running session. Take a snapshot before using a ref.",
+			},
+			"op": map[string]any{
+				"type":        "string",
+				"description": "Sub-operation for grouped actions. tabs: list,new,select,close. storage: list,get,set,remove,clear. state: save,load. network: list,clear. route: add,list,clear. Defaults to list (or new/select where a parameter implies it).",
+			},
+			"url": map[string]any{
+				"type":        "string",
+				"description": "URL to open, for action=launch, goto, or tabs op=new.",
+			},
+			"ref": map[string]any{
+				"type":        "string",
+				"description": "Element handle from a snapshot, e.g. e3. Preferred over selector: it is resolved against the live DOM and cannot silently match the wrong element.",
+			},
+			"selector": map[string]any{
+				"type":        "string",
+				"description": "CSS selector, used only when ref is unavailable. Prefer ref.",
+			},
+			"text": map[string]any{
+				"type":        "string",
+				"description": "Text to type, for action=fill. Dispatches input/change events so framework-bound fields actually update.",
+			},
+			"key": map[string]any{
+				"type":        "string",
+				"description": "Key for action=press: Enter, Tab, Escape, ArrowUp/Down/Left/Right, PageUp/Down, Home, End, Backspace, Delete, or a single character.",
+			},
+			"expression": map[string]any{
+				"type":        "string",
+				"description": "JavaScript expression to evaluate in the page, for action=eval. The value is decoded as JSON, so return a value instead of using console.log.",
+			},
+			"submit": map[string]any{
+				"type":        "boolean",
+				"description": "For action=fill: press Enter afterwards to submit the form.",
+			},
+			"headless": map[string]any{
+				"type":        "boolean",
+				"description": "For action=launch: run without a visible window (default true). Set false to watch the browser work.",
+			},
+			"browser": map[string]any{
+				"type":        "string",
+				"description": "For action=launch: pin the browser product (chrome, chromium, msedge, brave, vivaldi). Defaults to the best detected one.",
+			},
+			"endpoint": map[string]any{
+				"type":        "string",
+				"description": "For action=launch: attach to an existing Chrome over CDP (http://127.0.0.1:9222 or a ws:// URL) instead of starting one. Useful for logged-in sessions.",
+			},
+			"path": map[string]any{
+				"type":        "string",
+				"description": "Output file for action=screenshot (PNG), action=pdf, or state op=save; input file for state op=load. Defaults to a timestamped file in the working directory.",
+			},
+			"full_page": map[string]any{
+				"type":        "boolean",
+				"description": "For action=screenshot: capture the whole scrollable page rather than the viewport.",
+			},
+			"clear": map[string]any{
+				"type":        "boolean",
+				"description": "For action=console or network: return only entries since the last read, then clear the buffer.",
+			},
+			"index": map[string]any{
+				"type":        "integer",
+				"description": "Tab index (0-based, from tabs op=list) for tabs op=select/close.",
+			},
+			"kind": map[string]any{
+				"type":        "string",
+				"description": "For action=storage: cookies, local (localStorage), or session (sessionStorage).",
+			},
+			"name": map[string]any{
+				"type":        "string",
+				"description": "Key name for storage op=get/set/remove, or cookie name for kind=cookies op=remove.",
+			},
+			"value": map[string]any{
+				"type":        "string",
+				"description": "Value for storage op=set, or the option to pick for action=select (matched by value or label).",
+			},
+			"domain": map[string]any{
+				"type":        "string",
+				"description": "Cookie domain for storage kind=cookies op=set/remove. Defaults to the current page.",
+			},
+			"pattern": map[string]any{
+				"type":        "string",
+				"description": "For action=route: URL glob (* and ?), e.g. **/api/stats or https://ads.example.com/*. Without a scheme prefix it matches anywhere in the URL.",
+			},
+			"body": map[string]any{
+				"type":        "string",
+				"description": "For route op=add: answer matching requests with this body instead of blocking them.",
+			},
+			"content_type": map[string]any{
+				"type":        "string",
+				"description": "For route op=add with a body: the Content-Type to answer with (default text/plain).",
+			},
+			"status": map[string]any{
+				"type":        "integer",
+				"description": "For route op=add with a body: HTTP status to answer with (default 200).",
+			},
+		},
+		"required": []string{"action"},
+	}
 }

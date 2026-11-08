@@ -5,41 +5,40 @@ import (
 	"encoding/json"
 	"testing"
 
-	"charm.land/fantasy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 	"github.com/nextsko/mocode-agent/internal/core/tools/internalx/filter"
 )
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-// stubTool creates a minimal fantasy.AgentTool whose Info().Name returns name.
-func stubTool(name string) fantasy.AgentTool {
-	return fantasy.NewAgentTool(
+// stubTool creates a minimal contract.Tool whose Name() returns name.
+func stubTool(name string) contract.Tool {
+	return contract.NewFunc(
 		name,
 		"stub "+name,
-		func(_ context.Context, _ struct{}, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			return fantasy.NewTextResponse("ok"), nil
+		map[string]any{"type": "object"},
+		func(_ context.Context, _ contract.ToolContext, _ json.RawMessage) (contract.ToolResult, error) {
+			return contract.Text("ok"), nil
 		},
 	)
 }
 
-func toolNames(tools []fantasy.AgentTool) []string {
+func toolNames(tools []contract.Tool) []string {
 	names := make([]string, len(tools))
 	for i, t := range tools {
-		names[i] = t.Info().Name
+		names[i] = t.Name()
 	}
 	return names
 }
-
-var _ = json.Marshal // keep import
 
 // ─── Apply ────────────────────────────────────────────────────────────────────
 
 func TestApply_NoFilters_ReturnsAll(t *testing.T) {
 	t.Parallel()
-	tools := []fantasy.AgentTool{stubTool("a"), stubTool("b"), stubTool("c")}
+	tools := []contract.Tool{stubTool("a"), stubTool("b"), stubTool("c")}
 	got := filter.Apply(context.Background(), tools)
 	require.Equal(t, tools, got)
 }
@@ -54,21 +53,21 @@ func TestApply_EmptyInput(t *testing.T) {
 
 func TestIncludeNames_KeepsMatchingTools(t *testing.T) {
 	t.Parallel()
-	tools := []fantasy.AgentTool{stubTool("bash"), stubTool("view"), stubTool("fetch")}
+	tools := []contract.Tool{stubTool("bash"), stubTool("view"), stubTool("fetch")}
 	got := filter.Apply(context.Background(), tools, filter.IncludeNames("bash", "view"))
 	assert.Equal(t, []string{"bash", "view"}, toolNames(got))
 }
 
 func TestIncludeNames_NoneMatch_ReturnsEmpty(t *testing.T) {
 	t.Parallel()
-	tools := []fantasy.AgentTool{stubTool("bash"), stubTool("view")}
+	tools := []contract.Tool{stubTool("bash"), stubTool("view")}
 	got := filter.Apply(context.Background(), tools, filter.IncludeNames("fetch"))
 	assert.Empty(t, got)
 }
 
 func TestIncludeNames_AllMatch(t *testing.T) {
 	t.Parallel()
-	tools := []fantasy.AgentTool{stubTool("a"), stubTool("b")}
+	tools := []contract.Tool{stubTool("a"), stubTool("b")}
 	got := filter.Apply(context.Background(), tools, filter.IncludeNames("a", "b"))
 	assert.Equal(t, []string{"a", "b"}, toolNames(got))
 }
@@ -77,21 +76,21 @@ func TestIncludeNames_AllMatch(t *testing.T) {
 
 func TestExcludeNames_BlocksMatchingTools(t *testing.T) {
 	t.Parallel()
-	tools := []fantasy.AgentTool{stubTool("bash"), stubTool("view"), stubTool("fetch")}
+	tools := []contract.Tool{stubTool("bash"), stubTool("view"), stubTool("fetch")}
 	got := filter.Apply(context.Background(), tools, filter.ExcludeNames("fetch"))
 	assert.Equal(t, []string{"bash", "view"}, toolNames(got))
 }
 
 func TestExcludeNames_NoneBlocked_ReturnsAll(t *testing.T) {
 	t.Parallel()
-	tools := []fantasy.AgentTool{stubTool("bash"), stubTool("view")}
+	tools := []contract.Tool{stubTool("bash"), stubTool("view")}
 	got := filter.Apply(context.Background(), tools, filter.ExcludeNames("fetch"))
 	assert.Equal(t, []string{"bash", "view"}, toolNames(got))
 }
 
 func TestExcludeNames_AllBlocked_ReturnsEmpty(t *testing.T) {
 	t.Parallel()
-	tools := []fantasy.AgentTool{stubTool("a"), stubTool("b")}
+	tools := []contract.Tool{stubTool("a"), stubTool("b")}
 	got := filter.Apply(context.Background(), tools, filter.ExcludeNames("a", "b"))
 	assert.Empty(t, got)
 }
@@ -100,7 +99,7 @@ func TestExcludeNames_AllBlocked_ReturnsEmpty(t *testing.T) {
 
 func TestChain_AndSemantics_BothMustPass(t *testing.T) {
 	t.Parallel()
-	tools := []fantasy.AgentTool{stubTool("bash"), stubTool("view"), stubTool("fetch")}
+	tools := []contract.Tool{stubTool("bash"), stubTool("view"), stubTool("fetch")}
 	// include only bash and view, then exclude view → only bash should remain
 	chained := filter.Chain(
 		filter.IncludeNames("bash", "view"),
@@ -112,7 +111,7 @@ func TestChain_AndSemantics_BothMustPass(t *testing.T) {
 
 func TestChain_Empty_PassesAll(t *testing.T) {
 	t.Parallel()
-	tools := []fantasy.AgentTool{stubTool("a"), stubTool("b")}
+	tools := []contract.Tool{stubTool("a"), stubTool("b")}
 	chained := filter.Chain()
 	got := filter.Apply(context.Background(), tools, chained)
 	assert.Equal(t, []string{"a", "b"}, toolNames(got))
@@ -125,12 +124,12 @@ func TestFilterFunc_ReceivesContext(t *testing.T) {
 	type ctxKey string
 	const key ctxKey = "role"
 
-	tools := []fantasy.AgentTool{stubTool("bash"), stubTool("fetch")}
+	tools := []contract.Tool{stubTool("bash"), stubTool("fetch")}
 
 	// Dynamic filter: only allow fetch when role==network
-	dynamicFilter := filter.FilterFunc(func(ctx context.Context, tool fantasy.AgentTool) bool {
+	dynamicFilter := filter.FilterFunc(func(ctx context.Context, tool contract.Tool) bool {
 		role, _ := ctx.Value(key).(string)
-		if tool.Info().Name == "fetch" {
+		if tool.Name() == "fetch" {
 			return role == "network"
 		}
 		return true
@@ -150,7 +149,7 @@ func TestFilterFunc_ReceivesContext(t *testing.T) {
 
 func TestIncludeNames_Idempotent(t *testing.T) {
 	t.Parallel()
-	tools := []fantasy.AgentTool{stubTool("bash"), stubTool("view")}
+	tools := []contract.Tool{stubTool("bash"), stubTool("view")}
 	f := filter.IncludeNames("bash", "view")
 	ctx := context.Background()
 	first := filter.Apply(ctx, tools, f)

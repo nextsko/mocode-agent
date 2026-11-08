@@ -4,14 +4,14 @@ import (
 	"cmp"
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-
-	"charm.land/fantasy"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
@@ -58,66 +58,102 @@ const (
 //go:embed ls.md
 var lsDescription []byte
 
-func NewLsTool(permissions permission.Service, workingDir string, lsConfig config.ToolLs) fantasy.AgentTool {
-	return fantasy.NewAgentTool(
+// NewLsPortTool is the framework-agnostic form of the ls tool.
+func NewLsPortTool(permissions permission.Service, workingDir string, lsConfig config.ToolLs) contract.Tool {
+	return contract.NewFunc(
 		LSToolName,
 		toolutil.FirstLineDescription(lsDescription),
-		func(ctx context.Context, params LSParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			searchPath, err := fsext.Expand(cmp.Or(params.Path, workingDir))
-			if err != nil {
-				return fantasy.NewTextErrorResponse(fmt.Sprintf("error expanding path: %v", err)), nil
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path": map[string]any{
+					"type":        "string",
+					"description": "The path to the directory to list (defaults to current working directory)",
+				},
+				"ignore": map[string]any{
+					"type":        "array",
+					"items":       map[string]any{"type": "string"},
+					"description": "List of glob patterns to ignore",
+				},
+				"depth": map[string]any{
+					"type":        "integer",
+					"description": "The maximum depth to traverse",
+				},
+			},
+			"required": []string{},
+		},
+		func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+			var params LSParams
+			if err := json.Unmarshal(args, &params); err != nil {
+				return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
 			}
+			callID, _ := toolutil.ToolCallIDFromCtx(ctx)
+			return runLs(ctx, permissions, workingDir, lsConfig, params, callID)
+		},
+	)
+}
 
-			searchPath = ext.SmartJoin(workingDir, searchPath)
+// runLs expands the target path, gates out-of-workspace listings behind a
+// permission prompt, and renders the directory tree.
+func runLs(
+	ctx context.Context,
+	permissions permission.Service,
+	workingDir string,
+	lsConfig config.ToolLs,
+	params LSParams,
+	callID string,
+) (contract.ToolResult, error) {
+	searchPath, err := fsext.Expand(cmp.Or(params.Path, workingDir))
+	if err != nil {
+		return contract.Error(fmt.Sprintf("error expanding path: %v", err)), nil
+	}
 
-			// Check if directory is outside working directory and request permission if needed
-			absWorkingDir, err := filepath.Abs(workingDir)
-			if err != nil {
-				return fantasy.NewTextErrorResponse(fmt.Sprintf("error resolving working directory: %v", err)), nil
-			}
+	searchPath = ext.SmartJoin(workingDir, searchPath)
 
-			absSearchPath, err := filepath.Abs(searchPath)
-			if err != nil {
-				return fantasy.NewTextErrorResponse(fmt.Sprintf("error resolving search path: %v", err)), nil
-			}
+	// Check if directory is outside working directory and request permission if needed
+	absWorkingDir, err := filepath.Abs(workingDir)
+	if err != nil {
+		return contract.Error(fmt.Sprintf("error resolving working directory: %v", err)), nil
+	}
 
-			relPath, err := filepath.Rel(absWorkingDir, absSearchPath)
-			if err != nil || strings.HasPrefix(relPath, "..") {
-				// Directory is outside working directory, request permission
-				sessionID := toolutil.GetSessionFromContext(ctx)
-				if sessionID == "" {
-					return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for accessing directories outside working directory")
-				}
+	absSearchPath, err := filepath.Abs(searchPath)
+	if err != nil {
+		return contract.Error(fmt.Sprintf("error resolving search path: %v", err)), nil
+	}
 
-				granted, err := permissions.Request(ctx,
-					permission.CreatePermissionRequest{
-						SessionID:   sessionID,
-						Path:        absSearchPath,
-						ToolCallID:  call.ID,
-						ToolName:    LSToolName,
-						Action:      "list",
-						Description: fmt.Sprintf("List directory outside working directory: %s", absSearchPath),
-						Params:      LSPermissionsParams(params),
-					},
-				)
-				if err != nil {
-					return fantasy.ToolResponse{}, err
-				}
-				if !granted {
-					return toolutil.NewPermissionDeniedResponse(), nil
-				}
-			}
+	relPath, err := filepath.Rel(absWorkingDir, absSearchPath)
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		// Directory is outside working directory, request permission
+		sessionID := toolutil.GetSessionFromContext(ctx)
+		if sessionID == "" {
+			return contract.ToolResult{}, fmt.Errorf("session ID is required for accessing directories outside working directory")
+		}
 
-			output, metadata, err := ListDirectoryTree(searchPath, params, lsConfig)
-			if err != nil {
-				return fantasy.NewTextErrorResponse(err.Error()), nil
-			}
+		granted, err := permissions.Request(ctx,
+			permission.CreatePermissionRequest{
+				SessionID:   sessionID,
+				Path:        absSearchPath,
+				ToolCallID:  callID,
+				ToolName:    LSToolName,
+				Action:      "list",
+				Description: fmt.Sprintf("List directory outside working directory: %s", absSearchPath),
+				Params:      LSPermissionsParams(params),
+			},
+		)
+		if err != nil {
+			return contract.ToolResult{}, err
+		}
+		if !granted {
+			return permissionDeniedResult(), nil
+		}
+	}
 
-			return fantasy.WithResponseMetadata(
-				fantasy.NewTextResponse(output),
-				metadata,
-			), nil
-		})
+	output, metadata, err := ListDirectoryTree(searchPath, params, lsConfig)
+	if err != nil {
+		return contract.Error(err.Error()), nil
+	}
+
+	return contract.WithMetadata(contract.Text(output), metadata), nil
 }
 
 func ListDirectoryTree(searchPath string, params LSParams, lsConfig config.ToolLs) (string, LSResponseMetadata, error) {

@@ -10,6 +10,7 @@ package agenttooladapter
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"charm.land/fantasy"
@@ -87,7 +88,9 @@ func (a *Adapter) Run(ctx context.Context, call fantasy.ToolCall) (fantasy.ToolR
 		return fantasy.ToolResponse{}, err
 	}
 	if result.Error != nil {
-		return fantasy.NewTextErrorResponse(result.Error.Error()), nil
+		errResp := fantasy.NewTextErrorResponse(result.Error.Error())
+		errResp.StopTurn = result.StopTurn
+		return errResp, nil
 	}
 
 	resp := fantasy.NewTextResponse(result.Content)
@@ -107,7 +110,13 @@ func (a *Adapter) Run(ctx context.Context, call fantasy.ToolCall) (fantasy.ToolR
 		resp.StopTurn = true
 	}
 	if len(result.Metadata) > 0 {
-		if b, err := json.Marshal(result.Metadata); err == nil {
+		payload := any(result.Metadata)
+		if len(result.Metadata) == 1 {
+			if inner, ok := result.Metadata["result"]; ok {
+				payload = inner
+			}
+		}
+		if b, err := json.Marshal(payload); err == nil {
 			resp.Metadata = string(b)
 		}
 	}
@@ -212,3 +221,36 @@ type nopCallbacks struct{}
 
 func (nopCallbacks) Before(string, json.RawMessage)           {}
 func (nopCallbacks) After(string, contract.ToolResult, error) {}
+
+// fantasyTool adapts a legacy fantasy.AgentTool to contract.Tool. It exists so
+// framework-agnostic filters (and dynamic MCP tools) can be handled uniformly;
+// new tools should be written as contract.Tool and wrapped with New instead.
+type fantasyTool struct{ inner fantasy.AgentTool }
+
+// WrapFantasy adapts a fantasy.AgentTool to contract.Tool. Text responses are
+// preserved; metadata is dropped because the runtime already consumed it.
+func WrapFantasy(t fantasy.AgentTool) contract.Tool { return fantasyTool{inner: t} }
+
+func (w fantasyTool) Name() string        { return w.inner.Info().Name }
+func (w fantasyTool) Description() string { return w.inner.Info().Description }
+
+func (w fantasyTool) Schema() contract.Schema {
+	info := w.inner.Info()
+	return contract.Schema{
+		Name:        info.Name,
+		Description: info.Description,
+		Parameters:  info.Parameters,
+	}
+}
+
+func (w fantasyTool) Execute(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+	resp, err := w.inner.Run(ctx, fantasy.ToolCall{Input: string(args)})
+	if err != nil {
+		return contract.ToolResult{}, err
+	}
+	res := contract.ToolResult{Content: resp.Content, StopTurn: resp.StopTurn}
+	if resp.IsError {
+		res.Error = errors.New(resp.Content)
+	}
+	return res, nil
+}

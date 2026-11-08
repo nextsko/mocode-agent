@@ -143,6 +143,54 @@ var packageRules = []packageRule{
 			"charm.land/",
 		},
 	},
+
+	// The remaining tool trees are ported; the adapter owns the fantasy edge.
+	// external/mcp is deliberately absent: its dynamic bridge (mcp-tools.go)
+	// still returns structured image/media responses the port cannot express.
+	{
+		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/core/fs",
+		forbidden: []string{"charm.land/"},
+	},
+	{
+		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/core/web",
+		forbidden: []string{"charm.land/"},
+	},
+	{
+		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/core/shell",
+		forbidden: []string{"charm.land/"},
+	},
+	{
+		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/core/sandbox",
+		forbidden: []string{"charm.land/"},
+	},
+	{
+		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/internalx/lsp",
+		forbidden: []string{"charm.land/"},
+	},
+	{
+		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/internalx/filter",
+		forbidden: []string{"charm.land/"},
+	},
+	{
+		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/ssh",
+		forbidden: []string{"charm.land/"},
+	},
+	{
+		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitea",
+		forbidden: []string{"charm.land/"},
+	},
+	{
+		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/gitops",
+		forbidden: []string{"charm.land/"},
+	},
+	{
+		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/browser",
+		forbidden: []string{"charm.land/"},
+	},
+	{
+		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/wechat",
+		forbidden: []string{"charm.land/"},
+	},
 }
 
 // bannedBy reports the first forbidden import matching a rule for pkgPath.

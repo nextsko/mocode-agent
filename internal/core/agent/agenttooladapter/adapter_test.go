@@ -155,3 +155,36 @@ func TestProviderOptionsRoundTrip(t *testing.T) {
 	adapter.SetProviderOptions(opts)
 	require.Equal(t, opts, adapter.ProviderOptions())
 }
+
+// TestRun_FlattensWrappedMetadata guards the legacy TUI contract: ports wrap
+// structured payloads under Metadata["result"], and the adapter must emit the
+// payload flat ({"lines":...}) rather than nested ({"result":{"lines":...}}).
+func TestRun_FlattensWrappedMetadata(t *testing.T) {
+	t.Parallel()
+	port := &fakeTool{
+		schema: contract.Schema{Name: "meta", Parameters: map[string]any{}},
+		result: contract.WithMetadata(contract.Text("ok"), map[string]int{"lines": 3}),
+	}
+	adapter := New(port, nil)
+	resp, err := adapter.Run(context.Background(), fantasy.ToolCall{Input: "{}"})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"lines":3}`, resp.Metadata)
+}
+
+// TestRun_ErrorKeepsStopTurn guards permission denials: the port reports the
+// denial as a tool error plus StopTurn, and the adapter must not drop it.
+func TestRun_ErrorKeepsStopTurn(t *testing.T) {
+	t.Parallel()
+	denied := contract.Error("User denied permission")
+	denied.StopTurn = true
+	port := &fakeTool{
+		schema: contract.Schema{Name: "deny", Parameters: map[string]any{}},
+		result: denied,
+	}
+	adapter := New(port, nil)
+	resp, err := adapter.Run(context.Background(), fantasy.ToolCall{Input: "{}"})
+	require.NoError(t, err)
+	require.True(t, resp.IsError)
+	require.True(t, resp.StopTurn)
+	require.Contains(t, resp.Content, "User denied permission")
+}

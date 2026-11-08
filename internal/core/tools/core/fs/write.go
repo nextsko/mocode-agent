@@ -3,6 +3,7 @@ package fs
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -11,8 +12,7 @@ import (
 	"time"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
-
-	"charm.land/fantasy"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 
 	"github.com/nextsko/mocode-agent/internal/domain/filetracker"
 	"github.com/nextsko/mocode-agent/internal/domain/history"
@@ -46,134 +46,168 @@ type WriteResponseMetadata struct {
 
 const WriteToolName = "write"
 
-func NewWriteTool(
+// NewWritePortTool is the framework-agnostic form of the write tool.
+func NewWritePortTool(
 	lspManager *lsp.Manager,
 	permissions permission.Service,
 	files history.Service,
 	filetracker filetracker.Service,
 	workingDir string,
-) fantasy.AgentTool {
-	return fantasy.NewAgentTool(
+) contract.Tool {
+	return contract.NewFunc(
 		WriteToolName,
 		toolutil.FirstLineDescription(writeDescription),
-		func(ctx context.Context, params WriteParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			if params.FilePath == "" {
-				return fantasy.NewTextErrorResponse("file_path is required"), nil
-			}
-
-			if params.Content == "" {
-				return fantasy.NewTextErrorResponse("content is required"), nil
-			}
-
-			sessionID := toolutil.GetSessionFromContext(ctx)
-			if sessionID == "" {
-				return fantasy.ToolResponse{}, fmt.Errorf("session_id is required")
-			}
-
-			filePath := ext.SmartJoin(workingDir, params.FilePath)
-
-			fileInfo, err := os.Stat(filePath)
-			if err == nil {
-				if fileInfo.IsDir() {
-					return fantasy.NewTextErrorResponse(fmt.Sprintf("Path is a directory, not a file: %s", filePath)), nil
-				}
-
-				modTime := fileInfo.ModTime().Truncate(time.Second)
-				lastRead := filetracker.LastReadTime(ctx, sessionID, filePath)
-				if modTime.After(lastRead) {
-					return fantasy.NewTextErrorResponse(fmt.Sprintf("File %s has been modified since it was last read.\nLast modification: %s\nLast read: %s\n\nPlease read the file again before modifying it.",
-						filePath, modTime.Format(time.RFC3339), lastRead.Format(time.RFC3339))), nil
-				}
-
-				oldContent, readErr := os.ReadFile(filePath)
-				if readErr == nil && string(oldContent) == params.Content {
-					return fantasy.NewTextErrorResponse(fmt.Sprintf("File %s already contains the exact content. No changes made.", filePath)), nil
-				}
-			} else if !os.IsNotExist(err) {
-				return fantasy.ToolResponse{}, fmt.Errorf("error checking file: %w", err)
-			}
-
-			dir := filepath.Dir(filePath)
-			if err = os.MkdirAll(dir, 0o750); err != nil {
-				return fantasy.ToolResponse{}, fmt.Errorf("error creating directory: %w", err)
-			}
-
-			oldContent := ""
-			if fileInfo != nil && !fileInfo.IsDir() {
-				oldBytes, readErr := os.ReadFile(filePath)
-				if readErr == nil {
-					oldContent = string(oldBytes)
-				}
-			}
-
-			diff, additions, removals := diff.GenerateDiff(
-				oldContent,
-				params.Content,
-				strings.TrimPrefix(filePath, workingDir),
-			)
-
-			p, err := permissions.Request(ctx,
-				permission.CreatePermissionRequest{
-					SessionID:   sessionID,
-					Path:        fsext.PathOrPrefix(filePath, workingDir),
-					ToolCallID:  call.ID,
-					ToolName:    WriteToolName,
-					Action:      "write",
-					Description: fmt.Sprintf("Create file %s", filePath),
-					Params: WritePermissionsParams{
-						FilePath:   filePath,
-						OldContent: oldContent,
-						NewContent: params.Content,
-					},
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"file_path": map[string]any{
+					"type":        "string",
+					"description": "The path to the file to write",
 				},
-			)
-			if err != nil {
-				return fantasy.ToolResponse{}, err
-			}
-			if !p {
-				return toolutil.NewPermissionDeniedResponse(), nil
-			}
-
-			err = os.WriteFile(filePath, []byte(params.Content), 0o600)
-			if err != nil {
-				return fantasy.ToolResponse{}, fmt.Errorf("error writing file: %w", err)
-			}
-
-			// Check if file exists in history
-			file, err := files.GetByPathAndSession(ctx, filePath, sessionID)
-			if err != nil {
-				_, err = files.Create(ctx, sessionID, filePath, oldContent)
-				if err != nil {
-					// Log error but don't fail the operation
-					return fantasy.ToolResponse{}, fmt.Errorf("error creating file history: %w", err)
-				}
-			}
-			if file.Content != oldContent {
-				// User manually changed the content; store an intermediate version
-				_, err = files.CreateVersion(ctx, sessionID, filePath, oldContent)
-				if err != nil {
-					slog.Error("Error creating file history version", "error", err)
-				}
-			}
-			// Store the new version
-			_, err = files.CreateVersion(ctx, sessionID, filePath, params.Content)
-			if err != nil {
-				slog.Error("Error creating file history version", "error", err)
-			}
-
-			filetracker.RecordRead(ctx, sessionID, filePath)
-
-			lsp.NotifyLSPs(ctx, lspManager, params.FilePath)
-
-			result := fmt.Sprintf("File successfully written: %s", filePath)
-			result = fmt.Sprintf("<result>\n%s\n</result>", result)
-			result += lsp.GetDiagnostics(filePath, lspManager)
-			return fantasy.WithResponseMetadata(fantasy.NewTextResponse(result),
-				WriteResponseMetadata{
-					Diff:      diff,
-					Additions: additions,
-					Removals:  removals,
+				"content": map[string]any{
+					"type":        "string",
+					"description": "The content to write to the file",
 				},
-			), nil
-		})
+			},
+			"required": []string{"file_path", "content"},
+		},
+		func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+			var params WriteParams
+			if err := json.Unmarshal(args, &params); err != nil {
+				return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
+			}
+			callID, _ := toolutil.ToolCallIDFromCtx(ctx)
+			return runWrite(ctx, lspManager, permissions, files, filetracker, workingDir, params, callID)
+		},
+	)
+}
+
+// runWrite validates the target, asks for permission, writes the file, and
+// records history plus LSP diagnostics.
+func runWrite(
+	ctx context.Context,
+	lspManager *lsp.Manager,
+	permissions permission.Service,
+	files history.Service,
+	filetracker filetracker.Service,
+	workingDir string,
+	params WriteParams,
+	callID string,
+) (contract.ToolResult, error) {
+	if params.FilePath == "" {
+		return contract.Error("file_path is required"), nil
+	}
+
+	if params.Content == "" {
+		return contract.Error("content is required"), nil
+	}
+
+	sessionID := toolutil.GetSessionFromContext(ctx)
+	if sessionID == "" {
+		return contract.ToolResult{}, fmt.Errorf("session_id is required")
+	}
+
+	filePath := ext.SmartJoin(workingDir, params.FilePath)
+
+	fileInfo, err := os.Stat(filePath)
+	if err == nil {
+		if fileInfo.IsDir() {
+			return contract.Error(fmt.Sprintf("Path is a directory, not a file: %s", filePath)), nil
+		}
+
+		modTime := fileInfo.ModTime().Truncate(time.Second)
+		lastRead := filetracker.LastReadTime(ctx, sessionID, filePath)
+		if modTime.After(lastRead) {
+			return contract.Error(fmt.Sprintf("File %s has been modified since it was last read.\nLast modification: %s\nLast read: %s\n\nPlease read the file again before modifying it.",
+				filePath, modTime.Format(time.RFC3339), lastRead.Format(time.RFC3339))), nil
+		}
+
+		oldContent, readErr := os.ReadFile(filePath)
+		if readErr == nil && string(oldContent) == params.Content {
+			return contract.Error(fmt.Sprintf("File %s already contains the exact content. No changes made.", filePath)), nil
+		}
+	} else if !os.IsNotExist(err) {
+		return contract.ToolResult{}, fmt.Errorf("error checking file: %w", err)
+	}
+
+	dir := filepath.Dir(filePath)
+	if err = os.MkdirAll(dir, 0o750); err != nil {
+		return contract.ToolResult{}, fmt.Errorf("error creating directory: %w", err)
+	}
+
+	oldContent := ""
+	if fileInfo != nil && !fileInfo.IsDir() {
+		oldBytes, readErr := os.ReadFile(filePath)
+		if readErr == nil {
+			oldContent = string(oldBytes)
+		}
+	}
+
+	diff, additions, removals := diff.GenerateDiff(
+		oldContent,
+		params.Content,
+		strings.TrimPrefix(filePath, workingDir),
+	)
+
+	p, err := permissions.Request(ctx,
+		permission.CreatePermissionRequest{
+			SessionID:   sessionID,
+			Path:        fsext.PathOrPrefix(filePath, workingDir),
+			ToolCallID:  callID,
+			ToolName:    WriteToolName,
+			Action:      WriteToolName,
+			Description: fmt.Sprintf("Create file %s", filePath),
+			Params: WritePermissionsParams{
+				FilePath:   filePath,
+				OldContent: oldContent,
+				NewContent: params.Content,
+			},
+		},
+	)
+	if err != nil {
+		return contract.ToolResult{}, err
+	}
+	if !p {
+		return permissionDeniedResult(), nil
+	}
+
+	err = os.WriteFile(filePath, []byte(params.Content), 0o600)
+	if err != nil {
+		return contract.ToolResult{}, fmt.Errorf("error writing file: %w", err)
+	}
+
+	// Check if file exists in history
+	file, err := files.GetByPathAndSession(ctx, filePath, sessionID)
+	if err != nil {
+		_, err = files.Create(ctx, sessionID, filePath, oldContent)
+		if err != nil {
+			// Log error but don't fail the operation
+			return contract.ToolResult{}, fmt.Errorf("error creating file history: %w", err)
+		}
+	}
+	if file.Content != oldContent {
+		// User manually changed the content; store an intermediate version
+		_, err = files.CreateVersion(ctx, sessionID, filePath, oldContent)
+		if err != nil {
+			slog.Error("Error creating file history version", "error", err)
+		}
+	}
+	// Store the new version
+	_, err = files.CreateVersion(ctx, sessionID, filePath, params.Content)
+	if err != nil {
+		slog.Error("Error creating file history version", "error", err)
+	}
+
+	filetracker.RecordRead(ctx, sessionID, filePath)
+
+	lsp.NotifyLSPs(ctx, lspManager, params.FilePath)
+
+	result := fmt.Sprintf("File successfully written: %s", filePath)
+	result = fmt.Sprintf("<result>\n%s\n</result>", result)
+	result += lsp.GetDiagnostics(filePath, lspManager)
+	return contract.WithMetadata(contract.Text(result), WriteResponseMetadata{
+		Diff:      diff,
+		Additions: additions,
+		Removals:  removals,
+	}), nil
 }

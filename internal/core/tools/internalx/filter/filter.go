@@ -1,9 +1,11 @@
 // Package filter provides context-aware filtering primitives for agent tools.
 // It is inspired by the FilterFunc / FilterToolSet pattern in trpc-agent-go/tool/filter.go.
 //
-// FilterFunc operates on fantasy.AgentTool only; descriptor-aware predicates
-// (ByCategory, ByKind) are defined in the parent tools package (registry_filter.go)
-// to avoid an import cycle.
+// FilterFunc operates on the framework-agnostic contract.Tool, so filtering
+// stays independent of the LLM runtime. Descriptor-aware predicates
+// (ByCategory, ByKind) are defined in the parent tools package
+// (registry_filter.go) to avoid an import cycle; they adapt the fantasy-backed
+// tool list to contract.Tool at the registry boundary.
 //
 // Usage:
 //
@@ -21,21 +23,21 @@ package filter
 import (
 	"context"
 
-	"charm.land/fantasy"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 )
 
 // FilterFunc decides whether a given tool should be included.
 // ctx is the request-scoped context; implementations may read values from it
 // to make dynamic decisions (e.g. agent role, session flags).
-type FilterFunc func(ctx context.Context, tool fantasy.AgentTool) bool
+type FilterFunc func(ctx context.Context, tool contract.Tool) bool
 
 // Apply returns only the tools for which all FilterFuncs return true.
 // An empty fns slice is a no-op (returns the original slice unchanged).
-func Apply(ctx context.Context, tools []fantasy.AgentTool, fns ...FilterFunc) []fantasy.AgentTool {
+func Apply(ctx context.Context, tools []contract.Tool, fns ...FilterFunc) []contract.Tool {
 	if len(fns) == 0 {
 		return tools
 	}
-	out := make([]fantasy.AgentTool, 0, len(tools))
+	out := make([]contract.Tool, 0, len(tools))
 	for _, t := range tools {
 		if accepts(ctx, t, fns) {
 			out = append(out, t)
@@ -46,7 +48,7 @@ func Apply(ctx context.Context, tools []fantasy.AgentTool, fns ...FilterFunc) []
 
 // Chain combines multiple FilterFuncs into one with AND semantics: all must pass.
 func Chain(fns ...FilterFunc) FilterFunc {
-	return func(ctx context.Context, tool fantasy.AgentTool) bool {
+	return func(ctx context.Context, tool contract.Tool) bool {
 		return accepts(ctx, tool, fns)
 	}
 }
@@ -57,8 +59,8 @@ func IncludeNames(names ...string) FilterFunc {
 	for _, n := range names {
 		allow[n] = struct{}{}
 	}
-	return func(_ context.Context, tool fantasy.AgentTool) bool {
-		_, ok := allow[tool.Info().Name]
+	return func(_ context.Context, tool contract.Tool) bool {
+		_, ok := allow[tool.Name()]
 		return ok
 	}
 }
@@ -69,14 +71,14 @@ func ExcludeNames(names ...string) FilterFunc {
 	for _, n := range names {
 		block[n] = struct{}{}
 	}
-	return func(_ context.Context, tool fantasy.AgentTool) bool {
-		_, blocked := block[tool.Info().Name]
+	return func(_ context.Context, tool contract.Tool) bool {
+		_, blocked := block[tool.Name()]
 		return !blocked
 	}
 }
 
 // accepts is a shared helper: returns true when all fns pass for the tool.
-func accepts(ctx context.Context, tool fantasy.AgentTool, fns []FilterFunc) bool {
+func accepts(ctx context.Context, tool contract.Tool, fns []FilterFunc) bool {
 	for _, fn := range fns {
 		if !fn(ctx, tool) {
 			return false

@@ -33,8 +33,11 @@ All notable changes to mocode are documented here. The format follows
   as `tools.*` aliases); an `agenttooladapter` converts `tools.Tool` into the
   runtime `fantasy.AgentTool`; all twelve agent tools are migrated and that
   package no longer imports the framework (layercheck enforces it); the
-  question tool, SSH helpers and the screenshot tool are ported as well. The
-  coordinator supplies a per-call
+  every tool tree (fs, web, shell, sandbox, question, lsp, filter, ssh, gitea,
+  gitops, browser, wechat) is ported, with layercheck forbidding the framework
+  in each package; the screenshot tool is ported too. The adapter now emits
+  legacy-compatible flat metadata and preserves StopTurn on tool-level errors
+  (permission denials still end the turn). The coordinator supplies a per-call
   context with session id, working directory and a prompting permission
   checker. layercheck keeps the contract package dependency-free (leaf).
 - WeChat account manager is created at the command boundary and injected into

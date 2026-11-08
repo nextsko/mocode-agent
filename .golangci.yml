@@ -91,6 +91,11 @@ linters:
       # Three-letter repeats ("bash", "tool", "enabled") in one file are not
       # worth a constant; five or more in the same package are.
       min-occurrences: 5
+      # JSON-schema vocabulary and the property names every tool schema shares
+      # are declarative wire format, not duplicated domain strings. Hand-written
+      # port schemas repeat them by design.
+      ignore-string-values:
+        - '^(type|description|properties|required|items|array|object|string|integer|boolean|number|file_path|url|host|shell_id)$'
   exclusions:
     generated: lax
     presets:

@@ -7,6 +7,7 @@ package web
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,10 +16,10 @@ import (
 	"unicode/utf8"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 	netcommon "github.com/nextsko/mocode-agent/internal/core/tools/external/common/net"
 	"github.com/nextsko/mocode-agent/internal/util/errcoll"
 
-	"charm.land/fantasy"
 	md "github.com/JohannesKaufmann/html-to-markdown"
 	"github.com/PuerkitoBio/goquery"
 
@@ -37,179 +38,209 @@ type FetchPermissionsParams = netcommon.FetchPermissionsParams
 //go:embed fetch.md
 var fetchDescription []byte
 
-func NewFetchTool(permissions permission.Service, workingDir string, client *http.Client) fantasy.AgentTool {
+// NewFetchPortTool is the framework-agnostic form of the fetch tool.
+func NewFetchPortTool(permissions permission.Service, workingDir string, client *http.Client) contract.Tool {
 	if client == nil {
 		client = netcommon.DefaultHTTPClient()
 	}
 
-	return fantasy.NewParallelAgentTool(
+	return asParallel(contract.NewFunc(
 		FetchToolName,
 		toolutil.FirstLineDescription(fetchDescription),
-		func(ctx context.Context, params FetchParams, call fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			record := func(category errcoll.ErrorCategory, err error, msg string) {
-				if c := errcoll.FromContext(ctx); c != nil {
-					c.Record(errcoll.ErrorRecord{
-						SessionID: toolutil.GetSessionFromContext(ctx),
-						ToolName:  FetchToolName,
-						Error:     msg,
-						Category:  category,
-					})
-				}
-			}
-
-			if params.URL == "" {
-				return fantasy.NewTextErrorResponse("URL parameter is required"), nil
-			}
-
-			format := strings.ToLower(params.Format)
-			if format != "text" && format != "markdown" && format != "html" {
-				return fantasy.NewTextErrorResponse("Format must be one of: text, markdown, html"), nil
-			}
-
-			if !strings.HasPrefix(params.URL, "http://") && !strings.HasPrefix(params.URL, "https://") {
-				return fantasy.NewTextErrorResponse("URL must start with http:// or https://"), nil
-			}
-
-			sessionID := toolutil.GetSessionFromContext(ctx)
-			if sessionID == "" {
-				msg := "session ID is required for fetch"
-				record(errcoll.CategoryToolExecution, nil, msg)
-				return fantasy.NewTextErrorResponse(msg), nil
-			}
-
-			p, err := permissions.Request(
-				ctx,
-				permission.CreatePermissionRequest{
-					SessionID:   sessionID,
-					Path:        workingDir,
-					ToolCallID:  call.ID,
-					ToolName:    FetchToolName,
-					Action:      "fetch",
-					Description: fmt.Sprintf("Fetch content from URL: %s", params.URL),
-					Params:      FetchPermissionsParams(params),
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"url": map[string]any{
+					"type":        "string",
+					"description": "The URL to fetch content from",
 				},
-			)
-			if err != nil {
-				msg := "Permission request failed: " + err.Error()
-				record(errcoll.CategoryPermission, err, msg)
-				return fantasy.NewTextErrorResponse(msg), nil
+				"format": map[string]any{
+					"type":        "string",
+					"description": "The format to return the content in (text, markdown, or html)",
+				},
+				"timeout": map[string]any{
+					"type":        "integer",
+					"description": "Optional timeout in seconds (max 120)",
+				},
+			},
+			"required": []string{"url", "format"},
+		},
+		func(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
+			var params FetchParams
+			if err := json.Unmarshal(args, &params); err != nil {
+				return contract.ToolResult{}, fmt.Errorf("invalid parameters: %w", err)
 			}
-			if !p {
-				record(errcoll.CategoryPermission, nil, "permission denied")
-				return toolutil.NewPermissionDeniedResponse(), nil
-			}
+			callID, _ := toolutil.ToolCallIDFromCtx(ctx)
+			return runFetch(ctx, permissions, workingDir, client, params, callID)
+		},
+	))
+}
 
-			// maxFetchTimeoutSeconds is the maximum allowed timeout for fetch requests (2 minutes)
-			const maxFetchTimeoutSeconds = 120
+// runFetch validates the request, asks for permission and renders the URL
+// content in the requested format.
+func runFetch(ctx context.Context, permissions permission.Service, workingDir string, client *http.Client, params FetchParams, callID string) (contract.ToolResult, error) {
+	record := func(category errcoll.ErrorCategory, _ error, msg string) {
+		if c := errcoll.FromContext(ctx); c != nil {
+			c.Record(errcoll.ErrorRecord{
+				SessionID: toolutil.GetSessionFromContext(ctx),
+				ToolName:  FetchToolName,
+				Error:     msg,
+				Category:  category,
+			})
+		}
+	}
 
-			// Handle timeout with context
-			requestCtx := ctx
-			if params.Timeout > 0 {
-				if params.Timeout > maxFetchTimeoutSeconds {
-					params.Timeout = maxFetchTimeoutSeconds
-				}
-				var cancel context.CancelFunc
-				requestCtx, cancel = context.WithTimeout(ctx, time.Duration(params.Timeout)*time.Second)
-				defer cancel()
-			}
+	if params.URL == "" {
+		return contract.Error("URL parameter is required"), nil
+	}
 
-			req, err := http.NewRequestWithContext(requestCtx, "GET", params.URL, nil)
-			if err != nil {
-				msg := fmt.Sprintf("failed to create request: %v", err)
-				record(errcoll.CategoryToolExecution, err, msg)
-				return fantasy.NewTextErrorResponse(msg), nil
-			}
+	format := strings.ToLower(params.Format)
+	if format != "text" && format != "markdown" && format != "html" {
+		return contract.Error("Format must be one of: text, markdown, html"), nil
+	}
 
-			req.Header.Set("User-Agent", netcommon.BrowserUserAgent)
+	if !strings.HasPrefix(params.URL, "http://") && !strings.HasPrefix(params.URL, "https://") {
+		return contract.Error("URL must start with http:// or https://"), nil
+	}
 
-			resp, err := client.Do(req)
-			if err != nil {
-				msg := fmt.Sprintf("failed to fetch URL: %v", err)
-				record(errcoll.CategoryToolExecution, err, msg)
-				return fantasy.NewTextErrorResponse(msg), nil
-			}
-			defer resp.Body.Close()
+	sessionID := toolutil.GetSessionFromContext(ctx)
+	if sessionID == "" {
+		msg := "session ID is required for fetch"
+		record(errcoll.CategoryToolExecution, nil, msg)
+		return contract.Error(msg), nil
+	}
 
-			if resp.StatusCode != http.StatusOK {
-				msg := fmt.Sprintf("Request failed with status code: %d", resp.StatusCode)
-				record(errcoll.CategoryToolExecution, nil, msg)
-				return fantasy.NewTextErrorResponse(msg), nil
-			}
-
-			body, err := io.ReadAll(io.LimitReader(resp.Body, MaxFetchSize))
-			if err != nil {
-				msg := "Failed to read response body: " + err.Error()
-				record(errcoll.CategoryToolExecution, err, msg)
-				return fantasy.NewTextErrorResponse(msg), nil
-			}
-
-			content := string(body)
-
-			validUTF8 := utf8.ValidString(content)
-			if !validUTF8 {
-				msg := "Response content is not valid UTF-8"
-				record(errcoll.CategoryToolExecution, nil, msg)
-				return fantasy.NewTextErrorResponse(msg), nil
-			}
-			contentType := resp.Header.Get("Content-Type")
-
-			switch format {
-			case "text":
-				if strings.Contains(contentType, "text/html") {
-					text, err := extractTextFromHTML(content)
-					if err != nil {
-						msg := "Failed to extract text from HTML: " + err.Error()
-						record(errcoll.CategoryToolExecution, err, msg)
-						return fantasy.NewTextErrorResponse(msg), nil
-					}
-					content = text
-				}
-
-			case "markdown":
-				if strings.Contains(contentType, "text/html") {
-					markdown, err := convertHTMLToMarkdown(content)
-					if err != nil {
-						msg := "Failed to convert HTML to Markdown: " + err.Error()
-						record(errcoll.CategoryToolExecution, err, msg)
-						return fantasy.NewTextErrorResponse(msg), nil
-					}
-					content = markdown
-				}
-
-				content = "```\n" + content + "\n```"
-
-			case "html":
-				// return only the body of the HTML document
-				if strings.Contains(contentType, "text/html") {
-					doc, err := goquery.NewDocumentFromReader(strings.NewReader(content))
-					if err != nil {
-						msg := "Failed to parse HTML: " + err.Error()
-						record(errcoll.CategoryToolExecution, err, msg)
-						return fantasy.NewTextErrorResponse(msg), nil
-					}
-					body, err := doc.Find("body").Html()
-					if err != nil {
-						msg := "Failed to extract body from HTML: " + err.Error()
-						record(errcoll.CategoryToolExecution, err, msg)
-						return fantasy.NewTextErrorResponse(msg), nil
-					}
-					if body == "" {
-						msg := "No body content found in HTML"
-						record(errcoll.CategoryToolExecution, nil, msg)
-						return fantasy.NewTextErrorResponse(msg), nil
-					}
-					content = "<html>\n<body>\n" + body + "\n</body>\n</html>"
-				}
-			}
-			// truncate content if it exceeds max read size
-			if int64(len(content)) >= MaxFetchSize {
-				content = content[:MaxFetchSize]
-				content += fmt.Sprintf("\n\n[Content truncated to %d bytes]", MaxFetchSize)
-			}
-
-			return fantasy.NewTextResponse(content), nil
+	p, err := permissions.Request(
+		ctx,
+		permission.CreatePermissionRequest{
+			SessionID:   sessionID,
+			Path:        workingDir,
+			ToolCallID:  callID,
+			ToolName:    FetchToolName,
+			Action:      "fetch",
+			Description: fmt.Sprintf("Fetch content from URL: %s", params.URL),
+			Params:      FetchPermissionsParams(params),
 		},
 	)
+	if err != nil {
+		msg := "Permission request failed: " + err.Error()
+		record(errcoll.CategoryPermission, err, msg)
+		return contract.Error(msg), nil
+	}
+	if !p {
+		record(errcoll.CategoryPermission, nil, "permission denied")
+		return permissionDeniedResult(), nil
+	}
+
+	// maxFetchTimeoutSeconds is the maximum allowed timeout for fetch requests (2 minutes)
+	const maxFetchTimeoutSeconds = 120
+
+	// Handle timeout with context
+	requestCtx := ctx
+	if params.Timeout > 0 {
+		if params.Timeout > maxFetchTimeoutSeconds {
+			params.Timeout = maxFetchTimeoutSeconds
+		}
+		var cancel context.CancelFunc
+		requestCtx, cancel = context.WithTimeout(ctx, time.Duration(params.Timeout)*time.Second)
+		defer cancel()
+	}
+
+	req, err := http.NewRequestWithContext(requestCtx, "GET", params.URL, nil)
+	if err != nil {
+		msg := fmt.Sprintf("failed to create request: %v", err)
+		record(errcoll.CategoryToolExecution, err, msg)
+		return contract.Error(msg), nil
+	}
+
+	req.Header.Set("User-Agent", netcommon.BrowserUserAgent)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		msg := fmt.Sprintf("failed to fetch URL: %v", err)
+		record(errcoll.CategoryToolExecution, err, msg)
+		return contract.Error(msg), nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		msg := fmt.Sprintf("Request failed with status code: %d", resp.StatusCode)
+		record(errcoll.CategoryToolExecution, nil, msg)
+		return contract.Error(msg), nil
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, MaxFetchSize))
+	if err != nil {
+		msg := "Failed to read response body: " + err.Error()
+		record(errcoll.CategoryToolExecution, err, msg)
+		return contract.Error(msg), nil
+	}
+
+	content := string(body)
+
+	validUTF8 := utf8.ValidString(content)
+	if !validUTF8 {
+		msg := "Response content is not valid UTF-8"
+		record(errcoll.CategoryToolExecution, nil, msg)
+		return contract.Error(msg), nil
+	}
+	contentType := resp.Header.Get("Content-Type")
+
+	switch format {
+	case "text":
+		if strings.Contains(contentType, "text/html") {
+			text, err := extractTextFromHTML(content)
+			if err != nil {
+				msg := "Failed to extract text from HTML: " + err.Error()
+				record(errcoll.CategoryToolExecution, err, msg)
+				return contract.Error(msg), nil
+			}
+			content = text
+		}
+
+	case "markdown":
+		if strings.Contains(contentType, "text/html") {
+			markdown, err := convertHTMLToMarkdown(content)
+			if err != nil {
+				msg := "Failed to convert HTML to Markdown: " + err.Error()
+				record(errcoll.CategoryToolExecution, err, msg)
+				return contract.Error(msg), nil
+			}
+			content = markdown
+		}
+
+		content = "```\n" + content + "\n```"
+
+	case "html":
+		// return only the body of the HTML document
+		if strings.Contains(contentType, "text/html") {
+			doc, err := goquery.NewDocumentFromReader(strings.NewReader(content))
+			if err != nil {
+				msg := "Failed to parse HTML: " + err.Error()
+				record(errcoll.CategoryToolExecution, err, msg)
+				return contract.Error(msg), nil
+			}
+			body, err := doc.Find("body").Html()
+			if err != nil {
+				msg := "Failed to extract body from HTML: " + err.Error()
+				record(errcoll.CategoryToolExecution, err, msg)
+				return contract.Error(msg), nil
+			}
+			if body == "" {
+				msg := "No body content found in HTML"
+				record(errcoll.CategoryToolExecution, nil, msg)
+				return contract.Error(msg), nil
+			}
+			content = "<html>\n<body>\n" + body + "\n</body>\n</html>"
+		}
+	}
+	// truncate content if it exceeds max read size
+	if int64(len(content)) >= MaxFetchSize {
+		content = content[:MaxFetchSize]
+		content += fmt.Sprintf("\n\n[Content truncated to %d bytes]", MaxFetchSize)
+	}
+
+	return contract.Text(content), nil
 }
 
 func extractTextFromHTML(html string) (string, error) {
