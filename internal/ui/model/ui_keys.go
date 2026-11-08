@@ -570,6 +570,10 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 	return tea.Sequence(cmds...)
 }
 
+// handleTextareaHeightChange checks whether the textarea height changed and,
+// if so, recalculates the layout. When the chat is in follow mode it keeps
+// the view scrolled to the bottom. The returned command, if non-nil, must be
+// batched by the caller.
 func (m *UI) handleTextareaHeightChange(prevHeight int) tea.Cmd {
 	if m.textarea.Height() == prevHeight {
 		return nil
@@ -581,10 +585,20 @@ func (m *UI) handleTextareaHeightChange(prevHeight int) tea.Cmd {
 	return nil
 }
 
+// updateTextarea updates the textarea for msg and then reconciles layout if
+// the textarea height changed as a result.
 func (m *UI) updateTextarea(msg tea.Msg) tea.Cmd {
 	return m.updateTextareaWithPrevHeight(msg, m.textarea.Height())
 }
 
+// updateTextareaWithPrevHeight is for cases when the height of the layout may
+// have changed.
+//
+// Particularly, it's for cases where the textarea changes before
+// textarea.Update is called (for example, SetValue, Reset, and InsertRune). We
+// pass the height from before those changes took place so we can compare
+// "before" vs "after" sizing and recalculate the layout if the textarea grew
+// or shrank.
 func (m *UI) updateTextareaWithPrevHeight(msg tea.Msg, prevHeight int) tea.Cmd {
 	ta, cmd := m.textarea.Update(msg)
 	m.textarea = ta

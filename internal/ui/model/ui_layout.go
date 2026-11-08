@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/ultraviolet/layout"
 )
 
+// updateLayoutAndSize updates the layout and sizes of UI components.
 func (m *UI) updateLayoutAndSize() {
 	// Determine if we should be in compact mode
 	if m.state == uiChat {
@@ -32,6 +33,7 @@ func (m *UI) updateLayoutAndSize() {
 	}
 }
 
+// updateSize updates the sizes of UI components based on the current layout.
 func (m *UI) updateSize() {
 	m.chat.SetSize(m.layout.main.Dx(), m.layout.main.Dy())
 	m.textarea.MaxHeight = TextareaMaxHeight
@@ -92,6 +94,8 @@ func (m *UI) layoutCompactChat(uiLayout *uiLayout, appRect, area image.Rectangle
 	uiLayout.editor = editorRect
 }
 
+// generateLayout calculates the layout rectangles for all UI components based
+// on the current UI state and terminal dimensions.
 func (m *UI) generateLayout(w, h int) uiLayout {
 	// The screen area we're working with
 	area := image.Rect(0, 0, w, h)

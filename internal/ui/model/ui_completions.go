@@ -182,6 +182,7 @@ func (m *UI) updateSlashArgCompletions() bool {
 	return true
 }
 
+// closeCompletions closes the completions popup and resets state.
 func (m *UI) closeCompletions() {
 	m.completionsOpen = false
 	m.completionsSlashMode = false
@@ -223,6 +224,9 @@ func thinkingSettingItems(cfg *config.Config) []completions.SlashCompletionValue
 	}}
 }
 
+// slashCompletionGroups returns slash commands organised into named groups.
+// The set mirrors the Commands dialog and is filtered by the same context
+// guards (session presence, model capabilities, environment variables).
 func (m *UI) slashCompletionGroups() []completions.SlashGroup {
 	hasSession := m.hasSession()
 	hasTodos := hasSession && pills.HasIncompleteTodos(m.session.Todos)
@@ -370,6 +374,8 @@ func (m *UI) slashCompletionGroups() []completions.SlashGroup {
 	return groups
 }
 
+// slashLabelFromCommandID derives a "/name" label from a custom command ID
+// like "user:my-feature" or "project:spec".
 func slashLabelFromCommandID(id string) string {
 	// ID is now a stable hash; display the actual command name from the
 	// loader's Path field when available. As a fallback for hash-only
@@ -400,6 +406,8 @@ func slashDescFromContent(content string) string {
 	return ""
 }
 
+// insertCompletionText replaces the @query in the textarea with the given text.
+// Returns false if the replacement cannot be performed.
 func (m *UI) insertCompletionText(text string) bool {
 	return m.insertCompletionTextWithGap(text, true)
 }
@@ -421,6 +429,8 @@ func (m *UI) insertCompletionTextWithGap(text string, trailingGap bool) bool {
 	return true
 }
 
+// insertFileCompletion inserts the selected file path into the textarea,
+// replacing the @query, and adds the file as an attachment.
 func (m *UI) insertFileCompletion(path string) tea.Cmd {
 	prevHeight := m.textarea.Height()
 	if !m.insertCompletionText(path) {
@@ -462,6 +472,8 @@ func (m *UI) insertFileCompletion(path string) tea.Cmd {
 	return tea.Batch(heightCmd, fileCmd)
 }
 
+// insertMCPResourceCompletion inserts the selected resource into the textarea,
+// replacing the @query, and adds the resource as an attachment.
 func (m *UI) insertMCPResourceCompletion(item completions.ResourceCompletionValue) tea.Cmd {
 	displayText := cmp.Or(item.Title, item.URI)
 
@@ -514,6 +526,7 @@ func (m *UI) insertMCPResourceCompletion(item completions.ResourceCompletionValu
 	return tea.Batch(heightCmd, resourceCmd)
 }
 
+// completionsPosition returns the X and Y position for the completions popup.
 func (m *UI) completionsPosition() image.Point {
 	cur := m.textarea.Cursor()
 	if cur == nil {
@@ -528,14 +541,17 @@ func (m *UI) completionsPosition() image.Point {
 	}
 }
 
+// textareaWord returns the current word at the cursor position.
 func (m *UI) textareaWord() string {
 	return m.textarea.Word()
 }
 
+// isWhitespace returns true if the byte is a whitespace character.
 func isWhitespace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
 }
 
+// mimeOf detects the MIME type of the given content.
 func mimeOf(content []byte) string {
 	mimeBufferSize := min(512, len(content))
 	return http.DetectContentType(content[:mimeBufferSize])
@@ -546,17 +562,22 @@ func (m *UI) randomizePlaceholders() {
 	m.readyPlaceholder = readyPlaceholders[randomIntn(len(readyPlaceholders))]
 }
 
+// isAgentBusy returns true if the agent coordinator exists and is currently
+// busy processing a request.
 func (m *UI) isAgentBusy() bool {
 	return m.com.Workspace.AgentIsReady() &&
 		m.com.Workspace.AgentIsBusy()
 }
 
+// breathingCmd returns a command that sends a breathTickMsg after 800ms.
+// This drives the editor prompt breathing animation while the agent is busy.
 func (m *UI) breathingCmd() tea.Cmd {
 	return tea.Tick(800*time.Millisecond, func(time.Time) tea.Msg {
 		return breathTickMsg{}
 	})
 }
 
+// hasSession returns true if there is an active session with a valid ID.
 func (m *UI) hasSession() bool {
 	return m.session != nil && m.session.ID != ""
 }

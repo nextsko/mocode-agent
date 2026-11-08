@@ -57,6 +57,8 @@ func (m *UI) openEditor(value string) tea.Cmd {
 	})
 }
 
+// setEditorPrompt configures the textarea prompt function based on whether
+// yolo mode is enabled.
 func (m *UI) setEditorPrompt(yolo bool) {
 	if yolo {
 		m.textarea.SetPromptFunc(4, m.yoloPromptFunc)
@@ -65,6 +67,10 @@ func (m *UI) setEditorPrompt(yolo bool) {
 	m.textarea.SetPromptFunc(4, m.normalPromptFunc)
 }
 
+// normalPromptFunc returns the normal editor prompt style ("  > " on first
+// line, "::: " on subsequent lines).
+// When the agent is busy, the "::: " dots alternate between bright and dim
+// colors to create a breathing/pulsing effect.
 func (m *UI) normalPromptFunc(info textarea.PromptInfo) string {
 	t := m.com.Styles
 	if info.LineNumber == 0 {
@@ -83,6 +89,8 @@ func (m *UI) normalPromptFunc(info textarea.PromptInfo) string {
 	return t.Editor.PromptNormalBlurred.Render()
 }
 
+// yoloPromptFunc returns the yolo mode editor prompt style with warning icon
+// and colored dots.
 func (m *UI) yoloPromptFunc(info textarea.PromptInfo) string {
 	t := m.com.Styles
 	if info.LineNumber == 0 {
@@ -166,6 +174,7 @@ func (m *UI) refreshStyles() {
 	m.chat.InvalidateRenderCaches()
 }
 
+// toggleCompactMode toggles compact mode and persists the choice.
 func (m *UI) toggleCompactMode() tea.Cmd {
 	m.forceCompactMode = !m.forceCompactMode
 
