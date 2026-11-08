@@ -310,6 +310,7 @@ func standardPlugins() []ToolPlugin {
 		thinkPlugin{},
 		learnPlugin{},
 		memoryPlugin{},
+		flywheelPlugin{},
 		browserPlugin{},
 		giteaPlugin{},
 		gitOpsPlugin{},
@@ -582,6 +583,21 @@ func (thinkPlugin) Descriptors() []ToolDescriptor {
 
 func (thinkPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{deps.wrapPort(agenttools.NewThinkPortTool())}
+}
+
+// flywheelPlugin exposes the capability flywheel: archive → distill →
+// skill promotion → reuse scoring. It is the engine behind continuous
+// improvement, not a per-session scratchpad.
+type flywheelPlugin struct{}
+
+func (flywheelPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: agenttools.FlywheelToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
+	}
+}
+
+func (flywheelPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	return []fantasy.AgentTool{deps.wrapPort(agenttools.NewFlywheelPortTool(deps.Cfg.WorkingDir()))}
 }
 
 // ─── plugin/learn ─────────────────────────────────────────────────────────────

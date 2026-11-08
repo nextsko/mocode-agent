@@ -233,3 +233,11 @@ ground truth — a note is only as good as the session that wrote it.
 {{end}}
 </memory>
 {{end}}
+
+<flywheel>
+Multi-step task just finished? Archive it with the `flywheel` tool: type, goal, outcome,
+the steps you actually took (mark failed attempts — they become pitfalls) and lessons.
+Before a similar task, call `flywheel action=context` and reuse the skills it lists; record
+the result with `action=use`. The engine decides create / update / upgrade / skip from the
+evidence — never bump a skill version by hand.
+</flywheel>

@@ -5,6 +5,18 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
+## [0.17.0] - 2026-11-09
+
+### Added
+
+- **能力飞轮（flywheel）**: 长任务归档 → 最简成功路径蒸馏 → 技能判定
+  （create/update/upgrade/skip，引擎按证据执行，不手改版本）→ 复用记分 →
+  报表与 Mermaid 导出；技能带版本历史与成功率。
+- **上下文自调控入口**：`flywheel action=context` 返回预算内的紧凑摘要，
+  模型按需拉取细节，避免整段历史进上下文。
+- 设计吸收 Voyager / Reflexion / MemGPT / A-MEM 的技能库、语言化反馈、
+  分层记忆与动态链接模式；文档见 `docs/guides/14-flywheel.md`。
+
 ## [0.16.0] - 2026-11-09
 
 ### Added

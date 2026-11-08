@@ -45,6 +45,7 @@ var knownAllToolNames = []string{
 	TodosToolName,
 	LearnToolName,
 	MemoryToolName,
+	FlywheelToolName,
 	BrowserToolName,
 	BrowserUIDissectToolName,
 	ViewToolName,

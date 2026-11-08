@@ -639,6 +639,7 @@ func allToolNames() []string {
 		"todos",
 		"learn",
 		"memory",
+		"flywheel",
 		"browser",
 		"ui_dissect",
 		"view",

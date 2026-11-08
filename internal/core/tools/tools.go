@@ -139,6 +139,7 @@ const (
 	MessageExportToolName  = agenttools.MessageExportToolName
 	LearnToolName          = agenttools.LearnToolName
 	MemoryToolName         = agenttools.MemoryToolName
+	FlywheelToolName       = agenttools.FlywheelToolName
 )
 
 type (
