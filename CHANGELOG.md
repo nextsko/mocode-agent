@@ -35,7 +35,8 @@ All notable changes to mocode are documented here. The format follows
   package no longer imports the framework (layercheck enforces it); the
   every tool tree (fs, web, shell, sandbox, question, lsp, filter, ssh, gitea,
   gitops, browser, wechat) is ported, with layercheck forbidding the framework
-  in each package; the screenshot tool is ported too. The adapter now emits
+  in each package; the screenshot tool and the dynamic MCP bridge (image/media
+  payloads now travel as ToolResult attachments) are ported too. The adapter now emits
   legacy-compatible flat metadata and preserves StopTurn on tool-level errors
   (permission denials still end the turn). The coordinator supplies a per-call
   context with session id, working directory and a prompting permission

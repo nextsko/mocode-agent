@@ -78,9 +78,9 @@
 //	tool packages          ported and framework-free. Enforced by layercheck:
 //	  tools/internalx/agent, tools/internalx/{lsp,filter}, tools/core/{fs,
 //	  web,shell,sandbox,question}, tools/external/systems/{ssh,gitea,gitops,
-//	  browser,wechat}, tools/external/common/ssh, shellruntime/screencap.
-//	  tools/external/mcp stays framework-backed: mcp-tools.go returns
-//	  structured image/media responses the port cannot express yet.
+//	  browser,wechat}, tools/external/common/ssh, shellruntime/screencap and
+//	  tools/external/mcp (the dynamic bridge maps image/media payloads to
+//	  ToolResult.Attachments).
 //
 // nethttp stays pure (net/http + time only) so any future runtime can sit
 // behind it; netcommon may not grow LLM-runtime coupling.

@@ -183,8 +183,8 @@ var (
 )
 
 // MCPToolStruct is re-exported because the coordinator iterates MCP tools and
-// touches its Name field (alias, NOT a new type: keep identity for any
-// caller doing type switches).
+// touches MCP()/MCPToolName() before wrapping them with the agent adapter
+// (alias, NOT a new type: keep identity for any caller doing type switches).
 type MCPToolStruct = mcp.MCPToolStruct
 
 // ---------------------------------------------------------------------------

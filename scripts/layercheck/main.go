@@ -191,6 +191,10 @@ var packageRules = []packageRule{
 		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/external/systems/wechat",
 		forbidden: []string{"charm.land/"},
 	},
+	{
+		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/external/mcp",
+		forbidden: []string{"charm.land/"},
+	},
 }
 
 // bannedBy reports the first forbidden import matching a rule for pkgPath.

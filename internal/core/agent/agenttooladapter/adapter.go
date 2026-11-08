@@ -95,10 +95,17 @@ func (a *Adapter) Run(ctx context.Context, call fantasy.ToolCall) (fantasy.ToolR
 
 	resp := fantasy.NewTextResponse(result.Content)
 	// The runtime carries at most one binary payload per tool response. A
-	// single image attachment maps to an image response; additional
+	// single image attachment maps to an image response, other binary payloads
+	// (audio/video/PDF from MCP servers) map to a media response; additional
 	// attachments are reported in the text so nothing is silently dropped.
 	if len(result.Attachments) > 0 && len(result.Attachments[0].Content) > 0 && result.Attachments[0].IsImage() {
 		resp = fantasy.NewImageResponse(result.Attachments[0].Content, result.Attachments[0].MimeType)
+		if len(result.Attachments) > 1 {
+			resp.Content = fmt.Sprintf("%s\n(%d more attachments omitted)", result.Content, len(result.Attachments)-1)
+		}
+	} else if len(result.Attachments) > 0 && len(result.Attachments[0].Content) > 0 && result.Attachments[0].MimeType != "" {
+		resp = fantasy.NewMediaResponse(result.Attachments[0].Content, result.Attachments[0].MimeType)
+		resp.Content = result.Content
 		if len(result.Attachments) > 1 {
 			resp.Content = fmt.Sprintf("%s\n(%d more attachments omitted)", result.Content, len(result.Attachments)-1)
 		}

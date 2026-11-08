@@ -368,7 +368,7 @@ func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 	for _, mcpTool := range tools.GetMCPTools(c.permissions, c.cfg, c.cfg.WorkingDir()) {
 		if agentCfg.AllowedMCP == nil {
 			// No MCP restrictions.
-			filteredTools = append(filteredTools, mcpTool)
+			filteredTools = append(filteredTools, agenttooladapter.NewWithContext(mcpTool, c.portToolContextFactory()))
 			continue
 		}
 		if len(agentCfg.AllowedMCP) == 0 {
@@ -381,7 +381,7 @@ func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isS
 				continue
 			}
 			if len(mcpToolNames) == 0 || slices.Contains(mcpToolNames, mcpTool.MCPToolName()) {
-				filteredTools = append(filteredTools, mcpTool)
+				filteredTools = append(filteredTools, agenttooladapter.NewWithContext(mcpTool, c.portToolContextFactory()))
 				break
 			}
 			slog.Debug("MCP not allowed", "tool", mcpTool.Name(), "agent", agentCfg.Name)

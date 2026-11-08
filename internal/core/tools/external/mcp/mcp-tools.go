@@ -2,14 +2,14 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
-
-	"charm.land/fantasy"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
+	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 )
 
 // whitelistDockerTools contains Docker MCP tools that don't require permission.
@@ -40,112 +40,87 @@ func GetMCPTools(permissions permission.Service, cfg *config.ConfigStore, wd str
 
 // Tool is a tool from a MCP.
 type MCPToolStruct struct {
-	mcpName         string
-	tool            *Tool
-	cfg             *config.ConfigStore
-	permissions     permission.Service
-	workingDir      string
-	providerOptions fantasy.ProviderOptions
+	mcpName     string
+	tool        *Tool
+	cfg         *config.ConfigStore
+	permissions permission.Service
+	workingDir  string
 }
 
-func (m *MCPToolStruct) SetProviderOptions(opts fantasy.ProviderOptions) {
-	m.providerOptions = opts
-}
+// Description implements contract.Tool.
+func (m *MCPToolStruct) Description() string { return m.tool.Description }
 
-func (m *MCPToolStruct) ProviderOptions() fantasy.ProviderOptions {
-	return m.providerOptions
-}
+// MCP returns the MCP server name this tool belongs to.
+func (m *MCPToolStruct) MCP() string { return m.mcpName }
 
-func (m *MCPToolStruct) Name() string {
-	return fmt.Sprintf("mcp_%s_%s", m.mcpName, m.tool.Name)
-}
+// MCPToolName returns the original tool name inside the MCP server.
+func (m *MCPToolStruct) MCPToolName() string { return m.tool.Name }
 
-func (m *MCPToolStruct) MCP() string {
-	return m.mcpName
-}
+// Name implements contract.Tool.
+func (m *MCPToolStruct) Name() string { return fmt.Sprintf("mcp_%s_%s", m.mcpName, m.tool.Name) }
 
-func (m *MCPToolStruct) MCPToolName() string {
-	return m.tool.Name
-}
-
-func (m *MCPToolStruct) Info() fantasy.ToolInfo {
+// Schema implements contract.Tool, forwarding the MCP server's JSON Schema.
+func (m *MCPToolStruct) Schema() contract.Schema {
 	parameters := make(map[string]any)
-	required := make([]string, 0)
-
 	if input, ok := m.tool.InputSchema.(map[string]any); ok {
-		if props, ok := input["properties"].(map[string]any); ok {
-			parameters = props
-		}
-		if req, ok := input["required"].([]any); ok {
-			// Convert []any -> []string when elements are strings
-			for _, v := range req {
-				if s, ok := v.(string); ok {
-					required = append(required, s)
-				}
-			}
-		} else if reqStr, ok := input["required"].([]string); ok {
-			// Handle case where it's already []string
-			required = reqStr
-		}
+		parameters = input
 	}
-
-	return fantasy.ToolInfo{
+	return contract.Schema{
 		Name:        m.Name(),
 		Description: m.tool.Description,
 		Parameters:  parameters,
-		Required:    required,
 	}
 }
 
-func (m *MCPToolStruct) Run(ctx context.Context, params fantasy.ToolCall) (fantasy.ToolResponse, error) {
+// Execute implements contract.Tool.
+func (m *MCPToolStruct) Execute(ctx context.Context, _ contract.ToolContext, args json.RawMessage) (contract.ToolResult, error) {
 	sessionID := toolutil.GetSessionFromContext(ctx)
 	if sessionID == "" {
-		return fantasy.ToolResponse{}, fmt.Errorf("session ID is required for creating a new file")
+		return contract.ToolResult{}, fmt.Errorf("session ID is required for creating a new file")
 	}
 
 	// Skip permission for whitelisted Docker MCP tools.
-	if !slices.Contains(whitelistDockerTools, params.Name) {
-		permissionDescription := fmt.Sprintf("execute %s with the following parameters:", m.Info().Name)
+	if !slices.Contains(whitelistDockerTools, m.Name()) {
+		permissionDescription := fmt.Sprintf("execute %s with the following parameters:", m.Name())
+		callID, _ := toolutil.ToolCallIDFromCtx(ctx)
 		p, err := m.permissions.Request(ctx,
 			permission.CreatePermissionRequest{
 				SessionID:   sessionID,
-				ToolCallID:  params.ID,
+				ToolCallID:  callID,
 				Path:        m.workingDir,
-				ToolName:    m.Info().Name,
+				ToolName:    m.Name(),
 				Action:      "execute",
 				Description: permissionDescription,
-				Params:      params.Input,
+				Params:      string(args),
 			},
 		)
 		if err != nil {
-			return fantasy.ToolResponse{}, err
+			return contract.ToolResult{}, err
 		}
 		if !p {
-			return toolutil.NewPermissionDeniedResponse(), nil
+			return contract.Error("User denied permission"), nil
 		}
 	}
 
-	result, err := RunTool(ctx, m.cfg, m.mcpName, m.tool.Name, params.Input)
+	result, err := RunTool(ctx, m.cfg, m.mcpName, m.tool.Name, string(args))
 	if err != nil {
-		return fantasy.NewTextErrorResponse(err.Error()), nil
+		return contract.Error(err.Error()), nil
 	}
 
 	switch result.Type {
 	case "image", "media":
 		if !toolutil.GetSupportsImagesFromContext(ctx) {
 			modelName := toolutil.GetModelNameFromContext(ctx)
-			return fantasy.NewTextErrorResponse(fmt.Sprintf("This model (%s) does not support image data.", modelName)), nil
+			return contract.Error(fmt.Sprintf("This model (%s) does not support image data.", modelName)), nil
 		}
-
-		var response fantasy.ToolResponse
-		if result.Type == "image" {
-			response = fantasy.NewImageResponse(result.Data, result.MediaType)
-		} else {
-			response = fantasy.NewMediaResponse(result.Data, result.MediaType)
-		}
-		response.Content = result.Content
-		return response, nil
+		return contract.ToolResult{
+			Content: result.Content,
+			Attachments: []contract.Attachment{{
+				MimeType: result.MediaType,
+				Content:  result.Data,
+			}},
+		}, nil
 	default:
-		return fantasy.NewTextResponse(result.Content), nil
+		return contract.Text(result.Content), nil
 	}
 }
