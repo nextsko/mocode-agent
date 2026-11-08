@@ -128,11 +128,11 @@ func segment(nodes []Node, vw, vh float64) []Component {
 		if used[i] || n.Depth > 4 {
 			continue
 		}
-		if landmarks[n.Tag] && n.Rect.W >= vw*0.15 && n.Rect.H >= vh*0.02 {
+		if landmarks[n.Tag] && (vw == 0 || (n.Rect.W >= vw*0.15 && n.Rect.H >= vh*0.02)) {
 			add(i, n.Tag, 0)
 			continue
 		}
-		if n.Depth <= 1 && n.Rect.W*n.Rect.H >= vw*vh*0.03 {
+		if n.Depth <= 1 && (vw == 0 || n.Rect.W*n.Rect.H >= vw*vh*0.03) {
 			add(i, "region", 0)
 		}
 	}
@@ -290,7 +290,7 @@ func review(nodes []Node, vw float64) []Finding {
 
 	// Touch targets.
 	for _, n := range nodes {
-		if !n.Interactive || n.Disabled {
+		if !n.Interactive || n.Disabled || (n.Rect.W == 0 && n.Rect.H == 0) {
 			continue
 		}
 		if n.Rect.W < 32 || n.Rect.H < 32 {

@@ -72,3 +72,24 @@ ui_dissect { "action": "list" }
 - 截图 + 视觉回归（对照 map 的盒子差异）
 - 设计令牌对比（当前页面 vs 已沉淀的品牌令牌）
 - 生成 React/Vue/Svelte 目标框架的复刻骨架
+
+## 扩展能力（v0.14.0）
+
+| action | 作用 | 产物 |
+|---|---|---|
+| `system` | 跨页组件指纹聚类 + 站点令牌 | `.mocode/ui/system.json` / `system.md` |
+| `diff` | 盒子级视觉回归（moved/resized/restyled/added/removed/component） | `.mocode/ui/diffs/*-diff.md` |
+| `brand` | 把当前页令牌存为品牌基线 | `.mocode/ui/brand.json` |
+| `tokens` | 当前页 vs 品牌基线，报告 off-brand / unused | 文本报告 |
+| `replicate target=react\|vue\|svelte` | 多框架组件骨架 | `.mocode/ui/components/*.{jsx,vue,svelte}` |
+| `skill` | 生成 learn 可直接消化的 SKILL.md 草稿 | `.mocode/ui/skills/<name>/SKILL.md` |
+
+### 真实页面验证方式
+
+```bash
+UIDISSECT_REAL_URL=https://example.com \
+UIDISSECT_REAL_URL2=https://go.dev/learn/ \
+go test -count=1 -run 'TestUIDissect' ./internal/core/tools/external/systems/browser/
+```
+
+覆盖：单页 map、双页 system 聚类、双页 diff、品牌令牌对比、四框架 replicate、skill 草稿。

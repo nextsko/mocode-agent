@@ -77,13 +77,16 @@ func Save(m Map, workingDir string) (Saved, error) {
 }
 
 // SaveComponent persists a replicated component and returns its file path.
-func SaveComponent(m Map, comp Component, html, css, workingDir string) (string, error) {
+func SaveComponent(m Map, comp Component, html, css, extension, workingDir string) (string, error) {
 	dir := filepath.Join(Dir(workingDir), "components")
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return "", fmt.Errorf("create components dir: %w", err)
 	}
 	name := time.Now().UTC().Format("20060102T150405") + "-" + slugify(comp.Kind+"-"+comp.ID)
-	path := filepath.Join(dir, name+".html")
+	if extension == "" {
+		extension = ".html"
+	}
+	path := filepath.Join(dir, name+extension)
 	doc := fmt.Sprintf("<!-- source: %s · component %s (%s) -->\n<style>\n%s\n</style>\n%s\n", m.URL, comp.ID, comp.Kind, css, html)
 	if err := os.WriteFile(path, []byte(doc), 0o600); err != nil {
 		return "", fmt.Errorf("write component: %w", err)
@@ -123,4 +126,30 @@ func hostOf(raw string) string {
 		rest = rest[:j]
 	}
 	return rest
+}
+
+// LoadMapFile reads one saved map JSON.
+func LoadMapFile(path string) (Map, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return Map{}, fmt.Errorf("read map: %w", err)
+	}
+	var m Map
+	if err := jsonUnmarshal(raw, &m); err != nil {
+		return Map{}, fmt.Errorf("parse map: %w", err)
+	}
+	return m, nil
+}
+
+// SaveDiff persists a regression report next to the maps.
+func SaveDiff(d Diff, workingDir string) (string, error) {
+	dir := filepath.Join(Dir(workingDir), "diffs")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return "", fmt.Errorf("create diffs dir: %w", err)
+	}
+	path := filepath.Join(dir, time.Now().UTC().Format("20060102T150405")+"-diff.md")
+	if err := os.WriteFile(path, []byte(RenderDiff(d)), 0o600); err != nil {
+		return "", fmt.Errorf("write diff: %w", err)
+	}
+	return path, nil
 }

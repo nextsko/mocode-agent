@@ -102,3 +102,141 @@ func TestSaveWritesArtifactsAndIndex(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, entries)
 }
+
+func TestSystemFromClustersAcrossMaps(t *testing.T) {
+	t.Parallel()
+	m1 := Build(fixture())
+	raw2 := fixture()
+	raw2.URL = "https://example.com/about"
+	raw2.Title = "About"
+	raw2.Nodes[3].Text = "Different copy"
+	m2 := Build(raw2)
+
+	sys := SystemFrom([]Map{m1, m2})
+	require.Equal(t, 2, sys.Pages)
+	require.NotEmpty(t, sys.Clusters)
+
+	var cards *Cluster
+	for i := range sys.Clusters {
+		if sys.Clusters[i].Kind == "card" {
+			cards = &sys.Clusters[i]
+			break
+		}
+	}
+	require.NotNil(t, cards, "card shape should cluster across pages")
+	assert.Equal(t, 2, cards.Count)
+	assert.Len(t, cards.Pages, 2)
+	assert.Contains(t, RenderSystem(sys), "站点设计系统")
+}
+
+func TestFromHTMLBuildsStaticMap(t *testing.T) {
+	t.Parallel()
+	html := `<!doctype html><html><head><title>Demo</title></head><body>
+<header><h1>Demo</h1></header>
+<main><div class="card"><h2>A</h2><button>Go</button></div>
+<div class="card"><h2>B</h2><button>Go</button></div>
+<div class="card"><h2>C</h2><button>Go</button></div></main>
+<footer><img src="x.png"></footer></body></html>`
+	raw, err := FromHTML(html, "https://example.com/demo")
+	require.NoError(t, err)
+	require.NotEmpty(t, raw.Nodes)
+	m := Build(raw)
+	require.NotEmpty(t, m.Components)
+	assert.Contains(t, RenderMarkdown(m), "Demo")
+}
+
+func TestCompareReportsBoxAndStyleChanges(t *testing.T) {
+	t.Parallel()
+	base := Build(fixture())
+	raw := fixture()
+	raw.Nodes[3].Rect.X = 40
+	raw.Nodes[3].Rect.W = 360
+	raw.Nodes[2].Styles.Color = "rgb(0,0,0)"
+	raw.Nodes = append(raw.Nodes, Node{Path: "extra", Tag: "p", Depth: 1, Text: "new", Rect: Rect{W: 100, H: 20}})
+	cur := Build(raw)
+
+	diff := Compare(base, cur)
+	require.NotEmpty(t, diff.Changes)
+	assert.Greater(t, diff.Summary["moved"], 0)
+	assert.Greater(t, diff.Summary["resized"], 0)
+	assert.Greater(t, diff.Summary["restyled"], 0)
+	assert.Greater(t, diff.Summary["added"], 0)
+	assert.Contains(t, RenderDiff(diff), "UI 视觉回归")
+}
+
+func TestCompareIdenticalMapsIsClean(t *testing.T) {
+	t.Parallel()
+	m := Build(fixture())
+	diff := Compare(m, m)
+	assert.Empty(t, diff.Changes)
+	assert.Contains(t, RenderDiff(diff), "No differences")
+}
+
+func TestCompareTokensReportsDrift(t *testing.T) {
+	t.Parallel()
+	brand := Tokens{
+		FontSizes: []float64{12, 14, 20, 32},
+		Spacing:   []float64{4, 8, 16},
+		Colors:    []string{"rgb(20,20,20)", "rgb(255,255,255)"},
+		Radii:     []string{"8px"},
+	}
+	cur := Tokens{
+		FontSizes: []float64{13, 20, 36},
+		Spacing:   []float64{4, 12},
+		Colors:    []string{"rgb(20,20,20)", "rgb(255,0,0)"},
+		Radii:     []string{"8px"},
+	}
+	drifts := CompareTokens(brand, cur)
+	require.NotEmpty(t, drifts)
+	var offBrand, unused int
+	for _, d := range drifts {
+		switch d.Status {
+		case "off-brand":
+			offBrand++
+		case "unused":
+			unused++
+		}
+	}
+	assert.Greater(t, offBrand, 0)
+	assert.Greater(t, unused, 0)
+	assert.Contains(t, RenderTokenDrift(Brand{Name: "brand"}, cur, drifts), "品牌令牌对比")
+}
+
+func TestSkeletonForTargets(t *testing.T) {
+	t.Parallel()
+	m := Build(fixture())
+	require.NotEmpty(t, m.Components)
+	comp := m.Components[0]
+
+	react, _ := SkeletonFor(m, comp, TargetReact)
+	assert.Contains(t, react, "className=")
+	assert.NotContains(t, react, `class="`)
+
+	vue, _ := SkeletonFor(m, comp, TargetVue)
+	assert.Contains(t, vue, "<template>")
+	assert.Contains(t, vue, "<style scoped>")
+
+	svelte, _ := SkeletonFor(m, comp, TargetSvelte)
+	assert.Contains(t, svelte, "<style>")
+
+	html, _ := SkeletonFor(m, comp, TargetHTML)
+	assert.Contains(t, html, `<section`)
+
+	assert.Equal(t, ".jsx", ExtensionFor(TargetReact))
+	assert.Equal(t, ".vue", ExtensionFor(TargetVue))
+	assert.Equal(t, ".svelte", ExtensionFor(TargetSvelte))
+	assert.Equal(t, ".html", ExtensionFor(TargetHTML))
+}
+
+func TestSkillDraftIsLearnReady(t *testing.T) {
+	t.Parallel()
+	m := Build(fixture())
+	name, desc, body := SkillDraft(m, nil)
+	assert.True(t, strings.HasPrefix(desc, "Use when"), "skill descriptions must start with 'Use when'")
+	assert.NotEmpty(t, name)
+	doc := RenderSkillMarkdown(name, desc, body)
+	assert.Contains(t, doc, "---")
+	assert.Contains(t, doc, "name: "+name)
+	assert.Contains(t, doc, "## 组件清单")
+	assert.Contains(t, doc, "## 设计令牌")
+}

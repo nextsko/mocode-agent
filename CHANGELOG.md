@@ -5,6 +5,19 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
+## [0.14.0] - 2026-11-09
+
+### Added
+
+- **UI 能力扩展（ui_dissect）**: 在 0.13.0 的 map/review/replicate 之上补齐闭环：
+  - 跨页组件指纹聚类 + 站点设计系统（`action=system`）；
+  - 盒子级视觉回归 diff（moved/resized/restyled/added/removed/component）；
+  - 品牌令牌基线与 off-brand 对比（`brand` / `tokens`）；
+  - 多框架复刻骨架（HTML / React / Vue / Svelte）；
+  - learn 可直接消化的 skill 草稿（`skill`）；
+  - 无浏览器时的静态 HTML 兜底（goquery 解析，结构与语义可用）。
+  真实页面验证覆盖 example.com 与 go.dev/learn 的双页聚类、diff、令牌对比、四框架复刻与 skill 草稿。
+
 ## [0.13.0] - 2026-11-09
 
 ### Added
