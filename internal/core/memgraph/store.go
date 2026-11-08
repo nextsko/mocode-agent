@@ -277,8 +277,20 @@ func (s *Store) Search(kind, contains string) []Node {
 		if kind != "" && n.Kind != kind {
 			continue
 		}
-		if q != "" && !strings.Contains(strings.ToLower(n.Name+" "+fmt.Sprint(n.Props)), q) {
-			continue
+		if q != "" {
+			hay := strings.ToLower(n.Name + " " + fmt.Sprint(n.Props))
+			// Multi-word queries are AND: every term must appear, so
+			// "nextsko 记忆" finds the combination without a tokenizer.
+			all := true
+			for _, term := range strings.Fields(q) {
+				if !strings.Contains(hay, term) {
+					all = false
+					break
+				}
+			}
+			if !all {
+				continue
+			}
 		}
 		out = append(out, n)
 	}

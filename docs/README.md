@@ -61,6 +61,7 @@
 | 13 | [guides/13-ui-dissect.md](guides/13-ui-dissect.md) | UI 审查与复刻：庖丁解牛工作流（ui_dissect / 组件切片 / 审美 / 令牌）|
 | 14 | [guides/14-flywheel.md](guides/14-flywheel.md) | 能力飞轮：归档 → 最优路径 → 技能进化 → 导出可视化 |
 | 15 | [guides/15-memory-graph.md](guides/15-memory-graph.md) | 图谱记忆：人格、用户画像、证据链与冲突演化 |
+| 16 | [guides/16-acp.md](guides/16-acp.md) | ACP：把 mocode 接入 Zed 等编辑器的 Agent 协议 |
 
 ### 参考研究（外部项目深度分析）
 

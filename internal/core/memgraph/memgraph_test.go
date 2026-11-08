@@ -206,3 +206,21 @@ func TestConflictsOnlyForFunctionalRelationsAndFacts(t *testing.T) {
 	}
 	assert.True(t, found, "fact conflict should be reported")
 }
+
+func TestSearchRequiresAllTerms(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	s, err := Open(dir)
+	require.NoError(t, err)
+	_, err = s.UpsertNode(Node{ID: "u1", Kind: KindUser, Name: "nextsko"})
+	require.NoError(t, err)
+	_, err = s.UpsertNode(Node{ID: "p1", Kind: KindPreference, Name: "结构化记忆"})
+	require.NoError(t, err)
+	_, err = s.UpsertNode(Node{ID: "p2", Kind: KindPreference, Name: "简洁回答"})
+	require.NoError(t, err)
+
+	assert.Len(t, s.Search("", "nextsko"), 1)
+	assert.Len(t, s.Search("", "结构化"), 1)
+	assert.Empty(t, s.Search("", "nextsko 简洁"), "terms from different nodes must not match")
+	assert.Len(t, s.Search("preference", "结构化"), 1)
+}

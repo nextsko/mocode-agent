@@ -5,6 +5,23 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
+## [0.20.0] - 2026-11-09
+
+### Added
+
+- **ACP v1（`mocode acp`）**: 完整实现握手、会话生命周期（new/load/resume/list/
+  delete/close）、prompt/cancel、模式与模型配置、流式 session/update
+  （消息/思考/tool_call/命令/模式/配置）、权限桥 `session/request_permission`。
+- **真实端到端验证**: 最小 ACP 客户端拉起 mocode，完成 initialize → session/new →
+  prompt("只回复 OK") 流式返回；并验证 bash 工具经 permission 批准后执行、
+  结果回传（tool_call_update）。
+- **memgraph recall 多词 AND 查询**: 多词查询要求全部命中，避免跨节点误匹配。
+
+### Known gaps
+
+- ACP `mcpServers` 未按会话动态挂载；`session/load` 不回放历史；
+  客户端 fs/terminal/elicitation 未被本地工具使用；未发送 plan 更新。
+
 ## [0.19.2] - 2026-11-09
 
 ### Fixed
