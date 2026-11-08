@@ -8,6 +8,7 @@ import (
 
 // Explain returns evidence chains for a node: paths through the graph that
 // end at evidence (sources), so a belief can be traced instead of asserted.
+// Paths carry node IDs, never names, so duplicate names cannot cross-link.
 func (s *Store) Explain(id string) []EvidenceChain {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -21,62 +22,85 @@ func (s *Store) Explain(id string) []EvidenceChain {
 
 	const maxDepth = 4
 	type frame struct {
-		path  []string
+		ids   []string
+		names []string
 		kinds []string
 		conf  float64
+		seen  map[string]bool
+	}
+	start := frame{
+		ids: []string{id}, names: []string{target.Name}, conf: target.Confidence,
+		seen: map[string]bool{id: true},
 	}
 	var out []EvidenceChain
-	visited := map[string]bool{id: true}
-	queue := []frame{{path: []string{target.Name}, conf: target.Confidence}}
+	queue := []frame{start}
 	for depth := 0; depth < maxDepth && len(queue) > 0; depth++ {
 		var next []frame
 		for _, f := range queue {
-			curID := nodeIDByName(s.g, f.path[len(f.path)-1])
-			if curID == "" {
-				continue
-			}
-			for _, e := range s.g.Edges {
-				if e.From != curID && e.To != curID {
+			cur := f.ids[len(f.ids)-1]
+			for _, e := range sortedEdges(s.g.Edges) {
+				if e.From != cur && e.To != cur {
 					continue
 				}
 				other := e.To
-				if e.To == curID {
+				if e.To == cur {
 					other = e.From
 				}
-				if visited[other] {
+				if f.seen[other] {
 					continue
 				}
-				n := s.g.Nodes[other]
+				n, ok := s.g.Nodes[other]
+				if !ok {
+					continue
+				}
 				nf := frame{
-					path:  append(append([]string{}, f.path...), n.Name),
+					ids:   append(append([]string{}, f.ids...), other),
+					names: append(append([]string{}, f.names...), n.Name),
 					kinds: append(append([]string{}, f.kinds...), e.Kind),
 					conf:  minFloat(f.conf, e.Confidence, n.Confidence),
+					seen:  copySeen(f.seen, other),
 				}
 				if len(n.Sources) > 0 {
-					visited[other] = true
-					out = append(out, EvidenceChain{Path: nf.path, EdgeKinds: nf.kinds, Sources: n.Sources, Confidence: nf.conf})
+					out = append(out, EvidenceChain{Path: nf.names, EdgeKinds: nf.kinds, Sources: n.Sources, Confidence: nf.conf})
 					continue
 				}
-				visited[other] = true
 				next = append(next, nf)
 			}
 		}
 		queue = next
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Confidence > out[j].Confidence })
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Confidence != out[j].Confidence {
+			return out[i].Confidence > out[j].Confidence
+		}
+		return strings.Join(out[i].Path, ">") < strings.Join(out[j].Path, ">")
+	})
 	if len(out) > 8 {
 		out = out[:8]
 	}
 	return out
 }
 
-func nodeIDByName(g Graph, name string) string {
-	for id, n := range g.Nodes {
-		if n.Name == name {
-			return id
-		}
+func sortedEdges(edges map[string]Edge) []Edge {
+	ids := make([]string, 0, len(edges))
+	for id := range edges {
+		ids = append(ids, id)
 	}
-	return ""
+	sort.Strings(ids)
+	out := make([]Edge, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, edges[id])
+	}
+	return out
+}
+
+func copySeen(in map[string]bool, add string) map[string]bool {
+	out := make(map[string]bool, len(in)+1)
+	for k := range in {
+		out[k] = true
+	}
+	out[add] = true
+	return out
 }
 
 func minFloat(vals ...float64) float64 {

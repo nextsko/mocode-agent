@@ -128,3 +128,34 @@ func TestForgetAndDecay(t *testing.T) {
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, changed, 1)
 }
+
+func TestExplainDoesNotCrossLinkDuplicateNames(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	s, err := Open(dir)
+	require.NoError(t, err)
+
+	// Two different beliefs share the same display name; each must resolve to
+	// its own evidence instead of whichever node the map iterates first.
+	a, err := s.UpsertNode(Node{ID: "pref-a", Kind: KindPreference, Name: "theme"})
+	require.NoError(t, err)
+	b, err := s.UpsertNode(Node{ID: "pref-b", Kind: KindPreference, Name: "theme"})
+	require.NoError(t, err)
+	ea, err := s.UpsertNode(Node{Kind: KindEvent, Name: "said dark", Sources: []Source{{Kind: "message", Ref: "m1", Quote: "dark please", At: time.Now().UTC()}}})
+	require.NoError(t, err)
+	eb, err := s.UpsertNode(Node{Kind: KindEvent, Name: "said light", Sources: []Source{{Kind: "message", Ref: "m2", Quote: "light please", At: time.Now().UTC()}}})
+	require.NoError(t, err)
+	_, err = s.UpsertEdge(Edge{From: a.ID, To: ea.ID, Kind: EdgeEvidencedBy})
+	require.NoError(t, err)
+	_, err = s.UpsertEdge(Edge{From: b.ID, To: eb.ID, Kind: EdgeEvidencedBy})
+	require.NoError(t, err)
+
+	ca := s.Explain(a.ID)
+	cb := s.Explain(b.ID)
+	require.NotEmpty(t, ca)
+	require.NotEmpty(t, cb)
+	assert.Equal(t, []string{"theme", "said dark"}, ca[0].Path)
+	assert.Equal(t, []string{"theme", "said light"}, cb[0].Path)
+	assert.Equal(t, "dark please", ca[0].Sources[0].Quote)
+	assert.Equal(t, "light please", cb[0].Sources[0].Quote)
+}

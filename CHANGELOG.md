@@ -5,6 +5,21 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
+## [0.19.0] - 2026-11-09
+
+### Fixed
+
+- **memgraph Explain 串链**: 证据链路径改为全程携带节点 ID，不再按名字反查；
+  同名节点各自解析到自己的证据，输出按置信度+路径稳定排序。
+- **同进程并发**: 同一项目目录共享一个 Store，避免并发工具调用在内存图与
+  快照写入上互相覆盖。
+- 新增同名不同 ID 的确定性回归测试。
+- **Navigate 丢事件竞态**: 先订阅 `Page.loadEventFired` 再发 Page.navigate，
+  避免快页面在“响应返回→订阅”之间触发 load 导致等待 15s 超时（并行测试下会偶发）。
+
+- 真实子代理验证：用 mocode 自身作为 DSH 子代理完成“只读分析”和“写码+跑测试”
+  两个任务，并据其反馈修复上述问题。
+
 ## [0.18.0] - 2026-11-09
 
 ### Added

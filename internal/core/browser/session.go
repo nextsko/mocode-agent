@@ -403,11 +403,17 @@ func (s *Session) pickTarget(ctx context.Context) (string, error) {
 }
 
 // Navigate points the attached page at url and waits for the load event.
+//
+// The load listener is armed BEFORE the navigation call: a fast page can fire
+// Page.loadEventFired between the navigate response and any later subscription,
+// which would make the wait miss the event and block for the full timeout.
 func (s *Session) Navigate(ctx context.Context, url string) error {
+	loaded, off := s.expectLoad()
+	defer off()
 	if err := s.navigate(ctx, url); err != nil {
 		return err
 	}
-	return s.waitLoad(ctx)
+	return awaitLoad(ctx, loaded)
 }
 
 // navigate issues the navigation call without waiting for the page to load.
@@ -431,6 +437,13 @@ func (s *Session) navigate(ctx context.Context, url string) error {
 // pages. Filtering on the session id keeps another tab's load from releasing
 // this wait early.
 func (s *Session) waitLoad(ctx context.Context) error {
+	loaded, off := s.expectLoad()
+	defer off()
+	return awaitLoad(ctx, loaded)
+}
+
+// expectLoad subscribes to the load event and returns an unsubscribe func.
+func (s *Session) expectLoad() (<-chan struct{}, func()) {
 	loaded := make(chan struct{}, 1)
 	off := s.conn.On("Page.loadEventFired", func(sessionID string, _ json.RawMessage) {
 		if sessionID != "" && sessionID != s.sessionID {
@@ -441,11 +454,13 @@ func (s *Session) waitLoad(ctx context.Context) error {
 		default:
 		}
 	})
-	defer off()
+	return loaded, off
+}
 
-	// Redirects and aborted loads mean the load event is a best-effort signal:
-	// wait briefly, then carry on rather than failing a navigation that in fact
-	// succeeded.
+// awaitLoad waits for a pre-armed load signal. Redirects and aborted loads
+// mean the load event is a best-effort signal: wait briefly, then carry on
+// rather than failing a navigation that in fact succeeded.
+func awaitLoad(ctx context.Context, loaded <-chan struct{}) error {
 	select {
 	case <-loaded:
 	case <-time.After(15 * time.Second):

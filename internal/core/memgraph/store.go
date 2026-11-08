@@ -23,8 +23,28 @@ type Store struct {
 	g    Graph
 }
 
+// storeCache keeps one Store per project directory so concurrent tool calls
+// in the same process share a lock instead of racing on the same file.
+var storeCache sync.Map
+
 // Open loads (or initialises) the graph under workingDir.
 func Open(workingDir string) (*Store, error) {
+	abs, err := filepath.Abs(workingDir)
+	if err != nil {
+		abs = workingDir
+	}
+	if v, ok := storeCache.Load(abs); ok {
+		return v.(*Store), nil
+	}
+	st, err := openFresh(abs)
+	if err != nil {
+		return nil, err
+	}
+	actual, _ := storeCache.LoadOrStore(abs, st)
+	return actual.(*Store), nil
+}
+
+func openFresh(workingDir string) (*Store, error) {
 	dir := filepath.Join(workingDir, RootDir)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, fmt.Errorf("create memory dir: %w", err)
