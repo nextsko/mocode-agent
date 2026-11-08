@@ -159,3 +159,18 @@ func TestExplainDoesNotCrossLinkDuplicateNames(t *testing.T) {
 	assert.Equal(t, "dark please", ca[0].Sources[0].Quote)
 	assert.Equal(t, "light please", cb[0].Sources[0].Quote)
 }
+
+func TestCJKNamesGetDistinctIDs(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	s, err := Open(dir)
+	require.NoError(t, err)
+	a, err := s.UpsertNode(Node{Kind: KindPreference, Name: "结构化记忆"})
+	require.NoError(t, err)
+	b, err := s.UpsertNode(Node{Kind: KindPreference, Name: "简洁回答"})
+	require.NoError(t, err)
+	assert.NotEqual(t, a.ID, b.ID, "distinct CJK names must not collapse to one id")
+	assert.Contains(t, a.ID, "preference-")
+	assert.NotEqual(t, "preference", a.ID)
+	assert.Contains(t, RenderMermaid(s.Graph()), "id="+a.ID)
+}

@@ -5,6 +5,16 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
+## [0.19.1] - 2026-11-09
+
+### Fixed
+
+- **CJK 名称 ID 冲突**: 纯中文/非 ASCII 名称经 slug 后曾退化为 `preference` 之类，
+  多条偏好会合并成同一节点；现在追加原始名称的稳定哈希后缀，保证唯一。
+- **图谱视图 ID 误导**: Mermaid 节点标签现在同时显示真实 id（`id=...`），
+  子代理不会再照抄安全化后的下划线标识去调用 relate。
+- 以上问题由 mocode 自身作为子代理真实使用图谱时发现并回归验证。
+
 ## [0.19.0] - 2026-11-09
 
 ### Fixed

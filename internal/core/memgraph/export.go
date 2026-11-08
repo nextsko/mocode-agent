@@ -21,7 +21,7 @@ func RenderMermaid(g Graph) string {
 	sort.Strings(ids)
 	for _, id := range ids {
 		n := g.Nodes[id]
-		fmt.Fprintf(&b, "  %s[\"%s\\n%s %.2f\"]\n", safeID(id), escape(n.Name), n.Kind, n.Confidence)
+		fmt.Fprintf(&b, "  %s[\"%s\\n%s %.2f\\nid=%s\"]\n", safeID(id), escape(n.Name), n.Kind, n.Confidence, id)
 	}
 	edgeIDs := make([]string, 0, len(g.Edges))
 	for id := range g.Edges {

@@ -3,6 +3,7 @@ package memgraph
 import (
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"sort"
@@ -370,7 +371,31 @@ func slug(s string) string {
 			}
 		}
 	}
-	return strings.Trim(b.String(), "-")
+	out := strings.Trim(b.String(), "-")
+	// Non-ASCII names (Chinese, emoji, …) reduce to little or nothing here.
+	// Append a stable hash of the original so distinct names never collide.
+	if hasNonASCII(s) {
+		if out == "" {
+			out = "n"
+		}
+		out += "-" + shortHash(s)
+	}
+	return out
+}
+
+func hasNonASCII(s string) bool {
+	for _, r := range s {
+		if r > 127 {
+			return true
+		}
+	}
+	return false
+}
+
+func shortHash(s string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(s))
+	return fmt.Sprintf("%08x", h.Sum32())[:8]
 }
 
 func mergeMaps(a, b map[string]any) map[string]any {
