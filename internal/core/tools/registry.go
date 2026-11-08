@@ -653,14 +653,18 @@ type browserPlugin struct{}
 func (browserPlugin) Descriptors() []ToolDescriptor {
 	return []ToolDescriptor{
 		{Name: browser.BrowserToolName, Kind: ToolKindPlugin, Category: CategoryBrowser},
+		{Name: browser.UIDissectToolName, Kind: ToolKindPlugin, Category: CategoryBrowser},
 	}
 }
 
 func (browserPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
-	return []fantasy.AgentTool{deps.wrapPort(browser.NewBrowserPortTool(browser.Deps{
-		Permissions: deps.Permissions,
-		Manager:     browserManager(),
-	}))}
+	return []fantasy.AgentTool{
+		deps.wrapPort(browser.NewBrowserPortTool(browser.Deps{
+			Permissions: deps.Permissions,
+			Manager:     browserManager(),
+		})),
+		deps.wrapPort(browser.NewUIDissectPortTool(browserManager(), deps.Cfg.WorkingDir())),
+	}
 }
 
 func (browserPlugin) Start(context.Context) error { return nil }

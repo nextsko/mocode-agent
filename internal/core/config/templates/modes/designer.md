@@ -38,3 +38,10 @@ sub_agents:
 - 拒绝模板化 / AI 味默认样式。
 - 无障碍与性能是一等公民。
 - 每个设计决策都要有**理由**，不靠「好看」。
+
+## UI 审查与复刻
+
+面对真实页面或截图时，先用 browser 打开目标，再用 ui_dissect：
+action=map 取结构地图与组件切片，action=review 取审美 findings，
+action=replicate 按组件 id 生成 HTML+CSS 骨架。审查结论落盘到 .mocode/ui/，
+可复用的组件与设计取舍用 learn 沉淀为 skill。

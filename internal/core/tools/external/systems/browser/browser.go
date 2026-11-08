@@ -54,6 +54,8 @@ const (
 	actionClose      = "close"
 )
 
+const subActionList = "list"
+
 // actionList names every action, for error messages that teach.
 const actionList = "status, launch, goto, back, forward, reload, snapshot, click, dblclick, fill, press, hover, check, uncheck, select, eval, screenshot, pdf, console, tabs, storage, state, network, route, close"
 
@@ -547,7 +549,7 @@ func opOf(p BrowserParams, def string) string {
 // tabsAction handles action=tabs: list, new, select, close.
 func tabsAction(ctx context.Context, session *corebrowser.Session, p BrowserParams) (contract.ToolResult, error) {
 	switch op := opOf(p, "list"); op {
-	case "list":
+	case subActionList:
 		tabs, err := session.Tabs(ctx)
 		if err != nil {
 			return softError(fmt.Sprintf("listing tabs: %v", err)), nil
@@ -611,7 +613,7 @@ func renderTabs(tabs []corebrowser.TabInfo) string {
 // cookieStorageAction handles the cookie flavor of action=storage.
 func cookieStorageAction(ctx context.Context, session *corebrowser.Session, p BrowserParams, op string) (contract.ToolResult, error) {
 	switch op {
-	case "list":
+	case subActionList:
 		cookies, err := session.Cookies(ctx)
 		if err != nil {
 			return softError(fmt.Sprintf("reading cookies: %v", err)), nil
@@ -683,7 +685,7 @@ func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserP
 	}
 
 	switch op {
-	case "list":
+	case subActionList:
 		items, err := session.StorageList(ctx, p.Kind)
 		if err != nil {
 			return softError(fmt.Sprintf("listing storage: %v", err)), nil
@@ -816,7 +818,7 @@ func stateAction(ctx context.Context, session *corebrowser.Session, p BrowserPar
 // routeAction handles action=route: block or mock requests by URL pattern.
 func routeAction(ctx context.Context, session *corebrowser.Session, p BrowserParams) (contract.ToolResult, error) {
 	switch op := opOf(p, "list"); op {
-	case "list":
+	case subActionList:
 		routes := session.Routes()
 		if len(routes) == 0 {
 			return contract.WithMetadata(

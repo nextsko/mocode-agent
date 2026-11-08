@@ -191,7 +191,8 @@ type MCPToolStruct = mcp.MCPToolStruct
 // external/systems — browser, gitops and wechat
 
 const (
-	BrowserToolName = browsertool.BrowserToolName
+	BrowserToolName          = browsertool.BrowserToolName
+	BrowserUIDissectToolName = browsertool.UIDissectToolName
 
 	PlanCommitsToolName    = gitops.PlanCommitsToolName
 	ExecuteCommitsToolName = gitops.ExecuteCommitsToolName

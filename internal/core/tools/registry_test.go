@@ -46,6 +46,7 @@ var knownAllToolNames = []string{
 	LearnToolName,
 	MemoryToolName,
 	BrowserToolName,
+	BrowserUIDissectToolName,
 	ViewToolName,
 	WriteToolName,
 	ListMCPResourcesToolName,

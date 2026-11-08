@@ -5,6 +5,16 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
+## [Unreleased]
+
+### Added
+
+- **UI 审查与复刻（ui_dissect）**: 浏览器能力升级为结构理解。新工具 `ui_dissect`
+  用 CDP 测量真实页面（DOM 路径 / 盒子 / 计算样式），切成组件（重复卡片、地标、
+  大区块），产出审美 findings（对比度 / 字号阶梯 / 间距节奏 / 色板 / 触控目标 /
+  溢出 / alt / h1）、设计令牌，并可按组件 id 生成 HTML+CSS 骨架；结果沉淀到
+  `.mocode/ui/`。设计文档见 `docs/guides/13-ui-dissect.md`。
+
 ## [0.12.0] - 2026-11-07
 
 ### Added

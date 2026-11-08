@@ -640,6 +640,7 @@ func allToolNames() []string {
 		"learn",
 		"memory",
 		"browser",
+		"ui_dissect",
 		"view",
 		"write",
 		"list_mcp_resources",

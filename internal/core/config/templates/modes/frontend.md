@@ -43,3 +43,10 @@ sub_agents:
 - 拒绝「AI 味」模板化设计（见 `design-taste-frontend` 禁令）。
 - 默认不用 barrel import；第三方/分析脚本延后到水合之后。
 - 无障碍不是可选项；列表接口必须分页。
+
+## UI 审查与复刻
+
+面对真实页面或截图时，先用 browser 打开目标，再用 ui_dissect：
+action=map 取结构地图与组件切片，action=review 取审美 findings，
+action=replicate 按组件 id 生成 HTML+CSS 骨架。审查结论落盘到 .mocode/ui/，
+可复用的组件与设计取舍用 learn 沉淀为 skill。
