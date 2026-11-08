@@ -23,12 +23,13 @@ const UIDissectToolName = "ui_dissect"
 
 // UIDissectParams controls the dissection actions.
 type UIDissectParams struct {
-	Action    string `json:"action" enum:"map,review,replicate,diff,system,brand,tokens,skill,list" description:"map builds the full structural map; review returns only aesthetic findings; replicate emits a skeleton for one component; list shows saved maps."`
-	URL       string `json:"url,omitempty" description:"Optional URL to navigate to before measuring; omit to use the current page."`
-	Component string `json:"component,omitempty" description:"Component id (c1, c2, …) from a map, required for action=replicate."`
-	Baseline  string `json:"baseline,omitempty" description:"For action=diff: path to a saved map JSON, or 'latest' (default)."`
-	Target    string `json:"target,omitempty" enum:"html,react,vue,svelte" description:"For action=replicate: output framework (default html)."`
-	Save      *bool  `json:"save,omitempty" description:"Persist the map/skeleton under .mocode/ui (default true)."`
+	Action    string               `json:"action" enum:"map,review,replicate,diff,system,brand,tokens,skill,dynamic,retro,list" description:"map builds the full structural map; review returns only aesthetic findings; replicate emits a skeleton for one component; list shows saved maps."`
+	URL       string               `json:"url,omitempty" description:"Optional URL to navigate to before measuring; omit to use the current page."`
+	Component string               `json:"component,omitempty" description:"Component id (c1, c2, …) from a map, required for action=replicate."`
+	Baseline  string               `json:"baseline,omitempty" description:"For action=diff: path to a saved map JSON, or 'latest' (default)."`
+	Target    string               `json:"target,omitempty" enum:"html,react,vue,svelte" description:"For action=replicate: output framework (default html)."`
+	Steps     []uidissect.FlowStep `json:"steps,omitempty" description:"For action=dynamic: interaction steps (click/fill/press/hover/scroll/wait)."`
+	Save      *bool                `json:"save,omitempty" description:"Persist the map/skeleton under .mocode/ui (default true)."`
 }
 
 // NewUIDissectPortTool builds the UI dissection tool. It shares the browser
@@ -40,9 +41,9 @@ func NewUIDissectPortTool(manager *corebrowser.Manager, workingDir string) contr
 		map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"action": map[string]any{
+				fieldAction: map[string]any{
 					"type":        "string",
-					"enum":        []string{"map", "review", "replicate", "diff", "system", "brand", "tokens", "skill", subActionList},
+					"enum":        []string{"map", "review", "replicate", "diff", "system", "brand", "tokens", "skill", "dynamic", "retro", subActionList},
 					"description": "map builds the full structural map; review returns only aesthetic findings; replicate emits a skeleton for one component; list shows saved maps.",
 				},
 				"url": map[string]any{
@@ -61,6 +62,21 @@ func NewUIDissectPortTool(manager *corebrowser.Manager, workingDir string) contr
 					"type":        "string",
 					"enum":        []string{uidissect.TargetHTML, uidissect.TargetReact, uidissect.TargetVue, uidissect.TargetSvelte},
 					"description": "For action=replicate: output framework (default html).",
+				},
+				"steps": map[string]any{
+					"type":        "array",
+					"description": "For action=dynamic: interaction steps executed in order.",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							fieldAction: map[string]any{"type": "string", "enum": []string{"click", "fill", "press", "hover", "scroll", "wait"}},
+							"target":    map[string]any{"type": "string", "description": "CSS selector or mocode ref."},
+							"text":      map[string]any{"type": "string", "description": "For action=fill."},
+							"key":       map[string]any{"type": "string", "description": "For action=press, e.g. Enter."},
+							"ms":        map[string]any{"type": "integer", "description": "For scroll/wait: milliseconds or pixels."},
+						},
+						"required": []string{"action"},
+					},
 				},
 				"save": map[string]any{
 					"type":        "boolean",
@@ -96,9 +112,16 @@ func runUIDissect(ctx context.Context, manager *corebrowser.Manager, workingDir 
 			return contract.Text("No UI maps saved yet. Run action=map first."), nil
 		}
 		return contract.Text("Saved UI maps:\n- " + strings.Join(entries, "\n- ")), nil
-	case "map", "review", "replicate", "brand", "tokens", "skill":
+	case "map", "review", "replicate", "brand", "tokens", "skill", "dynamic", "retro":
 	default:
-		return contract.Error(`action must be one of: map, review, replicate, diff, system, brand, tokens, skill, list`), nil
+		return contract.Error(`action must be one of: map, review, replicate, diff, system, brand, tokens, skill, dynamic, retro, list`), nil
+	}
+
+	if strings.EqualFold(params.Action, "dynamic") {
+		return runDynamic(ctx, manager, workingDir, params)
+	}
+	if strings.EqualFold(params.Action, "retro") {
+		return renderRetro(workingDir)
 	}
 
 	raw, mode, err := measurePage(ctx, manager, params.URL)
@@ -155,6 +178,9 @@ func runUIDissect(ctx context.Context, manager *corebrowser.Manager, workingDir 
 		text += fmt.Sprintf("\n\nSaved map: `%s`\nSaved JSON: `%s`", saved.Markdown, saved.JSONPath)
 		if sysPath, err := updateSystem(workingDir); err == nil && sysPath != "" {
 			text += fmt.Sprintf("\nDesign system updated: `%s`", sysPath)
+		}
+		if tastePath, err := updateTaste(workingDir); err == nil && tastePath != "" {
+			text += fmt.Sprintf("\nTaste retrospective updated: `%s`", tastePath)
 		}
 	}
 	return contract.Text(truncateForModel(text, 12000)), nil
@@ -361,6 +387,100 @@ func runSkill(m uidissect.Map, params UIDissectParams, workingDir string) contra
 	name, desc, body := uidissect.SkillDraft(m, comp)
 	text := fmt.Sprintf("Skill draft staged: `%s`\n\nTo persist it in the skill library, call `learn` with:\n- name: %s\n- description: %s\n\n---\n\n%s", path, name, desc, uidissect.RenderSkillMarkdown(name, desc, body))
 	return contract.Text(truncateForModel(text, 12000))
+}
+
+// runDynamic drives interactions and records each state plus the diff between
+// consecutive states. It requires a live browser: static HTML cannot execute
+// clicks, so the fallback deliberately refuses instead of faking a flow.
+func runDynamic(ctx context.Context, manager *corebrowser.Manager, workingDir string, params UIDissectParams) (contract.ToolResult, error) {
+	if manager == nil {
+		return contract.Error("dynamic capture requires a live browser; static HTML cannot execute interactions"), nil
+	}
+	session, err := manager.Ensure(ctx, corebrowser.EnsureOptions{URL: params.URL})
+	if err != nil {
+		return contract.Error("failed to start browser: " + err.Error()), nil //nolint:nilerr // tool-level error is reported as text to the model.
+	}
+	if params.URL != "" {
+		if err := session.Navigate(ctx, params.URL); err != nil {
+			return contract.Error("failed to navigate: " + err.Error()), nil //nolint:nilerr // tool-level error is reported as text to the model.
+		}
+	}
+
+	exec := func(step uidissect.FlowStep) error {
+		switch strings.ToLower(step.Action) {
+		case "click":
+			return session.Click(ctx, step.Target)
+		case "fill":
+			return session.Fill(ctx, step.Target, step.Text, false)
+		case "press":
+			return session.Press(ctx, step.Key)
+		case "hover":
+			return session.Hover(ctx, step.Target)
+		case "scroll":
+			px := step.Ms
+			if px == 0 {
+				px = 600
+			}
+			return session.Evaluate(ctx, fmt.Sprintf("window.scrollBy(0, %d)", px), nil)
+		case "wait":
+			ms := step.Ms
+			if ms <= 0 {
+				ms = 300
+			}
+			time.Sleep(time.Duration(ms) * time.Millisecond)
+			return nil
+		default:
+			return fmt.Errorf("unsupported step action %q", step.Action)
+		}
+	}
+	measure := func() (uidissect.Map, error) {
+		var raw uidissect.Raw
+		if err := session.Evaluate(ctx, uidissect.CollectorScript, &raw); err != nil {
+			return uidissect.Map{}, err
+		}
+		return uidissect.Build(raw), nil
+	}
+
+	flow, err := uidissect.RecordFlow(params.URL, params.Steps, exec, measure)
+	if err != nil {
+		return contract.Error("dynamic capture failed: " + err.Error()), nil //nolint:nilerr // tool-level error is reported as text to the model.
+	}
+	text := uidissect.RenderFlow(flow)
+	if params.Save == nil || *params.Save {
+		if path, err := uidissect.SaveFlow(flow, workingDir); err == nil {
+			text += "\n\nSaved: `" + path + "`"
+		}
+	}
+	return contract.Text(truncateForModel(text, 12000)), nil
+}
+
+// renderRetro mines the aesthetic retrospective from all saved maps.
+func renderRetro(workingDir string) (contract.ToolResult, error) {
+	maps, err := uidissect.LoadMaps(workingDir)
+	if err != nil {
+		return contract.Error("failed to load maps: " + err.Error()), nil //nolint:nilerr // tool-level error is reported as text to the model.
+	}
+	if len(maps) == 0 {
+		return contract.Text("No saved maps yet. Run action=map on a few pages, then look back."), nil
+	}
+	t := uidissect.BuildTaste(maps)
+	path, err := uidissect.SaveTaste(t, workingDir)
+	if err != nil {
+		return contract.Error("failed to save retrospective: " + err.Error()), nil //nolint:nilerr // tool-level error is reported as text to the model.
+	}
+	return contract.Text(uidissect.RenderTaste(t) + "\n\nSaved: `" + path + "`"), nil
+}
+
+// updateTaste refreshes the retrospective from saved maps.
+func updateTaste(workingDir string) (string, error) {
+	maps, err := uidissect.LoadMaps(workingDir)
+	if err != nil {
+		return "", err
+	}
+	if len(maps) == 0 {
+		return "", nil
+	}
+	return uidissect.SaveTaste(uidissect.BuildTaste(maps), workingDir)
 }
 
 // updateSystem re-mines the site design system from all saved maps.

@@ -118,4 +118,6 @@ type Map struct {
 	Findings    []Finding   `json:"findings"`
 	Tokens      Tokens      `json:"tokens"`
 	Stats       Stats       `json:"stats"`
+	// Score is a 0-100 aesthetic health score derived from findings.
+	Score int `json:"score"`
 }

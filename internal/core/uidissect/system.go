@@ -177,7 +177,11 @@ func LoadMaps(workingDir string) ([]Map, error) {
 	}
 	var maps []Map
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") || e.Name() == "system.json" {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		switch e.Name() {
+		case "system.json", "brand.json", "taste.json":
 			continue
 		}
 		raw, err := os.ReadFile(filepath.Join(Dir(workingDir), e.Name()))
@@ -186,6 +190,9 @@ func LoadMaps(workingDir string) ([]Map, error) {
 		}
 		var m Map
 		if err := jsonUnmarshal(raw, &m); err != nil {
+			continue
+		}
+		if m.GeneratedAt.IsZero() || (len(m.Nodes) == 0 && m.URL == "") {
 			continue
 		}
 		maps = append(maps, m)

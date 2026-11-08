@@ -93,3 +93,24 @@ go test -count=1 -run 'TestUIDissect' ./internal/core/tools/external/systems/bro
 ```
 
 覆盖：单页 map、双页 system 聚类、双页 diff、品牌令牌对比、四框架 replicate、skill 草稿。
+
+## 动态与复盘（v0.15.0）
+
+### 动态流 `action=dynamic`
+
+```json
+{"action":"dynamic","url":"https://example.com",
+ "steps":[{"action":"click","target":"#open"},{"action":"fill","target":"#q","text":"mocode"},{"action":"wait","ms":300}]}
+```
+
+每个 step 之后测量一次状态，并对比上一状态的盒子变化；产物 `.mocode/ui/flows/*.md|json`。
+需要真实浏览器（静态 HTML 无法执行交互，工具会明确拒绝而不是伪造结果）。
+
+### 审美复盘 `action=retro`
+
+- 每次 `map` 自动刷新：站点设计系统 + 审美复盘；
+- `retro` 输出：分数趋势、跨页重复问题、沉淀出的规则（lesson）；
+- 产物：`.mocode/ui/taste.md`、`taste.json`，以及 `.mocode/ui/taste/<时间戳>-taste.md` 历史快照；
+- 分数：100 − error×8 − warn×3 − info×1（下限 0）。
+
+复盘的目的是让“审美”变成可积累的规则：重复出现的问题会自动升级为 lesson，下一次改造直接带着规则走。

@@ -240,3 +240,44 @@ func TestSkillDraftIsLearnReady(t *testing.T) {
 	assert.Contains(t, doc, "## 组件清单")
 	assert.Contains(t, doc, "## 设计令牌")
 }
+
+func TestRecordFlowCapturesStatesAndDiffs(t *testing.T) {
+	t.Parallel()
+	base := Build(fixture())
+	mutated := fixture()
+	mutated.Nodes[3].Rect.X = 80
+	second := Build(mutated)
+
+	calls := 0
+	flow, err := RecordFlow("https://example.com", []FlowStep{{Action: "click", Target: "#buy"}},
+		func(FlowStep) error { calls++; return nil },
+		func() (Map, error) {
+			if calls == 0 {
+				return base, nil
+			}
+			return second, nil
+		})
+	require.NoError(t, err)
+	assert.Equal(t, 1, calls)
+	require.Len(t, flow.States, 2)
+	assert.NotEmpty(t, flow.States[1].Diff.Changes)
+	assert.Contains(t, RenderFlow(flow), "动态 UI 流")
+}
+
+func TestBuildTasteFindsRecurringLessons(t *testing.T) {
+	t.Parallel()
+	m1 := Build(fixture())
+	raw2 := fixture()
+	raw2.URL = "https://example.com/about"
+	raw2.Title = "About"
+	m2 := Build(raw2)
+
+	taste := BuildTaste([]Map{m1, m2})
+	require.Equal(t, 2, taste.Pages)
+	assert.Len(t, taste.ScoreTrend, 2)
+	require.NotEmpty(t, taste.Recurring)
+	require.NotEmpty(t, taste.Lessons)
+	joined := strings.Join(taste.Lessons, "\n")
+	assert.Contains(t, joined, "contrast")
+	assert.Contains(t, RenderTaste(taste), "审美复盘")
+}

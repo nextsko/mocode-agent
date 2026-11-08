@@ -54,7 +54,10 @@ const (
 	actionClose      = "close"
 )
 
-const subActionList = "list"
+const (
+	subActionList = "list"
+	fieldAction   = "action"
+)
 
 // actionList names every action, for error messages that teach.
 const actionList = "status, launch, goto, back, forward, reload, snapshot, click, dblclick, fill, press, hover, check, uncheck, select, eval, screenshot, pdf, console, tabs, storage, state, network, route, close"
@@ -997,7 +1000,7 @@ func browserParamsSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"action": map[string]any{
+			fieldAction: map[string]any{
 				"type":        "string",
 				"enum":        []string{"status", "launch", "goto", "back", "forward", "reload", "snapshot", "click", "dblclick", "fill", "press", "hover", "check", "uncheck", "select", "eval", "screenshot", "pdf", "console", "tabs", "storage", "state", "network", "route", "close"},
 				"description": "status reports which browsers are installed; launch starts or attaches to a session; the rest act on the running session. Take a snapshot before using a ref.",

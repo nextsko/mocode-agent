@@ -36,7 +36,27 @@ func Build(raw Raw) Map {
 	m.Stats.Nodes = len(raw.Nodes)
 	m.Stats.Components = len(m.Components)
 	m.Stats.Findings = len(m.Findings)
+	m.Score = scoreOf(m.Findings)
 	return m
+}
+
+// scoreOf turns findings into a 0-100 health score: errors weigh most.
+func scoreOf(findings []Finding) int {
+	score := 100
+	for _, f := range findings {
+		switch f.Severity {
+		case SeverityError:
+			score -= 8
+		case SeverityWarn:
+			score -= 3
+		default:
+			score--
+		}
+	}
+	if score < 0 {
+		return 0
+	}
+	return score
 }
 
 // segment finds landmarks, repeated siblings and large regions.

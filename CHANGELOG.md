@@ -5,6 +5,17 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
+## [0.15.0] - 2026-11-09
+
+### Added
+
+- **动态 UI 流（ui_dissect action=dynamic）**: 以 click/fill/press/hover/scroll/wait 步骤驱动真实页面，
+  每步测量状态并对比上一状态的盒子变化；需要浏览器，静态兜底会明确拒绝。
+- **审美复盘（ui_dissect action=retro）**: 跨页聚合 findings 与 0–100 审美分，
+  输出分数趋势、重复问题、以及沉淀出的规则；每次 map 自动刷新，
+  产物 `.mocode/ui/taste.md|json` + 带时间戳的历史快照。
+- 地图新增 `score` 字段；`system`/`taste` 的加载会忽略非地图 JSON（brand/system/taste）。
+
 ## [0.14.0] - 2026-11-09
 
 ### Added
