@@ -10,9 +10,10 @@ import (
 
 // Runner binds protocol sessions to a concrete agent runtime.
 type Runner interface {
-	NewSession(ctx context.Context, cwd string) (SessionInfo, error)
-	LoadSession(ctx context.Context, id, cwd string) (SessionInfo, bool, error)
-	ResumeSession(ctx context.Context, id, cwd string) (SessionInfo, bool, error)
+	NewSession(ctx context.Context, req NewSessionRequest) (SessionInfo, error)
+	LoadSession(ctx context.Context, req LoadSessionRequest) (SessionInfo, bool, error)
+	ResumeSession(ctx context.Context, req ResumeSessionRequest) (SessionInfo, bool, error)
+	History(ctx context.Context, sessionID string) ([]ReplayMessage, error)
 	ListSessions(ctx context.Context) ([]SessionInfo, error)
 	DeleteSession(ctx context.Context, id string) error
 	CloseSession(ctx context.Context, id string) error
@@ -41,13 +42,14 @@ type Server struct {
 
 	mu       sync.Mutex
 	sessions map[string]*sessionState
+	cancels  map[string]context.CancelFunc
 	// permission, when set, asks the ACP client for approval.
 	permission func(ctx context.Context, sessionID string, toolCall json.RawMessage, options []PermissionOption) (optionID string, cancelled bool)
 }
 
 // NewServer wires a peer and runner into an ACP agent.
 func NewServer(peer *Peer, runner Runner, info Implementation) *Server {
-	return &Server{peer: peer, runner: runner, info: info, sessions: map[string]*sessionState{}}
+	return &Server{peer: peer, runner: runner, info: info, sessions: map[string]*sessionState{}, cancels: map[string]context.CancelFunc{}}
 }
 
 // SetPermissionRequester installs the client approval callback used by the
@@ -98,6 +100,12 @@ func (s *Server) HandleNotification(method string, params json.RawMessage) {
 		return
 	}
 	s.runner.Cancel(req.SessionID)
+	s.mu.Lock()
+	cancel := s.cancels[req.SessionID]
+	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
 }
 
 func (s *Server) initialize(params json.RawMessage) (any, *Error) {
@@ -135,7 +143,7 @@ func (s *Server) newSession(ctx context.Context, params json.RawMessage) (any, *
 	if !isAbs(req.Cwd) {
 		return nil, invalidParams(fmt.Errorf("cwd must be an absolute path"))
 	}
-	info, err := s.runner.NewSession(ctx, req.Cwd)
+	info, err := s.runner.NewSession(ctx, req)
 	if err != nil {
 		return nil, internal(err)
 	}
@@ -163,7 +171,7 @@ func (s *Server) loadSession(ctx context.Context, params json.RawMessage) (any, 
 	if err := json.Unmarshal(params, &req); err != nil {
 		return nil, invalidParams(err)
 	}
-	info, ok, err := s.runner.LoadSession(ctx, req.SessionID, req.Cwd)
+	info, ok, err := s.runner.LoadSession(ctx, req)
 	if err != nil {
 		return nil, internal(err)
 	}
@@ -177,6 +185,23 @@ func (s *Server) loadSession(ctx context.Context, params json.RawMessage) (any, 
 	s.mu.Lock()
 	s.sessions[info.SessionID] = st
 	s.mu.Unlock()
+	// ACP requires replaying the conversation before answering session/load.
+	if history, err := s.runner.History(ctx, info.SessionID); err == nil {
+		for _, msg := range history {
+			kind := "agent_message_chunk"
+			if msg.Role == "user" {
+				kind = "user_message_chunk"
+			}
+			_ = s.peer.Notify("session/update", SessionNotification{
+				SessionID: info.SessionID,
+				Update: SessionUpdate{
+					SessionUpdate: kind,
+					MessageID:     msg.MessageID,
+					Content:       &ContentBlock{Type: "text", Text: msg.Text},
+				},
+			})
+		}
+	}
 	s.emitCommands(info.SessionID)
 	return LoadSessionResponse{SessionID: info.SessionID, ConfigOptions: st.config}, nil
 }
@@ -186,7 +211,7 @@ func (s *Server) resumeSession(ctx context.Context, params json.RawMessage) (any
 	if err := json.Unmarshal(params, &req); err != nil {
 		return nil, invalidParams(err)
 	}
-	info, ok, err := s.runner.ResumeSession(ctx, req.SessionID, req.Cwd)
+	info, ok, err := s.runner.ResumeSession(ctx, req)
 	if err != nil {
 		return nil, internal(err)
 	}
@@ -296,12 +321,23 @@ func (s *Server) prompt(ctx context.Context, params json.RawMessage) (any, *Erro
 		return nil, &Error{Code: CodeInvalidParams, Message: "unknown session: " + req.SessionID}
 	}
 
-	stop, err := s.runner.Prompt(ctx, req.SessionID, text, func(u SessionUpdate) {
+	runCtx, cancel := context.WithCancel(ctx)
+	s.mu.Lock()
+	s.cancels[req.SessionID] = cancel
+	s.mu.Unlock()
+	defer func() {
+		cancel()
+		s.mu.Lock()
+		delete(s.cancels, req.SessionID)
+		s.mu.Unlock()
+	}()
+
+	stop, err := s.runner.Prompt(runCtx, req.SessionID, text, func(u SessionUpdate) {
 		_ = s.peer.Notify("session/update", SessionNotification{SessionID: req.SessionID, Update: u})
 	})
 	if err != nil {
 		if ctx.Err() != nil {
-			return PromptResponse{StopReason: StopCancelled}, nil //nolint:nilerr // cancellation is a protocol outcome, not an error
+			return PromptResponse{StopReason: StopCancelled}, nil
 		}
 		return nil, internal(err)
 	}
@@ -339,9 +375,10 @@ func (s *Server) RequestPermissionSync(ctx context.Context, sessionID string, to
 
 func permissionOptions() []PermissionOption {
 	return []PermissionOption{
-		{OptionID: "allow_once", Name: "Allow once", Kind: "allow_once"},
-		{OptionID: "allow_always", Name: "Always allow", Kind: "allow_always"},
-		{OptionID: "reject_once", Name: "Reject", Kind: "reject_once"},
+		{OptionID: "allow-once", Name: "Allow once", Kind: "allow_once"},
+		{OptionID: "allow-always", Name: "Always allow", Kind: "allow_always"},
+		{OptionID: "reject-once", Name: "Reject", Kind: "reject_once"},
+		{OptionID: "reject-always", Name: "Always reject", Kind: "reject_always"},
 	}
 }
 

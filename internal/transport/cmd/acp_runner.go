@@ -19,8 +19,9 @@ type acpAppRunner struct {
 	ws  *workspace.AppWorkspace
 	app *app.App
 
-	mu     sync.Mutex
-	permit func(ctx context.Context, sessionID string, toolCall json.RawMessage) (string, bool, error)
+	mu         sync.Mutex
+	mcpServers []string
+	permit     func(ctx context.Context, sessionID string, toolCall json.RawMessage) (string, bool, error)
 }
 
 func newACPAppRunner(ws *workspace.AppWorkspace) *acpAppRunner {
@@ -31,7 +32,7 @@ func (r *acpAppRunner) setPermit(fn func(context.Context, string, json.RawMessag
 	r.permit = fn
 }
 
-func (r *acpAppRunner) NewSession(ctx context.Context, cwd string) (acp.SessionInfo, error) {
+func (r *acpAppRunner) NewSession(ctx context.Context, req acp.NewSessionRequest) (acp.SessionInfo, error) {
 	// Resolve providers/credentials the same way the non-interactive runner
 	// does; without this the coordinator can hold a model with no auth header.
 	if err := r.ws.InitCoderAgent(ctx); err != nil {
@@ -44,19 +45,88 @@ func (r *acpAppRunner) NewSession(ctx context.Context, cwd string) (acp.SessionI
 	if err != nil {
 		return acp.SessionInfo{}, err
 	}
-	return acp.SessionInfo{SessionID: sess.ID, Cwd: cwd, Title: sess.Title}, nil
+	if err := r.connectMCPServers(ctx, req.McpServers); err != nil {
+		return acp.SessionInfo{}, err
+	}
+	return acp.SessionInfo{SessionID: sess.ID, Cwd: req.Cwd, Title: sess.Title}, nil
 }
 
-func (r *acpAppRunner) LoadSession(ctx context.Context, id, cwd string) (acp.SessionInfo, bool, error) {
-	sess, err := r.ws.GetSession(ctx, id)
+func (r *acpAppRunner) LoadSession(ctx context.Context, req acp.LoadSessionRequest) (acp.SessionInfo, bool, error) {
+	sess, err := r.ws.GetSession(ctx, req.SessionID)
 	if err != nil {
 		return acp.SessionInfo{}, false, nil //nolint:nilerr // missing session maps to the protocol "not found" outcome
 	}
-	return acp.SessionInfo{SessionID: sess.ID, Cwd: cwd, Title: sess.Title}, true, nil
+	if err := r.connectMCPServers(ctx, req.McpServers); err != nil {
+		return acp.SessionInfo{}, false, err
+	}
+	return acp.SessionInfo{SessionID: sess.ID, Cwd: req.Cwd, Title: sess.Title}, true, nil
 }
 
-func (r *acpAppRunner) ResumeSession(ctx context.Context, id, cwd string) (acp.SessionInfo, bool, error) {
-	return r.LoadSession(ctx, id, cwd)
+func (r *acpAppRunner) ResumeSession(ctx context.Context, req acp.ResumeSessionRequest) (acp.SessionInfo, bool, error) {
+	return r.LoadSession(ctx, acp.LoadSessionRequest{SessionID: req.SessionID, Cwd: req.Cwd, McpServers: req.McpServers})
+}
+
+// History replays the stored conversation for session/load.
+func (r *acpAppRunner) History(ctx context.Context, sessionID string) ([]acp.ReplayMessage, error) {
+	msgs, err := r.app.Messages.List(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]acp.ReplayMessage, 0, len(msgs))
+	for _, m := range msgs {
+		if m.Role != message.User && m.Role != message.Assistant {
+			continue
+		}
+		var b strings.Builder
+		for _, part := range m.Parts {
+			if t, ok := part.(message.TextContent); ok {
+				b.WriteString(t.Text)
+			}
+		}
+		if strings.TrimSpace(b.String()) == "" {
+			continue
+		}
+		out = append(out, acp.ReplayMessage{Role: string(m.Role), MessageID: m.ID, Text: b.String()})
+	}
+	return out, nil
+}
+
+// connectMCPServers mounts client-supplied stdio MCP servers into the
+// workspace config and connects them. mocode's MCP manager is global, so
+// these entries are removed again on CloseSession.
+func (r *acpAppRunner) connectMCPServers(ctx context.Context, servers []acp.McpServer) error {
+	if len(servers) == 0 {
+		return nil
+	}
+	cfg := r.ws.Config()
+	if cfg == nil {
+		return fmt.Errorf("workspace config unavailable")
+	}
+	if cfg.MCP == nil {
+		cfg.MCP = config.MCPs{}
+	}
+	for _, srv := range servers {
+		if srv.Command == "" {
+			continue
+		}
+		env := map[string]string{}
+		for _, e := range srv.Env {
+			env[e.Name] = e.Value
+		}
+		cfg.MCP[srv.Name] = config.MCPConfig{
+			Command: srv.Command,
+			Args:    srv.Args,
+			Env:     env,
+			Type:    config.MCPStdio,
+		}
+		if err := r.ws.ReloadMCP(ctx, srv.Name); err != nil {
+			return fmt.Errorf("connect MCP server %q: %w", srv.Name, err)
+		}
+		r.mu.Lock()
+		r.mcpServers = append(r.mcpServers, srv.Name)
+		r.mu.Unlock()
+	}
+	return nil
 }
 
 func (r *acpAppRunner) ListSessions(ctx context.Context) ([]acp.SessionInfo, error) {
@@ -75,7 +145,19 @@ func (r *acpAppRunner) DeleteSession(ctx context.Context, id string) error {
 	return r.ws.DeleteSession(ctx, id)
 }
 
-func (r *acpAppRunner) CloseSession(_ context.Context, _ string) error { return nil }
+func (r *acpAppRunner) CloseSession(ctx context.Context, _ string) error {
+	r.mu.Lock()
+	names := append([]string{}, r.mcpServers...)
+	r.mcpServers = nil
+	r.mu.Unlock()
+	for _, name := range names {
+		_ = r.ws.ReloadMCP(ctx, name)
+		if cfg := r.ws.Config(); cfg != nil {
+			delete(cfg.MCP, name)
+		}
+	}
+	return nil
+}
 
 func (r *acpAppRunner) Prompt(ctx context.Context, sessionID, text string, emit func(acp.SessionUpdate)) (string, error) {
 	ctx, cancel := context.WithCancel(ctx)
@@ -268,9 +350,9 @@ func (r *acpAppRunner) watchPermissions(ctx context.Context, sessionID string) {
 				continue
 			}
 			switch option {
-			case "allow_always":
+			case "allow-always", "allow_always":
 				r.app.Permissions.GrantPersistent(req)
-			case "allow_once":
+			case "allow-once", "allow_once":
 				r.app.Permissions.Grant(req)
 			default:
 				r.app.Permissions.Deny(req)

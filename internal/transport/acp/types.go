@@ -416,3 +416,10 @@ type LogoutRequest struct{}
 
 // LogoutResponse is empty.
 type LogoutResponse struct{}
+
+// ReplayMessage is one conversation entry replayed on session/load.
+type ReplayMessage struct {
+	Role      string `json:"role"` // user | assistant
+	MessageID string `json:"messageId,omitempty"`
+	Text      string `json:"text"`
+}

@@ -5,6 +5,19 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
+## [0.21.0] - 2026-11-09
+
+### Added
+
+- **ACP 对齐官方实现**：
+  - `session/load` 先回放历史（user/agent chunk）再响应，符合 v1 规范；
+  - 按会话挂载并连接客户端传来的 **stdio MCP servers**（env 支持，关闭时清理）；
+  - 权限选项改为官方四种 kind（allow_once/allow_always/reject_once/reject_always），
+    optionId 对齐示例；
+  - `session/cancel` 会同时取消挂起的权限请求，避免客户端等不到 cancelled。
+- 真实 E2E 新增：`session/load` 回放验证、最小 stdio MCP server 挂载并由 agent
+  实际调用（echo_tool 返回 ECHO:HELLO）。
+
 ## [0.20.0] - 2026-11-09
 
 ### Added

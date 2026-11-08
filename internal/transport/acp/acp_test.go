@@ -22,16 +22,23 @@ func newFakeRunner() *fakeRunner {
 	return &fakeRunner{prompted: make(chan string, 4), cancelled: make(chan struct{}, 4)}
 }
 
-func (f *fakeRunner) NewSession(_ context.Context, cwd string) (SessionInfo, error) {
-	return SessionInfo{SessionID: "s1", Cwd: cwd}, nil
+func (f *fakeRunner) NewSession(_ context.Context, req NewSessionRequest) (SessionInfo, error) {
+	return SessionInfo{SessionID: "s1", Cwd: req.Cwd}, nil
 }
 
-func (f *fakeRunner) LoadSession(_ context.Context, id, cwd string) (SessionInfo, bool, error) {
-	return SessionInfo{SessionID: id, Cwd: cwd}, true, nil
+func (f *fakeRunner) LoadSession(_ context.Context, req LoadSessionRequest) (SessionInfo, bool, error) {
+	return SessionInfo{SessionID: req.SessionID, Cwd: req.Cwd}, true, nil
 }
 
-func (f *fakeRunner) ResumeSession(ctx context.Context, id, cwd string) (SessionInfo, bool, error) {
-	return f.LoadSession(ctx, id, cwd)
+func (f *fakeRunner) ResumeSession(ctx context.Context, req ResumeSessionRequest) (SessionInfo, bool, error) {
+	return f.LoadSession(ctx, LoadSessionRequest{SessionID: req.SessionID, Cwd: req.Cwd})
+}
+
+func (f *fakeRunner) History(_ context.Context, _ string) ([]ReplayMessage, error) {
+	return []ReplayMessage{
+		{Role: "user", MessageID: "m1", Text: "hello"},
+		{Role: "assistant", MessageID: "m2", Text: "hi there"},
+	}, nil
 }
 
 func (f *fakeRunner) ListSessions(context.Context) ([]SessionInfo, error) {
@@ -174,11 +181,11 @@ func TestPermissionSyncUsesHandler(t *testing.T) {
 	h := newHarness(t)
 	h.srv.SetPermissionRequester(func(_ context.Context, sessionID string, toolCall json.RawMessage, opts []PermissionOption) (string, bool) {
 		assert.Equal(t, "s1", sessionID)
-		assert.Len(t, opts, 3)
-		return "allow_once", false
+		assert.Len(t, opts, 4)
+		return "allow-once", false
 	})
 	id, cancelled := h.srv.RequestPermissionSync(context.Background(), "s1", json.RawMessage(`{"toolCallId":"t1"}`))
-	assert.Equal(t, "allow_once", id)
+	assert.Equal(t, "allow-once", id)
 	assert.False(t, cancelled)
 }
 
@@ -192,4 +199,19 @@ func TestPromptTextFlattensBlocks(t *testing.T) {
 	assert.Contains(t, got, "hello")
 	assert.Contains(t, got, "[file.go](file:///tmp/file.go)")
 	assert.Contains(t, got, "package a")
+}
+
+func TestLoadSessionReplaysHistory(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	res, rerr := h.call(t, "session/load", LoadSessionRequest{SessionID: "s1", Cwd: "/tmp"})
+	require.Nil(t, rerr)
+	resp, ok := res.(LoadSessionResponse)
+	require.True(t, ok)
+	assert.Equal(t, "s1", resp.SessionID)
+	frames := h.out.String()
+	assert.Contains(t, frames, "user_message_chunk")
+	assert.Contains(t, frames, "agent_message_chunk")
+	assert.Contains(t, frames, `"text":"hello"`)
+	assert.Contains(t, frames, "hi there")
 }

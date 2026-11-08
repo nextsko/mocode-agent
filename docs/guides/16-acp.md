@@ -21,11 +21,12 @@ mocode acp --yolo     # 自动批准所有权限（仅限可信环境）
 | 类别 | 方法 |
 |---|---|
 | 握手 | `initialize`（能力协商）、`authenticate`、`logout` |
-| 会话 | `session/new`、`session/load`、`session/resume`、`session/list`、`session/delete`、`session/close` |
+| 会话 | `session/new`、`session/load`（回放历史）、`session/resume`、`session/list`、`session/delete`、`session/close` |
+| MCP | `session/new` 的 stdio MCP servers 会按会话挂载并连接（env 支持；关闭会话时移除） |
 | 回合 | `session/prompt`、`session/cancel` |
 | 设置 | `session/set_mode`（mocode 的 agent 模式）、`session/set_config_option`（模型选择） |
 | 流式更新 | `agent_message_chunk`、`agent_thought_chunk`、`tool_call`、`tool_call_update`、`available_commands_update`、`current_mode_update`、`config_option_update` |
-| 权限 | 工具需要授权时向客户端发 `session/request_permission`，支持 allow_once / allow_always / reject |
+| 权限 | 工具需要授权时向客户端发 `session/request_permission`，四种 kind：allow_once / allow_always / reject_once / reject_always |
 | 命令 | 启动会话后推送 `available_commands_update`，来自 mocode 的 slash 命令注册表 |
 
 权限回调与工具调用流都接在真实执行路径上：客户端批准后 mocode 的工具照常执行，
@@ -43,13 +44,18 @@ mocode acp --yolo     # 自动批准所有权限（仅限可信环境）
 测试在 `internal/transport/acp/acp_test.go`（协议/取消/权限/多块 prompt）
 与 `rpc_test.go`（双向请求、通知）中；真实链路用 Node 最小客户端验证。
 
+## 与官方/主流实现对齐
+
+- `session/load` 按规范先回放历史（user/agent chunk），再响应请求；
+- stdio MCP 按规范支持，会话结束清理；HTTP/SSE 未声明能力；
+- 取消会同时终止挂起的 `session/request_permission`（返回 cancelled）；
+- 权限选项对齐官方 kind 与示例 optionId（allow-once / allow-always / reject-*）。
+
 ## 当前边界（诚实说明）
 
-- `session/new` 的 `mcpServers` 暂不接入：mocode 使用自身配置里的 MCP 服务，
-  不会为每个 ACP 会话动态挂载客户端提供的 MCP server；
-- `session/load` 只恢复会话元数据，不回放历史消息；
-- 客户端 fs / terminal / elicitation 方法尚未被本地工具调用（工具在进程内执行），
-  协议层保留了这些能力的位置；
-- 未发送 `plan` 更新（mocode 的 todo 尚未映射到 ACP plan）。
+- 回放只覆盖文本消息，不重放 tool_call 历史；
+- 客户端 fs / terminal / elicitation 方法尚未被本地工具调用（工具在进程内执行）；
+- 未发送 `plan` 更新（mocode 的 todo 尚未映射到 ACP plan）；
+- `reject_always` 当前只拒绝当次请求，未做持久化拒绝记忆。
 
 这些是下一步的明确缺口，而非“已支持”的模糊表述。
