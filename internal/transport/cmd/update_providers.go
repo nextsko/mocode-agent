@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/x/exp/charmtone"
 	"github.com/spf13/cobra"
 
-	"github.com/nextsko/mocode-agent/internal/core/config"
+	"github.com/nextsko/mocode-agent/internal/core/catwalkconv"
 )
 
 var updateProvidersSource string
@@ -48,7 +48,7 @@ Mocode update-providers --source=hyper https://hyper.example.com
 		var err error
 		switch updateProvidersSource {
 		case "catwalk":
-			err = config.UpdateProviders(pathOrURL)
+			err = catwalkconv.UpdateProviders(pathOrURL)
 		default:
 			return fmt.Errorf("invalid source %q, must be 'catwalk'", updateProvidersSource)
 		}

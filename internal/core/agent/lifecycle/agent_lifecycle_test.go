@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/ctxcompress"
+	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/util/csync"
@@ -338,8 +338,8 @@ func newLifecycleTestAgent(t *testing.T, large, small fantasy.LanguageModel, age
 	sessions := newFakeSessionService()
 	messages := newFakeMessageService()
 	sa := &sessionAgent{
-		largeModel:         csync.NewValue(Model{Model: large, CatwalkCfg: catwalk.Model{ContextWindow: 0}}),
-		smallModel:         csync.NewValue(Model{Model: small, CatwalkCfg: catwalk.Model{ContextWindow: 0}}),
+		largeModel:         csync.NewValue(Model{Model: large, CatwalkCfg: config.Model{ContextWindow: 0}}),
+		smallModel:         csync.NewValue(Model{Model: small, CatwalkCfg: config.Model{ContextWindow: 0}}),
 		systemPromptPrefix: csync.NewValue(""),
 		systemPrompt:       csync.NewValue("test system prompt"),
 		tools:              csync.NewSliceFrom(agentTools),

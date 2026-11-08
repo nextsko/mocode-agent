@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/nextsko/mocode-agent/internal/core/catwalkconv"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/util/version"
 )
@@ -183,7 +184,7 @@ func collectDoctorReport(ctx context.Context, cmd *cobra.Command, opts doctorOpt
 
 func loadDoctorConfigStore(cwd string, cmd *cobra.Command) (*doctorLoadedConfig, error) {
 	debug, _ := cmd.Flags().GetBool("debug")
-	store, err := config.LoadReadOnly(cwd, debug)
+	store, err := config.LoadReadOnly(cwd, debug, catwalkconv.ProvidersWithCache)
 	if err != nil {
 		return nil, err
 	}

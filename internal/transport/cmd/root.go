@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nextsko/mocode-agent/internal/core/app"
+	"github.com/nextsko/mocode-agent/internal/core/catwalkconv"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/config/projects"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
@@ -368,7 +369,7 @@ func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error
 // directory-explicit form of setupLocalWorkspace, used by commands that switch
 // projects at runtime (for example `mcp serve`).
 func setupLocalWorkspaceAt(ctx context.Context, cwd string, debug, yolo bool) (workspace.Workspace, func(), error) {
-	store, err := config.Init(cwd, debug)
+	store, err := config.Init(cwd, debug, catwalkconv.ProvidersWithCache)
 	if err != nil {
 		return nil, nil, err
 	}

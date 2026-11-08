@@ -15,7 +15,6 @@ import (
 	"strings"
 	"sync"
 
-	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/ctxcompress"
@@ -93,7 +92,7 @@ type SessionAgent interface {
 
 type Model struct {
 	Model      fantasy.LanguageModel
-	CatwalkCfg catwalk.Model
+	CatwalkCfg config.Model
 	ModelCfg   config.SelectedModel
 }
 

@@ -140,7 +140,7 @@ func (m *UI) slashArgCompletionGroups(input string) (groups []completions.SlashG
 			if p.Disable {
 				continue
 			}
-			provider := p.ToProvider()
+			provider := p.AsProvider()
 			for _, model := range p.Models {
 				if model.ID == "" {
 					continue

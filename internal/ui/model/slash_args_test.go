@@ -3,7 +3,6 @@ package model
 import (
 	"testing"
 
-	"charm.land/catwalk/pkg/catwalk"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/ui/dialog"
 	"github.com/nextsko/mocode-agent/internal/util/csync"
@@ -28,7 +27,7 @@ func newArgTestUI(t *testing.T) *UI {
 	cfg.Providers.Set("testprov", config.ProviderConfig{
 		ID:   "testprov",
 		Name: "Test Provider",
-		Models: []catwalk.Model{
+		Models: []config.Model{
 			{ID: "model-a", Name: "Model A"},
 			{ID: "model-b"},
 		},

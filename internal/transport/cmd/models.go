@@ -7,11 +7,11 @@ import (
 	"sort"
 	"strings"
 
-	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/lipgloss/v2/tree"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 
+	"github.com/nextsko/mocode-agent/internal/core/catwalkconv"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 )
 
@@ -33,7 +33,7 @@ Mocode models gpt5`,
 
 		debug, _ := cmd.Flags().GetBool("debug")
 
-		cfg, err := config.Init(cwd, debug)
+		cfg, err := config.Init(cwd, debug, catwalkconv.ProvidersWithCache)
 		if err != nil {
 			return err
 		}
@@ -43,7 +43,7 @@ Mocode models gpt5`,
 		}
 
 		term := strings.ToLower(strings.Join(args, " "))
-		filter := func(p config.ProviderConfig, m catwalk.Model) bool {
+		filter := func(p config.ProviderConfig, m config.Model) bool {
 			for _, s := range []string{p.ID, p.Name, m.ID, m.Name} {
 				if term == "" || strings.Contains(strings.ToLower(s), term) {
 					return true

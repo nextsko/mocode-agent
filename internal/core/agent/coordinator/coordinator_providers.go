@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
@@ -52,7 +51,7 @@ func (c *Coordinator) buildAnthropicProvider(baseURL, apiKey string, headers map
 		// NOTE: Prevent the SDK from picking up the API key from env.
 		_ = os.Setenv("ANTHROPIC_API_KEY", "")
 		headers["Authorization"] = apiKey
-	case providerID == string(catwalk.InferenceProviderMiniMax) || providerID == string(catwalk.InferenceProviderMiniMaxChina):
+	case providerID == string(config.InferenceProviderMiniMax) || providerID == string(config.InferenceProviderMiniMaxChina):
 		// NOTE: Prevent the SDK from picking up the API key from env.
 		_ = os.Setenv("ANTHROPIC_API_KEY", "")
 		headers["Authorization"] = "Bearer " + apiKey
@@ -241,7 +240,7 @@ func (c *Coordinator) buildProvider(providerCfg config.ProviderConfig, model con
 		return c.buildGoogleVertexProvider(headers, providerCfg.ExtraParams)
 	case openaicompat.Name:
 		switch providerCfg.ID {
-		case string(catwalk.InferenceProviderZAI):
+		case string(config.InferenceProviderZAI):
 			if providerCfg.ExtraBody == nil {
 				providerCfg.ExtraBody = map[string]any{}
 			}

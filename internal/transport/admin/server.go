@@ -18,8 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"charm.land/catwalk/pkg/catwalk"
-
+	"github.com/nextsko/mocode-agent/internal/core/catwalkconv"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/tools/external/mcp"
 	"github.com/nextsko/mocode-agent/internal/transport/workspace"
@@ -254,18 +253,18 @@ func (s *Server) handleProviders(w http.ResponseWriter, r *http.Request) {
 
 // handleProvidersCatalog lists all available providers from the catwalk catalog.
 func (s *Server) handleProvidersCatalog(w http.ResponseWriter, r *http.Request) {
-	catwalkProviders, err := config.Providers(s.workspace.Config())
+	catwalkProviders, err := catwalkconv.Providers(s.workspace.Config())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 	type CatalogEntry struct {
-		ID          string          `json:"id"`
-		Name        string          `json:"name"`
-		Type        string          `json:"type"`
-		APIEndpoint string          `json:"api_endpoint"`
-		Models      []catwalk.Model `json:"models"`
-		ModelCount  int             `json:"model_count"`
+		ID          string         `json:"id"`
+		Name        string         `json:"name"`
+		Type        string         `json:"type"`
+		APIEndpoint string         `json:"api_endpoint"`
+		Models      []config.Model `json:"models"`
+		ModelCount  int            `json:"model_count"`
 	}
 	result := make([]CatalogEntry, 0, len(catwalkProviders))
 	for _, p := range catwalkProviders {
@@ -315,13 +314,13 @@ func (s *Server) handleProviderSave(w http.ResponseWriter, r *http.Request) {
 		maxTokens = 65536
 	}
 	reasoning := cmpTrim(req.Reasoning, "medium")
-	models := make([]catwalk.Model, 0)
+	models := make([]config.Model, 0)
 	for _, mid := range req.Models {
 		mid = strings.TrimSpace(mid)
 		if mid == "" {
 			continue
 		}
-		models = append(models, catwalk.Model{
+		models = append(models, config.Model{
 			ID:                     mid,
 			Name:                   mid,
 			DefaultMaxTokens:       maxTokens,
@@ -335,7 +334,7 @@ func (s *Server) handleProviderSave(w http.ResponseWriter, r *http.Request) {
 		ID:      providerID,
 		Name:    cmpTrim(req.Name, providerID),
 		BaseURL: baseURL,
-		Type:    catwalk.Type(strings.TrimSpace(req.Type)),
+		Type:    config.ProviderType(strings.TrimSpace(req.Type)),
 		APIKey:  apiKey,
 		Models:  models,
 	}

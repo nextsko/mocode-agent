@@ -5,32 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"charm.land/catwalk/pkg/catwalk"
 	"github.com/stretchr/testify/require"
 )
-
-// resetProviderState is kept for test call sites; the provider list is no
-// longer memoized in package state, so there is nothing to reset.
-func resetProviderState() {}
-
-func TestProviders_Integration_AutoUpdateDisabled(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_DATA_HOME", tmpDir)
-
-	resetProviderState()
-	defer resetProviderState()
-
-	cfg := &Config{
-		Options: &Options{
-			DisableProviderAutoUpdate: true,
-		},
-	}
-
-	providers, err := Providers(cfg)
-	require.NoError(t, err)
-	require.NotNil(t, providers)
-	require.Greater(t, len(providers), 5, "Expected embedded providers")
-}
 
 func TestCache_StoreAndGet(t *testing.T) {
 	t.Parallel()
@@ -38,9 +14,9 @@ func TestCache_StoreAndGet(t *testing.T) {
 	tmpDir := t.TempDir()
 	cachePath := tmpDir + "/test.json"
 
-	cache := newCache[[]catwalk.Provider](cachePath)
+	cache := newCache[[]Provider](cachePath)
 
-	providers := []catwalk.Provider{
+	providers := []Provider{
 		{Name: "Provider1", ID: "p1"},
 		{Name: "Provider2", ID: "p2"},
 	}
@@ -63,7 +39,7 @@ func TestCache_GetNonExistent(t *testing.T) {
 	tmpDir := t.TempDir()
 	cachePath := tmpDir + "/nonexistent.json"
 
-	cache := newCache[[]catwalk.Provider](cachePath)
+	cache := newCache[[]Provider](cachePath)
 
 	_, _, err := cache.Get()
 	require.Error(t, err)
@@ -78,7 +54,7 @@ func TestCache_GetInvalidJSON(t *testing.T) {
 
 	require.NoError(t, os.WriteFile(cachePath, []byte("invalid json"), 0o644))
 
-	cache := newCache[[]catwalk.Provider](cachePath)
+	cache := newCache[[]Provider](cachePath)
 
 	_, _, err := cache.Get()
 	require.Error(t, err)

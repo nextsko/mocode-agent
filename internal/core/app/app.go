@@ -15,7 +15,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -24,6 +23,7 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/agent"
 	"github.com/nextsko/mocode-agent/internal/core/agent/notify"
+	"github.com/nextsko/mocode-agent/internal/core/catwalkconv"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/permission"
 	"github.com/nextsko/mocode-agent/internal/core/question"
@@ -140,7 +140,7 @@ func New(ctx context.Context, storeCfg *config.ConfigStore) (*App, error) {
 	app.setupEvents()
 
 	// Update providers in the background without blocking startup.
-	config.UpdateProvidersAsync(storeCfg.Config())
+	catwalkconv.UpdateProvidersAsync(storeCfg.Config())
 
 	go mcp.Initialize(ctx, app.Permissions, storeCfg)
 
@@ -495,8 +495,8 @@ func (app *App) GetDefaultSmallModel(providerID string) config.SelectedModel {
 	largeModelCfg := cfg.Models[config.SelectedModelTypeLarge]
 
 	// Find the provider in the known providers list to get its default small model.
-	knownProviders, _ := config.Providers(cfg)
-	var knownProvider *catwalk.Provider
+	knownProviders, _ := catwalkconv.Providers(cfg)
+	var knownProvider *config.Provider
 	for _, p := range knownProviders {
 		if string(p.ID) == providerID {
 			knownProvider = &p

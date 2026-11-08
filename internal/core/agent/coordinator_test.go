@@ -9,7 +9,6 @@ import (
 	"errors"
 	"testing"
 
-	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -61,7 +60,7 @@ func newTestCoordinator(t *testing.T, env fakeEnv, providerID string, providerCf
 func newMockAgent(providerID string, maxTokens int64, runFunc func(context.Context, SessionAgentCall) (*fantasy.AgentResult, error)) *mockSessionAgent {
 	return &mockSessionAgent{
 		model: Model{
-			CatwalkCfg: catwalk.Model{
+			CatwalkCfg: config.Model{
 				DefaultMaxTokens: maxTokens,
 			},
 			ModelCfg: config.SelectedModel{
@@ -122,7 +121,7 @@ func TestRunSubAgent(t *testing.T) {
 
 		agent := &mockSessionAgent{
 			model: Model{
-				CatwalkCfg: catwalk.Model{
+				CatwalkCfg: config.Model{
 					DefaultMaxTokens: 4096,
 				},
 				ModelCfg: config.SelectedModel{

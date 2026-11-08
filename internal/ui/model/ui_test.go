@@ -8,7 +8,6 @@ import (
 
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/require"
 
@@ -70,7 +69,7 @@ func TestCurrentModelSupportsImages(t *testing.T) {
 		providers := csync.NewMap[string, config.ProviderConfig]()
 		providers.Set("test-provider", config.ProviderConfig{
 			ID: "test-provider",
-			Models: []catwalk.Model{
+			Models: []config.Model{
 				{ID: "test-model", SupportsImages: true},
 			},
 		})

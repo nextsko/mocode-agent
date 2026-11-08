@@ -149,8 +149,6 @@ var packageRules = []packageRule{
 	},
 
 	// The remaining tool trees are ported; the adapter owns the fantasy edge.
-	// external/mcp is deliberately absent: its dynamic bridge (mcp-tools.go)
-	// still returns structured image/media responses the port cannot express.
 	{
 		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/core/fs",
 		forbidden: []string{charmLandPrefix},
@@ -197,6 +195,12 @@ var packageRules = []packageRule{
 	},
 	{
 		pkg:       "github.com/nextsko/mocode-agent/internal/core/tools/external/mcp",
+		forbidden: []string{charmLandPrefix},
+	},
+	{
+		// config owns the wire types; catalog SDK types live only in
+		// internal/core/catwalkconv.
+		pkg:       "github.com/nextsko/mocode-agent/internal/core/config",
 		forbidden: []string{charmLandPrefix},
 	},
 }

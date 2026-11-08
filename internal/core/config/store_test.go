@@ -10,6 +10,39 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testKnownProviders returns a minimal catalog for load tests.
+func testKnownProviders() []Provider {
+	return []Provider{
+		{
+			ID:                  InferenceProvider("openai"),
+			Name:                "OpenAI",
+			APIEndpoint:         "https://api.openai.com/v1",
+			Type:                ProviderTypeOpenAI,
+			DefaultLargeModelID: "gpt-4",
+			DefaultSmallModelID: "gpt-4",
+			Models: []Model{
+				{ID: "gpt-4", Name: "GPT-4"},
+			},
+		},
+		{
+			ID:                  InferenceProviderAnthropic,
+			Name:                "Anthropic",
+			APIEndpoint:         "https://api.anthropic.com/v1",
+			Type:                ProviderTypeAnthropic,
+			DefaultLargeModelID: "claude-sonnet-4",
+			DefaultSmallModelID: "claude-sonnet-4",
+			Models: []Model{
+				{ID: "claude-sonnet-4", Name: "Claude Sonnet 4"},
+			},
+		},
+	}
+}
+
+// testProviderSource is the injected catalog used by load tests.
+func testProviderSource() ProviderSource {
+	return func(*Config) ([]Provider, error) { return testKnownProviders(), nil }
+}
+
 func TestConfigStore_ConfigPath_GlobalAlwaysWorks(t *testing.T) {
 	t.Parallel()
 
@@ -336,7 +369,7 @@ func TestReloadFromDisk_UsesNewConfigValues(t *testing.T) {
 	require.NoError(t, os.WriteFile(configPath, []byte(initialConfig), 0o600))
 
 	// Load initial config properly
-	store, err := Load(dir, false)
+	store, err := Load(dir, false, testProviderSource())
 	require.NoError(t, err)
 
 	// Set globalDataPath for the test (Load doesn't set this directly)
@@ -389,7 +422,7 @@ func TestSetConfigField_AutoReloads(t *testing.T) {
 	require.NoError(t, os.WriteFile(configPath, []byte(initialConfig), 0o600))
 
 	// Load initial config
-	store, err := Load(dir, false)
+	store, err := Load(dir, false, testProviderSource())
 	require.NoError(t, err)
 
 	// Verify initial state
@@ -424,7 +457,7 @@ func TestRemoveConfigField_AutoReloads(t *testing.T) {
 	require.NoError(t, os.WriteFile(configPath, []byte(initialConfig), 0o600))
 
 	// Load initial config
-	store, err := Load(dir, false)
+	store, err := Load(dir, false, testProviderSource())
 	require.NoError(t, err)
 
 	// Set globalDataPath and capture snapshot
@@ -490,7 +523,7 @@ func TestAutoReloadDisabledDuringReload(t *testing.T) {
 
 	// Load will trigger configureProviders which removes anthropic OAuth config
 	// This should NOT cause infinite recursion thanks to autoReloadDisabled guard
-	store, err := Load(dir, false)
+	store, err := Load(dir, false, testProviderSource())
 	require.NoError(t, err)
 
 	// Verify the store loaded successfully and autoReloadDisabled was unset

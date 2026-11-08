@@ -10,7 +10,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/lipgloss/v2"
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
@@ -321,7 +320,7 @@ func (a *AssistantInfoItem) renderContent(width int) string {
 		if modelName == "" {
 			modelName = "Unknown Model"
 		}
-		model = &catwalk.Model{Name: modelName}
+		model = &config.Model{Name: modelName}
 	}
 	modelFormatted := a.sty.Messages.AssistantInfoModel.Render(model.Name)
 	providerName := a.message.Provider

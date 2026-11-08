@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"charm.land/catwalk/pkg/catwalk"
 	"github.com/stretchr/testify/require"
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
@@ -116,7 +115,7 @@ func TestDoctorModelConfigCheck(t *testing.T) {
 			"openai": {
 				ID:   "openai",
 				Name: "OpenAI",
-				Models: []catwalk.Model{
+				Models: []config.Model{
 					{ID: "gpt-4.1"},
 					{ID: "gpt-4.1-mini"},
 				},

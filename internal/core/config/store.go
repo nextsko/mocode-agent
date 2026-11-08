@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"slices"
 
-	"charm.land/catwalk/pkg/catwalk"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -38,7 +37,8 @@ type ConfigStore struct {
 	resolver           VariableResolver
 	globalDataPath     string   // ~/.local/share/mocode/mocode.json
 	loadedPaths        []string // config files that were successfully loaded
-	knownProviders     []catwalk.Provider
+	knownProviders     []Provider
+	providerSource     ProviderSource
 	overrides          RuntimeOverrides
 	trackedConfigPaths []string                // unique, normalized config file paths
 	snapshots          map[string]fileSnapshot // path -> snapshot at last capture
@@ -70,7 +70,7 @@ func (s *ConfigStore) Resolve(key string) (string, error) {
 }
 
 // KnownProviders returns the list of known providers.
-func (s *ConfigStore) KnownProviders() []catwalk.Provider {
+func (s *ConfigStore) KnownProviders() []Provider {
 	return s.knownProviders
 }
 
@@ -273,7 +273,7 @@ func (s *ConfigStore) SetProviderAPIKey(scope Scope, providerID string, apiKey a
 		return nil
 	}
 
-	var foundProvider *catwalk.Provider
+	var foundProvider *Provider
 	for _, p := range s.knownProviders {
 		if string(p.ID) == providerID {
 			foundProvider = &p
@@ -525,12 +525,16 @@ func (s *ConfigStore) ReloadFromDisk(ctx context.Context) error {
 	// Preserve runtime overrides
 	overrides := s.overrides
 
-	// Reconfigure providers
+	// Reconfigure providers from the injected catalog source.
 	env := NewEnv()
 	resolver := NewShellVariableResolver(env)
-	providers, err := Providers(cfg)
-	if err != nil {
-		return fmt.Errorf("failed to load providers during reload: %w", err)
+	var providers []Provider
+	if s.providerSource != nil {
+		var err error
+		providers, err = s.providerSource(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to load providers during reload: %w", err)
+		}
 	}
 
 	if err := cfg.configureProviders(s, env, resolver, providers); err != nil {

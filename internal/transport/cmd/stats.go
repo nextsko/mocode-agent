@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/nextsko/mocode-agent/internal/core/catwalkconv"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/store"
 )
@@ -24,7 +25,7 @@ var statsCmd = &cobra.Command{
 			return fmt.Errorf("get working directory: %w", err)
 		}
 
-		cfg, err := config.Init(cwd, false)
+		cfg, err := config.Init(cwd, false, catwalkconv.ProvidersWithCache)
 		if err != nil {
 			return fmt.Errorf("init config: %w", err)
 		}

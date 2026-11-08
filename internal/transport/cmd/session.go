@@ -21,6 +21,7 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
+	"github.com/nextsko/mocode-agent/internal/core/catwalkconv"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/core/tools"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
@@ -112,7 +113,7 @@ func sessionSetup(cmd *cobra.Command) (context.Context, *sessionServices, func()
 		return nil, nil, nil, fmt.Errorf("get working directory: %w", err)
 	}
 
-	cfg, err := config.Init(cwd, false)
+	cfg, err := config.Init(cwd, false, catwalkconv.ProvidersWithCache)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize config: %w", err)
 	}

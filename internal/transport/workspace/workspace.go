@@ -9,7 +9,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
 
 	"github.com/nextsko/mocode-agent/internal/core/config"
@@ -55,7 +54,7 @@ type LSPEvent struct {
 type AgentModel struct {
 	AgentID    string
 	Name       string
-	CatwalkCfg catwalk.Model
+	CatwalkCfg config.Model
 	ModelCfg   config.SelectedModel
 }
 

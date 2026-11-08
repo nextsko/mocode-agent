@@ -9,9 +9,9 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/catwalk/pkg/catwalk"
 	uv "github.com/charmbracelet/ultraviolet"
 
+	"github.com/nextsko/mocode-agent/internal/core/catwalkconv"
 	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/ui/common"
 	"github.com/nextsko/mocode-agent/internal/ui/styles"
@@ -79,7 +79,7 @@ type Models struct {
 	isOnboarding bool
 
 	modelType ModelType
-	providers []catwalk.Provider
+	providers []config.Provider
 
 	keyMap struct {
 		Tab      key.Binding
@@ -145,7 +145,7 @@ func NewModels(com *common.Common, isOnboarding bool) (*Models, error) {
 	m.keyMap.Close = CloseKey
 
 	var err error
-	m.providers, err = config.Providers(m.com.Config())
+	m.providers, err = catwalkconv.Providers(m.com.Config())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get providers: %w", err)
 	}
@@ -356,14 +356,14 @@ func (m *Models) setProviderItems() error {
 	addedProviders := make(map[string]bool)
 
 	// Get a list of known providers to compare against
-	knownProviders, err := config.Providers(cfg)
+	knownProviders, err := catwalkconv.Providers(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to get providers: %w", err)
 	}
 
-	containsProviderFunc := func(id string) func(p catwalk.Provider) bool {
-		return func(p catwalk.Provider) bool {
-			return p.ID == catwalk.InferenceProvider(id)
+	containsProviderFunc := func(id string) func(p config.Provider) bool {
+		return func(p config.Provider) bool {
+			return p.ID == config.InferenceProvider(id)
 		}
 	}
 
@@ -378,7 +378,7 @@ func (m *Models) setProviderItems() error {
 		// Check if this provider is not in the known providers list
 		if !slices.ContainsFunc(knownProviders, containsProviderFunc(id)) ||
 			!slices.ContainsFunc(m.providers, containsProviderFunc(id)) {
-			provider := p.ToProvider()
+			provider := p.AsProvider()
 
 			// Add this unknown provider to the list
 			name := cmp.Or(p.Name, id)

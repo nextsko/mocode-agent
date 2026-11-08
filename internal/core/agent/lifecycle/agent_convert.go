@@ -7,7 +7,6 @@ import (
 	"os"
 	"strconv"
 
-	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
 	"charm.land/fantasy/providers/anthropic"
 	"charm.land/fantasy/providers/bedrock"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/ctxcompress"
 	"github.com/nextsko/mocode-agent/internal/core/agent/llmconv"
+	"github.com/nextsko/mocode-agent/internal/core/config"
 	"github.com/nextsko/mocode-agent/internal/domain/session"
 	"github.com/nextsko/mocode-agent/internal/domain/session/message"
 	"github.com/nextsko/mocode-agent/internal/util/ext"
@@ -63,8 +63,8 @@ func (a *sessionAgent) convertToToolResult(result fantasy.ToolResultContent) mes
 }
 
 func (a *sessionAgent) workaroundProviderMediaLimitations(messages []fantasy.Message, largeModel Model) []fantasy.Message {
-	providerSupportsMedia := largeModel.ModelCfg.Provider == string(catwalk.InferenceProviderAnthropic) ||
-		largeModel.ModelCfg.Provider == string(catwalk.InferenceProviderBedrock)
+	providerSupportsMedia := largeModel.ModelCfg.Provider == string(config.InferenceProviderAnthropic) ||
+		largeModel.ModelCfg.Provider == string(config.InferenceProviderBedrock)
 
 	if providerSupportsMedia {
 		return messages

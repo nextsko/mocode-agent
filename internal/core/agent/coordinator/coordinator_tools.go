@@ -11,7 +11,6 @@ import (
 	"slices"
 	"strings"
 
-	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
 	"charm.land/fantasy/providers/anthropic"
 	"charm.land/fantasy/providers/azure"
@@ -175,11 +174,11 @@ func getProviderOptions(model Model, providerCfg config.ProviderConfig) fantasy.
 		// Future work: abstract this in Fantasy and let custom providers
 		// specify how to set this.
 		switch providerCfg.ID {
-		case string(catwalk.InferenceProviderIoNet):
+		case string(config.InferenceProviderIoNet):
 			extraBody["chat_template_kwargs"] = map[string]any{
 				"thinking": model.ModelCfg.Think,
 			}
-		case string(catwalk.InferenceProviderZAI):
+		case string(config.InferenceProviderZAI):
 			if model.ModelCfg.Think {
 				extraBody["thinking"] = map[string]any{
 					"type": "enabled",
@@ -430,8 +429,8 @@ func (c *Coordinator) buildAgentModels(ctx context.Context) (Model, Model, error
 		return Model{}, Model{}, err
 	}
 
-	var largeCatwalkModel *catwalk.Model
-	var smallCatwalkModel *catwalk.Model
+	var largeCatwalkModel *config.Model
+	var smallCatwalkModel *config.Model
 
 	for _, m := range largeProviderCfg.Models {
 		if m.ID == largeModelCfg.Model {

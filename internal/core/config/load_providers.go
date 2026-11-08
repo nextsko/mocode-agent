@@ -7,11 +7,9 @@ import (
 	"maps"
 	"slices"
 	"strings"
-
-	"charm.land/catwalk/pkg/catwalk"
 )
 
-func (c *Config) configureProviders(store *ConfigStore, env Env, resolver VariableResolver, knownProviders []catwalk.Provider) error {
+func (c *Config) configureProviders(store *ConfigStore, env Env, resolver VariableResolver, knownProviders []Provider) error {
 	knownProviderNames := make(map[string]bool)
 	restore := PushPopMocodeEnv()
 	defer restore()
@@ -64,7 +62,7 @@ func (c *Config) configureProviders(store *ConfigStore, env Env, resolver Variab
 		}
 
 		switch {
-		case p.ID == catwalk.InferenceProviderAnthropic && config.OAuthToken != nil:
+		case p.ID == InferenceProviderAnthropic && config.OAuthToken != nil:
 			// Claude Code subscription is not supported anymore. Remove to show onboarding.
 			if !store.reloadInProgress {
 				if err := store.RemoveConfigField(ScopeGlobal, "providers.anthropic"); err != nil {
@@ -77,7 +75,7 @@ func (c *Config) configureProviders(store *ConfigStore, env Env, resolver Variab
 
 		switch p.ID {
 		// Handle specific providers that require additional configuration
-		case catwalk.InferenceProviderVertexAI:
+		case InferenceProviderVertexAI:
 			var (
 				project  = env.Get("VERTEXAI_PROJECT")
 				location = env.Get("VERTEXAI_LOCATION")
@@ -91,7 +89,7 @@ func (c *Config) configureProviders(store *ConfigStore, env Env, resolver Variab
 			}
 			prepared.ExtraParams["project"] = project
 			prepared.ExtraParams["location"] = location
-		case catwalk.InferenceProviderAzure:
+		case InferenceProviderAzure:
 			endpoint, err := resolver.ResolveValue(p.APIEndpoint)
 			if err != nil || endpoint == "" {
 				if configExists {
@@ -102,7 +100,7 @@ func (c *Config) configureProviders(store *ConfigStore, env Env, resolver Variab
 			}
 			prepared.BaseURL = endpoint
 			prepared.ExtraParams["apiVersion"] = env.Get("AZURE_OPENAI_API_VERSION")
-		case catwalk.InferenceProviderBedrock:
+		case InferenceProviderBedrock:
 			if !hasAWSCredentials(env) {
 				if configExists {
 					slog.Warn("Skipping Bedrock provider due to missing AWS credentials")
@@ -143,8 +141,8 @@ func (c *Config) configureProviders(store *ConfigStore, env Env, resolver Variab
 		providerConfig.ID = id
 		providerConfig.Name = cmp.Or(providerConfig.Name, id) // Use ID as name if not set
 		// default to OpenAI if not set
-		providerConfig.Type = cmp.Or(providerConfig.Type, catwalk.TypeOpenAICompat)
-		if !slices.Contains(catwalk.KnownProviderTypes(), providerConfig.Type) {
+		providerConfig.Type = cmp.Or(providerConfig.Type, ProviderTypeOpenAICompat)
+		if !slices.Contains(KnownProviderTypes(), providerConfig.Type) {
 			slog.Warn("Skipping custom provider due to unsupported provider type", "provider", id)
 			c.Providers.Del(id)
 			continue
@@ -198,7 +196,7 @@ func (c *Config) configureProviders(store *ConfigStore, env Env, resolver Variab
 	return nil
 }
 
-func (c *Config) defaultModelSelection(knownProviders []catwalk.Provider) (largeModel SelectedModel, smallModel SelectedModel, err error) {
+func (c *Config) defaultModelSelection(knownProviders []Provider) (largeModel SelectedModel, smallModel SelectedModel, err error) {
 	if len(knownProviders) == 0 && c.Providers.Len() == 0 {
 		err = fmt.Errorf("no providers configured, please configure at least one provider")
 		return largeModel, smallModel, err
@@ -270,7 +268,7 @@ func (c *Config) defaultModelSelection(knownProviders []catwalk.Provider) (large
 // mergeProviderOverrides applies user-configured provider fields on top of the
 // catalog entry. Configured models take precedence; catalog models are appended
 // afterwards so that model IDs stay unique.
-func mergeProviderOverrides(p *catwalk.Provider, config ProviderConfig) {
+func mergeProviderOverrides(p *Provider, config ProviderConfig) {
 	if config.BaseURL != "" {
 		p.APIEndpoint = config.BaseURL
 	}
@@ -281,7 +279,7 @@ func mergeProviderOverrides(p *catwalk.Provider, config ProviderConfig) {
 		return
 	}
 
-	models := make([]catwalk.Model, 0, len(config.Models)+len(p.Models))
+	models := make([]Model, 0, len(config.Models)+len(p.Models))
 	seen := make(map[string]bool)
 	for _, model := range config.Models {
 		if seen[model.ID] {
@@ -306,7 +304,7 @@ func mergeProviderOverrides(p *catwalk.Provider, config ProviderConfig) {
 	p.Models = models
 }
 
-func configureSelectedModels(store *ConfigStore, knownProviders []catwalk.Provider, persist bool) error {
+func configureSelectedModels(store *ConfigStore, knownProviders []Provider, persist bool) error {
 	c := store.config
 	defaultLarge, defaultSmall, err := c.defaultModelSelection(knownProviders)
 	if err != nil {

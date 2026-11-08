@@ -255,7 +255,7 @@ func (m *UI) handleReAuthenticate(providerID string) tea.Cmd {
 	if !ok {
 		return nil
 	}
-	return m.openAuthenticationDialog(providerCfg.ToProvider(), cfg.Models[agentCfg.Model], agentCfg.Model)
+	return m.openAuthenticationDialog(providerCfg.AsProvider(), cfg.Models[agentCfg.Model], agentCfg.Model)
 }
 
 // newSession clears the current session state and prepares for a new session.

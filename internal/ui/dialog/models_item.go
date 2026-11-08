@@ -1,7 +1,6 @@
 package dialog
 
 import (
-	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/sahilm/fuzzy"
@@ -51,8 +50,8 @@ func (m *ModelGroup) Render(width int) string {
 
 // ModelItem represents a list item for a model type.
 type ModelItem struct {
-	prov      catwalk.Provider
-	model     catwalk.Model
+	prov      config.Provider
+	model     config.Model
 	modelType ModelType
 
 	cache        map[int]string
@@ -80,7 +79,7 @@ func (m *ModelItem) SelectedModelType() config.SelectedModelType {
 var _ ListItem = &ModelItem{}
 
 // NewModelItem creates a new ModelItem.
-func NewModelItem(t *styles.Styles, prov catwalk.Provider, model catwalk.Model, typ ModelType, showProvider bool) *ModelItem {
+func NewModelItem(t *styles.Styles, prov config.Provider, model config.Model, typ ModelType, showProvider bool) *ModelItem {
 	return &ModelItem{
 		prov:         prov,
 		model:        model,

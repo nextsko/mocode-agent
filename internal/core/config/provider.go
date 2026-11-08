@@ -1,29 +1,17 @@
 package config
 
 import (
-	"cmp"
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
-	"strings"
 
-	"charm.land/catwalk/pkg/catwalk"
-	"charm.land/catwalk/pkg/embedded"
 	"github.com/charmbracelet/x/etag"
 
-	"github.com/nextsko/mocode-agent/internal/util/csync"
 	"github.com/nextsko/mocode-agent/internal/util/infra"
 )
-
-type syncer[T any] interface {
-	Get(context.Context) (T, error)
-}
 
 // providersCacheFile is the cache file name for the provider list.
 const providersCacheFile = "providers"
@@ -50,87 +38,22 @@ func cachePathFor() string {
 	return filepath.Join(infra.Dir(), ".local", "share", appName, name+".json")
 }
 
-// UpdateProviders updates the Catwalk providers list from a specified source.
-func UpdateProviders(pathOrURL string) error {
-	var providers []catwalk.Provider
-	pathOrURL = cmp.Or(pathOrURL, os.Getenv("CATWALK_URL"), defaultCatwalkURL)
+// ProviderCachePath returns the path of the provider catalog cache file.
+func ProviderCachePath() string { return cachePathFor() }
 
-	switch {
-	case pathOrURL == "embedded":
-		providers = embedded.GetAll()
-	case strings.HasPrefix(pathOrURL, "http://") || strings.HasPrefix(pathOrURL, "https://"):
-		var err error
-		providers, err = catwalk.NewWithURL(pathOrURL).GetProviders(context.Background(), "")
-		if err != nil {
-			return fmt.Errorf("failed to fetch providers from Catwalk: %w", err)
-		}
-	default:
-		content, err := os.ReadFile(pathOrURL) //nolint:gosec // cache path derives from the internal provider name.
-		if err != nil {
-			return fmt.Errorf("failed to read file: %w", err)
-		}
-		if err := json.Unmarshal(content, &providers); err != nil {
-			return fmt.Errorf("failed to unmarshal provider data: %w", err)
-		}
-		if len(providers) == 0 {
-			return fmt.Errorf("no providers found in the provided source")
-		}
+// ReadProviderCache returns the cached provider catalog. It reports an error
+// when no usable cache exists yet.
+func ReadProviderCache() ([]Provider, error) {
+	providers, _, err := newCache[[]Provider](cachePathFor()).Get()
+	if err != nil {
+		return nil, err
 	}
-
-	if err := newCache[[]catwalk.Provider](cachePathFor()).Store(providers); err != nil {
-		return fmt.Errorf("failed to save providers to cache: %w", err)
-	}
-
-	slog.Info("Providers updated successfully", "count", len(providers), "from", pathOrURL, "to", cachePathFor())
-	return nil
+	return providers, nil
 }
 
-// ProvidersWithCache returns the list of providers from cache only,
-// without any network requests. This is the default behavior to avoid
-// blocking startup on network operations.
-func ProvidersWithCache(cfg *Config) ([]catwalk.Provider, error) {
-	var errs []error
-	providers := csync.NewSlice[catwalk.Provider]()
-	customProvidersOnly := cfg.Options.DisableDefaultProviders
-
-	if !customProvidersOnly {
-		// Load catwalk providers from cache
-		catwalkCache := newCache[[]catwalk.Provider](cachePathFor())
-		catwalkProviders, _, err := catwalkCache.Get()
-		if err == nil {
-			providers.Append(catwalkProviders...)
-		} else {
-			slog.Debug("Failed to load catwalk providers from cache, using embedded", "error", err)
-			providers.Append(embedded.GetAll()...)
-		}
-	}
-
-	return slices.Collect(providers.Seq()), errors.Join(errs...)
-}
-
-// Providers returns the list of providers. This is an alias for ProvidersWithCache
-// to maintain backward compatibility. Network updates are now handled asynchronously
-// via UpdateProvidersAsync.
-func Providers(cfg *Config) ([]catwalk.Provider, error) {
-	return ProvidersWithCache(cfg)
-}
-
-// UpdateProvidersAsync updates providers in the background without blocking.
-// This should be called from a goroutine during app startup.
-func UpdateProvidersAsync(cfg *Config) {
-	go func() {
-		if cfg.Options.DisableProviderAutoUpdate {
-			return
-		}
-		if cfg.Options.DisableDefaultProviders {
-			return
-		}
-
-		slog.Info("Starting async provider update")
-		if err := UpdateProviders(""); err != nil {
-			slog.Warn("Async provider update failed", "error", err)
-		}
-	}()
+// WriteProviderCache stores the provider catalog in the cache file.
+func WriteProviderCache(providers []Provider) error {
+	return newCache[[]Provider](cachePathFor()).Store(providers)
 }
 
 type cache[T any] struct {
@@ -166,7 +89,7 @@ func (c cache[T]) Store(v T) error {
 		return fmt.Errorf("failed to marshal provider data: %w", err)
 	}
 
-	if err := os.WriteFile(c.path, data, 0o600); err != nil { //nolint:gosec // c.path is derived from the app data dir, not user input.
+	if err := os.WriteFile(c.path, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write provider data to cache: %w", err)
 	}
 	return nil

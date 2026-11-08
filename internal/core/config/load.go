@@ -15,21 +15,25 @@ import (
 	"github.com/nextsko/mocode-agent/internal/util/csync"
 )
 
-const defaultCatwalkURL = "https://catwalk.charm.land"
+// ProviderSource supplies the known-provider catalog while loading and
+// reloading configuration. Callers inject the adapter (catwalkconv) so this
+// package keeps no dependency on the catalog client. A nil source means no
+// catalog: only providers declared in the config file are considered.
+type ProviderSource func(cfg *Config) ([]Provider, error)
 
 // Load loads the configuration from the default paths and returns a
 // ConfigStore that owns both the pure-data Config and all runtime state.
-func Load(workingDir string, debug bool) (*ConfigStore, error) {
-	return loadConfigStore(workingDir, debug, true, true)
+func Load(workingDir string, debug bool, providers ProviderSource) (*ConfigStore, error) {
+	return loadConfigStore(workingDir, debug, true, true, providers)
 }
 
 // LoadReadOnly loads configuration for inspection without mutating persisted
 // config state or syncing agent files to disk.
-func LoadReadOnly(workingDir string, debug bool) (*ConfigStore, error) {
-	return loadConfigStore(workingDir, debug, false, false)
+func LoadReadOnly(workingDir string, debug bool, providers ProviderSource) (*ConfigStore, error) {
+	return loadConfigStore(workingDir, debug, false, false, providers)
 }
 
-func loadConfigStore(workingDir string, debug bool, persistModels bool, syncAgents bool) (*ConfigStore, error) {
+func loadConfigStore(workingDir string, debug bool, persistModels bool, syncAgents bool, providers ProviderSource) (*ConfigStore, error) {
 	configPaths := lookupConfigs(workingDir)
 
 	cfg, loadedPaths, err := loadFromConfigPaths(configPaths)
@@ -44,6 +48,7 @@ func loadConfigStore(workingDir string, debug bool, persistModels bool, syncAgen
 		workingDir:     workingDir,
 		globalDataPath: GlobalConfigData(),
 		loadedPaths:    loadedPaths,
+		providerSource: providers,
 	}
 
 	if debug {
@@ -70,12 +75,14 @@ func loadConfigStore(workingDir string, debug bool, persistModels bool, syncAgen
 		assignIfNil(&cfg.Options.TUI.Transparent, true)
 	}
 
-	// Load known providers, this loads the config from catwalk
-	providers, err := ProvidersWithCache(cfg)
-	if err != nil {
-		return nil, err
+	// Load the known-provider catalog through the injected source.
+	if providers != nil {
+		knownProviders, err := providers(cfg)
+		if err != nil {
+			return nil, err
+		}
+		store.knownProviders = knownProviders
 	}
-	store.knownProviders = providers
 
 	env := NewEnv()
 	// Configure providers

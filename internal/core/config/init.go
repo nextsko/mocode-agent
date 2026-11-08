@@ -10,8 +10,8 @@ import (
 	"github.com/nextsko/mocode-agent/internal/util/fsext"
 )
 
-func Init(workingDir string, debug bool) (*ConfigStore, error) {
-	store, err := Load(workingDir, debug)
+func Init(workingDir string, debug bool, providers ProviderSource) (*ConfigStore, error) {
+	store, err := Load(workingDir, debug, providers)
 	if err != nil {
 		return nil, err
 	}
