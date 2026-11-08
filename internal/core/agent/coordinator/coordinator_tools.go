@@ -270,7 +270,7 @@ func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent) ([]
 		allTools = append(allTools, agentTool)
 	}
 	if slices.Contains(agentCfg.AllowedTools, tools.AgenticFetchToolName) {
-		allTools = append(allTools, c.agenticFetchTool(ctx, nil))
+		allTools = append(allTools, agenttooladapter.NewWithContext(c.newAgenticFetchPort(nil), c.portToolContextFactory()))
 	}
 
 	// ── standard tools via registry ──────────────────────────────────────────
