@@ -14,6 +14,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/nextsko/mocode-agent/internal/core/acpfs"
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 
@@ -172,6 +173,32 @@ func runView(
 		if !granted {
 			return permissionDeniedResult(), nil
 		}
+	}
+
+	// ACP clients may expose virtual files (unsaved buffers, remote
+	// workspaces). When this session has a client filesystem, read through it
+	// instead of the local disk.
+	if content, ok, clientErr := acpfs.Read(ctx, sessionID, absFilePath); ok {
+		if clientErr != nil {
+			return contract.Error(clientErr.Error()), nil
+		}
+		if params.Limit <= 0 {
+			params.Limit = DefaultReadLimit
+		}
+		sliced, hasMore := sliceClientContent(content, params.Offset, params.Limit)
+		if !utf8.ValidString(sliced) {
+			return contract.Error("File content is not valid UTF-8"), nil
+		}
+		output := "<file source=\"acp-client-fs\">\n" + addLineNumbers(sliced, params.Offset+1)
+		if hasMore {
+			output += fmt.Sprintf("\n\n(File has more lines. Use 'offset' parameter to read beyond line %d)", params.Offset+len(strings.Split(sliced, "\n")))
+		}
+		output += "\n</file>\n"
+		filetracker.RecordRead(ctx, sessionID, filePath)
+		return contract.WithMetadata(contract.Text(output), ViewResponseMetadata{
+			FilePath: filePath,
+			Content:  sliced,
+		}), nil
 	}
 
 	// Check if file exists
@@ -539,4 +566,21 @@ func uriGuidance(err error, registry *uri.Registry) string {
 		return msg + "\n\n" + registry.Describe()
 	}
 	return msg + "\n\nAddress a namespace without a path to list what it contains, e.g. mocode://docs/"
+}
+
+// sliceClientContent applies offset/limit to in-memory client file content,
+// mirroring readTextFile's line semantics.
+func sliceClientContent(content string, offset, limit int) (string, bool) {
+	lines := strings.Split(content, "\n")
+	if offset > 0 {
+		if offset >= len(lines) {
+			return "", false
+		}
+		lines = lines[offset:]
+	}
+	hasMore := len(lines) > limit
+	if hasMore {
+		lines = lines[:limit]
+	}
+	return strings.Join(lines, "\n"), hasMore
 }

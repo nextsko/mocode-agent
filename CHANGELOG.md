@@ -5,6 +5,17 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
+## [0.25.0] - 2026-11-09
+
+### Added
+
+- **ACP 客户端文件系统桥接**: 会话声明 `fs.readTextFile` / `fs.writeTextFile` 后，
+  `view` 读取与 `write` 写入走客户端（虚拟/未保存文件），本地磁盘不更新；
+  结果明确标注 `acp-client-fs`，避免 agent 用本地 bash 误验证。
+- 按会话注册/注销客户端 FS，关闭会话自动清理。
+- 真实 E2E：客户端提供虚拟 `/virtual/hello.txt`，agent 读取后写入 `/virtual/out.txt`，
+  客户端收到内容且含 HELLO_FS。
+
 ## [0.24.0] - 2026-11-09
 
 ### Added

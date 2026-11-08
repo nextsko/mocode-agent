@@ -54,8 +54,10 @@ mocode acp --yolo     # 自动批准所有权限（仅限可信环境）
 
 ## 当前边界（诚实说明）
 
-- 客户端 fs / terminal / elicitation 能力未委派：mocode 的工具针对本地工作区执行
-  （与编辑器同机场景一致），因此读取/写入走本地文件系统，而不是 ACP 的 fs 方法；
+- 客户端 **fs 已委派**：会话声明 `fs.readTextFile` / `fs.writeTextFile` 后，
+  `view`/`write` 对虚拟文件走 `fs/read_text_file`、`fs/write_text_file`，本地磁盘不落盘；
+- `terminal` / `elicitation` 仍未委派：命令在本地工作区执行（同机场景），
+  避免把长驻进程/PTY 语义交给客户端；
 - `reject_always` 在**会话内**记住拒绝（同一工具后续不再询问），但不跨会话持久化；
 - `session/load` 现在会回放文本 + tool_call / tool_result，但不重放 reasoning。
 

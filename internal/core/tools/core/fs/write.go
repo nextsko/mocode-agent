@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nextsko/mocode-agent/internal/core/acpfs"
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
 
@@ -108,6 +109,12 @@ func runWrite(
 	}
 
 	filePath := ext.SmartJoin(workingDir, params.FilePath)
+
+	// ACP client filesystem: virtual files are read and written through the
+	// client, so local stat/history checks on disk do not apply.
+	if acpfs.Has(sessionID) {
+		return writeViaClientFS(ctx, permissions, files, filetracker, workingDir, sessionID, filePath, params, callID)
+	}
 
 	fileInfo, err := os.Stat(filePath)
 	if err == nil {
@@ -209,5 +216,66 @@ func runWrite(
 		Diff:      diff,
 		Additions: additions,
 		Removals:  removals,
+	}), nil
+}
+
+// writeViaClientFS writes a virtual file through the ACP client filesystem,
+// keeping permission gating and history but skipping local disk semantics.
+func writeViaClientFS(
+	ctx context.Context,
+	permissions permission.Service,
+	files history.Service,
+	filetracker filetracker.Service,
+	workingDir, sessionID, filePath string,
+	params WriteParams,
+	callID string,
+) (contract.ToolResult, error) {
+	oldContent, _, readErr := acpfs.Read(ctx, sessionID, filePath)
+	if readErr != nil {
+		oldContent = ""
+	}
+	diff, additions, removals := diff.GenerateDiff(
+		oldContent,
+		params.Content,
+		strings.TrimPrefix(filePath, workingDir),
+	)
+	granted, permErr := permissions.Request(ctx, permission.CreatePermissionRequest{
+		SessionID:   sessionID,
+		Path:        fsext.PathOrPrefix(filePath, workingDir),
+		ToolCallID:  callID,
+		ToolName:    WriteToolName,
+		Action:      WriteToolName,
+		Description: fmt.Sprintf("Write file through ACP client: %s", filePath),
+		Params: WritePermissionsParams{
+			FilePath:   filePath,
+			OldContent: oldContent,
+			NewContent: params.Content,
+		},
+	})
+	if permErr != nil {
+		return contract.ToolResult{}, permErr
+	}
+	if !granted {
+		return permissionDeniedResult(), nil
+	}
+	ok, writeErr := acpfs.Write(ctx, sessionID, filePath, params.Content)
+	if !ok {
+		return contract.Error("ACP client filesystem is no longer available; retry the write"), nil
+	}
+	if writeErr != nil {
+		return contract.Error(writeErr.Error()), nil
+	}
+	file, histErr := files.GetByPathAndSession(ctx, filePath, sessionID)
+	if histErr != nil {
+		_, _ = files.Create(ctx, sessionID, filePath, oldContent)
+	} else if file.Content != oldContent {
+		_, _ = files.CreateVersion(ctx, sessionID, filePath, oldContent)
+	}
+	_, _ = files.CreateVersion(ctx, sessionID, filePath, params.Content)
+	filetracker.RecordRead(ctx, sessionID, filePath)
+
+	result := fmt.Sprintf("<result>\nFile successfully written via the ACP client filesystem: %s\n(local disk is not updated; do not verify with bash)\n</result>", filePath)
+	return contract.WithMetadata(contract.Text(result), WriteResponseMetadata{
+		Diff: diff, Additions: additions, Removals: removals,
 	}), nil
 }

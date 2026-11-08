@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/nextsko/mocode-agent/internal/core/acpfs"
 )
 
 // Runner binds protocol sessions to a concrete agent runtime.
@@ -40,9 +42,10 @@ type Server struct {
 	runner Runner
 	info   Implementation
 
-	mu       sync.Mutex
-	sessions map[string]*sessionState
-	cancels  map[string]context.CancelFunc
+	mu         sync.Mutex
+	sessions   map[string]*sessionState
+	cancels    map[string]context.CancelFunc
+	clientCaps ClientCapabilities
 	// permission, when set, asks the ACP client for approval.
 	permission func(ctx context.Context, sessionID string, toolCall json.RawMessage, options []PermissionOption) (optionID string, cancelled bool)
 }
@@ -113,6 +116,9 @@ func (s *Server) initialize(params json.RawMessage) (any, *Error) {
 	if err := json.Unmarshal(params, &req); err != nil {
 		return nil, invalidParams(err)
 	}
+	s.mu.Lock()
+	s.clientCaps = req.ClientCapabilities
+	s.mu.Unlock()
 	version := ProtocolVersion
 	if req.ProtocolVersion > 0 && req.ProtocolVersion < version {
 		version = req.ProtocolVersion
@@ -157,6 +163,7 @@ func (s *Server) newSession(ctx context.Context, params json.RawMessage) (any, *
 	s.mu.Lock()
 	s.sessions[info.SessionID] = st
 	s.mu.Unlock()
+	s.registerClientFS(info.SessionID)
 	s.emitCommands(info.SessionID)
 	resp := NewSessionResponse{SessionID: info.SessionID, ConfigOptions: st.config}
 	if st.mode != "" {
@@ -228,6 +235,7 @@ func (s *Server) loadSession(ctx context.Context, params json.RawMessage) (any, 
 			}
 		}
 	}
+	s.registerClientFS(info.SessionID)
 	s.emitCommands(info.SessionID)
 	return LoadSessionResponse{SessionID: info.SessionID, ConfigOptions: st.config}, nil
 }
@@ -273,6 +281,7 @@ func (s *Server) deleteSession(ctx context.Context, params json.RawMessage) (any
 	s.mu.Lock()
 	delete(s.sessions, req.SessionID)
 	s.mu.Unlock()
+	acpfs.Unregister(req.SessionID)
 	return DeleteSessionResponse{}, nil
 }
 
@@ -287,6 +296,7 @@ func (s *Server) closeSession(ctx context.Context, params json.RawMessage) (any,
 	s.mu.Lock()
 	delete(s.sessions, req.SessionID)
 	s.mu.Unlock()
+	acpfs.Unregister(req.SessionID)
 	return CloseSessionResponse{}, nil
 }
 
@@ -446,4 +456,46 @@ func internal(err error) *Error {
 
 func isAbs(p string) bool {
 	return strings.HasPrefix(p, "/") || (len(p) > 2 && p[1] == ':' && (p[2] == '\\' || p[2] == '/'))
+}
+
+// registerClientFS binds the ACP client's file-system capability to the
+// session, so view/write tools use virtual files when the client supports it.
+func (s *Server) registerClientFS(sessionID string) {
+	s.mu.Lock()
+	caps := s.clientCaps.Fs
+	s.mu.Unlock()
+	if !caps.ReadTextFile && !caps.WriteTextFile {
+		return
+	}
+	acpfs.Register(sessionID, &peerFS{peer: s.peer, read: caps.ReadTextFile, write: caps.WriteTextFile})
+}
+
+// peerFS adapts ACP fs/* requests to the acpfs.Client interface.
+type peerFS struct {
+	peer  *Peer
+	read  bool
+	write bool
+}
+
+func (p *peerFS) ReadTextFile(ctx context.Context, sessionID, path string) (string, error) {
+	if !p.read {
+		return "", fmt.Errorf("client does not support fs.readTextFile")
+	}
+	raw, err := p.peer.Call(ctx, "fs/read_text_file", ReadTextFileRequest{SessionID: sessionID, Path: path})
+	if err != nil {
+		return "", err
+	}
+	var resp ReadTextFileResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return "", fmt.Errorf("decode fs/read_text_file: %w", err)
+	}
+	return resp.Content, nil
+}
+
+func (p *peerFS) WriteTextFile(ctx context.Context, sessionID, path, content string) error {
+	if !p.write {
+		return fmt.Errorf("client does not support fs.writeTextFile")
+	}
+	_, err := p.peer.Call(ctx, "fs/write_text_file", WriteTextFileRequest{SessionID: sessionID, Path: path, Content: content})
+	return err
 }
