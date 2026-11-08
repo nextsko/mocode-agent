@@ -108,14 +108,16 @@ type NewSessionRequest struct {
 
 // McpServer is an MCP server the client wants the agent to connect.
 type McpServer struct {
-	Name    string   `json:"name"`
-	Command string   `json:"command,omitempty"`
-	Args    []string `json:"args,omitempty"`
+	Name    string            `json:"name"`
+	Type    string            `json:"type,omitempty"` // stdio | http | sse
+	Command string            `json:"command,omitempty"`
+	URL     string            `json:"url,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
+	Args    []string          `json:"args,omitempty"`
 	Env     []struct {
 		Name  string `json:"name"`
 		Value string `json:"value"`
 	} `json:"env,omitempty"`
-	URL string `json:"url,omitempty"`
 }
 
 // SessionMode is one agent mode.

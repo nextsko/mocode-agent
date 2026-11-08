@@ -106,6 +106,8 @@ func TestInitializeNegotiatesVersionAndCapabilities(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, 1, init.ProtocolVersion)
 	assert.True(t, init.AgentCapabilities.LoadSession)
+	assert.True(t, init.AgentCapabilities.McpCapabilities.HTTP)
+	assert.True(t, init.AgentCapabilities.McpCapabilities.SSE)
 	assert.True(t, init.AgentCapabilities.SessionCapabilities.List != nil)
 	assert.Equal(t, "mocode", init.AgentInfo.Name)
 }

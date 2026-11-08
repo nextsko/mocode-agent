@@ -21,11 +21,12 @@ type acpAppRunner struct {
 
 	mu         sync.Mutex
 	mcpServers []string
+	denied     map[string]map[string]bool
 	permit     func(ctx context.Context, sessionID string, toolCall json.RawMessage) (string, bool, error)
 }
 
 func newACPAppRunner(ws *workspace.AppWorkspace) *acpAppRunner {
-	return &acpAppRunner{ws: ws, app: ws.App()}
+	return &acpAppRunner{ws: ws, app: ws.App(), denied: map[string]map[string]bool{}}
 }
 
 func (r *acpAppRunner) setPermit(fn func(context.Context, string, json.RawMessage) (string, bool, error)) {
@@ -106,19 +107,29 @@ func (r *acpAppRunner) connectMCPServers(ctx context.Context, servers []acp.McpS
 		cfg.MCP = config.MCPs{}
 	}
 	for _, srv := range servers {
-		if srv.Command == "" {
+		if srv.Command == "" && srv.URL == "" {
 			continue
 		}
 		env := map[string]string{}
 		for _, e := range srv.Env {
 			env[e.Name] = e.Value
 		}
-		cfg.MCP[srv.Name] = config.MCPConfig{
+		mcpCfg := config.MCPConfig{
 			Command: srv.Command,
 			Args:    srv.Args,
 			Env:     env,
 			Type:    config.MCPStdio,
 		}
+		if srv.URL != "" {
+			mcpCfg.Command = ""
+			mcpCfg.URL = srv.URL
+			mcpCfg.Headers = srv.Headers
+			mcpCfg.Type = config.MCPHttp
+			if srv.Type == "sse" {
+				mcpCfg.Type = config.MCPSSE
+			}
+		}
+		cfg.MCP[srv.Name] = mcpCfg
 		if err := r.ws.ReloadMCP(ctx, srv.Name); err != nil {
 			return fmt.Errorf("connect MCP server %q: %w", srv.Name, err)
 		}
@@ -145,10 +156,11 @@ func (r *acpAppRunner) DeleteSession(ctx context.Context, id string) error {
 	return r.ws.DeleteSession(ctx, id)
 }
 
-func (r *acpAppRunner) CloseSession(ctx context.Context, _ string) error {
+func (r *acpAppRunner) CloseSession(ctx context.Context, sessionID string) error {
 	r.mu.Lock()
 	names := append([]string{}, r.mcpServers...)
 	r.mcpServers = nil
+	delete(r.denied, sessionID)
 	r.mu.Unlock()
 	for _, name := range names {
 		_ = r.ws.ReloadMCP(ctx, name)
@@ -192,7 +204,10 @@ func (r *acpAppRunner) Prompt(ctx context.Context, sessionID, text string, emit 
 			return acp.StopEndTurn, nil
 		case ev := <-msgs:
 			msg := ev.Payload
-			if msg.SessionID != sessionID || msg.Role != message.Assistant {
+			if msg.SessionID != sessionID {
+				continue
+			}
+			if msg.Role != message.Assistant && msg.Role != message.Tool {
 				continue
 			}
 			r.emitMessage(msg, emit, textSeen, reasonSeen, toolSeen)
@@ -203,9 +218,13 @@ func (r *acpAppRunner) Prompt(ctx context.Context, sessionID, text string, emit 
 // emitMessage turns one assistant message update into ACP chunks. Messages
 // are re-published as they grow, so we diff by length per message id.
 func (r *acpAppRunner) emitMessage(msg message.Message, emit func(acp.SessionUpdate), textSeen, reasonSeen map[string]int, toolSeen map[string]bool) {
+	assistant := msg.Role == message.Assistant
 	for _, part := range msg.Parts {
 		switch p := part.(type) {
 		case message.TextContent:
+			if !assistant {
+				continue
+			}
 			prev := textSeen[msg.ID]
 			if len(p.Text) > prev {
 				emit(acp.SessionUpdate{
@@ -337,6 +356,10 @@ func (r *acpAppRunner) watchPermissions(ctx context.Context, sessionID string) {
 			if req.SessionID != sessionID {
 				continue
 			}
+			if r.isDenied(sessionID, req.ToolName) {
+				r.app.Permissions.Deny(req)
+				continue
+			}
 			raw, _ := json.Marshal(map[string]any{
 				"toolCallId": req.ToolCallID,
 				"title":      firstNonEmptyStr(req.Description, req.ToolName, req.Action),
@@ -354,11 +377,29 @@ func (r *acpAppRunner) watchPermissions(ctx context.Context, sessionID string) {
 				r.app.Permissions.GrantPersistent(req)
 			case "allow-once", "allow_once":
 				r.app.Permissions.Grant(req)
+			case "reject-always", "reject_always":
+				r.markDenied(sessionID, req.ToolName)
+				r.app.Permissions.Deny(req)
 			default:
 				r.app.Permissions.Deny(req)
 			}
 		}
 	}
+}
+
+func (r *acpAppRunner) isDenied(sessionID, tool string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.denied[sessionID][tool]
+}
+
+func (r *acpAppRunner) markDenied(sessionID, tool string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.denied[sessionID] == nil {
+		r.denied[sessionID] = map[string]bool{}
+	}
+	r.denied[sessionID][tool] = true
 }
 
 func toolKind(name string) string {

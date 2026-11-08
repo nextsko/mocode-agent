@@ -5,6 +5,18 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
+## [0.22.0] - 2026-11-09
+
+### Added
+
+- **ACP 补齐工具完成态**: tool 角色的结果消息现在也会转成 `tool_call_update`
+  （completed/failed），不再只有 pending 的 `tool_call`。
+- **HTTP / SSE MCP**: `session/new` 的 MCP servers 支持 stdio/HTTP/SSE（含 headers），
+  initialize 如实声明 `mcpCapabilities.http/sse`。
+- **reject_always 会话内记忆**: 选择 always reject 后，同一工具在本会话后续请求
+  不再打扰客户端，直接拒绝。
+- E2E 复验：最小 stdio MCP server 挂载后 `toolUpdates=2`（创建 + 完成），ECHO 成功。
+
 ## [0.21.0] - 2026-11-09
 
 ### Added

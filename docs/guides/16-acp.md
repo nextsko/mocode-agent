@@ -22,10 +22,10 @@ mocode acp --yolo     # 自动批准所有权限（仅限可信环境）
 |---|---|
 | 握手 | `initialize`（能力协商）、`authenticate`、`logout` |
 | 会话 | `session/new`、`session/load`（回放历史）、`session/resume`、`session/list`、`session/delete`、`session/close` |
-| MCP | `session/new` 的 stdio MCP servers 会按会话挂载并连接（env 支持；关闭会话时移除） |
+| MCP | `session/new` 的 MCP servers 按会话挂载：stdio / HTTP / SSE（env、headers 支持；关闭时移除） |
 | 回合 | `session/prompt`、`session/cancel` |
 | 设置 | `session/set_mode`（mocode 的 agent 模式）、`session/set_config_option`（模型选择） |
-| 流式更新 | `agent_message_chunk`、`agent_thought_chunk`、`tool_call`、`tool_call_update`、`available_commands_update`、`current_mode_update`、`config_option_update` |
+| 流式更新 | `agent_message_chunk`、`agent_thought_chunk`、`tool_call`、`tool_call_update`（pending → completed/failed）、`available_commands_update`、`current_mode_update`、`config_option_update` |
 | 权限 | 工具需要授权时向客户端发 `session/request_permission`，四种 kind：allow_once / allow_always / reject_once / reject_always |
 | 命令 | 启动会话后推送 `available_commands_update`，来自 mocode 的 slash 命令注册表 |
 
@@ -55,7 +55,7 @@ mocode acp --yolo     # 自动批准所有权限（仅限可信环境）
 
 - 回放只覆盖文本消息，不重放 tool_call 历史；
 - 客户端 fs / terminal / elicitation 方法尚未被本地工具调用（工具在进程内执行）；
-- 未发送 `plan` 更新（mocode 的 todo 尚未映射到 ACP plan）；
-- `reject_always` 当前只拒绝当次请求，未做持久化拒绝记忆。
+- `reject_always` 在**会话内**记住拒绝（同一工具后续不再询问），但不跨会话持久化；
+- 未发送 `plan` 更新：mocode 目前没有独立的 plan/todo 数据源，不伪造。
 
 这些是下一步的明确缺口，而非“已支持”的模糊表述。

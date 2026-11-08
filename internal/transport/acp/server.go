@@ -133,7 +133,7 @@ func (s *Server) initialize(params json.RawMessage) (any, *Error) {
 }
 
 // McpServerCapabilities reports the MCP transports this build supports.
-func McpServerCapabilities() McpCapabilities { return McpCapabilities{} }
+func McpServerCapabilities() McpCapabilities { return McpCapabilities{HTTP: true, SSE: true} }
 
 func (s *Server) newSession(ctx context.Context, params json.RawMessage) (any, *Error) {
 	var req NewSessionRequest
