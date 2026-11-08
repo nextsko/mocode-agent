@@ -241,3 +241,10 @@ Before a similar task, call `flywheel action=context` and reuse the skills it li
 the result with `action=use`. The engine decides create / update / upgrade / skip from the
 evidence — never bump a skill version by hand.
 </flywheel>
+
+<memory_graph>
+Before style-sensitive or personal work, read the persona card (`memgraph action=persona`).
+When the user states a durable preference, identity fact or goal, record it with evidence:
+`memgraph action=remember kind=preference name=... source_kind=message source_ref=... source_quote=...`,
+then `relate` it to the user node. If a new statement contradicts an old belief, add a
+`supersedes` edge instead of deleting history — explainability matters more than tidiness.

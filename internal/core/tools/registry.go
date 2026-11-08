@@ -311,6 +311,7 @@ func standardPlugins() []ToolPlugin {
 		learnPlugin{},
 		memoryPlugin{},
 		flywheelPlugin{},
+		memgraphPlugin{},
 		browserPlugin{},
 		giteaPlugin{},
 		gitOpsPlugin{},
@@ -598,6 +599,20 @@ func (flywheelPlugin) Descriptors() []ToolDescriptor {
 
 func (flywheelPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 	return []fantasy.AgentTool{deps.wrapPort(agenttools.NewFlywheelPortTool(deps.Cfg.WorkingDir()))}
+}
+
+// memgraphPlugin exposes the traceable memory graph: persona, user profile,
+// preferences, decisions and the evidence behind each belief.
+type memgraphPlugin struct{}
+
+func (memgraphPlugin) Descriptors() []ToolDescriptor {
+	return []ToolDescriptor{
+		{Name: agenttools.MemgraphToolName, Kind: ToolKindPlugin, Category: CategoryMemory},
+	}
+}
+
+func (memgraphPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
+	return []fantasy.AgentTool{deps.wrapPort(agenttools.NewMemgraphPortTool(deps.Cfg.WorkingDir()))}
 }
 
 // ─── plugin/learn ─────────────────────────────────────────────────────────────

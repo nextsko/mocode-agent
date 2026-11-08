@@ -640,6 +640,7 @@ func allToolNames() []string {
 		"learn",
 		"memory",
 		"flywheel",
+		"memgraph",
 		"browser",
 		"ui_dissect",
 		"view",

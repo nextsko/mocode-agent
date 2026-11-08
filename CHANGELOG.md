@@ -5,6 +5,20 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
+## [0.18.0] - 2026-11-09
+
+### Added
+
+- **图谱记忆（memgraph）**: 可追溯的结构化记忆图。节点（user/persona/preference/
+  fact/goal/decision/task/skill/project/event/artifact）与边（prefers/knows/decided/
+  supersedes/contradicts/evidenced_by/…）均带证据（来源+引用+时间）与置信度；
+  支持合并观测、时间有效性、冲突检测、supersede 演化、陈旧衰减。
+- **人格与用户画像卡**: `memgraph action=persona` 输出 prompt-ready 卡片
+  （角色/特质/偏好/目标/待澄清冲突）。
+- **证据链解释**: `explain` 回答“为什么相信这个”，输出路径 + 原始证据。
+- **导出可视化**: graph.json / graph.mmd / graph.html（Mermaid）。
+- 追加式事件日志 events.jsonl，支持审计与回放；forget 支持隐私删除。
+
 ## [0.17.0] - 2026-11-09
 
 ### Added

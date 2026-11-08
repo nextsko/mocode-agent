@@ -140,6 +140,7 @@ const (
 	LearnToolName          = agenttools.LearnToolName
 	MemoryToolName         = agenttools.MemoryToolName
 	FlywheelToolName       = agenttools.FlywheelToolName
+	MemgraphToolName       = agenttools.MemgraphToolName
 )
 
 type (
