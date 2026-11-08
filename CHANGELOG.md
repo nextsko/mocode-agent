@@ -5,7 +5,7 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
-## [Unreleased]
+## [0.13.0] - 2026-11-09
 
 ### Added
 
