@@ -10,7 +10,7 @@ var (
 	// real source of truth: init() below overrides this with the buildinfo
 	// Main.Version (tag or pseudo-version), so in any git checkout this
 	// string never displays.
-	Version = "0.25.0"
+	Version = "0.26.0"
 	Commit  = "unknown"
 )
 

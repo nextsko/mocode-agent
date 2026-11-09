@@ -5,6 +5,21 @@ All notable changes to mocode are documented here. The format follows
 [semantic versioning](https://semver.org/). The git tag is the source of truth;
 `internal/util/version/version.go` mirrors it for `go install` builds.
 
+## [0.26.0] - 2026-11-09
+
+### Fixed
+
+- **Admin 服务无法启动**: Go 1.22 ServeMux 下 `GET /` 与 `/api/` 模式冲突导致
+  `Start` panic；改为无方法前缀的 `/`。
+- **Admin API 全部 404**: `/api/` 挂载未剥离前缀；加 `http.StripPrefix("/api", ...)`。
+- **App.Shutdown panic**: Coordinator 为 nil 时仍调用 `Close`；加 nil 保护。
+- 对上述路径补运行时验收测试（真实端口 + bearer token + `/api/knowledge`）。
+
+### Added
+
+- `Server.Token()` 便于自动化/测试编程访问 admin。
+- `scripts/acceptance/`：ACP 真实验收脚本（协议、load、plan、stdio/HTTP/SSE MCP、客户端 FS）。
+
 ## [0.25.0] - 2026-11-09
 
 ### Added

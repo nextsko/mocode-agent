@@ -727,6 +727,9 @@ func (app *App) Shutdown() {
 	// Drain the coordinator's tool registry (closes plugin-owned pools,
 	// e.g. the shared SSH connections).
 	wg.Go(func() {
+		if app.AgentCoordinator == nil {
+			return
+		}
 		if err := app.AgentCoordinator.Close(shutdownCtx); err != nil {
 			slog.Error("Failed to close tool registry on shutdown", "error", err)
 		}

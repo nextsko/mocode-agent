@@ -171,6 +171,15 @@ func (s *Server) Stop(ctx context.Context) error {
 	return s.stopLocked(ctx)
 }
 
+// Token returns the bearer token for the running admin server. It is empty
+// before Start; callers that need programmatic access (tests, local tooling)
+// use it instead of scraping logs.
+func (s *Server) Token() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.authToken
+}
+
 func (s *Server) Status() Status {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -192,11 +201,11 @@ func (s *Server) stopLocked(ctx context.Context) error {
 }
 
 func (s *Server) routes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /", s.handleIndex)
+	mux.HandleFunc("/", s.handleIndex)
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServer(http.FS(assetSubFS()))))
 	api := http.NewServeMux()
 	s.registerAPIRoutes(api)
-	mux.Handle("/api/", bearerAuth(s.authToken, api))
+	mux.Handle("/api/", http.StripPrefix("/api", bearerAuth(s.authToken, api)))
 }
 
 func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
