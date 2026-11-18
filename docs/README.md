@@ -28,6 +28,7 @@
 | 16 | [design/16-learn-tool.md](design/16-learn-tool.md) | learn 工具：任务沉淀为 skill（provenance / 备份 / 权限门）|
 | 17 | [design/17-internal-uri-protocol.md](design/17-internal-uri-protocol.md) | 内部资源协议 mocode://：skills / docs / exp / github / browser 命名空间 |
 | 18 | [design/18-session-memory-protocol.md](design/18-session-memory-protocol.md) | 会话记忆协议：文件为基座、全局/会话两层、自动索引会话位置、萃取 |
+| 19 | [design/19-ask-user-crush-parity.md](design/19-ask-user-crush-parity.md) | ask-user 对齐上游 Crush：交互式限定 + 批次寻址 + 聊天区渲染 |
 
 ### 架构文档
 
@@ -84,3 +85,4 @@
 | plans/subagent-summary-box | [plans/subagent-summary-box/README.md](plans/subagent-summary-box/README.md) | 子代理摘要盒遮挡主输入框 + 完成后自动隐藏（编辑器高度记账 / EffectiveStatus 根因）|
 | plans/slash-popup-ansi-residue/01 | [plans/slash-popup-ansi-residue/01-root-cause.md](plans/slash-popup-ansi-residue/01-root-cause.md) | `/` 补全弹窗非选中行 ANSI 残码根因（着色后按纯文本下标切分 rune）|
 | skills-and-roles | [skills-and-roles/README.md](skills-and-roles/README.md) | 10 个专家角色 + 91 个内置 skill 的可浏览索引 |
+| anthropic-long-running-harness/01 | [plans/anthropic-long-running-harness/01-long-running-agent-knowledge-graph.md](plans/anthropic-long-running-harness/01-long-running-agent-knowledge-graph.md) | Anthropic 持续运行智能体：8 条公理 + 16 节点知识图谱 + 费曼拆解 + mocode 差距清单 |
