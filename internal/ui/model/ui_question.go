@@ -62,13 +62,13 @@ func (m *UI) openQuestionDialog(batch question.Request) {
 
 	form := dialog.NewQuestionForm(m.com.Styles, batch)
 	form.OnAnswer = func(responses []question.Answer) {
-		m.com.Workspace.QuestionAnswer(responses)
+		m.com.Workspace.QuestionAnswer(batch.ID, responses)
 		m.dialog.CloseDialog(dialog.QuestionFormID)
 		m.textarea.Focus()
 		m.updateLayoutAndSize()
 	}
 	form.OnCancel = func() {
-		m.com.Workspace.QuestionCancel()
+		m.com.Workspace.QuestionCancel(batch.ID)
 		m.dialog.CloseDialog(dialog.QuestionFormID)
 		m.textarea.Focus()
 		m.updateLayoutAndSize()
@@ -79,12 +79,21 @@ func (m *UI) openQuestionDialog(batch question.Request) {
 	m.updateLayoutAndSize()
 }
 
-// handleQuestionNotification dismisses an open question form when any client
-// resolved the pending batch (only one question can be pending at a time).
-func (m *UI) handleQuestionNotification(_ question.Notification) {
-	if m.dialog.ContainsDialog(dialog.QuestionFormID) {
-		m.dialog.CloseDialog(dialog.QuestionFormID)
-		m.textarea.Focus()
-		m.updateLayoutAndSize()
+// handleQuestionNotification dismisses an open question form when another
+// client resolved that batch.
+//
+// Several sessions can have a batch pending at once, so the notification is
+// matched against the batch the open form shows: a batch resolved elsewhere
+// must not close a form for a different, still-unanswered batch.
+func (m *UI) handleQuestionNotification(n question.Notification) {
+	dlg, ok := m.dialog.Dialog(dialog.QuestionFormID).(*dialog.QuestionDialog)
+	if !ok || dlg == nil {
+		return
 	}
+	if n.BatchID != "" && dlg.Form.BatchID != "" && n.BatchID != dlg.Form.BatchID {
+		return
+	}
+	m.dialog.CloseDialog(dialog.QuestionFormID)
+	m.textarea.Focus()
+	m.updateLayoutAndSize()
 }

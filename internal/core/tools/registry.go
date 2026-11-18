@@ -111,6 +111,10 @@ type ToolDeps struct {
 	SummarySchedule agenttools.SessionSummaryScheduler
 	SessionSearch   *store.SessionSearch
 	HTTP            *nethttp.Factory
+	// Interactive reports whether a human can answer questions raised by
+	// tools. Non-interactive transports (run/MCP/ACP/WeChat gateway) must
+	// leave it false so the question tool is never registered.
+	Interactive bool
 	// WrapPort converts a framework-agnostic tools.Tool into the runtime's
 	// AgentTool. It is injected by the agent boundary so this package does not
 	// import the adapter (which would create an import cycle). When nil, tools
@@ -365,6 +369,11 @@ func (execPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
 
 // questionPlugin exposes the AskUser-style question tool (crush-compatible):
 // 4 question types, batched tabbed forms, blocking-until-answered.
+//
+// The tool is interactive-only: it blocks until a human answers, so it is
+// registered only when the transport can actually show the form. In every
+// other transport (mocode run, MCP serve, ACP, the WeChat gateway, and every
+// sub-agent) the model must not be able to ask a question nobody can answer.
 type questionPlugin struct{}
 
 func (questionPlugin) Descriptors() []ToolDescriptor {
@@ -374,7 +383,7 @@ func (questionPlugin) Descriptors() []ToolDescriptor {
 }
 
 func (questionPlugin) Build(_ context.Context, deps ToolDeps) []fantasy.AgentTool {
-	if deps.Questions == nil {
+	if deps.Questions == nil || !deps.Interactive {
 		return nil
 	}
 	return []fantasy.AgentTool{deps.wrapPort(agentquestion.NewQuestionPortTool(deps.Questions))}

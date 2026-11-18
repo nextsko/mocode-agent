@@ -140,8 +140,12 @@ type Workspace interface {
 	PermissionSetSkipRequests(skip bool)
 
 	// Questions (AskUser-style)
-	QuestionAnswer(answers []question.Answer) bool
-	QuestionCancel() bool
+	// QuestionAnswer resolves the pending question batch with the given
+	// ID. An empty ID names the only pending batch.
+	QuestionAnswer(batchID string, answers []question.Answer) bool
+	// QuestionCancel cancels the pending question batch with the given
+	// ID. An empty ID names the only pending batch.
+	QuestionCancel(batchID string) bool
 
 	// FileTracker
 	FileTrackerRecordRead(ctx context.Context, sessionID, path string)

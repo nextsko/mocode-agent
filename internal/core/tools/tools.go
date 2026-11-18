@@ -14,6 +14,7 @@ import (
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	fs "github.com/nextsko/mocode-agent/internal/core/tools/core/fs"
+	agentquestion "github.com/nextsko/mocode-agent/internal/core/tools/core/question"
 	shell "github.com/nextsko/mocode-agent/internal/core/tools/core/shell"
 	web "github.com/nextsko/mocode-agent/internal/core/tools/core/web"
 	netcommon "github.com/nextsko/mocode-agent/internal/core/tools/external/common/net"
@@ -91,6 +92,20 @@ type (
 	GrepResponseMetadata  = fs.GrepResponseMetadata
 	LSParams              = fs.LSParams
 	LSPermissionsParams   = fs.LSPermissionsParams
+)
+
+// ---------------------------------------------------------------------------
+// core/question — ask-the-user tool (interactive transports only)
+
+const QuestionToolName = agentquestion.QuestionToolName
+
+var NewQuestionPortTool = agentquestion.NewQuestionPortTool
+
+type (
+	QuestionParams           = agentquestion.QuestionParams
+	QuestionItem             = agentquestion.QuestionItem
+	QuestionChoice           = agentquestion.QuestionChoice
+	QuestionResponseMetadata = agentquestion.QuestionResponseMetadata
 )
 
 // ---------------------------------------------------------------------------

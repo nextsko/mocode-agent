@@ -247,7 +247,7 @@ func (c *Coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, age
 	})
 
 	c.readyWg.Go(func() error {
-		tools, err := c.buildTools(ctx, agent)
+		tools, err := c.buildTools(ctx, agent, isSubAgent)
 		if err != nil {
 			return err
 		}
@@ -258,7 +258,16 @@ func (c *Coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, age
 	return result, nil
 }
 
-func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent) ([]fantasy.AgentTool, error) {
+// interactiveToolsEnabled reports whether the agent being built may receive
+// the interactive-only tools (currently the question tool).
+//
+// The main agent of an interactive transport gets them; a sub-agent never
+// does, because a delegated task has no human to answer it.
+func (c *Coordinator) interactiveToolsEnabled(isSubAgent bool) bool {
+	return c.interactive && !isSubAgent
+}
+
+func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent, isSubAgent bool) ([]fantasy.AgentTool, error) {
 	// ── coordinator-owned tools (call back into coordinator state) ───────────
 	var allTools []fantasy.AgentTool
 	if slices.Contains(agentCfg.AllowedTools, AgentToolName) {
@@ -292,6 +301,10 @@ func (c *Coordinator) buildTools(ctx context.Context, agentCfg config.Agent) ([]
 		ActiveSkills: c.activeSkills,
 		SkillTracker: c.skillTracker,
 		ModelName:    modelName,
+		// The question tool blocks until a human answers, so it is only
+		// given to the main agent of an interactive transport. Sub-agents
+		// never get it, even when the parent session is interactive.
+		Interactive: c.interactiveToolsEnabled(isSubAgent),
 		SummarySchedule: func(ctx context.Context, sessionID string) error {
 			c.summaryQueue.Add(sessionID)
 			return nil

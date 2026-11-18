@@ -78,6 +78,12 @@ type Coordinator struct {
 	filetracker filetracker.Service
 	lspManager  *lsp.Manager
 	notify      pubsub.Publisher[notify.Notification]
+	// interactive reports whether a human can answer the questions the
+	// main agent raises. It gates the question tool: a transport without
+	// a human (mocode run, MCP serve, ACP, the WeChat gateway) must leave
+	// it false, or the model would block forever on an unanswered form.
+	// Sub-agents never get the question tool, interactive or not.
+	interactive bool
 
 	currentAgent  SessionAgent
 	activeAgentID string
@@ -131,6 +137,7 @@ func New(
 	notify pubsub.Publisher[notify.Notification],
 	errorCollector *errcoll.Collector,
 	sessionSearch *store.SessionSearch,
+	interactive bool,
 ) (*Coordinator, error) {
 	// Discover skills once at session start.
 	allSkills, activeSkills := discoverSkills(cfg)
@@ -146,6 +153,7 @@ func New(
 		filetracker:    filetracker,
 		lspManager:     lspManager,
 		notify:         notify,
+		interactive:    interactive,
 		agents:         make(map[string]SessionAgent),
 		subagentIndex:  csync.NewMap[string, string](),
 		summaryQueue:   summary.NewQueue(),
@@ -424,7 +432,7 @@ func (c *Coordinator) UpdateModels(ctx context.Context) error {
 		c.activeAgentID = activeAgentID
 	}
 
-	tools, err := c.buildTools(ctx, agentCfg)
+	tools, err := c.buildTools(ctx, agentCfg, false)
 	if err != nil {
 		return err
 	}

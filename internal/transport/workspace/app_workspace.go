@@ -267,12 +267,16 @@ func (w *AppWorkspace) PermissionSetSkipRequests(skip bool) {
 
 // -- Questions --
 
-func (w *AppWorkspace) QuestionAnswer(answers []question.Answer) bool {
-	return w.app.Questions.Answer(answers)
+// QuestionAnswer resolves the pending question batch with the given ID.
+// An empty ID names the only pending batch.
+func (w *AppWorkspace) QuestionAnswer(batchID string, answers []question.Answer) bool {
+	return w.app.Questions.Answer(batchID, answers)
 }
 
-func (w *AppWorkspace) QuestionCancel() bool {
-	return w.app.Questions.Cancel()
+// QuestionCancel cancels the pending question batch with the given ID.
+// An empty ID names the only pending batch.
+func (w *AppWorkspace) QuestionCancel(batchID string) bool {
+	return w.app.Questions.Cancel(batchID)
 }
 
 // -- FileTracker --

@@ -349,26 +349,28 @@ func setupWorkspaceWithProgressBar(cmd *cobra.Command) (workspace.Workspace, fun
 }
 
 // setupWorkspace creates an in-process app.App and returns an AppWorkspace.
+// The TUI is the one interactive surface, so the app is created with the
+// interactive option: a human is present to answer questions.
 func setupWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error) {
-	return setupLocalWorkspace(cmd)
+	return setupLocalWorkspace(cmd, app.WithInteractive())
 }
 
 // setupLocalWorkspace creates an in-process app.App and wraps it in an
 // AppWorkspace.
-func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error) {
+func setupLocalWorkspace(cmd *cobra.Command, opts ...app.Option) (workspace.Workspace, func(), error) {
 	debug, _ := cmd.Flags().GetBool("debug")
 	yolo, _ := cmd.Flags().GetBool("yolo")
 	cwd, err := ResolveCwd(cmd)
 	if err != nil {
 		return nil, nil, err
 	}
-	return setupLocalWorkspaceAt(cmd.Context(), cwd, debug, yolo)
+	return setupLocalWorkspaceAt(cmd.Context(), cwd, debug, yolo, opts...)
 }
 
 // setupLocalWorkspaceAt creates an in-process app.App rooted at cwd. It is the
 // directory-explicit form of setupLocalWorkspace, used by commands that switch
 // projects at runtime (for example `mcp serve`).
-func setupLocalWorkspaceAt(ctx context.Context, cwd string, debug, yolo bool) (workspace.Workspace, func(), error) {
+func setupLocalWorkspaceAt(ctx context.Context, cwd string, debug, yolo bool, opts ...app.Option) (workspace.Workspace, func(), error) {
 	store, err := config.Init(cwd, debug, catwalkconv.ProvidersWithCache)
 	if err != nil {
 		return nil, nil, err
@@ -383,7 +385,7 @@ func setupLocalWorkspaceAt(ctx context.Context, cwd string, debug, yolo bool) (w
 	logFile := filepath.Join(infra.DataDir(), "logs", mocodelog.MainLogFileName)
 	mocodelog.Setup(logFile, debug)
 
-	appInstance, err := app.New(ctx, store)
+	appInstance, err := app.New(ctx, store, opts...)
 	if err != nil {
 		slog.Error("Failed to create app instance", "error", err)
 		return nil, nil, err

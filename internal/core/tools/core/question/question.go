@@ -80,6 +80,13 @@ type QuestionChoice struct {
 	Description string `json:"description,omitempty" description:"Optional description for this choice"`
 }
 
+// QuestionResponseMetadata carries the structured questions and answers so
+// the UI can render them without parsing the LLM-facing text.
+type QuestionResponseMetadata struct {
+	Questions []question.Question `json:"questions"`
+	Answers   []question.Answer   `json:"answers"`
+}
+
 // NewQuestionPortTool is the framework-agnostic form of the question tool.
 func NewQuestionPortTool(svc question.Service) contract.Tool {
 	return contract.NewFunc(
@@ -178,6 +185,9 @@ func convertChoices(in []QuestionChoice) []question.Choice {
 }
 
 // formatAnswers converts answers into a tool response string for the LLM.
+//
+// The structured questions and answers travel along as metadata so the chat
+// UI can render "question → answer" instead of the raw LLM-facing text.
 func formatAnswers(answers []question.Answer, questions []question.Question) (contract.ToolResult, error) {
 	var b strings.Builder
 	for i, answer := range answers {
@@ -190,7 +200,8 @@ func formatAnswers(answers []question.Answer, questions []question.Question) (co
 		formatted := formatAnswer(&answer)
 		b.WriteString(formatted.Content)
 	}
-	return contract.Text(b.String()), nil
+	meta := QuestionResponseMetadata{Questions: questions, Answers: answers}
+	return contract.WithMetadata(contract.Text(b.String()), meta), nil
 }
 
 // formatAnswer formats a single answer for the LLM.
@@ -223,7 +234,7 @@ func formatAnswer(answer *question.Answer) contract.ToolResult {
 	if len(answer.Notes) > 0 {
 		b.WriteString("\n\nNotes:")
 		for key, note := range answer.Notes {
-			if key == "_question" {
+			if key == question.QuestionNoteKey {
 				fmt.Fprintf(&b, "\n- %s", note)
 			} else {
 				fmt.Fprintf(&b, "\n- [%s]: %s", key, note)

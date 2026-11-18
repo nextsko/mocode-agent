@@ -58,6 +58,12 @@ type App struct {
 
 	config *config.ConfigStore
 
+	// interactive reports whether a human is present to answer the
+	// questions the agent raises. It gates the question tool, which
+	// blocks until a human answers: a transport without one (mocode
+	// run, MCP serve, ACP, the WeChat gateway) must leave it false.
+	interactive bool
+
 	theme theme.SpinnerThemer // resolves spinner colors; defaults to NoopThemer, wired from the UI layer
 
 	serviceEventsWG *sync.WaitGroup
@@ -87,9 +93,31 @@ type SessionServices struct {
 	FileTracker filetracker.Service
 }
 
+// Option configures optional App behaviour at construction time.
+type Option func(*App)
+
+// WithInteractive marks the App as fronted by an interactive human surface
+// (the TUI). It enables the tools that block on a human answer — currently
+// the question tool.
+//
+// Every other transport (mocode run, MCP serve, ACP, the WeChat gateway)
+// must leave it unset: there is nobody to answer, so a question would block
+// the run forever.
+func WithInteractive() Option {
+	return func(a *App) { a.interactive = true }
+}
+
+// nonInteractiveQuestionTimeout bounds how long a question may stay pending
+// in a transport where nobody can answer it.
+//
+// The question tool is not even registered there; this is the second line of
+// defence, so a mis-wired transport fails with a clear error instead of
+// hanging.
+const nonInteractiveQuestionTimeout = 2 * time.Minute
+
 // New initializes a new application instance with file-based storage.
 
-func New(ctx context.Context, storeCfg *config.ConfigStore) (*App, error) {
+func New(ctx context.Context, storeCfg *config.ConfigStore, opts ...Option) (*App, error) {
 	cfg := storeCfg.Config()
 	skipPermissionsRequests := storeCfg.Overrides().SkipPermissionRequests
 	var allowedTools []string
@@ -104,7 +132,6 @@ func New(ctx context.Context, storeCfg *config.ConfigStore) (*App, error) {
 
 	app := &App{
 		Permissions: permission.NewPermissionService(storeCfg.WorkingDir(), skipPermissionsRequests, allowedTools),
-		Questions:   question.NewService(),
 		LSPManager:  lsp.NewManager(storeCfg),
 
 		globalCtx: ctx,
@@ -116,6 +143,18 @@ func New(ctx context.Context, storeCfg *config.ConfigStore) (*App, error) {
 		serviceEventsWG:    &sync.WaitGroup{},
 		tuiWG:              &sync.WaitGroup{},
 		agentNotifications: pubsub.NewBroker[notify.Notification](),
+	}
+
+	for _, opt := range opts {
+		opt(app)
+	}
+
+	// An interactive app waits forever for a human answer; every other
+	// transport gets a bounded wait so a question can never hang a run.
+	if app.interactive {
+		app.Questions = question.NewService()
+	} else {
+		app.Questions = question.NewServiceWithTimeout(nonInteractiveQuestionTimeout)
 	}
 
 	// Initialize the project-local error collector.
@@ -608,6 +647,7 @@ func (app *App) InitCoderAgent(ctx context.Context) error {
 		app.agentNotifications,
 		app.ErrorCollector,
 		app.store.Search(),
+		app.interactive,
 	)
 	if err != nil {
 		slog.Error("Failed to create coder agent", "err", err)

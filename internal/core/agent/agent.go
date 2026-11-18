@@ -72,6 +72,9 @@ type (
 const AgentToolName = coordinator.AgentToolName
 
 // NewCoordinator builds the default coordinator (forwarded constructor).
+//
+// interactive reports whether a human can answer the questions the agent
+// raises; it gates the question tool, which blocks until answered.
 func NewCoordinator(
 	ctx context.Context,
 	cfg *config.ConfigStore,
@@ -85,6 +88,7 @@ func NewCoordinator(
 	notify pubsub.Publisher[agentnotify.Notification],
 	errorCollector *errcoll.Collector,
 	sessionSearch *store.SessionSearch,
+	interactive bool,
 ) (Coordinator, error) {
-	return coordinator.New(ctx, cfg, sessions, messages, permissions, questions, history, filetracker, lspManager, notify, errorCollector, sessionSearch)
+	return coordinator.New(ctx, cfg, sessions, messages, permissions, questions, history, filetracker, lspManager, notify, errorCollector, sessionSearch, interactive)
 }
