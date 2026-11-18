@@ -73,10 +73,22 @@ eval: ({ title: document.title, links: [...document.querySelectorAll('a')].map(a
 
 The pattern is a glob over the URL; `**/api/stats` matches anywhere, `https://ads.example.com/*` only that host. Routes apply to future requests — `reload` after installing one.
 
+## Viewport
+
+`viewport` sets the size the page lays out at, independently of the browser window:
+
+- `op=set` with `width` and `height` — e.g. 2500 and 1600 for a full-size design canvas.
+- `op=design` — the 2500x1600 design canvas.
+- `op=reset` — back to the browser's own window size.
+- `op=get` — report the size in force.
+
+`scale` sets the device pixel ratio, `mobile` turns on touch emulation, and the size survives navigations and tab switches. The same size can be passed to `launch` so the first page is already at it.
+
 ## Capturing output
 
 - `screenshot` (PNG, `full_page: true` for the whole scroll, `path` to choose the file).
 - `pdf` renders the page to a PDF file (headless sessions only — a headed browser refuses, and the error says so).
+- `record` with `op=start` / `op=stop` captures the page as a video file (MJPEG AVI). `path` chooses the file, `fps` and `quality` control the capture, `max_width` / `max_height` scale the frames down.
 
 ## Debugging recipes
 

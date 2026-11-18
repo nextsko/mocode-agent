@@ -202,6 +202,18 @@ func TestBrowser_RefIsPreferredOverSelector(t *testing.T) {
 
 // ─── value rendering ─────────────────────────────────────────────────────────
 
+func TestBrowser_ViewportAndRecordNeedASession(t *testing.T) {
+	t.Parallel()
+
+	deps := Deps{Manager: newIdleManager(t)}
+
+	viewport := runTool(t, deps, `{"action":"viewport","width":2500,"height":1600}`)
+	assert.Contains(t, viewport.Content, "browser session", "a viewport without a session is a soft error")
+
+	record := runTool(t, deps, `{"action":"record","op":"start"}`)
+	assert.Contains(t, record.Content, "browser session", "a recording without a session is a soft error")
+}
+
 func TestRenderValue(t *testing.T) {
 	t.Parallel()
 
@@ -229,10 +241,10 @@ func TestBrowser_SchemaExposesActionEnum(t *testing.T) {
 		"status", "launch", "goto", "back", "forward", "reload", "snapshot",
 		"click", "dblclick", "fill", "press", "hover", "check", "uncheck",
 		"select", "eval", "screenshot", "pdf", "console", "tabs", "storage",
-		"state", "network", "route", "close",
+		"state", "network", "route", "viewport", "record", "close",
 	}, action["enum"])
 
-	for _, field := range []string{"url", "ref", "selector", "text", "key", "expression", "path", "op", "kind", "index", "name", "value", "pattern", "body", "status"} {
+	for _, field := range []string{"url", "ref", "selector", "text", "key", "expression", "path", "op", "kind", "index", "name", "value", "pattern", "body", "status", "width", "height", "scale", "mobile", "fps", "quality", "max_width", "max_height"} {
 		spec, ok := info.Parameters[field].(map[string]any)
 		require.Truef(t, ok, "field %q missing from the generated schema", field)
 		assert.NotEmptyf(t, spec["description"], "field %q needs a description for the model", field)

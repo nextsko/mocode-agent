@@ -121,6 +121,20 @@ func profileDirFor(c Candidate, opts LaunchOptions) (string, error) {
 	return dir, nil
 }
 
+// Recorder returns the screencast in progress, or nil when none is running.
+func (s *Session) Recorder() *Recorder {
+	s.recorderMu.Lock()
+	defer s.recorderMu.Unlock()
+	return s.recorder
+}
+
+// setRecorder remembers the screencast in progress.
+func (s *Session) setRecorder(r *Recorder) {
+	s.recorderMu.Lock()
+	defer s.recorderMu.Unlock()
+	s.recorder = r
+}
+
 // Session is a live browser plus one attached page.
 type Session struct {
 	conn *cdpConn
@@ -134,6 +148,15 @@ type Session struct {
 
 	targetID  string
 	sessionID string
+
+	// recorder is the screencast in progress, if any.
+	recorderMu sync.Mutex
+	recorder   *Recorder
+
+	// viewport is the emulated viewport in force on the current page session,
+	// remembered so it survives a tab switch.
+	viewportMu sync.Mutex
+	viewport   Viewport
 
 	console    *consoleBuffer
 	network    *networkBuffer
@@ -353,6 +376,12 @@ func (s *Session) switchPage(ctx context.Context, targetID string) error {
 		if err := s.conn.Call(ctx, s.sessionID, m, nil, nil); err != nil {
 			return fmt.Errorf("%s: %w", m, err)
 		}
+	}
+
+	// The emulated viewport is session-scoped too: re-apply it to the page we
+	// just switched to, or the new tab renders at the browser's own size.
+	if err := s.applyViewport(ctx); err != nil {
+		return err
 	}
 
 	// Routes installed on a previous page must keep applying after a tab

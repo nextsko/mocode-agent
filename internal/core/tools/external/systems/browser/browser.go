@@ -51,16 +51,19 @@ const (
 	actionState      = "state"
 	actionNetwork    = "network"
 	actionRoute      = "route"
+	actionViewport   = "viewport"
+	actionRecord     = "record"
 	actionClose      = "close"
 )
 
 const (
-	subActionList = "list"
-	fieldAction   = "action"
+	subActionList  = "list"
+	subActionClear = "clear"
+	fieldAction    = "action"
 )
 
 // actionList names every action, for error messages that teach.
-const actionList = "status, launch, goto, back, forward, reload, snapshot, click, dblclick, fill, press, hover, check, uncheck, select, eval, screenshot, pdf, console, tabs, storage, state, network, route, close"
+const actionList = "status, launch, goto, back, forward, reload, snapshot, click, dblclick, fill, press, hover, check, uncheck, select, eval, screenshot, pdf, console, tabs, storage, state, network, route, viewport, record, close"
 
 // PermissionGate is the slice of permission.Service this tool needs. Kept
 // narrow so tests can pass a small fake; nil means pre-approved.
@@ -82,7 +85,7 @@ type Deps struct {
 // BrowserParams holds the parameters for a browser tool call.
 type BrowserParams struct {
 	//nolint:lll // descriptions are read by the model, not by humans
-	Action string `json:"action" enum:"status,launch,goto,back,forward,reload,snapshot,click,dblclick,fill,press,hover,check,uncheck,select,eval,screenshot,pdf,console,tabs,storage,state,network,route,close" description:"status reports which browsers are installed; launch starts or attaches to a session; the rest act on the running session. Take a snapshot before using a ref."`
+	Action string `json:"action" enum:"status,launch,goto,back,forward,reload,snapshot,click,dblclick,fill,press,hover,check,uncheck,select,eval,screenshot,pdf,console,tabs,storage,state,network,route,viewport,record,close" description:"status reports which browsers are installed; launch starts or attaches to a session; the rest act on the running session. Take a snapshot before using a ref."`
 	//nolint:lll
 	Op string `json:"op,omitempty" description:"Sub-operation for grouped actions. tabs: list,new,select,close. storage: list,get,set,remove,clear. state: save,load. network: list,clear. route: add,list,clear. Defaults to list (or new/select where a parameter implies it)."`
 	//nolint:lll
@@ -129,6 +132,22 @@ type BrowserParams struct {
 	ContentType string `json:"content_type,omitempty" description:"For route op=add with a body: the Content-Type to answer with (default text/plain)."`
 	//nolint:lll
 	Status int `json:"status,omitempty" description:"For route op=add with a body: HTTP status to answer with (default 200)."`
+	//nolint:lll
+	Width int `json:"Width,omitempty" description:"Viewport width in CSS pixels, e.g. 2500."`
+	//nolint:lll
+	Height int `json:"Height,omitempty" description:"Viewport height in CSS pixels, e.g. 1600."`
+	//nolint:lll
+	Scale float64 `json:"Scale,omitempty" description:"Device pixel ratio (default 1)."`
+	//nolint:lll
+	Mobile bool `json:"Mobile,omitempty" description:"Emulate a mobile device."`
+	//nolint:lll
+	FPS int `json:"FPS,omitempty" description:"Recording frame rate (default 10)."`
+	//nolint:lll
+	Quality int `json:"Quality,omitempty" description:"Recording JPEG quality, 1-100."`
+	//nolint:lll
+	MaxWidth int `json:"MaxWidth,omitempty" description:"Scale recorded frames to this width."`
+	//nolint:lll
+	MaxHeight int `json:"MaxHeight,omitempty" description:"Scale recorded frames to this height."`
 }
 
 // BrowserPermissionParams is the approval payload for launching a browser.
@@ -239,6 +258,13 @@ func launch(ctx context.Context, deps Deps, p BrowserParams, callID string) (con
 	var b strings.Builder
 	b.WriteString("Browser session ready.\n")
 	b.WriteString(deps.Manager.State())
+	if p.Width > 0 || p.Height > 0 {
+		vp := corebrowser.Viewport{Width: p.Width, Height: p.Height, Scale: p.Scale, Mobile: p.Mobile}
+		if err := session.SetViewport(ctx, vp); err != nil {
+			return softError(fmt.Sprintf("could not set the viewport: %v", err)), nil
+		}
+		fmt.Fprintf(&b, "\n\nViewport: %s", vp)
+	}
 	if url := strings.TrimSpace(p.URL); url != "" {
 		fmt.Fprintf(&b, "\n\nOpened: %s", url)
 	}
@@ -495,6 +521,10 @@ func sessionAction(ctx context.Context, deps Deps, action string, p BrowserParam
 	case actionRoute:
 		return routeAction(ctx, session, p)
 
+	case actionViewport:
+		return viewportAction(ctx, session, p)
+	case actionRecord:
+		return recordAction(ctx, session, p)
 	case actionConsole:
 		entries := p.consoleEntries(session)
 		if len(entries) == 0 {
@@ -660,7 +690,7 @@ func cookieStorageAction(ctx context.Context, session *corebrowser.Session, p Br
 			BrowserResponseMetadata{Action: actionStorage},
 		), nil
 
-	case "clear":
+	case subActionClear:
 		if err := session.ClearCookies(ctx); err != nil {
 			return softError(fmt.Sprintf("clearing cookies: %v", err)), nil
 		}
@@ -751,7 +781,7 @@ func storageAction(ctx context.Context, session *corebrowser.Session, p BrowserP
 			BrowserResponseMetadata{Action: actionStorage},
 		), nil
 
-	case "clear":
+	case subActionClear:
 		if err := session.StorageClear(ctx, p.Kind); err != nil {
 			return softError(fmt.Sprintf("clearing storage: %v", err)), nil
 		}
@@ -864,7 +894,7 @@ func routeAction(ctx context.Context, session *corebrowser.Session, p BrowserPar
 			BrowserResponseMetadata{Action: actionRoute, Count: 1},
 		), nil
 
-	case "clear":
+	case subActionClear:
 		routes := session.Routes()
 		// Clearing has no pattern parameter on purpose: routes are few, and a
 		// stale one is removed by re-adding or by clear + re-add.
@@ -1002,7 +1032,7 @@ func browserParamsSchema() map[string]any {
 		"properties": map[string]any{
 			fieldAction: map[string]any{
 				"type":        "string",
-				"enum":        []string{"status", "launch", "goto", "back", "forward", "reload", "snapshot", "click", "dblclick", "fill", "press", "hover", "check", "uncheck", "select", "eval", "screenshot", "pdf", "console", "tabs", "storage", "state", "network", "route", "close"},
+				"enum":        []string{"status", "launch", "goto", "back", "forward", "reload", "snapshot", "click", "dblclick", "fill", "press", "hover", "check", "uncheck", "select", "eval", "screenshot", "pdf", "console", "tabs", "storage", "state", "network", "route", "viewport", "record", "close"},
 				"description": "status reports which browsers are installed; launch starts or attaches to a session; the rest act on the running session. Take a snapshot before using a ref.",
 			},
 			"op": map[string]any{
@@ -1012,6 +1042,38 @@ func browserParamsSchema() map[string]any {
 			"url": map[string]any{
 				"type":        "string",
 				"description": "URL to open, for action=launch, goto, or tabs op=new.",
+			},
+			"width": map[string]any{
+				"type":        "integer",
+				"description": "For action=viewport: viewport width in CSS pixels, e.g. 2500 for the design canvas.",
+			},
+			"height": map[string]any{
+				"type":        "integer",
+				"description": "For action=viewport: viewport height in CSS pixels, e.g. 1600 for the design canvas.",
+			},
+			"scale": map[string]any{
+				"type":        "number",
+				"description": "For action=viewport: device pixel ratio the page is emulated at (default 1).",
+			},
+			"mobile": map[string]any{
+				"type":        "boolean",
+				"description": "For action=viewport: emulate a mobile device (touch events, mobile viewport).",
+			},
+			"fps": map[string]any{
+				"type":        "integer",
+				"description": "For action=record op=start: playback frame rate of the recording (default 10).",
+			},
+			"quality": map[string]any{
+				"type":        "integer",
+				"description": "For action=record op=start: JPEG quality of each captured frame, 1-100 (default 60).",
+			},
+			"max_width": map[string]any{
+				"type":        "integer",
+				"description": "For action=record op=start: scale captured frames down to this width. 0 keeps the page size.",
+			},
+			"max_height": map[string]any{
+				"type":        "integer",
+				"description": "For action=record op=start: scale captured frames down to this height. 0 keeps the page size.",
 			},
 			"ref": map[string]any{
 				"type":        "string",
@@ -1057,7 +1119,7 @@ func browserParamsSchema() map[string]any {
 				"type":        "boolean",
 				"description": "For action=screenshot: capture the whole scrollable page rather than the viewport.",
 			},
-			"clear": map[string]any{
+			subActionClear: map[string]any{
 				"type":        "boolean",
 				"description": "For action=console or network: return only entries since the last read, then clear the buffer.",
 			},

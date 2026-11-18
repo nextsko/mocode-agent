@@ -231,6 +231,43 @@ func (c *cdpConn) On(method string, fn func(sessionID string, params json.RawMes
 	}
 }
 
+// Notify sends a command without waiting for its response.
+//
+// A few CDP commands have to be issued from inside an event handler — the
+// screencast frame acknowledgement is one — and waiting for the response
+// there would deadlock the read loop that is supposed to deliver it. The
+// response is dropped when it arrives: an id nobody is waiting for.
+func (c *cdpConn) Notify(sessionID, method string, params any) error {
+	raw, err := json.Marshal(params)
+	if err != nil {
+		return fmt.Errorf("encoding params for %s: %w", method, err)
+	}
+	if params == nil {
+		raw = nil
+	}
+
+	c.mu.Lock()
+	select {
+	case <-c.closed:
+		err := c.lastErr
+		c.mu.Unlock()
+		return fmt.Errorf("cdp connection is closed: %w", orEOF(err))
+	default:
+	}
+	c.nextID++
+	id := c.nextID
+	c.mu.Unlock()
+
+	msg := cdpMessage{ID: id, Method: method, Params: raw, SessionID: sessionID}
+	c.writeMu.Lock()
+	writeErr := c.ws.WriteJSON(msg)
+	c.writeMu.Unlock()
+	if writeErr != nil {
+		return fmt.Errorf("sending %s: %w", method, writeErr)
+	}
+	return nil
+}
+
 // Call issues a command and decodes the result into out (which may be nil).
 // An empty sessionID targets the browser itself.
 func (c *cdpConn) Call(ctx context.Context, sessionID, method string, params any, out any) error {

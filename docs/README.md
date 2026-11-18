@@ -41,6 +41,7 @@
 | 05 | [architecture/05-wechat-butler-arch.md](architecture/05-wechat-butler-arch.md) | WeChat Butler 架构 |
 | 06 | [architecture/06-playwright-cli-design.md](architecture/06-playwright-cli-design.md) | Playwright CLI 设计要点（skill 形态）|
 | 07 | [architecture/07-native-browser-runtime.md](architecture/07-native-browser-runtime.md) | 原生浏览器运行时：跨平台探测 + CDP 直连 + 三层闭环测试 |
+| 08 | [architecture/08-browser-viewport-and-recording.md](architecture/08-browser-viewport-and-recording.md) | 视口可控（2500x1600 设计画布）与视频录制（MJPEG AVI）|
 | — | [architecture/00-hermes-blueprint.md](architecture/00-hermes-blueprint.md) | Hermes 蓝图（唯一规划真相源）|
 
 ### 开发指南
