@@ -2,7 +2,6 @@ package shell
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -366,8 +365,16 @@ func runBash(ctx context.Context, permissions permission.Service, workingDir, ca
 		return contract.Error("missing command"), nil
 	}
 
-	// Determine working directory
-	execWorkingDir := cmp.Or(params.WorkingDir, workingDir)
+	// Working directory: explicit param > session-persisted cwd > project
+	// root. The session cwd carries across bash calls within one session
+	// (see sessioncwd.go) — the model no longer needs `cd <dir> &&` prefixes.
+	sessionID := toolutil.GetSessionFromContext(ctx)
+	if sessionID == "" {
+		msg := "session ID is required for executing shell command"
+		record(errcoll.CategoryToolExecution, nil, msg)
+		return contract.Error(msg), nil
+	}
+	execWorkingDir := cleanSessionPath(resolveSessionWorkingDir(sessionID, params.WorkingDir, workingDir))
 
 	isSafeReadOnly := false
 	cmdLower := strings.ToLower(params.Command)
@@ -381,12 +388,6 @@ func runBash(ctx context.Context, permissions permission.Service, workingDir, ca
 		}
 	}
 
-	sessionID := toolutil.GetSessionFromContext(ctx)
-	if sessionID == "" {
-		msg := "session ID is required for executing shell command"
-		record(errcoll.CategoryToolExecution, nil, msg)
-		return contract.Error(msg), nil
-	}
 	if !isSafeReadOnly {
 		p, err := permissions.Request(
 			ctx,
@@ -449,6 +450,7 @@ func runBash(ctx context.Context, permissions permission.Service, workingDir, ca
 				record(classifyCommandError(stderr), execErr, execErr.Error())
 			}
 
+			end := endWorkingDir(sessionID, bgShell)
 			stdout = formatOutput(stdout, stderr, execErr)
 
 			metadata := BashResponseMetadata{
@@ -457,13 +459,13 @@ func runBash(ctx context.Context, permissions permission.Service, workingDir, ca
 				Output:           stdout,
 				Description:      params.Description,
 				Background:       params.RunInBackground,
-				WorkingDirectory: bgShell.WorkingDir,
+				WorkingDirectory: end,
 				TTY:              bgShell.TTY,
 			}
 			if stdout == "" {
 				return contract.WithMetadata(contract.Text(BashNoOutput), metadata), nil
 			}
-			stdout += fmt.Sprintf("\n\n<cwd>%s</cwd>", normalizeWorkingDir(bgShell.WorkingDir))
+			stdout += fmt.Sprintf("\n\n<cwd>%s</cwd>", normalizeWorkingDir(end))
 			return contract.WithMetadata(contract.Text(stdout), metadata), nil
 		}
 
@@ -566,6 +568,7 @@ waitLoop:
 			record(classifyCommandError(stderr), execErr, execErr.Error())
 		}
 
+		end := endWorkingDir(sessionID, bgShell)
 		stdout = formatOutput(stdout, stderr, execErr)
 
 		metadata := BashResponseMetadata{
@@ -574,13 +577,13 @@ waitLoop:
 			Output:           stdout,
 			Description:      params.Description,
 			Background:       params.RunInBackground,
-			WorkingDirectory: bgShell.WorkingDir,
+			WorkingDirectory: end,
 			TTY:              bgShell.TTY,
 		}
 		if stdout == "" {
 			return contract.WithMetadata(contract.Text(BashNoOutput), metadata), nil
 		}
-		stdout += fmt.Sprintf("\n\n<cwd>%s</cwd>", normalizeWorkingDir(bgShell.WorkingDir))
+		stdout += fmt.Sprintf("\n\n<cwd>%s</cwd>", normalizeWorkingDir(end))
 		return contract.WithMetadata(contract.Text(stdout), metadata), nil
 	}
 
@@ -668,6 +671,20 @@ func countLines(s string) int {
 		return 0
 	}
 	return len(strings.Split(s, "\n"))
+}
+
+// endWorkingDir returns the directory a completed bash call ended in and
+// persists it as the session's cwd. The mvdan/sh engine tracks `cd` across
+// execs (Shell.updateShellFromRunner); TTY jobs execute through a PTY
+// runner outside the engine, so for them the start dir is all we know.
+func endWorkingDir(sessionID string, bs *shell.BackgroundShell) string {
+	end := bs.WorkingDir
+	if bs.Shell != nil && !bs.TTY {
+		end = bs.Shell.GetWorkingDir()
+	}
+	end = cleanSessionPath(end)
+	persistSessionWorkingDir(sessionID, end)
+	return end
 }
 
 func normalizeWorkingDir(path string) string {

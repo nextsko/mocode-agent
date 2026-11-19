@@ -16,17 +16,17 @@ Common shell builtins and core utils available on Windows.
 </execution_steps>
 
 <usage_notes>
-- Command required, working_dir optional (defaults to current directory)
+- Command required, working_dir optional (relative paths resolve against the session cwd)
 Tool selection (don't reflexively reach for bash):
 - SEARCHING code: use the `grep` tool (faster, structured output, respects ignore patterns). Don't `bash grep` or `bash rg`.
-- READING files: use `view` or `read_files`. Don't `bash cat`, `bash head`, or `bash tail` — they hide line numbers and don't count as "read" for editing.
-- LISTING files: use `ls` or `glob` tools. Don't `bash ls` or `bash find`.
-- COMPUTING / data processing / verifying a snippet: use `ts_run` (TypeScript/JS) or `py_run` (Python, with ephemeral deps). They run in isolated sandboxes with timeouts and bounded output — safer and cleaner than bash one-liners. Don't write `node -e` or `python -c` via bash.
+- READING files: use `view`/`read_files`. Don't `bash cat`, `bash head`, or `bash tail` — they hide line numbers and don't count as "read" for editing.
+- LISTING files: use `ls`/`glob` tools. Don't `bash ls` or `bash find`.
+- COMPUTING / data processing / verifying a snippet: use `ts_run`/`py_run` sandboxes — safer and cleaner than bash one-liners. Don't write `node -e` or `python -c` via bash.
 - EXECUTING commands (build, test, git, install, run scripts): use `bash` — that's what it's for.
 The dedicated tools give better results and work identically across platforms. Bash is for command execution, not file inspection.
 - Chain with ';' or '&&', avoid newlines except in quoted strings
-- Each command runs in independent shell (no state persistence between calls)
-- Prefer absolute paths over 'cd' (use 'cd' only if user explicitly requests)
+- The working directory PERSISTS across bash calls in a session: a command that `cd`s anywhere leaves the session cwd there, and every result ends with `<cwd>…</cwd>` showing where the NEXT command will start.
+- Don't prefix commands with `cd <dir> && …`: pass `working_dir` instead, or rely on the persisted cwd. Absolute paths in file arguments are still preferred.
 </usage_notes>
 
 <background_execution>
