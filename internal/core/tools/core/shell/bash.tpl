@@ -25,8 +25,9 @@ Tool selection (don't reflexively reach for bash):
 - EXECUTING commands (build, test, git, install, run scripts): use `bash` — that's what it's for.
 The dedicated tools give better results and work identically across platforms. Bash is for command execution, not file inspection.
 - Chain with ';' or '&&', avoid newlines except in quoted strings
-- The working directory PERSISTS across bash calls in a session: a command that `cd`s anywhere leaves the session cwd there, and every result ends with `<cwd>…</cwd>` showing where the NEXT command will start.
-- Don't prefix commands with `cd <dir> && …`: pass `working_dir` instead, or rely on the persisted cwd. Absolute paths in file arguments are still preferred.
+- NEVER patch files by feeding python/node scripts to bash via heredoc (interpreter followed by a heredoc redirect) — use edit/multiedit for file changes, py_run/ts_run for computation. Bash-embedded patch scripts are unreviewable, untracked and break edit-tracking.
+- The working directory PERSISTS across bash calls in a session: a command that `cd`s anywhere leaves the session cwd there, and every result ends with a cwd line showing where the NEXT command will start.
+- Don't prefix commands with a `cd X &&` chain: pass `working_dir` instead, or rely on the persisted cwd. Absolute paths in file arguments are still preferred.
 </usage_notes>
 
 <background_execution>

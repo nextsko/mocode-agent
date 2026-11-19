@@ -62,6 +62,12 @@ const (
 	MaxAutoBackgroundAfter = 30
 	MaxOutputLength        = 30000
 	BashNoOutput           = "no output"
+
+	// repeatWarnThreshold is how many identical completed commands in one
+	// session trigger the blind-retry warning in the result. The zxxw trace
+	// showed 16x identical `timeout 600 cargo …` reruns and 34x identical
+	// python patch scripts — loops a runtime nudge can break.
+	repeatWarnThreshold = 3
 )
 
 //go:embed bash.tpl
@@ -452,6 +458,7 @@ func runBash(ctx context.Context, permissions permission.Service, workingDir, ca
 
 			end := endWorkingDir(sessionID, bgShell)
 			stdout = formatOutput(stdout, stderr, execErr)
+			stdout += bashGuidance(params.Command, recordCommandRun(sessionID, params.Command))
 
 			metadata := BashResponseMetadata{
 				StartTime:        startTime.UnixMilli(),
@@ -570,6 +577,7 @@ waitLoop:
 
 		end := endWorkingDir(sessionID, bgShell)
 		stdout = formatOutput(stdout, stderr, execErr)
+		stdout += bashGuidance(params.Command, recordCommandRun(sessionID, params.Command))
 
 		metadata := BashResponseMetadata{
 			StartTime:        startTime.UnixMilli(),
@@ -671,6 +679,46 @@ func countLines(s string) int {
 		return 0
 	}
 	return len(strings.Split(s, "\n"))
+}
+
+// heredocInterpreterTokens are interpreter command names whose heredoc-fed
+// scripts should be routed to dedicated tools instead of bash.
+var heredocInterpreterTokens = map[string]struct{}{
+	"python": {}, "python3": {}, "node": {}, "ruby": {}, "perl": {},
+}
+
+// isHeredocScript reports whether the command feeds an interpreter script
+// via a heredoc: the interpreter name appears as a bare token before the
+// first `<<` redirect. The regex-free form handles `cd X && python3 - <<EOF`
+// and flag values containing '=' that defeat a linear pattern.
+func isHeredocScript(command string) bool {
+	heredoc := strings.Index(command, "<<")
+	if heredoc < 0 {
+		return false
+	}
+	for _, tok := range strings.Fields(command[:heredoc]) {
+		if _, ok := heredocInterpreterTokens[tok]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// bashGuidance returns post-run guidance appended to a completed command's
+// output: heredoc-script redirection and blind-retry warnings. Empty when
+// nothing applies.
+func bashGuidance(command string, runCount int) string {
+	var b strings.Builder
+	if isHeredocScript(command) {
+		b.WriteString("\n\n[mocode] note: a heredoc script was fed to an interpreter inside bash. " +
+			"For file edits use the edit/multiedit tools; for data processing use the py_run/ts_run sandboxes (isolated, timed, bounded output).")
+	}
+	if runCount >= repeatWarnThreshold {
+		fmt.Fprintf(&b,
+			"\n\n[mocode] this exact command has now run %d times in this session — if it keeps failing or hanging, inspect the full error output and change the approach (narrower inputs, run_in_background for long builds, or a different tool) instead of retrying blindly.",
+			runCount)
+	}
+	return b.String()
 }
 
 // endWorkingDir returns the directory a completed bash call ended in and

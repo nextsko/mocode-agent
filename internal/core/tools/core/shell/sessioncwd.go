@@ -79,6 +79,50 @@ func dropSessionWorkingDir(sessionID string) {
 	sessionCwd.mu.Unlock()
 }
 
+// commandRepeatStore counts exact bash command repeats per session. Blind
+// retry loops (the zxxw trace: 16x identical timeout-600 cargo build, 34x
+// identical python pathlib patch) burn hours; a runtime nudge in the tool
+// result tells the model to change approach after 3 identical runs.
+type commandRepeatStore struct {
+	mu     sync.Mutex
+	counts map[string]map[string]int
+}
+
+var commandRepeats = &commandRepeatStore{counts: make(map[string]map[string]int)}
+
+// repeatKey normalizes a command for repeat detection: whitespace collapsed
+// and truncated — enough to identify "the same command" without storing
+// unbounded text.
+func repeatKey(command string) string {
+	k := strings.Join(strings.Fields(command), " ")
+	return k[:min(len(k), 200)]
+}
+
+// recordCommandRun increments the per-session counter for a command and
+// returns the total number of runs in this session.
+func recordCommandRun(sessionID, command string) int {
+	commandRepeats.mu.Lock()
+	defer commandRepeats.mu.Unlock()
+	perSession, ok := commandRepeats.counts[sessionID]
+	if !ok {
+		perSession = make(map[string]int)
+		commandRepeats.counts[sessionID] = perSession
+	}
+	key := repeatKey(command)
+	perSession[key]++
+	return perSession[key]
+}
+
+// dropSessionCommandCounts forgets a session's command counters.
+func dropSessionCommandCounts(sessionID string) {
+	if sessionID == "" {
+		return
+	}
+	commandRepeats.mu.Lock()
+	delete(commandRepeats.counts, sessionID)
+	commandRepeats.mu.Unlock()
+}
+
 func cmpOrStrings(a, b string) string {
 	if a != "" {
 		return a
