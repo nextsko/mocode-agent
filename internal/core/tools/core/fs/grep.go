@@ -108,6 +108,10 @@ func runGrep(ctx context.Context, workingDir string, config config.ToolGrep, par
 		return contract.Error(fmt.Sprintf("error searching files: %v", err)), nil
 	}
 
+	if searchCtx.Err() != nil {
+		truncated = true
+	}
+
 	var output strings.Builder
 	if len(matches) == 0 { //nolint:nestif // extracted verbatim from the legacy closure.
 		output.WriteString("No files found")
@@ -139,7 +143,14 @@ func runGrep(ctx context.Context, workingDir string, config config.ToolGrep, par
 		}
 
 		if truncated {
-			output.WriteString("\n(Results are truncated. Consider using a more specific path or pattern.)")
+			output.WriteString("\n(Results are truncated. Consider using a more specific path or pattern.")
+			if searchCtx.Err() != nil {
+				fmt.Fprintf(&output,
+					" The scan hit the %v limit and was stopped early — narrow the path (current: %s) or use a more specific pattern instead of retrying the same call.)",
+					config.GetTimeout(), searchPath)
+			} else {
+				output.WriteString(")")
+			}
 		}
 	}
 

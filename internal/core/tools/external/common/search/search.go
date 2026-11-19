@@ -90,8 +90,18 @@ func EscapeRegexPattern(pattern string) string {
 func SearchFiles(ctx context.Context, pattern, rootPath, include string, limit int) ([]Match, bool, error) {
 	matches, err := searchWithRipgrep(ctx, pattern, rootPath, include)
 	if err != nil {
-		matches, err = searchFilesWithRegex(pattern, rootPath, include)
+		if ctx.Err() != nil {
+			// ripgrep was killed by the deadline — re-walking the whole tree
+			// with the fallback doubles the cost of every timeout (the zxxw
+			// trace: a /data01 grep burned 7.7 min exactly this way).
+			return nil, true, nil
+		}
+		matches, err = searchFilesWithRegex(ctx, pattern, rootPath, include)
 		if err != nil {
+			if ctx.Err() != nil {
+				// Fallback walk aborted by the deadline: return what it found.
+				return matches, true, nil
+			}
 			return nil, false, err
 		}
 	}
@@ -177,8 +187,18 @@ type ripgrepMatch struct {
 	} `json:"data"`
 }
 
-func searchFilesWithRegex(pattern, rootPath, include string) ([]Match, error) {
+func searchFilesWithRegex(ctx context.Context, pattern, rootPath, include string) ([]Match, error) {
 	matches := []Match{}
+
+	// Use cached regex compilation.
+	ctxCheck := func() error {
+		if ctx.Err() != nil {
+			// Abort the walk on deadline; caller maps this to a partial
+			// result with truncated=true (never a second full re-walk).
+			return ctx.Err()
+		}
+		return nil
+	}
 
 	// Use cached regex compilation.
 	regex, err := searchRegexCache.get(pattern)
@@ -199,6 +219,9 @@ func searchFilesWithRegex(pattern, rootPath, include string) ([]Match, error) {
 	walker := fsext.NewFastGlobWalker(rootPath)
 
 	err = filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
+		if ctxErr := ctxCheck(); ctxErr != nil {
+			return ctxErr
+		}
 		if err != nil {
 			return nil //nolint:nilerr // Best-effort walk: unreadable paths are skipped.
 		}
@@ -248,6 +271,11 @@ func searchFilesWithRegex(pattern, rootPath, include string) ([]Match, error) {
 		return nil
 	})
 	if err != nil {
+		if ctx.Err() != nil {
+			// Deadline aborted the walk — partial results are the answer,
+			// not an error.
+			return matches, nil
+		}
 		return nil, fmt.Errorf("walk %s: %w", rootPath, err)
 	}
 
