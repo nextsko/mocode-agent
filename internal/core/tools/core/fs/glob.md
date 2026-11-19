@@ -24,6 +24,7 @@ Find files by name/pattern (glob syntax), sorted by modification time; max 100 r
 <limitations>
 - Results limited to 100 files (newest first)
 - Does not search file contents (use Grep for that)
+- Scans are capped at 60s — a huge tree that hits the cap returns what was found plus a "narrow the path" hint instead of hanging; narrow the path or pattern instead of retrying
 - Hidden files (starting with '.') skipped
 </limitations>
 

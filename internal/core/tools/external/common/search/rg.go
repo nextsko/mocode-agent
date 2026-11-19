@@ -1,13 +1,13 @@
 package searchcommon
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 
@@ -63,21 +63,32 @@ func GetRgSearchCmd(ctx context.Context, pattern, path, include string) *exec.Cm
 }
 
 // RunRipgrep executes a ripgrep --files command and returns matched paths.
-func RunRipgrep(cmd *exec.Cmd, searchRoot string, limit int) ([]string, error) {
-	out, err := cmd.CombinedOutput()
+// Output is streamed and the process is killed as soon as limit matches are
+// collected — an unbounded `rg --files` over a huge mount (the zxxw trace:
+// 7.7 minutes on /data01) burned its whole latency budget before truncation
+// ever applied. Returns stoppedEarly=true when the process was killed after
+// reaching the limit, so callers can flag truncation without rerunning.
+func RunRipgrep(cmd *exec.Cmd, searchRoot string, limit int) ([]string, bool, error) {
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	pipe, err := cmd.StdoutPipe()
 	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 1 {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("ripgrep: %w\n%s", err, out)
+		return nil, false, fmt.Errorf("ripgrep stdout pipe: %w", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, false, fmt.Errorf("ripgrep start: %w", err)
 	}
 
 	var matches []string
-	for p := range bytes.SplitSeq(out, []byte{0}) {
-		if len(p) == 0 {
+	stoppedEarly := false
+	scanner := bufio.NewScanner(pipe)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1<<20)
+	for scanner.Scan() {
+		absPath := scanner.Text() // --null separated
+		if absPath == "" {
 			continue
 		}
-		absPath := string(p)
 		if !filepath.IsAbs(absPath) {
 			absPath = filepath.Join(searchRoot, absPath)
 		}
@@ -85,14 +96,26 @@ func RunRipgrep(cmd *exec.Cmd, searchRoot string, limit int) ([]string, error) {
 			continue
 		}
 		matches = append(matches, absPath)
+		if limit > 0 && len(matches) >= limit {
+			stoppedEarly = true
+			_ = cmd.Process.Kill()
+			break
+		}
 	}
 
-	sort.SliceStable(matches, func(i, j int) bool {
-		return len(matches[i]) < len(matches[j])
-	})
-
-	if limit > 0 && len(matches) > limit {
-		matches = matches[:limit]
+	waitErr := cmd.Wait()
+	if !stoppedEarly {
+		if scannerErr := scanner.Err(); scannerErr != nil && waitErr == nil {
+			return matches, false, fmt.Errorf("ripgrep output: %w", scannerErr)
+		}
+		if waitErr != nil {
+			if ee, ok := waitErr.(*exec.ExitError); ok && ee.ExitCode() == 1 {
+				return nil, false, nil
+			}
+			return matches, false, fmt.Errorf("ripgrep: %w\n%s", waitErr, stderr.String())
+		}
 	}
-	return matches, nil
+	// stoppedEarly: scanner.Err() and waitErr reflect the deliberate kill —
+	// both ignored.
+	return matches, stoppedEarly, nil
 }

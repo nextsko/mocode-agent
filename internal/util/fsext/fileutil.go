@@ -94,6 +94,13 @@ func GlobGitignoreAware(pattern string, cwd string, limit int) ([]string, bool, 
 	return globWithDoubleStar(pattern, cwd, limit, true)
 }
 
+// maxGlobWalkEntries caps fastwalk traversal regardless of match count: a
+// sparse pattern over a huge mount would otherwise walk the entire tree
+// (zxxw trace: `**/design-taste-frontend/…` on /data01 = 7.7 min). fastwalk
+// has no context support, so a visited-entry cap is the practical bound.
+// Var (not const) so tests can shrink it.
+var maxGlobWalkEntries = 500_000
+
 func globWithDoubleStar(pattern, searchPath string, limit int, gitignore bool) ([]string, bool, error) {
 	// Normalize pattern to forward slashes on Windows so their config can use
 	// backslashes
@@ -101,6 +108,14 @@ func globWithDoubleStar(pattern, searchPath string, limit int, gitignore bool) (
 
 	walker := NewFastGlobWalker(searchPath)
 	found := csync.NewSlice[FileInfo]()
+
+	// Walk budget: a sparse pattern over a huge mount would otherwise walk
+	// the entire tree (zxxw trace: `**/design-taste-frontend/…` on /data01
+	// = 7.7 min). fastwalk has no context support, so a visited-entry cap is
+	// the practical bound. Var (not const) so tests can shrink it.
+	entriesVisited := 0
+	budgetExhausted := false
+
 	conf := fastwalk.Config{
 		Follow:  true,
 		ToSlash: fastwalk.DefaultToSlash(),
@@ -109,6 +124,12 @@ func globWithDoubleStar(pattern, searchPath string, limit int, gitignore bool) (
 	err := fastwalk.Walk(&conf, searchPath, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil //nolint:nilerr // Walk errors skip unreadable entries by design.
+		}
+
+		entriesVisited++
+		if entriesVisited > maxGlobWalkEntries {
+			budgetExhausted = true
+			return filepath.SkipAll
 		}
 
 		isDir := d.IsDir()
@@ -158,7 +179,7 @@ func globWithDoubleStar(pattern, searchPath string, limit int, gitignore bool) (
 	for i, m := range matches {
 		results[i] = m.Path
 	}
-	return results, truncated || errors.Is(err, filepath.SkipAll), nil
+	return results, truncated || budgetExhausted, nil
 }
 
 // ShouldExcludeFile checks if a file should be excluded from processing

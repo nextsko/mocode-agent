@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/nextsko/mocode-agent/internal/core/agent/toolutil"
 	"github.com/nextsko/mocode-agent/internal/core/tools/contract"
@@ -18,6 +19,12 @@ import (
 )
 
 const GlobToolName = "glob"
+
+// globScanTimeout caps one glob call. An unbounded scan of a huge mount was
+// the worst latency path in the zxxw deployment trace (7.7 min on /data01);
+// a legitimate search that needs longer should narrow the path, not wait
+// longer. Var (not const) so tests can shrink it.
+var globScanTimeout = 60 * time.Second
 
 //go:embed glob.md
 var globDescription []byte
@@ -69,19 +76,25 @@ func runGlob(ctx context.Context, workingDir string, params GlobParams) (contrac
 
 	searchPath := cmp.Or(params.Path, workingDir)
 
-	files, truncated, err := globFiles(ctx, params.Pattern, searchPath, 100)
+	globCtx, cancel := context.WithTimeout(ctx, globScanTimeout)
+	defer cancel()
+
+	files, truncated, err := globFiles(globCtx, params.Pattern, searchPath, 100)
 	if err != nil {
 		return contract.ToolResult{}, fmt.Errorf("error finding files: %w", err)
+	}
+	if globCtx.Err() != nil {
+		truncated = true
 	}
 
 	var output string
 	if len(files) == 0 {
-		output = "No files found"
+		output = "No files found. " + globNarrowHint(searchPath, globCtx)
 	} else {
 		normalizeFilePaths(files)
 		output = strings.Join(files, "\n")
 		if truncated {
-			output += "\n\n(Results are truncated. Consider using a more specific path or pattern.)"
+			output += "\n\n(Results are truncated. " + globNarrowHint(searchPath, globCtx) + ")"
 		}
 	}
 
@@ -95,14 +108,32 @@ func globFiles(ctx context.Context, pattern, searchPath string, limit int) ([]st
 	cmdRg := searchcommon.GetRgCmd(ctx, pattern)
 	if cmdRg != nil {
 		cmdRg.Dir = searchPath
-		matches, err := searchcommon.RunRipgrep(cmdRg, searchPath, limit)
+		matches, stoppedEarly, err := searchcommon.RunRipgrep(cmdRg, searchPath, limit)
 		if err == nil {
-			return matches, len(matches) >= limit && limit > 0, nil
+			return matches, stoppedEarly || len(matches) >= limit, nil
+		}
+		if ctx.Err() != nil {
+			// Deadline hit: return what ripgrep already streamed instead of
+			// re-walking the whole tree with the fallback — doubling the
+			// cost of every timeout was exactly the zxxw failure mode.
+			return matches, true, nil
 		}
 		slog.Warn("Ripgrep execution failed, falling back to doublestar", "error", err)
 	}
 
 	return fsext.GlobGitignoreAware(pattern, searchPath, limit)
+}
+
+// globNarrowHint tells the model how to recover from a truncated or timed
+// out scan instead of retrying the same call.
+func globNarrowHint(searchPath string, ctx context.Context) string {
+	if ctx.Err() != nil {
+		return fmt.Sprintf(
+			"The scan hit the %v limit and was stopped early — narrow the path (current: %s) or use a more specific pattern instead of retrying the same call.",
+			globScanTimeout, searchPath,
+		)
+	}
+	return "Consider using a more specific path or pattern."
 }
 
 func normalizeFilePaths(paths []string) {
