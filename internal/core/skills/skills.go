@@ -172,6 +172,23 @@ func splitFrontmatter(content string) (frontmatter, body string, err error) {
 	return frontmatter, body, nil
 }
 
+// parseFailureOnce suppresses repeated parse/validation failure warnings for
+// the same file+error within one process lifetime: discovery runs at every
+// session start, and a single broken SKILL.md (e.g. a pack template without
+// frontmatter) logged 680 identical warnings on the zxxw deployment — one
+// per discovery run. The failure is still reported through the states list
+// every time; only the log line is deduplicated. If the file is edited (the
+// error text changes) a fresh warning is emitted.
+var parseFailureOnce sync.Map // path+"\x00"+errText -> struct{}{}
+
+func logSkillFailureOnce(path string, err error, msg string) {
+	key := path + "\x00" + err.Error()
+	if _, dup := parseFailureOnce.LoadOrStore(key, struct{}{}); dup {
+		return
+	}
+	slog.Warn(msg, "path", path, "error", err)
+}
+
 // Discover finds all valid skills in the given paths.
 func Discover(paths []string) []*Skill {
 	skills, _ := DiscoverWithStates(paths)
@@ -224,12 +241,12 @@ func DiscoverWithStates(paths []string) ([]*Skill, []*SkillState) {
 			mu.Unlock()
 			skill, err := Parse(path)
 			if err != nil {
-				slog.Warn("Failed to parse skill file", "path", path, "error", err)
+				logSkillFailureOnce(path, err, "Failed to parse skill file")
 				addState("", path, StateError, err)
 				return nil
 			}
 			if err := skill.Validate(); err != nil {
-				slog.Warn("Skill validation failed", "path", path, "error", err)
+				logSkillFailureOnce(path, err, "Skill validation failed")
 				addState(skill.Name, path, StateError, err)
 				return nil
 			}
