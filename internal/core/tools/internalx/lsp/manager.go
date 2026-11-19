@@ -247,14 +247,18 @@ func (s *Manager) startServer(ctx context.Context, name, filepath string, server
 	defer cancel()
 
 	if _, err := client.Initialize(initCtx, s.cfg.WorkingDir()); err != nil {
-		slog.Error("LSP client initialization failed", "name", name, "error", err)
-		// Mark as unavailable to avoid retry loops
-		// Check if it's a permanent failure (e.g., executable not found)
+		// A server that dies mid-initialize ("jsonrpc2: connection is
+		// closed") fails identically on every retry, so it must back off
+		// like a missing executable — the zxxw deployment logged 588 init
+		// failures + 596 shutdown failures from a rustup shim whose
+		// toolchain lacked the component, retried per session/file open.
 		errStr := err.Error()
 		if strings.Contains(errStr, "executable file not found") ||
-			strings.Contains(errStr, "exec:") {
+			strings.Contains(errStr, "exec:") ||
+			strings.Contains(errStr, "connection is closed") {
 			s.markUnavailable(name)
 		}
+		logLSPInitFailureOnce(name, err)
 		_ = client.Close(ctx)
 		s.clients.Del(name)
 		return
@@ -285,6 +289,23 @@ func (s *Manager) recentlyUnavailable(name string) bool {
 	}
 	s.unavailable.Del(name)
 	return false
+}
+
+// lspInitFailureOnce dedups LSP init-failure logs per server+error within
+// one process lifetime. A deterministic init failure (dead shim, missing
+// component) previously logged per retry — 588 identical lines on the zxxw
+// deployment.
+var lspInitFailureOnce sync.Map // name+"\x00"+errText -> struct{}{}
+
+func logLSPInitFailureOnce(name string, err error) {
+	key := name + "\x00" + err.Error()
+	if _, dup := lspInitFailureOnce.LoadOrStore(key, struct{}{}); dup {
+		return
+	}
+	slog.Error("LSP client initialization failed",
+		"name", name, "error", err,
+		"hint", "server process likely exited during initialize — check 'Language server stderr' log lines for this command, or run the server command manually to see why",
+	)
 }
 
 func (s *Manager) markUnavailable(name string) {
